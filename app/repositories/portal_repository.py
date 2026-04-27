@@ -94,6 +94,7 @@ class RepairRequestRepository:
         for key, value in data.items():
             if value is not None:
                 setattr(record, key, value)
+        record.upddate = datetime.now(UTC)
         return record
 
 
