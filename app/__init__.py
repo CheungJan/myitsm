@@ -48,11 +48,13 @@ def _register_blueprints(app: Flask) -> None:
     """注册蓝图。"""
     from app.api.auth import auth_bp
     from app.api.health import health_bp
+    from app.api.itsm import itsm_bp
     from app.api.system import system_bp
 
     app.register_blueprint(health_bp, url_prefix="/api/v1")
     app.register_blueprint(auth_bp, url_prefix="/api/v1")
     app.register_blueprint(system_bp, url_prefix="/api/v1")
+    app.register_blueprint(itsm_bp, url_prefix="/api/v1/itsm")
 
 
 def _make_error_body(code: int, message: str) -> dict[str, Any]:

@@ -1,13 +1,38 @@
 """数据模型。"""
 
 from app.models.itsm import (
+    AccessoriesUpdate,
+    ArchiveCode,
+    CloseBills,
+    CustPosDaily,
     DeviceChange,
+    EquipmentOpen,
+    EquipmentRenovate,
+    FreeReplace,
+    FreeReplaceDt,
+    ItsmSysCode,
+    LiabilityReg,
+    LiabilityRegDt,
+    Maintenance,
+    MaintenanceArchive,
+    MaintenanceAttc,
+    MaintenanceD2D,
     MaintenanceDaily,
     MaintenanceDailyTrack,
+    MaintenanceDispatch,
+    MaintenanceLiability,
     MaintenanceOpen,
+    MaintenancePlan,
     MaintenanceRenovate,
+    MaintenanceRV,
+    NoCloseTrack,
+    OnChooseDt,
+    PayList,
     PosDetail,
+    RepairInfo,
     StoreClose,
+    TimepointArea,
+    UserArea,
 )
 from app.models.master import (
     Area,
@@ -65,12 +90,48 @@ __all__ = [
     "SupplierClass",
     "SysCode",
     "IdMaster",
-    # ITSM
+    # ITSM 字典/配置
+    "TimepointArea",
+    "LiabilityReg",
+    "LiabilityRegDt",
+    "ItsmSysCode",
+    "ArchiveCode",
+    "RepairInfo",
+    "UserArea",
+    # ITSM 日常维护
     "MaintenanceDaily",
+    "MaintenanceLiability",
     "MaintenanceDailyTrack",
     "PosDetail",
+    "MaintenanceAttc",
+    "MaintenanceArchive",
+    # ITSM 新机开通
     "MaintenanceOpen",
+    "EquipmentOpen",
+    # ITSM 旧机翻新
     "MaintenanceRenovate",
+    "EquipmentRenovate",
+    # ITSM 设备变更
     "DeviceChange",
+    # ITSM 日常保养
+    "Maintenance",
+    "CustPosDaily",
+    "MaintenancePlan",
+    # ITSM 门店关闭
     "StoreClose",
+    # ITSM 配件选取
+    "OnChooseDt",
+    # ITSM 分派
+    "MaintenanceDispatch",
+    # ITSM 公用附表
+    "MaintenanceD2D",
+    "MaintenanceRV",
+    "AccessoriesUpdate",
+    "PayList",
+    "CloseBills",
+    # ITSM 免费更换
+    "FreeReplace",
+    "FreeReplaceDt",
+    # ITSM 未关单跟踪
+    "NoCloseTrack",
 ]
