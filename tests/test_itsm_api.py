@@ -11,7 +11,7 @@ from flask.testing import FlaskClient
 
 def _auth_header(app: Flask) -> dict[str, str]:
     """生成 JWT 认证头。"""
-    import jwt  # type: ignore[import-untyped]
+    import jwt
 
     payload = {"sub": "T00001", "exp": 9999999999}
     token: str = jwt.encode(payload, app.config["SECRET_KEY"], algorithm="HS256")
