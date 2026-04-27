@@ -48,12 +48,17 @@ def _register_blueprints(app: Flask) -> None:
     """注册蓝图。"""
     from app.api.attendance import attendance_bp
     from app.api.auth import auth_bp
+    from app.api.billing import billing_bp
     from app.api.contract import contract_bp
     from app.api.deposit import deposit_bp
+    from app.api.finance import finance_bp
     from app.api.health import health_bp
     from app.api.inventory import inventory_bp
+    from app.api.iot import iot_bp
     from app.api.itsm import itsm_bp
+    from app.api.mes import mes_bp
     from app.api.notification import notification_bp
+    from app.api.portal import portal_bp
     from app.api.procurement import procurement_bp
     from app.api.sales import sales_bp
     from app.api.sla import sla_bp
@@ -73,6 +78,13 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(deposit_bp, url_prefix="/api/v1/deposit")
     app.register_blueprint(contract_bp, url_prefix="/api/v1/contract")
     app.register_blueprint(notification_bp, url_prefix="/api/v1/notification")
+    # Tier-2 扩展
+    app.register_blueprint(billing_bp, url_prefix="/api/v1/billing")
+    app.register_blueprint(finance_bp, url_prefix="/api/v1/finance")
+    app.register_blueprint(portal_bp, url_prefix="/api/v1/portal")
+    # Tier-3 扩展
+    app.register_blueprint(mes_bp, url_prefix="/api/v1/mes")
+    app.register_blueprint(iot_bp, url_prefix="/api/v1/iot")
 
 
 def _make_error_body(code: int, message: str) -> dict[str, Any]:
