@@ -1,7 +1,8 @@
 # ITSM 重构项目需求设计文档
 
-**文档版本**: v1.0  
+**文档版本**: v1.1  
 **创建时间**: 2026-04-27  
+**更新时间**: 2026-04-27（新增双库合并方案）  
 **目标**: 将 PowerBuilder ITSM 系统重构为 Python + Flask + PostgreSQL 技术栈  
 **状态**: 待确认
 
@@ -173,6 +174,61 @@
 - u_trans_in：调入管理（764 行，17 条 SQL — SQL 密度最高）
 - u_trans_out：调出管理（620 行，16 条 SQL）
 
+### 2.7 双数据库架构分析（CCGLPDB + LGREPORTPDB）
+
+原系统采用 **两个 Oracle 数据库**，通过 DB Link 实现跨库访问：
+
+| 数据库 | 用途 | 核心表 |
+|--------|------|--------|
+| **CCGLPDB**（主库） | ITSM 业务主库，承载客户、物料、维护单、仓储等全部核心业务表 | TIT*、TMM*、TWH*、PLAN_* 等 |
+| **LGREPORTPDB**（零售库） | 零售经营数据管理，承载门店日经营数据、收入产出、合同等 | T_D_*、经营数据表 |
+
+**跨库访问方式**：LGREPORTPDB 中的代码通过 Oracle DB Link `@CCGL_23`、`@CCGL_24` 访问 CCGLPDB 中的主数据表。
+
+#### 跨库引用统计
+
+| 引用方式 | 涉及文件数 | 说明 |
+|---------|-----------|------|
+| `@CCGL_23` DB Link | **19 个文件** | LGREPORTPDB → CCGLPDB 跨库查询（集中在 lsgldata.pbl 和 report.pbl） |
+| `@CCGL_24` DB Link | **1 个文件** | 跨库更新客户 USEFLG（report.pbl/u_mm_cust_useflg_modify.sru） |
+| `CCGLLSGL` 连接名 | **24 个文件** | PB 代码中建立第二数据库连接（itrans.ServerName = "ccgllsgl"） |
+| `USP_*` 存储过程 | **100 个文件** | CCGLPDB 中的存储过程（入库/出库/状态变更等） |
+
+#### 通过 @CCGL_23 跨库访问的 CCGLPDB 表
+
+| 被跨库访问的表 | 说明 | 引用模块 |
+|--------------|------|----------|
+| TMM22_CUSTOMERS | 客户/门店主表 | lsgldata.pbl, report.pbl |
+| TMM35_CUST_POS_RL | 门店设备关联 | lsgldata.pbl, report.pbl |
+| TMM31_SYSCODES | 系统编码 | lsgldata.pbl |
+| TMM21_CUSTCLASS | 客户分类 | lsgldata.pbl |
+| TMM46_AREA | 区域表 | lsgldata.pbl |
+| TMM47_COMMODE | 通讯方式 | lsgldata.pbl |
+
+#### 跨库访问的典型场景
+
+1. **零售数据报表关联客户信息**：lsgldata.pbl 中的报表需要关联 CCGLPDB 的客户表获取门店名称、设备信息等
+   ```sql
+   -- 示例：门店经营数据查询关联客户主数据
+   FROM tmm35_cust_pos_rl@ccgl_23 t, tmm22_customers@ccgl_23 c
+   WHERE t.custcd = c.custcd
+   ```
+2. **客户信息同步**：report.pbl 中通过 `@CCGL_24` 跨库更新客户使用标志
+   ```sql
+   update tmm22_customers@ccgl_24 b set b.useflg = '0' where b.custcd in(...)
+   ```
+3. **lsgldata 模块双连接模式**：16+ 个业务对象通过 `itrans.ServerName = "ccgllsgl"` 建立到 LGREPORTPDB 的第二连接，同时访问本地（CCGLPDB）和远程（LGREPORTPDB）数据
+
+#### 核心存储过程（CCGLPDB）
+
+| 存储过程 | 用途 | 引用文件数 |
+|---------|------|----------|
+| USP_WH_IN | 入库核心逻辑（更新库存） | 多处 |
+| USP_WH_OUT | 出库核心逻辑（扣减库存） | 多处 |
+| USP_CREATE_PCPLAN | 创建采购计划 | n_tr.sru |
+| USP_PLANSTATUS | 更新计划状态 | n_tr.sru |
+| USP_QCSTATUS | 质检状态更新 | n_tr.sru |
+
 ---
 
 ## 三、源码问题与优化点清单
@@ -259,6 +315,17 @@
 - **位置**：`sale.pbl/u_plan_befor.sru` L659（已注释代码）
 - **现象**：plantyp='40'（关门）的处理逻辑被注释，TIT18_STORE_CLOSE 表存在但流程不完整
 - **优化方案**：重构时实现完整的门店关闭流程
+
+#### 问题10：双数据库架构增加复杂度（⚠️ 重要）
+
+- **位置**：lsgldata.pbl（16+ 文件）、report.pbl（6+ 文件）
+- **现象**：原系统使用 CCGLPDB（业务主库）和 LGREPORTPDB（零售库）两个数据库，通过 Oracle DB Link `@CCGL_23`/`@CCGL_24` 跨库查询/更新，PB 代码中通过 `itrans.ServerName = "ccgllsgl"` 建立第二数据库连接
+- **影响**：
+  - 19 个文件使用 `@CCGL_23` 跨库查询，1 个文件使用 `@CCGL_24` 跨库更新
+  - 24 个文件建立双连接访问两个库
+  - 跨库事务无法保证一致性
+  - PostgreSQL 不支持 Oracle DB Link 语法
+- **优化方案**：重构时合并为单一 PostgreSQL 数据库，消除所有跨库访问
 
 ### 3.3 P2级问题（改进项）
 
@@ -613,10 +680,35 @@ app/
 
 ### 7.3 数据库
 
-- 目标库：**PostgreSQL**（替代原 Oracle）
+- **原始架构**：Oracle 双库（CCGLPDB 业务主库 + LGREPORTPDB 零售库），通过 DB Link 跨库访问
+- **目标架构**：合并为**单一 PostgreSQL 数据库**，消除跨库依赖
 - ORM：SQLAlchemy + Flask-Migrate (Alembic)
 - 连接配置通过环境变量，禁止硬编码
 - 事务在 Service 层统一管理
+- 原 Oracle 存储过程（USP_WH_IN/USP_WH_OUT 等）改写为 Python Service 层逻辑
+
+#### 7.3.1 双库合并方案
+
+**合并原则**：CCGLPDB 和 LGREPORTPDB 的所有表统一迁入一个 PostgreSQL 数据库，通过 Schema 或表前缀区分来源。
+
+| 原数据库 | 迁移目标 | 说明 |
+|---------|---------|------|
+| CCGLPDB 全部表（TIT*、TMM*、TWH*、PLAN_*） | PostgreSQL 主 Schema (public) | 业务主表，直接迁移 |
+| LGREPORTPDB 表（零售/经营数据） | PostgreSQL 主 Schema (public) | 合并到同一库，消除 DB Link |
+
+**SQL 改造要点**：
+
+| 改造项 | 原 Oracle 写法 | 目标 PostgreSQL 写法 |
+|--------|---------------|---------------------|
+| 跨库查询 | `FROM TMM22_CUSTOMERS@CCGL_23` | `FROM tmm22_customers`（同库直接访问） |
+| 跨库更新 | `UPDATE tmm22_customers@ccgl_24` | `UPDATE tmm22_customers`（同库直接更新） |
+| DB Link 连接 | `itrans.ServerName = "ccgllsgl"` | 不需要（单一连接） |
+| 存储过程调用 | `CALL CCGL.USP_WH_IN(...)` | Python Service 方法 |
+| DECODE 函数 | `DECODE(col, val1, res1, default)` | `CASE WHEN col = val1 THEN res1 ELSE default END` |
+| 序列 | `seq_xxx.NEXTVAL` | `SERIAL` / `GENERATED ALWAYS AS IDENTITY` |
+| 日期函数 | `SYSDATE` | `NOW()` / `CURRENT_TIMESTAMP` |
+| 字符串截取 | `SUBSTR(str, 0, n)` | `SUBSTRING(str FROM 1 FOR n)`（注意起始位置差异） |
+| NVL 函数 | `NVL(col, default)` | `COALESCE(col, default)` |
 
 ### 7.4 代码规范
 
@@ -675,7 +767,8 @@ app/
 
 | 风险 | 影响 | 应对措施 |
 |------|------|---------|
-| Oracle → PostgreSQL 迁移 SQL 语法差异 | 高 | 建立 SQL 兼容性映射表，重点关注 DECODE→CASE、SYSDATE→NOW()、序列→SERIAL 等 |
+| Oracle 双库 → PostgreSQL 单库合并 | 高 | 合并 CCGLPDB + LGREPORTPDB 为单一 PostgreSQL 库；消除 19 个文件的 @CCGL_23 DB Link 引用和 24 个文件的双连接代码；建立 SQL 兼容性映射表（DECODE→CASE、SYSDATE→NOW()、序列→SERIAL、NVL→COALESCE、SUBSTR→SUBSTRING） |
+| Oracle 存储过程改写 | 高 | USP_WH_IN/USP_WH_OUT 等 100 个文件引用的存储过程需改写为 Python Service 层逻辑，需逐一验证业务等价性 |
 | 存量数据状态初始化复杂 | 高 | 编写专门迁移脚本，分批执行，保留原始数据备份 |
 | 回收任务与日常维护单并行运行 | 中 | 增加 SOURCE_TYPE 字段区分，逐步迁移 |
 | 仓储统一模型影响范围大 | 高 | 作为独立优化项，核心业务稳定后实施 |
