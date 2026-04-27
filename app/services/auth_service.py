@@ -10,8 +10,7 @@ import jwt
 from flask import current_app
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.extensions import db
-from app.models.system import AccLog, User, UserGroup
+from app.repositories.auth_repository import AuthRepository
 
 __all__ = ["AuthService"]
 
@@ -21,24 +20,29 @@ logger = logging.getLogger(__name__)
 class AuthService:
     """认证业务服务，对应 PB nvo_appmanager 登录事件链。"""
 
+    def __init__(self, repo: AuthRepository | None = None) -> None:
+        self._repo = repo or AuthRepository()
+
     @staticmethod
-    def login(user_id: str, password: str) -> dict[str, Any] | None:
+    def login(
+        user_id: str,
+        password: str,
+        repo: AuthRepository | None = None,
+    ) -> dict[str, Any] | None:
         """用户登录，返回 JWT token 和用户信息。"""
-        user = db.session.get(User, user_id)
+        _repo = repo or AuthRepository()
+
+        user = _repo.get_user(user_id)
         if user is None or user.status != "1":
             return None
 
         if not check_password_hash(user.password, password):
             return None
 
-        groups = db.session.query(UserGroup).filter(UserGroup.user_cd == user_id).all()
-
+        groups = _repo.get_user_groups(user_id)
         token = _generate_token(user_id)
 
-        # 记录登录日志
-        log = AccLog(user_cd=user_id, action="LOGIN", detail="用户登录")
-        db.session.add(log)
-        db.session.commit()
+        _repo.add_access_log(user_cd=user_id, action="LOGIN", detail="用户登录")
 
         return {
             "token": token,
@@ -66,17 +70,22 @@ class AuthService:
             return None
 
     @staticmethod
-    def get_session(token: str) -> dict[str, Any] | None:
+    def get_session(
+        token: str,
+        repo: AuthRepository | None = None,
+    ) -> dict[str, Any] | None:
         """获取会话信息。"""
+        _repo = repo or AuthRepository()
+
         payload = AuthService.validate_token(token)
         if payload is None:
             return None
 
-        user = db.session.get(User, payload["user_code"])
+        user = _repo.get_user(payload["user_code"])
         if user is None:
             return None
 
-        groups = db.session.query(UserGroup).filter(UserGroup.user_cd == user.user_cd).all()
+        groups = _repo.get_user_groups(user.user_cd)
 
         return {
             "user_code": user.user_cd,
