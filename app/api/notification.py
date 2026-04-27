@@ -61,7 +61,10 @@ def create_template():  # type: ignore[no-untyped-def]
 def update_template(template_id: str):  # type: ignore[no-untyped-def]
     """更新通知模板。"""
     body = NotificationTemplateUpdate(**request.get_json(force=True))
-    data = NotificationTemplateService.update(template_id, body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = NotificationTemplateService.update(
+        template_id, body.model_dump(exclude_none=True), user_cd
+    )
     if data is None:
         return error_response(message="模板不存在", code=404)
     return success_response(data=data, message="更新成功")

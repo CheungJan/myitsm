@@ -40,11 +40,13 @@ class ContractService:
         return record.to_dict()
 
     @staticmethod
-    def update(htbh: str, data: dict[str, Any]) -> dict[str, Any] | None:
+    def update(
+        htbh: str, data: dict[str, Any], creator: str | None = None
+    ) -> dict[str, Any] | None:
         record = ContractRepository.get_by_id(htbh)
         if record is None:
             return None
-        ContractRepository.update(record, data)
+        ContractRepository.update(record, data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -81,10 +83,12 @@ class InvoiceService:
         return record.to_dict()
 
     @staticmethod
-    def update(fpbh: str, data: dict[str, Any]) -> dict[str, Any] | None:
+    def update(
+        fpbh: str, data: dict[str, Any], creator: str | None = None
+    ) -> dict[str, Any] | None:
         record = InvoiceRepository.get_by_id(fpbh)
         if record is None:
             return None
-        InvoiceRepository.update(record, data)
+        InvoiceRepository.update(record, data, creator)
         db.session.commit()
         return record.to_dict()

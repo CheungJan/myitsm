@@ -46,10 +46,16 @@ class NotificationTemplateRepository:
         return record
 
     @staticmethod
-    def update(record: NotificationTemplate, data: dict[str, Any]) -> NotificationTemplate:
+    def update(
+        record: NotificationTemplate,
+        data: dict[str, Any],
+        creator: str | None = None,
+    ) -> NotificationTemplate:
         for key, value in data.items():
             if value is not None:
                 setattr(record, key, value)
+        if creator:
+            record.opercd = creator
         record.upddate = datetime.now(UTC)
         return record
 

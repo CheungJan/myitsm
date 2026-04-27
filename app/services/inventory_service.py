@@ -66,11 +66,16 @@ class PriceService:
         return record.to_dict()
 
     @staticmethod
-    def update(itemcd: str, busityp: str, data: dict[str, Any]) -> dict[str, Any] | None:
+    def update(
+        itemcd: str,
+        busityp: str,
+        data: dict[str, Any],
+        creator: str | None = None,
+    ) -> dict[str, Any] | None:
         record = PriceRepository.get_by_key(itemcd, busityp)
         if record is None:
             return None
-        PriceRepository.update(record, data)
+        PriceRepository.update(record, data, creator)
         db.session.commit()
         return record.to_dict()
 

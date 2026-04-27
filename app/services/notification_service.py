@@ -33,11 +33,13 @@ class NotificationTemplateService:
         return record.to_dict()
 
     @staticmethod
-    def update(template_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
+    def update(
+        template_id: str, data: dict[str, Any], creator: str | None = None
+    ) -> dict[str, Any] | None:
         record = NotificationTemplateRepository.get_by_id(template_id)
         if record is None:
             return None
-        NotificationTemplateRepository.update(record, data)
+        NotificationTemplateRepository.update(record, data, creator)
         db.session.commit()
         return record.to_dict()
 

@@ -55,10 +55,12 @@ class ContractRepository:
         return record
 
     @staticmethod
-    def update(record: Contract, data: dict[str, Any]) -> Contract:
+    def update(record: Contract, data: dict[str, Any], creator: str | None = None) -> Contract:
         for key, value in data.items():
             if value is not None:
                 setattr(record, key, value)
+        if creator:
+            record.opercd = creator
         record.upddate = datetime.now(UTC)
         return record
 
@@ -101,9 +103,11 @@ class InvoiceRepository:
         return record
 
     @staticmethod
-    def update(record: Invoice, data: dict[str, Any]) -> Invoice:
+    def update(record: Invoice, data: dict[str, Any], creator: str | None = None) -> Invoice:
         for key, value in data.items():
             if value is not None:
                 setattr(record, key, value)
+        if creator:
+            record.opercd = creator
         record.upddate = datetime.now(UTC)
         return record

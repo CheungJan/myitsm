@@ -98,10 +98,12 @@ class PriceRepository:
         return record
 
     @staticmethod
-    def update(record: Price, data: dict[str, Any]) -> Price:
+    def update(record: Price, data: dict[str, Any], creator: str | None = None) -> Price:
         for key, value in data.items():
             if value is not None:
                 setattr(record, key, value)
+        if creator:
+            record.opercd = creator
         record.upddate = datetime.now(UTC)
         return record
 

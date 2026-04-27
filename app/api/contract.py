@@ -63,7 +63,8 @@ def create_contract():  # type: ignore[no-untyped-def]
 def update_contract(htbh: str):  # type: ignore[no-untyped-def]
     """更新合同。"""
     body = ContractUpdate(**request.get_json(force=True))
-    data = ContractService.update(htbh, body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = ContractService.update(htbh, body.model_dump(exclude_none=True), user_cd)
     if data is None:
         return error_response(message="合同不存在", code=404)
     return success_response(data=data, message="更新成功")
@@ -109,7 +110,8 @@ def create_invoice():  # type: ignore[no-untyped-def]
 def update_invoice(fpbh: str):  # type: ignore[no-untyped-def]
     """更新发票。"""
     body = InvoiceUpdate(**request.get_json(force=True))
-    data = InvoiceService.update(fpbh, body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = InvoiceService.update(fpbh, body.model_dump(exclude_none=True), user_cd)
     if data is None:
         return error_response(message="发票不存在", code=404)
     return success_response(data=data, message="更新成功")

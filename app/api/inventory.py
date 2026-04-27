@@ -97,7 +97,8 @@ def create_price():  # type: ignore[no-untyped-def]
 def update_price(itemcd: str, busityp: str):  # type: ignore[no-untyped-def]
     """更新价格规则。"""
     body = PriceUpdate(**request.get_json(force=True))
-    data = PriceService.update(itemcd, busityp, body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = PriceService.update(itemcd, busityp, body.model_dump(exclude_none=True), user_cd)
     if data is None:
         return error_response(message="价格规则不存在", code=404)
     return success_response(data=data, message="更新成功")
