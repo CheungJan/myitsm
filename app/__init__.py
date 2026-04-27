@@ -55,75 +55,40 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(system_bp, url_prefix="/api/v1")
 
 
+def _make_error_body(code: int, message: str) -> dict[str, Any]:
+    """构造统一错误响应体：{ code, message, data, request_id }。"""
+    return {
+        "code": code,
+        "message": message,
+        "data": None,
+        "request_id": getattr(g, "request_id", ""),
+    }
+
+
 def _register_error_handlers(app: Flask) -> None:
     """注册全局错误处理。"""
 
     @app.errorhandler(400)
     def bad_request(exc: Exception) -> tuple[Any, int]:
-        return (
-            jsonify(
-                {
-                    "code": 400,
-                    "message": str(exc),
-                    "data": {"request_id": getattr(g, "request_id", "")},
-                }
-            ),
-            400,
-        )
+        return jsonify(_make_error_body(400, str(exc))), 400
 
     @app.errorhandler(401)
     def unauthorized(exc: Exception) -> tuple[Any, int]:
-        return (
-            jsonify(
-                {
-                    "code": 401,
-                    "message": "未授权",
-                    "data": {"request_id": getattr(g, "request_id", "")},
-                }
-            ),
-            401,
-        )
+        return jsonify(_make_error_body(401, "未授权")), 401
 
     @app.errorhandler(403)
     def forbidden(exc: Exception) -> tuple[Any, int]:
-        return (
-            jsonify(
-                {
-                    "code": 403,
-                    "message": "无权限",
-                    "data": {"request_id": getattr(g, "request_id", "")},
-                }
-            ),
-            403,
-        )
+        return jsonify(_make_error_body(403, "无权限")), 403
 
     @app.errorhandler(404)
     def not_found(exc: Exception) -> tuple[Any, int]:
-        return (
-            jsonify(
-                {
-                    "code": 404,
-                    "message": "资源不存在",
-                    "data": {"request_id": getattr(g, "request_id", "")},
-                }
-            ),
-            404,
-        )
+        return jsonify(_make_error_body(404, "资源不存在")), 404
 
     @app.errorhandler(Exception)
     def handle_exception(exc: Exception) -> tuple[Any, int]:
         request_id = getattr(g, "request_id", "")
         logger.exception("请求处理异常，request_id=%s", request_id)
-        return (
-            jsonify(
-                {
-                    "code": 500,
-                    "message": "服务器内部错误",
-                    "data": {"request_id": request_id},
-                }
-            ),
-            500,
-        )
+        return jsonify(_make_error_body(500, "服务器内部错误")), 500
 
 
 def _register_before_request(app: Flask) -> None:

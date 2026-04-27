@@ -33,11 +33,11 @@ jobs:
       - name: Ruff Check
         run: ruff check app/ tests/ wsgi.py
 
-      - name: Mypy
-        run: mypy app/ tests/ wsgi.py --ignore-missing-imports
+      - name: Mypy Strict
+        run: mypy --strict app/ tests/ wsgi.py --ignore-missing-imports
 
       - name: Pytest
-        run: pytest tests/test_state_machine.py -q
+        run: pytest tests/ -q
 
       - name: Bandit
         run: bandit -r app/ -x app_old

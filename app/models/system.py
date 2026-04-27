@@ -17,6 +17,7 @@ class User(BaseModel):
     """用户表（TMC13_USERS）。"""
 
     __tablename__ = "tmc13_users"
+    _hidden_fields: set[str] = {"password"}
 
     user_cd = db.Column(db.String(20), primary_key=True, comment="用户编码")
     user_nm = db.Column(db.String(50), nullable=False, comment="用户名称")

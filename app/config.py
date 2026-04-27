@@ -37,13 +37,14 @@ class ProductionConfig(Config):
 
 
 class TestingConfig(Config):
-    """测试环境配置。"""
+    """测试环境配置（默认使用 SQLite 内存库，无需外部数据库）。"""
 
     TESTING: bool = True
     SQLALCHEMY_DATABASE_URI: str = os.getenv(
         "TEST_DATABASE_URL",
-        "postgresql://itsm:itsm@localhost:5432/itsm_test",
+        "sqlite:///:memory:",
     )
+    SQLALCHEMY_ENGINE_OPTIONS: dict[str, object] = {}
 
 
 config_map: dict[str, type[Config]] = {

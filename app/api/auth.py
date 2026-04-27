@@ -10,7 +10,9 @@ from functools import wraps
 from typing import Any, Callable
 
 from flask import Blueprint, g, request
+from pydantic import ValidationError
 
+from app.schemas.auth import LoginRequest
 from app.services.auth_service import AuthService
 from app.utils.response import error_response, success_response
 
@@ -51,15 +53,15 @@ def login():  # type: ignore[no-untyped-def]
     {"user_id": "U001", "password": "secret"}
     """
     body = request.get_json(silent=True) or {}
-    user_id = body.get("user_id", "").strip()
-    password = body.get("password", "").strip()
 
-    if not user_id:
-        return error_response(message="缺少参数 user_id", code=400)
-    if not password:
-        return error_response(message="缺少参数 password", code=400)
+    try:
+        req = LoginRequest(**body)
+    except ValidationError as exc:
+        errors = exc.errors()
+        msg = "; ".join(f"{e['loc'][0]}: {e['msg']}" for e in errors if e.get("loc"))
+        return error_response(message=msg or "参数校验失败", code=400)
 
-    result = AuthService.login(user_id=user_id, password=password)
+    result = AuthService.login(user_id=req.user_id, password=req.password)
     if result is None:
         return error_response(message="用户名或密码错误", code=401)
 
