@@ -1,5 +1,26 @@
 """数据模型。"""
 
+from app.models.attendance import (
+    Attendance,
+    AttendanceCount,
+)
+from app.models.auxiliary import (
+    Contract,
+    Invoice,
+)
+from app.models.deposit import (
+    Deposit,
+    DepositDetail,
+    DepositIO,
+    DepositList,
+    DepositPosModel,
+)
+from app.models.inventory import (
+    AdjustPrice,
+    InventoryLimit,
+    InventoryLimitHistory,
+    Price,
+)
 from app.models.itsm import (
     AccessoriesUpdate,
     ArchiveCode,
@@ -50,6 +71,10 @@ from app.models.master import (
     Supplier,
     SupplierClass,
     SysCode,
+)
+from app.models.notification import (
+    Notification,
+    NotificationTemplate,
 )
 from app.models.procurement import (
     PurchaseBill,
@@ -213,4 +238,24 @@ __all__ = [
     # SLA 服务级别管理（Tier-1）
     "SlaDefinition",
     "SlaTicket",
+    # 考勤管理
+    "Attendance",
+    "AttendanceCount",
+    # 库存预警与价格
+    "InventoryLimit",
+    "InventoryLimitHistory",
+    "Price",
+    "AdjustPrice",
+    # 押金管理
+    "Deposit",
+    "DepositDetail",
+    "DepositIO",
+    "DepositList",
+    "DepositPosModel",
+    # 合同管理（Tier-1）
+    "Contract",
+    "Invoice",
+    # 通知系统（Tier-1）
+    "NotificationTemplate",
+    "Notification",
 ]

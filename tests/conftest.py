@@ -34,3 +34,13 @@ def _rollback(app: Flask) -> Generator[None, None, None]:
 def client(app: Flask) -> FlaskClient:
     """创建测试客户端。"""
     return app.test_client()
+
+
+@pytest.fixture()
+def auth_header(app: Flask) -> dict[str, str]:
+    """生成 JWT 认证头。"""
+    import jwt
+
+    payload = {"sub": "T00001", "exp": 9999999999}
+    token: str = jwt.encode(payload, app.config["SECRET_KEY"], algorithm="HS256")
+    return {"Authorization": f"Bearer {token}", "X-User-Cd": "T00001"}
