@@ -22,6 +22,9 @@ from app.schemas.itsm import (
     MaintenanceOpenCreate,
     MaintenanceQuery,
     MaintenanceRenovateCreate,
+    RecycleTaskCreate,
+    RecycleTaskDtlCreate,
+    RecycleTaskQuery,
     RVCreate,
     StatusTransition,
     StoreCloseCreate,
@@ -35,6 +38,7 @@ from app.services.itsm_service import (
     MaintenanceDailyService,
     MaintenanceOpenService,
     MaintenanceRenovateService,
+    RecycleTaskService,
     RVService,
     StoreCloseService,
 )
@@ -48,6 +52,7 @@ _daily_svc = MaintenanceDailyService()
 _open_svc = MaintenanceOpenService()
 _renovate_svc = MaintenanceRenovateService()
 _device_change_svc = DeviceChangeService()
+_recycle_svc = RecycleTaskService()
 _store_close_svc = StoreCloseService()
 
 
@@ -444,4 +449,74 @@ def create_dispatch():  # type: ignore[no-untyped-def]
     body = DispatchCreate(**request.get_json(force=True))
     user_cd: str = request.headers.get("X-User-Cd", "system")
     data = DispatchService.create(body.model_dump(exclude_none=True), creator=user_cd)
+    return success_response(data=data, code=201)
+
+
+# ---- 回收任务 (TIT20，P0-1/优化4.2) ----
+
+
+@itsm_bp.get("/recycle-task")
+@login_required
+def list_recycle_task():  # type: ignore[no-untyped-def]
+    """回收任务列表。"""
+    params = RecycleTaskQuery.model_validate(request.args.to_dict())
+    data = RecycleTaskService.list_records(
+        task_status=params.task_status,
+        cust_cd=params.cust_cd,
+        page=params.page,
+        per_page=params.per_page,
+    )
+    return success_response(data=data)
+
+
+@itsm_bp.get("/recycle-task/<recycle_id>")
+@login_required
+def get_recycle_task(recycle_id: str):  # type: ignore[no-untyped-def]
+    """回收任务详情。"""
+    data = RecycleTaskService.get(recycle_id)
+    if data is None:
+        return error_response(message="回收任务不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/recycle-task")
+@login_required
+def create_recycle_task():  # type: ignore[no-untyped-def]
+    """创建回收任务。"""
+    body = RecycleTaskCreate(**request.get_json(force=True))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = RecycleTaskService.create(body.model_dump(exclude_none=True), creator=user_cd)
+    return success_response(data=data, code=201)
+
+
+@itsm_bp.post("/recycle-task/<recycle_id>/transition")
+@login_required
+def transition_recycle_task(recycle_id: str):  # type: ignore[no-untyped-def]
+    """回收任务状态流转。"""
+    body = StatusTransition(**request.get_json(force=True))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    result = _recycle_svc.transition(
+        recycle_id, body.to_status, operator=user_cd, remark=body.remark
+    )
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result)
+
+
+@itsm_bp.get("/recycle-task/<recycle_id>/details")
+@login_required
+def list_recycle_details(recycle_id: str):  # type: ignore[no-untyped-def]
+    """回收任务明细列表。"""
+    data = RecycleTaskService.list_details(recycle_id)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/recycle-task/<recycle_id>/details")
+@login_required
+def add_recycle_detail(recycle_id: str):  # type: ignore[no-untyped-def]
+    """添加回收任务明细。"""
+    body = RecycleTaskDtlCreate(**request.get_json(force=True))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    _ = user_cd
+    data = RecycleTaskService.add_detail(recycle_id, body.model_dump(exclude_none=True))
     return success_response(data=data, code=201)

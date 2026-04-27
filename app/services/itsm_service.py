@@ -14,6 +14,7 @@ from app.repositories.itsm_repository import (
     MaintenanceDailyRepository,
     MaintenanceOpenRepository,
     MaintenanceRenovateRepository,
+    RecycleTaskRepository,
     RVRepository,
     StoreCloseRepository,
 )
@@ -405,3 +406,70 @@ class DispatchService:
         record = DispatchRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
+
+
+class RecycleTaskService(_BaseMaintenanceService):
+    """回收任务服务（TIT20，P0-1/优化4.2）。
+
+    将取机/回收业务从日常维护单中剖离出来，
+    拥有独立的状态机和生命周期。
+    """
+
+    @staticmethod
+    def get(recycle_id: str) -> dict[str, Any] | None:
+        record = RecycleTaskRepository.get_by_id(recycle_id)
+        if record is None:
+            return None
+        return record.to_dict()
+
+    @staticmethod
+    def list_records(
+        task_status: str | None = None,
+        cust_cd: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> dict[str, Any]:
+        items, total = RecycleTaskRepository.list_by_filters(
+            task_status=task_status, cust_cd=cust_cd, page=page, per_page=per_page
+        )
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        record = RecycleTaskRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    def transition(
+        self,
+        recycle_id: str,
+        to_status: str,
+        operator: str,
+        remark: str | None = None,
+    ) -> dict[str, object]:
+        record = RecycleTaskRepository.get_by_id(recycle_id)
+        if record is None:
+            return {"success": False, "error": "回收任务不存在"}
+        from_status: str = record.task_status or "00"
+        result = StateMachine.validate_transition(from_status, to_status)
+        if not result["valid"]:
+            return {"success": False, "error": result.get("error", "状态流转验证失败")}
+        RecycleTaskRepository.update_status(record, to_status, operator)
+        db.session.commit()
+        return {"success": True, "from_status": from_status, "to_status": to_status}
+
+    @staticmethod
+    def add_detail(recycle_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        dtl = RecycleTaskRepository.add_detail(recycle_id, data)
+        db.session.commit()
+        return dtl.to_dict()
+
+    @staticmethod
+    def list_details(recycle_id: str) -> list[dict[str, Any]]:
+        items = RecycleTaskRepository.list_details(recycle_id)
+        return [item.to_dict() for item in items]

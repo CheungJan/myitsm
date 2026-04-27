@@ -217,3 +217,84 @@ class TestDeviceChange:
             headers=headers,
         )
         assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# 回收任务（TIT20，P0-1/优化4.2）
+# ---------------------------------------------------------------------------
+
+
+class TestRecycleTask:
+    """回收任务 CRUD + 状态流转 + 明细测试。"""
+
+    def test_create_and_get(self, app: Flask, client: FlaskClient) -> None:
+        headers = _auth_header(app)
+        resp = _post(
+            client,
+            "/api/v1/itsm/recycle-task",
+            {
+                "cust_cd": "S0000020",
+                "recycle_type": "01",
+                "asset_count": 3,
+                "target_warehouse": "WH001",
+                "remark": "预计划触发回收",
+            },
+            headers,
+        )
+        assert resp.status_code == 201
+        body = resp.get_json()
+        assert body["code"] == 201
+        rid = body["data"]["recycle_id"]
+
+        resp2 = client.get(f"/api/v1/itsm/recycle-task/{rid}", headers=headers)
+        assert resp2.status_code == 200
+        assert resp2.get_json()["data"]["cust_cd"] == "S0000020"
+
+    def test_list(self, app: Flask, client: FlaskClient) -> None:
+        headers = _auth_header(app)
+        resp = client.get("/api/v1/itsm/recycle-task", headers=headers)
+        assert resp.status_code == 200
+
+    def test_transition(self, app: Flask, client: FlaskClient) -> None:
+        headers = _auth_header(app)
+        resp = _post(
+            client,
+            "/api/v1/itsm/recycle-task",
+            {"cust_cd": "S0000021", "recycle_type": "02"},
+            headers,
+        )
+        rid = resp.get_json()["data"]["recycle_id"]
+
+        resp2 = _post(
+            client,
+            f"/api/v1/itsm/recycle-task/{rid}/transition",
+            {"to_status": "01"},
+            headers,
+        )
+        assert resp2.status_code == 200
+        assert resp2.get_json()["data"]["from_status"] == "00"
+        assert resp2.get_json()["data"]["to_status"] == "01"
+
+    def test_add_detail(self, app: Flask, client: FlaskClient) -> None:
+        headers = _auth_header(app)
+        resp = _post(
+            client,
+            "/api/v1/itsm/recycle-task",
+            {"cust_cd": "S0000022", "recycle_type": "01"},
+            headers,
+        )
+        rid = resp.get_json()["data"]["recycle_id"]
+
+        resp2 = _post(
+            client,
+            f"/api/v1/itsm/recycle-task/{rid}/details",
+            {"asset_id": "POS001", "asset_type": "OLD", "expected_status": "PENDING"},
+            headers,
+        )
+        assert resp2.status_code == 201
+
+        resp3 = client.get(f"/api/v1/itsm/recycle-task/{rid}/details", headers=headers)
+        assert resp3.status_code == 200
+        items = resp3.get_json()["data"]
+        assert len(items) >= 1
+        assert items[0]["asset_id"] == "POS001"

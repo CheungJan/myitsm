@@ -194,6 +194,41 @@ class StoreCloseCreate(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# 回收任务 (TIT20) — P0-1/优化4.2
+# ---------------------------------------------------------------------------
+
+
+class RecycleTaskCreate(BaseModel):
+    """创建回收任务。"""
+
+    cust_cd: str = Field(..., max_length=8, description="门店代码")
+    recycle_type: str | None = Field(None, max_length=2, description="回收类型")
+    plan_no: str | None = Field(None, max_length=10, description="来源预计划单号")
+    maintenance_id: str | None = Field(None, max_length=8, description="关联维护单号")
+    asset_count: int | None = Field(None, ge=0, description="应回收资产数量")
+    asset_list: str | None = Field(None, max_length=500, description="资产清单JSON")
+    target_warehouse: str | None = Field(None, max_length=10, description="目标仓库")
+    remark: str | None = Field(None, max_length=200, description="备注")
+
+
+class RecycleTaskDtlCreate(BaseModel):
+    """添加回收任务明细。"""
+
+    asset_id: str = Field(..., max_length=20, description="资产ID")
+    asset_type: str | None = Field(None, max_length=10, description="资产类型")
+    expected_status: str | None = Field(None, max_length=10, description="预期状态")
+
+
+class RecycleTaskQuery(BaseModel):
+    """回收任务列表查询参数。"""
+
+    task_status: str | None = Field(None, max_length=2, description="任务状态过滤")
+    cust_cd: str | None = Field(None, max_length=8, description="门店代码过滤")
+    page: int = Field(1, ge=1, description="页码")
+    per_page: int = Field(20, ge=1, le=100, description="每页条数")
+
+
+# ---------------------------------------------------------------------------
 # 查询参数
 # ---------------------------------------------------------------------------
 

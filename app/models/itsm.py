@@ -880,6 +880,68 @@ class FreeReplaceDt(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# TIT20 回收任务（P0-1/优化4.2：取机回收从日常维护剥离为独立业务）
+# ---------------------------------------------------------------------------
+
+
+class RecycleTask(BaseModel):
+    """
+    旧机回收任务主表（TIT20_RECYCLE_TASK）。
+
+    优化4.2：将取机/回收从日常维护单中独立出来，
+    原系统通过 plantyp='30' 在 TIT10 中创建回收记录，
+    新系统使用独立表+独立状态机。
+    """
+
+    __tablename__ = "tit20_recycle_task"
+
+    recycle_id = db.Column(db.String(12), primary_key=True, comment="回收任务ID")
+    recycle_type = db.Column(db.String(2), comment="回收类型")
+    plan_no = db.Column(db.String(10), comment="来源预计划单号")
+    maintenance_id = db.Column(db.String(8), comment="关联维护单号")
+    cust_cd = db.Column(db.String(8), nullable=False, comment="门店代码")
+    task_status = db.Column(db.String(2), default="00", comment="任务状态")
+    asset_count = db.Column(db.Integer, default=0, comment="应回收资产数量")
+    asset_list = db.Column(db.String(500), comment="资产清单JSON")
+    assigned_to = db.Column(db.String(6), comment="分配人员")
+    assigned_date = db.Column(db.DateTime, comment="分配日期")
+    completed_date = db.Column(db.DateTime, comment="完成日期")
+    actual_count = db.Column(db.Integer, default=0, comment="实际回收数量")
+    disposition = db.Column(db.String(2), comment="处置方式")
+    target_warehouse = db.Column(db.String(10), comment="目标仓库")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    remark = db.Column(db.String(200), comment="备注")
+    create_time = db.Column(db.DateTime, comment="创建时间")
+    creator = db.Column(db.String(6), comment="创建人")
+    update_time = db.Column(db.DateTime, comment="更新时间")
+    updator = db.Column(db.String(6), comment="更新人")
+
+    details = db.relationship("RecycleTaskDtl", back_populates="recycle_task", lazy="dynamic")
+
+
+class RecycleTaskDtl(BaseModel):
+    """回收任务明细表（TIT20_RECYCLE_TASK_DTL）。"""
+
+    __tablename__ = "tit20_recycle_task_dtl"
+
+    recycle_id = db.Column(
+        db.String(12),
+        db.ForeignKey("tit20_recycle_task.recycle_id"),
+        primary_key=True,
+        comment="回收任务ID",
+    )
+    asset_id = db.Column(db.String(20), primary_key=True, comment="资产ID")
+    asset_type = db.Column(db.String(10), comment="资产类型")
+    expected_status = db.Column(db.String(10), comment="预期状态")
+    actual_status = db.Column(db.String(10), comment="实际状态")
+    recovered_date = db.Column(db.DateTime, comment="回收日期")
+    warehouse_cd = db.Column(db.String(10), comment="入库仓库")
+    remark = db.Column(db.String(200), comment="备注")
+
+    recycle_task = db.relationship("RecycleTask", back_populates="details")
+
+
+# ---------------------------------------------------------------------------
 # TIT29 未关单跟踪
 # ---------------------------------------------------------------------------
 

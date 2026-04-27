@@ -20,6 +20,8 @@ from app.models.itsm import (
     MaintenanceOpen,
     MaintenanceRenovate,
     MaintenanceRV,
+    RecycleTask,
+    RecycleTaskDtl,
     StoreClose,
 )
 from app.models.master import CustomerHistory
@@ -457,3 +459,62 @@ class DispatchRepository:
         )
         db.session.add(record)
         return record
+
+
+class RecycleTaskRepository:
+    """回收任务数据访问（TIT20，P0-1/优化4.2）。"""
+
+    @staticmethod
+    def get_by_id(recycle_id: str) -> RecycleTask | None:
+        return db.session.get(RecycleTask, recycle_id)
+
+    @staticmethod
+    def list_by_filters(
+        task_status: str | None = None,
+        cust_cd: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list[RecycleTask], int]:
+        query = db.session.query(RecycleTask)
+        if task_status:
+            query = query.filter(RecycleTask.task_status == task_status)
+        if cust_cd:
+            query = query.filter(RecycleTask.cust_cd == cust_cd)
+        query = query.order_by(desc(RecycleTask.create_time))
+        total: int = query.count()
+        items: list[RecycleTask] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> RecycleTask:
+        now = datetime.now(UTC)
+        record = RecycleTask(
+            recycle_id=_gen_id("R"),
+            task_status="00",
+            create_time=now,
+            creator=creator,
+            update_time=now,
+            updator=creator,
+            **data,
+        )
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update_status(record: RecycleTask, new_status: str, updator: str) -> RecycleTask:
+        record.task_status = new_status
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
+        return record
+
+    @staticmethod
+    def add_detail(recycle_id: str, data: dict[str, Any]) -> RecycleTaskDtl:
+        dtl = RecycleTaskDtl(recycle_id=recycle_id, **data)
+        db.session.add(dtl)
+        return dtl
+
+    @staticmethod
+    def list_details(recycle_id: str) -> list[RecycleTaskDtl]:
+        return (
+            db.session.query(RecycleTaskDtl).filter(RecycleTaskDtl.recycle_id == recycle_id).all()
+        )

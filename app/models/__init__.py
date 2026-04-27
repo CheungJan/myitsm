@@ -29,6 +29,8 @@ from app.models.itsm import (
     OnChooseDt,
     PayList,
     PosDetail,
+    RecycleTask,
+    RecycleTaskDtl,
     RepairInfo,
     StoreClose,
     TimepointArea,
@@ -132,6 +134,9 @@ __all__ = [
     # ITSM 免费更换
     "FreeReplace",
     "FreeReplaceDt",
+    # ITSM 回收任务（P0-1/优化4.2）
+    "RecycleTask",
+    "RecycleTaskDtl",
     # ITSM 未关单跟踪
     "NoCloseTrack",
 ]
