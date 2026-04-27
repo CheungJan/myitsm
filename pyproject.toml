@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["app_old*", "tests*"]
+
+[project]
+name = "myitsm"
+version = "0.1.0"
+description = "ITSM 系统 — Python + Flask + PostgreSQL 重构版"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.0",
+    "flask-sqlalchemy>=3.1",
+    "flask-migrate>=4.0",
+    "flask-cors>=4.0",
+    "psycopg2-binary>=2.9",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0",
+    "PyJWT>=2.8",
+    "gunicorn>=21.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.0",
+    "isort>=5.13",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+    "bandit>=1.7",
+]
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["flask_migrate.*", "flask_cors.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"

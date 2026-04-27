@@ -1,0 +1,76 @@
+"""数据模型。"""
+
+from app.models.itsm import (
+    DeviceChange,
+    MaintenanceDaily,
+    MaintenanceDailyTrack,
+    MaintenanceOpen,
+    MaintenanceRenovate,
+    PosDetail,
+    StoreClose,
+)
+from app.models.master import (
+    Area,
+    ComMode,
+    Company,
+    CustClass,
+    Customer,
+    CustomerHistory,
+    CustPosRl,
+    IdMaster,
+    Item,
+    ItemClass,
+    Supplier,
+    SupplierClass,
+    SysCode,
+)
+from app.models.system import (
+    AccLog,
+    Department,
+    Group,
+    GroupRight,
+    Menu,
+    MenuDetail,
+    SysParm,
+    User,
+    UserBusiTyp,
+    UserGroup,
+    UserMenu,
+)
+
+__all__ = [
+    # 系统管理
+    "User",
+    "Group",
+    "UserGroup",
+    "UserBusiTyp",
+    "Department",
+    "Menu",
+    "MenuDetail",
+    "UserMenu",
+    "GroupRight",
+    "SysParm",
+    "AccLog",
+    # 主数据
+    "Company",
+    "Area",
+    "ComMode",
+    "CustClass",
+    "Customer",
+    "CustomerHistory",
+    "CustPosRl",
+    "Item",
+    "ItemClass",
+    "Supplier",
+    "SupplierClass",
+    "SysCode",
+    "IdMaster",
+    # ITSM
+    "MaintenanceDaily",
+    "MaintenanceDailyTrack",
+    "PosDetail",
+    "MaintenanceOpen",
+    "MaintenanceRenovate",
+    "DeviceChange",
+    "StoreClose",
+]
