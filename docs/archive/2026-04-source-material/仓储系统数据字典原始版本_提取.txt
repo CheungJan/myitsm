@@ -1,0 +1,1002 @@
+　　
+　　
+　　通方集团仓储管理系统
+　　数据库设计说明书
+　　Database Design Statement
+
+
+文件状态：
+　[  ] 草稿
+　[√] 正式发布
+　[  ] 正在修改文件编号：LOIC11006通方集团仓储管理系统_数据库设计说明书　　当前版本：
+1.0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+版本历史
+版本/状态作者参与者日期摘要1.0张超2011-08-26创建2.0陈斌鹤2018-06-29补充
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+版权信息
+本文件的版权属于上海通方信息系统有限公司
+任何形式的散发都必须先得到上海通方信息系统有限公司的许可
+http://www.chinatopfine.com/
+　　
+
+【目 录】
+1.	总体介绍	4
+1.1.	编写目的	4
+1.2.	适用范围	4
+1.3.	文章组织	4
+1.4.	参考资料	4
+1.5.	术语和缩写	4
+1.5.1.	定义	4
+1.5.2.	缩写词	5
+1.6.	问题、假设和限制	5
+1.6.1.	问题	5
+1.6.2.	假设	5
+1.6.3.	限制	5
+1.7.	工具和方法	5
+2.	概述	6
+2.1.	数据库平台	6
+2.2.	命名的约定	6
+2.3.	使用的程序	6
+3.	物理设计	6
+3.1.	标识符	6
+3.2.	物理文件	7
+3.3.	表空间设计	7
+3.3.1.	表空间1	7
+3.3.2.	表空间2	8
+4.	安全设计	8
+5.	逻辑设计	9
+5.1.	实体说明	9
+5.1.1.	数据表实体	9
+5.1.2.	序列实体	9
+5.1.3.	视图实体	9
+5.1.4.	存储过程实体	9
+5.1.5.	程序包实体	9
+5.2.	实体关系	9
+5.3.	实体设计	9
+5.3.1.	数据表实体	9
+5.3.2.	序列实体	9
+5.3.3.	视图实体	10
+5.3.4.	存储过程实体	10
+5.3.5.	程序包实体	10
+6.	备注	10
+
+1. 总体介绍
+1.1. 编写目的
+　　本文档针对通方集团仓储管理系统的数据库设计进行阐述，为开发人员进行项目代码开发提供参考，为实施人员进行项目实施提供依据。
+1.2. 适用范围
+　　本文档仅适用于通方集团仓储管理系统。
+1.3. 文章组织
+　　本文档包括6部分：
+　　第1章 总体介绍
+　　第2章 概述
+　　第3章 物理设计
+　　第4章 安全设计
+　　第5章 逻辑设计
+　　第6章 备注
+1.4. 参考资料
+参考文件备注LOIC11006_通方集团仓储管理系统_ 用户需求说明书LOIC11006_通方集团仓储管理系统_需求规格说明书LOIC11006_通方集团仓储管理系统_ 体系设计说明书1.5. 术语和缩写
+1.5.1. 定义
+　　在本文档中，以下这些黑体的词语用来定义某个特定需求的重要性：
+词语含义sm_in_open_result必须这个词或者"要"、"必需的"意味着所修饰的内容是规范中绝对的要求。不得这个词或者"禁止的"意味着所修饰的内容是规范中绝对的禁止。应该这个词或者"建议的"意味着在某些情况下可能有实际的理由忽略此要求，但必须彻底的了解需求并仔细的考虑权衡。项目经理要对决定负责。不应该这个词意味着在某些情况下可能有实际的理由要按照该内容去做，但必须彻底的了解需求并仔细的考虑权衡再这样实现。项目经理要对决定负责。可以这个词或者"可能"、"可选的"意味着该项内容确实是可有可无的，不会影响实现和规范的一致性。　　其它所有文本都是描述性或说明性的。
+1.5.2. 缩写词
+　　本文档中使用了以下这些缩写词：
+术语和缩写解释备注　　
+　　
+1.6. 问题、假设和限制
+1.6.1. 问题
+无。
+1.6.2. 假设
+无。
+1.6.3. 限制
+无。
+1.7. 工具和方法
+　　数据库设计工具：PowerDesigner 12
+2. 概述
+2.1. 数据库平台
+　　依据客户现有的环境，使用Oracle10G数据库，Oracle数据库强大的功能和卓越的性能已经得到业界的广泛认可。
+2.2. 命名的约定
+　　
+前缀说明PK表示主键UK表示唯一键FK表示外键UI表示唯一索引NUI表示非唯一索引AUTO表示数据库自动产生的序列号d_表示编码信息数据表h_表示历史信息数据表view_表示视图对象tri_表示触发器对象sp_表示存储过程对象pg_表示程序包对象pgb_表示程序包体sq_表示序列对象2.3. 使用的程序
+　　通方集团仓储管理系统。
+3. 物理设计
+3.1. 标识符
+　　数据库的标识名称：CCGL。
+3.2. 物理文件
+　　
+属性名属性值Initial File Name<OracleHome>\Admin\CDITS\pfile\init.oraDatabase NameCCGLLog File1File Name<OracleHome>\OraData\ CCGL \redo01.logFile Size1024KLog File2File Name<OracleHome>\OraData\ CCGL \redo02.logFile Size1024KMax Log Files32Max Log Members2Max Log History1Archive LogOnArchive Log Directory<OracleHome>\OraData\ CCGL \archiveArchive Log Formatarc%S.%TMax Data File511Max Instance1Character SetZHS16GBKNational Character SetZHS16GBK　　
+3.3. 表空间设计
+　　
+3.3.1. 表空间1
+　　
+　　属性名　　属性值　　Space Name　　SYSTEM　　Data File　　<OracleHome>\OraData\CCGL \system01.dbf　　Data File Size　　100M　　Reuse　　True　　Auto Extend　　On　　Storage Clause　　Initial　　10M　　　　Next　　5M　　　　Min Extents　　1　　　　Max Extents　　Unlimited　　　　Percent Increase　　0　　Function　　Storing the system object　　
+3.3.2. 表空间2
+......
+4. 安全设计
+　　不使用数据库系统本身默认的系统用户，设计单独用户，各种数据表、视图、序列等等均依赖与该用户，对他们的操作均通过该用户完成，应用系统对数据库的访问、操作也通过该用户完成。
+　　属性名　　属性值　　User Name　　CCGL　　Password　　　　Default Tablespace　　CCDATA　　Temporary Tablespace　　CCTEMP　　Role　　DBA　　System Popedom　　UNLIMITED TABLESPACE　　
+5. 逻辑设计
+5.1. 实体说明
+5.1.1. 数据表实体
+表名说明系统设置管理（MC）TMC01_Menus菜单主表TMC02_MenusDt菜单明细表TMC03_UserMenus用户常用菜单表TMC11_Departments 部门信息表TMC12_Groups分组信息表TMC13_Users 用户信息表TMC21_UserGroup用户分组关系表TMC22_UserBusiTyp用户业务类型关系表TMC31_GroupRight 分组权限表TMC41_AccLog日初状态表TMC42_ ConnectInfo连接数据库信息表TMC43_Logs系统日志表TMC44_syslock系统功能锁定表基础信息管理（MM）TMM01_Company公司信息表TMM02_Country国家信息表TMM03_Province省市信息表TMM04_City城市信息表TMM05_Town区县信息表TMM11_ItemClass商品类别表TMM12_Items商品信息表TMM18_supplierclass供应商类别表TMM19_suppliers供应商代码TMM21_CustClass客户类别表TMM22_Customers客户代码表TMM24_CustItems商品供应商清单TMM31_SysCodes系统代码主表TMM32_SysCodesDt系统代码明细表TMM33_Message系统信息表TMM34_IdMaster单据编码管理表TMM35_cust_pos_rl门店pos设备对照表TMM36_cust_ve_rl门店视频设备对照表TWH01_ WareHouse仓位信息表TMM38_itemprice商品价格表TMM39_AdjPrice 商品调价表TMM40_label标签表TMM41_BoMBom主表TMM42_BoMDtBom明细表TMM43_Eid设备id明细清单表TMM44_pos_r_eidPos与配件id对照表TMM45_suppappraisal供应商批发体系设置采购管理（PC）TPC01_PcPlan采购计划表TPC02_ PcPlanDt采购计划明细表TPC03_pcplanstatus采购计划状态表TPC12_Register采购订单主表TPC13_RegisterDt采购订单明细表TPC16_rpcbill采购退货主表TPC17_rpcbilldt采购退货明细表TPC20_suppappraisal供应商评价主表TPC21_ suppappraisalDT供应商评价明细表质检管理（QC）TQC10_result质检结果单主表TQC11_resultDT质检结果单明细表批次TQC11_resultDTEid质检结果单明细表设备id销售管理（SL）TSL01_Extend开通计划主表TSL02_ExtendDt开通计划明细表TSL10_SlBill销售单主表物流管理（WH）TWH01_WareHouse仓库信息表TWH11_Detail仓库库存表TWH12_DetailDt仓库库存明细表TWH13_In仓库验收主表TWH14_InDt仓库验收明细表TWH15_Out仓库出货主表TWH16_OutDt仓库出货明细批次表TWH16_OutDteid仓库出库明细eid表TWH17_OverLost溢缺调整主表TWH18_OverLostDt溢缺调整明细批次表TWH18_overlosteid溢缺调整明细设备代码表库存管理（IV）TIV11_Detail库存锁定主表TIV12_Detail库存锁定明细表门店通讯表（XM、XS、XC）TXC02_Control通讯控制指令表TXC03_Log通讯日志表业务管理（TIT）PLAN_CUST预计化表PLAN_SERVE呼出记录表SERVER_CALL日常问题记录表TIT10_MAINTENANCE_LIABILITY单据豁免信息表TIT10_MAINTENANCEDAY日常维护单主表TIT10_POS_DETAIL维护单换机配件明细TIT11_MAINTENANCE_ATTC日常维护单附表TIT12_MAINTENANCE_ARCHIVE维护单归档表TIT13_MAINTENANCE_OPEN开通单主表TIT14_EQUIPMENT_OPEN开单单明细表TIT15_EQUIPMENT_RENOVATE翻新单明细表TIT15_MAINTENANCE_RENOVATE翻新单主表TIT16_DEVICE_CHANGE变更单主表TIT21_MAINTENANCE_DISPATCH分派表TIT22_FETION_SEND飞信发送表TIT23_MAINTENANCE_D2D上门服务记录表TIT24_MAINTENANCE_RV回访表TIT25_ACCESSORIES_UPDATE更换记录表TIT27_CLOSE_BILLS关单表财务管理表THT01_HTGL合同管理表发票与收款表逻辑处理表SM_IN_OPEN_RESULT整机开通业务处理表SM_IN_PART_CHANGE日常维护业务处理表　　
+5.1.2. 序列实体
+实体名所在表空间说明　　
+5.1.3. 视图实体
+实体名所在表空间说明5.1.4. 存储过程实体
+实体名所在表空间说明　　
+5.1.5. 程序包实体
+实体名所在表空间说明　　
+5.2. 实体关系
+详细内容请参考数据库ER关系图。
+5.3. 实体设计
+5.3.1. 数据表实体
+1) TMC01_Menus：菜单主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC01_Menus菜单主表说明：此表中包含系统中所有的菜单，具体菜单的功能在明细中
+表项标识类型名称说明PMenuCdVarchar2(20)菜单代码MenuNmVarchar2(40)菜单名称LevelCdInteger菜单级数1：一级菜单，2：二级，3：三级ParentVarchar2(20)父菜单代码ExePathVarchar2(40)执行UO名Uo_itemsetPicNameVarchar2(250)图片名OrdNoInteger显示序列最终用户使用时，菜单在菜单树中的顺序OpenFlgChar(1)打开标志1：允许多次打开，0：不允许多次打开ChildFlgChar(1)子菜单标志1：存在子菜单，0：不存在子菜单 OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+2) TMC02_MenusDT：菜单明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC02_MenusDT菜单明细表说明：此表中包含系统中所有的菜单的具体功能，以使权限设置能设到功能级
+表项标识类型名称说明PMenuCdVarchar2(20)菜单代码PFuncCdVarchar2(30)功能代码FuncNmVarchar2(40)功能名称例：新增，修改，删除OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+3) TMC03_UserMenus：用户常用菜单表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC03_UserMenus用户常用菜单表说明： 
+表项标识类型名称说明PUserCdChar(6)用户代码PMenuCdVarchar2(20)菜单代码OrdNoInteger显示序列菜单显示的顺序OperCdChar(6)操作员代码GenDateDate生成日期UseFlgChar(1)有效标志1：有效，0：无效　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+
+4) TMC11_Departments：部门信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC11_Departments部门信息表说明： 
+表项标识类型名称说明PDeptCdChar(6)部门代码DeptNmVarchar2(20)部门名称LevelCdFloat级别ParentChar(6)上级部门ChildFlgChar(1)下级部门标志LeaderChar(6)负责人OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+5) TMC12_Groups：分组信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC12_Groups分组信息表说明：此表中包含操作本系统的所有分组信息，分组信息用来设定相应的菜单功能权限，分组信息与部门不存在一一对应关系 
+表项标识类型名称说明PGroupCdChar(2)分组代码GroupNmVarchar2(20)分组名称OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+6) TMC13_Users：用户代码表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC13_Users用户信息表说明：此表中包含操作本系统的所有用户信息，包括物流人员的信息
+表项标识类型名称说明PUserCdChar(6)用户代码UserNmVarchar2(20)用户名称 PassWdVarchar2(250)密码DeptCdChar(6)　部门代码CredAmtDecimal(16,4)采购额度OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+TMC21_UserGroup用户分组关系表
+7) TMC21_UserGroup：用户分组关系表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC21_UserGroup用户分组关系表说明： 
+表项标识类型名称说明PUserCdChar(6)用户代码PGroupCdChar(2)分组代码OperCdChar(6)操作员代码GenDateDate生成日期WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+8) TMC22_UserBusiTyp：用户操作类型关系表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC22_UserBusiTyp用户操作类型关系表说明： 
+表项标识类型名称说明PUserCdChar(6)用户代码PBusiTypChar(2)操作类型OperCdChar(6)操作员代码GenDateDate生成日期WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+9) TMC31_GroupRight：分组权限表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC31_GroupRight分组权限表说明： 
+表项标识类型名称说明PGroupCdCHAR(2)分组代码PMenuCdVARCHAR2(20)菜单代码PFuncCdVarchar2(30)功能代码ScaleInt(1)查询范围9：本人，0：所有OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+10) TMC41_AccLog：日初状态表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC41_AccLog日初状态表说明： 每日第一次登录系统执行日初功能，处理调价等信息，完成后更新StarDate，才能正式使用系统
+表项标识类型名称说明StartDateDate日初日期OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+11) TMC42_ ConnectInfo：连接数据库信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC42_ ConnectInfo连接数据库信息表说明： 表中存储直接连接数据库的用户名和密码(密码加密)
+表项标识类型名称说明PConnectUserVarchar2(10)用户名PassWdVarchar2(255)密码　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+12) TMC43_Logs：系统日志表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMC43_Logs系统日志表说明：
+表项标识类型名称说明PSeqNoInteger 流水号通过序列Seq_TMC43来产生LogTypChar(3)日志类型MenuCdVarchar2(20)菜单代码DiscribleVarchar2(250)描述OperCdChar(6)操作员代码GenDateDate生成日期MemoVarchar2(1000)备注　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+13) TMC44_syslock系统功能锁定表
+　　结构
+　　DB对象标识　　DB对象名称　　制作人　　制作日期　　TMC44_syslock　　系统功能锁定表　　　　　　说明：
+　　　　　　表项标识　　类型　　名称　　说明PExecDateDate执行日期Uo_nmVarchar2(100)执行的功能名称OperCdChar(6)操作员代码IpaddressVarchar2(15)Ip地址　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+　　
+14) TMM01_Company ：公司信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM01_Company公司信息表说明：此表中包含使用本系统的公司的相关信息，有且仅有一行记录
+表项标识类型名称说明PCompCdChar(2)公司代码CompNmVarchar2(60)公司名称CompAnmVarchar2(20)公司简称		LeaderVarchar2(10)法人AddressVarchar2(60)地址MailCdVarchar2(6)邮编PhoneNoVarchar2(20)电话号码TelexVarchar2(20)电报FaxNoVarchar2(20)传真BankNmVarchar2(30)开户银行BankAccNoVarchar2(20)银行帐号TaxNoVarchar2(18)税号OpenDateDate开业日期OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+15) TMM02_Country：国家信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM02_Country国家信息表说明：
+表项标识类型名称说明PCountryCdChar(3)国家代码CountryNmVarchar2(20)国家名称OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+16) TMM03_Province：省市信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM03_Province省市信息表说明：
+表项标识类型名称说明PPrvnCdChar(2)省份代码PrvnNmVarchar2(20)省份名称CountryCdChar(3)国家代码OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+17) TMM04_City：城市信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM04_City城市信息表说明：
+表项标识类型名称说明PCityCdChar(4)城市代码CityNmVarchar2(30)城市名称PrvnCdChar(2)省份代码OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+18) TMM05_Town：区县信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM05_Town区县信息表说明：
+表项标识类型名称说明PTownCdChar(4)区县代码TownNmVarchar2(30)区县名称CityCdChar(4)城市代码OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+19) TMM11_ItemClass：商品类别表
+     结构
+DB对象标识DB对象名称制作人制作日期TMM11_ItemClass商品类别表说明： 此表中包含两层商品类别的所有分类，分类方式：第1位到第2位大类标识 表项标识类型名称说明ClassTypChar(1)分类类别1：大类PClassCdVarchar2(6)类别代码ClassNmVarchar2(20)类别名称ParentVarchar2(4)父类代码ChildFlgChar(1)子类别标志1：存在子类别，0：不存在子类别 OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+20) TMM12_Items：商品信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM12_Items商品信息表说明： 
+表项标识类型名称说明PItemCdChar(6)商品代码第1位到第2位大类标识，第3位到第6位商品流水码(商品流水码支持英文字母，由用户直接输入，而非系统按顺序生成)ClassCdVarchar2(6)类别代码ItemNmVarchar2(40)商品名称ItemAnmVarchar2(20)商品简称ItemBrCdVarchar2(20)商品简码商品名称的拼音前一位，用于简化输入ItemSizeVarchar2(120)商品规格CountryCdChar(3)国家代码ProvinceCdChar(2)省份代码CityCd Char(4)城市代码wUnitVarchar2(4)计量单位'PcRepChar(6)采购业务员代码KeeperChar(6)商品保管员代码OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效upperlimitInteger库存上限总仓新品库LowerlimitInteger库存下限总仓新品库MinorderInteger最小采购量newperiodInteger新品保质期（天）oldperiodInteger旧品保质期（天）backupVarchar2(200)备注TypflgChar(1)成品标志1：成品，0：一般配件WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送PurchasetypChar(1)采购标志1：可以采购，0：不可采购Consumeflg     Char(1)易耗品标志1：易耗品，0：不是　　
+　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+21) TMM18_supplierclass：供应商类别表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM18_SUPPLIERCLASS客户类别表说明： 此表中包含一层供应商类别的所有分类，分类方式：第1位到第2位大类标识表项标识类型名称说明ClassTypChar(1)分类类别1：大类PClassCdVarchar2(6)类别代码ClassNmVarchar2(20)类别名称ParentVarchar2(4)父类代码ChildFlgChar(1)子类别标志1：存在子类别，0：不存在子类别 OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+22) TMM19_suppliers：供应商代码表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM19_suppliers客户代码表说明： 
+表项标识类型名称说明PcustCdChar(8)客户代码Tmm19_suppliers_seqCustNmVarchar2(60)客户名称CustAnmVarchar2(20)客户简称CustBrCdVarchar2(20)客户简码客户名称的拼音前一位，用于简化输入ClassCdChar(6)客户类别TMM18_SUPPLIERCLASS中的类别ScaleChar(1)客户等级L：大，M：中，S：小AddressVarchar2(40)客户地址ZipCdChar(6)邮编PhoneNoVarchar2(20)联络电话FaxNoVarchar2(20)传真ContactorVarchar2(10)联系人TaxNoVarchar2(18)税号BankNmVarchar2(40)开户银行BankAccNoVarchar2(50)帐号PcRepChar(6)进货业务员 OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效Suppinfochar(1)供应商基本资料1：有效，0：无效Agreementschar(1)品质协议1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+　　
+23) TMM21_CustClass：客户类别表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM21_CustClass客户类别表说明： 表项标识类型名称说明ClassTypChar(1)分类类别1：大类PClassCdVarchar2(6)类别代码ClassNmVarchar2(20)类别名称ParentVarchar2(4)父类代码ChildFlgChar(1)子类别标志OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+24) TMM22_Customers ：客户代码表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM22_Customers客户代码表说明： 
+表项标识类型名称说明PCustCdChar(8)客户代码Tmm22_customer_seqCustNmVarchar2(60)客户名称CustAnmVarchar2(20)客户简称CustBrCdVarchar2(20)客户简码客户名称的拼音前一位，用于简化输入ClassCdChar(6)客户类别TMM21_CustClass中的类别BusiTypChar(2)销售分类YX：有限公司，ZS：直属门店，YS：延伸门店AddressVarchar2(40)客户地址ZipCdChar(6)邮编PhoneNoVarchar2(20)联络电话FaxNoVarchar2(20)传真ContactorVarchar2(10)联系人TaxNoVarchar2(18)税号BankNmVarchar2(40)开户银行BankAccNoVarchar2(50)帐号OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效Parentcdchar(8)机构代码上级有限公司代码CustCardVarchar2(8)卷烟信息磁卡号BackupVarchar2(200)备注locationChar(1)环线位置1：内环2：中环3：外环areaChar(2)划区Pos_ninteger台数门店拥有pos数，开通做更新WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送opersystemvarchar(128)操作系统data_basevarchar(128)数据库soft_editionvarchar(128)软件版本S_STATUS  CHAR(1)门店状态0：未开通 1：开通2：临时关闭9：永久关闭AD_VIDEO   CHAR(1)视频业务状态0：没有视屏业务1：有视屏业务　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+
+25) TMM24_CustItems：商品供应商清单
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM24_CustItems供应商供货清单说明：一个商品对应多个供应商，并且对同一商品必须而且仅有一个默认供应商
+表项标识类型名称说明PItemCdChar(6)商品代码PCustCdChar(8)客户代码DfltFlgChar(1)默认标志Y：是，N：否 OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效DelivercycleInteger供货周期（天）servicecycleInteger配件维护周期（天）guaranteeperiodInteger供应商保质期（天）BackupVarchar2(200)备注WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+26) TMM31_SysCodes：系统代码表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM31_SysCodes系统代码表说明：此表中系统中使用的代码类型
+       SY：代码类型
+       UT：操作类型（PC 采购员，SL 销售）
+SS：商品属性（ZC 正常，JP 增品，DC 待处理品，TH 退货，TS特殊等）。
+YF：验收分类（RG 进货，AL 调拨，SL 负销售）。
+KL：仓库类型（）
+WL：仓位类型（）
+TZ：溢缺调整类型（）
+YY：溢缺原因2006-04-18增加（wujun）
+CL：车辆类型（MB 面包车，KC卡车）
+TD：退换原因（GQ过期，PS破损）
+PC:'CG'常规,'XT'销退,'HC'红冲，'BC'进货补差，'TS'特殊订单，'JP'奖品，'TH'退货
+IT：发票类型，'ZZ'增值税发票，'PT'普通发票
+BG：商品属性变更
+BT：销售分类，'LS'自营门店 'SH'社会客户
+PT：价格类型，10：进货, 21：批发， 25：零售
+所有信息分为系统级和用户级，系统级为系统正常运行所必需信息，用户不可修改和添加明细，用户级为用户可自行添加。
+请在设计时进行相应补充
+表项标识类型名称说明PCodeTypChar(2)代码类型如此行是代码类型，则字段信息'SY'PCodeCdChar(2)代码CodeNmVarchar2(20)代码名称SysFlgChar(1)系统级标志Y：是，N：否 OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+27) TMM33_Message：系统信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM33_Message系统信息表说明： 
+请在设计时进行相应补充
+表项标识类型名称说明PMessageidChar(6)信息代码MessagenmVarchar2(60)信息内容MessageTypChar(1)信息类别OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+28) TMM34_IdMaster：单据编码管理表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM34_IdMaster单据编码管理表说明： 生成新的单据前,先从本表中取得当前流水号(curbillid),加1后作为新的单据号,同时本表中curbillid也加1。
+AR：应收帐序号     AP：应付账序号   PA：调价单据       CV：转换单据
+SL：销售单据       SN：销售序列号     SD：销售清单     BK：退货单据
+AT：商品组装拆零单 OL：溢缺调整单     EX：退换单据     IT：税控传输号
+PC：进货单据       RG：收购通知单     CK：验收单据     OD：直送订货单据
+LD：借货单据       AL：仓库调拨单     MV：移库单据     DL：送货单据
+AO：仓库溢缺调整单  RS: 销售订单       SP：促销单据      FP：发票小号流水号
+IP：商品采购促销计划－赠品   PM：促销单      CP：门店盘点计划单
+DB：门店配货单号  CY 差异单据号   LP理赔单据号 类型名称说明PIdTypChar(2)单据类型代码IdTypNmVarchar2(20)单据类型名称CurBillidInteger当前流水号MaxB illidInteger最大流水号LoopsInteger循环次数OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+29) TIP01_Price：商品价格表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIP01_Price商品价格表说明：所有商品的所有价格都在本表中设置（包括进货价格、销售价格和成本价格）。
+　　　所有价格为零售单位价格。
+表项标识类型名称说明PItemcdChar(6)商品代码PBusiTypChar(2)业务类型10:新品 ，20：旧品PUnitCdChar(2)单位代码ItemPriceDecimal(16,8)商品价格OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送StTransFlgChar(1)门管传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+30) TIP03_AdjPrice：商品调价表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIP03_AdjPrice商品调价表说明： 
+表项标识类型名称说明PPaBillidChar(8)调价单据号PLineNoInteger行号ItemCdChar(8)商品代码BusiTypChar(2)业务类型10:新品 ，20：旧品OldPriceDecimal(16,8)原价格NewPriceDecimal(16,8)新价格OperCdChar(6)操作员代码GenDateDate生成日期UseFlgChar(1)有效标志0：未处理，1：已处理，2：已结束，9：作废　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+
+
+31) TMM35_cust_pos_rl：门店pos设备对照表
+　　结构
+DB对象标识DB对象名称制作人制作日期TMM35_cust_pos_rl门店pos设备对照表说明： 1记录所有门店中pos设备信息
+表项标识类型名称说明PCustcdChar(8)客户代码Tmm22_customers(custcd)PEidChar(13)设备序列号PItemCdChar(8)机型Tmm12_items(itemcd) typflg='1' 成品StartdateDate开通日期sysinfoVarchar2(30)系统程序softinfoVarchar2(30)软件配置posupddatedate设备更新时间PosinfovarChar2(30)Pos版本areaChar(2)划区statusChar(1)设备状态1：在用，0：备机TypflgChar(2)类型参考tmm31_syscodesMaintenancedateChar(6)保养时间1：上半年，0：下半年MaintenancetypDate保养状态1：已保养，0：未保养OperCdChar(6)操作员代码GenDateDate生成日期UpddateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+32) Tmm36_cust_ve_rl：门店视频设备对照表
+　　结构
+DB对象标识DB对象名称制作人制作日期Tmm36_cust_ve_rl门店视频设备对照表说明： 
+表项标识类型名称说明PCustcdChar(8)客户代码Tmm22_customers(custcd)PitemcdInteger行号PEidChar(13)设备序列号ItemCdChar(8)机型Tmm12_items(itemcd) typflg='1' 成品StartdateDate开通日期sysinfoVarchar2(30)系统程序softinfoVarchar2(30)软件配置posupddatedate设备更新时间PosinfovarChar2(30)Pos版本areaChar(2)划区statusChar(1)设备状态1：在用，0：备机TypflgChar(2)类型参考tmm31_syscodesMaintenancedateChar(6)保养时间1：上半年，0：下半年MaintenancetypChar(1)保养状态1：已保养，0：未保养OperCdChar(6)操作员代码GenDateDate生成日期UpddateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+
+
+
+33) TMM40_Label：标签表
+　　结构
+DB对象标识DB对象名称制作人制作日期Tmm40_label标签表说明： 按商品大类生成序列号
+配件：T-大类码+年月（yymm）+4位需要 例子：T-NC11050001
+整机：参见详细设计
+表项标识类型名称说明PLabelidChar(13)标签码classcdChar(2)大类码OperCdChar(6)操作员代码GenDateDate生成日期UpddateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效  初始无效 当产品入库检验后对使用的标签进行回写1 　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+34) TMM41_BOM：bom主表
+　　结构
+DB对象标识DB对象名称制作人制作日期Tmm41_bom标签表说明： 
+表项标识类型名称说明PbomcdChar(6)bom代码Tmm12_items.itemcdBomnmvarChar2(50)Bom名称OperCdChar(6)操作员代码GenDateDate生成日期UpddateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效 与tmm12_items　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+　　
+35) TMM42_BOMDT：bom明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期Tmm42_bomdt标签表说明：
+ 表项标识类型名称说明PbomcdChar(6)Bom代码PitemcdChar(6)商品代码Bomqtyinteger配件数量OperCdChar(6)操作员代码GenDateDate生成日期UpddateDate更新日期　　·索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+　　
+　　
+36) TMM43_Eid设备id明细清单表
+　　结构
+DB对象标识DB对象名称制作人制作日期Tmm43_Eid设备id明细清单说明： 
+表项标识类型名称说明PitemcdChar(6)商品代码PEidChar(13)配件idOperCdChar(6)操作员代码GenDateDate生成日期UpddateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效 EtypChar(1)设备类型0：配件1：主机SflgChar(1)状态标志0：新品已检验1：已使用2：已报废3：待检4：已退回RefidChar(8)最后的相关单据qcflgChar(1)质检结果whcdChar(2)所在仓库prddatedate批次itemtypChar(2)商品类别New_oldChar(1)新旧标识RemarkVarchar(200)备注Manuf_seqVarchar(100)原厂序列号Old_degreenumber新旧程度未启用IsnunitChar(1)是否整机未启用　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+　　
+37) TMM44_POS_R_Eid：POS与配件id对照表
+　　结构
+DB对象标识DB对象名称制作人制作日期Tmm44_pos_r_eidPOS与配件id对对照表说明：业务调整BOM配件明细表
+ 表项标识类型名称说明PPosidChar(13) 主机设备号PitemcdChar(6)配件代码PEidinteger配件数量OperCdChar(6)操作员代码GenDateDate生成日期UpddateDate更新日期USEFLGChar(6)是否有效MUTIEMVARChar(13)二级大类代码未启用　　·索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+38) TMM45_suppappraisal：供应商评分体系表
+　　结构
+DB对象标识DB对象名称制作人制作日期Tmm45_suppappraisal供应商评分体系表说明：
+ 表项标识类型名称说明PAppidChar(2编号appnmVarchar2(50)名称minappinteger最小分数maxappinteger最大分数Qualappinteger合格分数UpddateDate更新日期useflgChar(1)有效标记　　·索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+　　
+39) TPC01_pcplan：采购计划表
+　　结构
+DB对象标识DB对象名称制作人制作日期TPC01_pcplan采购计划表说明：销售单生成时根据bom库存数自动产生 
+表项标识类型名称说明PpcplanidChar(8)采购计划单号SlbillidChar(8)对应销售单号Tsl10_slbill.slbillidpcTypChar(1)销售分类0：采购 1：维护PTimesInteger打印次数本单据可重复打印，但必须记录打印次数OperCdChar(6)操作员代码MemoVarchar2(255)备注GenDateDate生成日期UseFlgChar(1)有效标志 PlandateDate采购计划日AuditManChar(6)审批人AuditDateDate审批日期CheckMemo Varchar2(255)审批备注AuditFlgChar(1)审批标志'0'未审批 '1'送审 '2'已审批TypeChar (1)生成标志'0'销售  '1' 库存界限 '2' 其他　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+40) TPC02_PcplanDt：采购计划明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TPC02_PcplanDt采购计划明细表说明： 
+表项标识类型名称说明PPcplanidChar(8)采购计划单号PLineNoInteger行号ItemCdChar(6)商品代码RgstQtyDecimal(12,0)采购计划数量UnitsvarChar2(4)采购单位StoreqtyDecimal(12,0)库存数对应仓库码'0001'的库存lowLimitDecimal(12,0)商品下限UpperlimitDecimal(12,0)商品上限AuditqtyDecimal(12,0)审核数　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+41) TPC03_pcplanstatus：采购计划状态表
+　　结构
+DB对象标识DB对象名称制作人制作日期TPC03_Pcplanstatus采购计划状态表说明： 采购计划生成的同时 ，同步采购计划状态表，增加待审批数量
+表项标识类型名称说明PItemcdChar(6)商品代码RgstQtyDecimal(12,0)采购计划数量AuditqtyDecimal(12,0)未采购数量pcqtyDecimal(12,0)已采购未入库OperCdChar(6)操作员代码MemoVarchar2(255)备注GenDateDate生成日期UseFlgChar(1)有效标志 跟商品信息useflg 同步UpddateDate更新日期　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+　　
+　　
+42) TPC12_Register：采购订单主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TPC12_Register采购订单主表说明： 
+表项标识类型名称说明PRgstBillidChar(8)采购订单号supplierCdChar(8)供应商代码PcRepChar(6)采购业务员代码PTimesInteger打印次数本单据可重复打印，但必须记录打印次数OperCdChar(6)操作员代码MemoVarchar2(255)备注GenDateDate生成日期AuditManChar(6)审批人AuditDateDate审批日期CheckMemo Varchar2(255)审批备注AuditFlgChar(1)审批标志'0'未审批 '1'送审 '2'已审批UseFlgChar(1)有效标志0：未验收，1：已验收，2：已进货，3.发票已录，9：作废RgstdateDate订单日期RgstamtNumber(12,2)采购金额　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+　　
+　　
+43) TPC13_RegisterDt：采购订单明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TPC13_RegisterDt采购订单明细表说明： 
+表项标识类型名称说明PRgstBillidChar(8)采购订单号PLineNoInteger行号ItemCdChar(6)商品代码RgstQtyDecimal(12,0)采购数量MemoVarchar2(255)备注字段UnitsvarChar2(4)采购单位RgstPriceDecimal(16,8)采购单价DeliverdateDate最晚送货日InqtyDecimal(12,0)已入库数量AuditqtyDecimal(12,0)审核数量　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+　　
+　　
+
+44) TPC16_Rpcbill：退货单主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TPC16_RPcBill退货单据主表说明： 
+表项标识类型名称说明PPcBillidChar(8)退货单号CustCdChar(8)客户代码PcDateDate退货日期PcAmtDecimal(16,4)总金额Whcdchar(2)退货仓库InvoiceFlgChar(1)结算标志0:未结算，1:已结算PTimesInteger打印次数本单据可重复打印，但必须记录打印次数OperCdChar(6)操作员代码MemoVarchar2(255)备注GenDateDate生成日期UseFlgChar(1)有效标志1:正常,9:作废　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+45) TPC17_RPcbillDt：退货单明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TPC17_RPcBillDt退货单据明细表说明： 
+表项标识类型名称说明PPcBillidChar(8)进货单号PLineNoInteger行号ItemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS'ItemCdChar(8)商品代码EidChar(13)通方设备idSeidVarchar2(30)供应商设备idRPcQtyDecimal(12,0)退货数量InvoiceQtyDecimal(12,0)结算数量Default 0,已结算的数量，初始为0,每次结算都记录数量，用于多次结算UnitsvarChar2(4)进货单位　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+46) TPC20_Suppappraisal：供应商评价主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TPC20_suppappraisal供应商评价主表说明： 
+表项标识类型名称说明PappidChar(8)评价单号SdateDate开始时间EdateDate结束时间MemoVarchar2(255)备注opercdChar(6)输入员gendatedate生成时间auditflgChar(1)审核标记auditmanChar(6)审核人auditdatedate审核日期0：未审批 1：送审 2 ：审批useflgChar(1)状态　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+47) TPC21_suppappraisalDT：供应商评价明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TPC20_suppappraisalDT供应商评价明细表说明： 
+表项标识类型名称说明PAppidChar(8)评价单号PLineNoInteger行号SupplieridChar(8)供应商编码AppcodeChar(2)评价编号appScoreinteger分数AppflgChar(1)合格状态'Y'：合格N'：不合格　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+48) TQC10_result：质检结果单主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TQC10_result质检结果单主表说明： 表项标识类型名称说明PQCbillidChar(8) 质检结果单号OptypChar(2)质检单类型TMM32_SysCodesDt中CodeTyp='QO' 
+Yh：易耗品 PJ:配件 C1：生产成品C2：成品转配件
+RefbillidChar(8)对应单号ItemcdChar(6)成品代码EidChar(13)成品设备代码OpercdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+49) TQC11_resultdt：质检结果单明细表批次
+　　结构
+DB对象标识DB对象名称制作人制作日期TQC11_resultDT质检结果明细表批次说明： 
+表项标识类型名称说明PQCbillidInteger 质检结果单号PItemcdChar(6)检验品代码PItemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS'PPrdDateDate生产日期qcQtyDecimal(12,0)质检数量PQcstatusChar(2)质检结果TMM32_SysCodesDt中CodeTyp='QC' 
+GA：绿a ， GB：绿b， GC：绿c  （合格），  RD：红（不合格），YR：黄（未检测），WH：白（报废品）
+InqtyDecimal(12,0)已入库数量OpercdChar(6)操作员代码GenDateDate生成日期UseFlgChar(1)有效标志1：有效，0：无效　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+50) TQC12_resulteid：质检结果单明细表设备id
+　　结构
+DB对象标识DB对象名称制作人制作日期TQC12_resultDTeid质检结果单明细表设备id说明： 
+表项标识类型名称说明PQCbillidChar(8)质检单号PItemcdChar(6)商品代码ItemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS'PrdDateDate生产日期qcQtyDecimal(12,0)质检数量QcstatusChar(2)质检结果TMM32_SysCodesDt中CodeTyp='QC' 
+GA：绿a ， GB：绿b， GC：绿c  （合格），  RD：红（不合格），YR：黄（未检测），WH：白（报废品）
+InqtyDecimal(12,0)已入库数量PEidChar(13)设备idOperCdChar(6)操作员代码GenDateDate生成日期　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+51) TSL01_Extend：开通计划表
+　　结构
+DB对象标识DB对象名称制作人制作日期TSL01_Extend开通计划表说明：
+表项标识类型名称说明PopBillidChar(8)开通号SlbillidChar(8)销售单号CustcdChar(8)客户代码有限公司ImpdateChar(6)开同实施时间YyyymmTraindateChar(6)培训时间YyyymmbusitypChar(2)门店类型LS：自营门店SH：社会门店SLtypChar(2)开通类型XZ：新装GX更新BQ：搬迁 GB ：关闭 BG：设备变更ItemcdChar(6)机型OperCdChar(6)操作员代码BackupVarchar2(255)备注GenDateDate生成日期UseFlgChar(1)有效标志1:有效,2：完成 9:无效auditflgChar(1)审核标志0：未送审1：送审2：已审批AuditmanChar(6)审核人AuditdateDate审核日期　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+
+52) TSL02_ExtendDt：开通计划明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TSL02_ExtendDt开通计划明细表说明： 
+表项标识类型名称说明POPBillidChar(8)开通计划单据号CustcardChar(8)磁卡号变更、搬迁（来源）CustCdChar(8)客户代码变更、搬迁（来源）PLANQtyDecimal(12,0)计划开通数量OPQtyDecimal(12,0)已开通数ClqtyDecimal(12,0)撤销数量UseflgChar(1)完成标志0：未完成 1：完成（计划开通数量=已开通数+撤销数量）ImpdateDate开同实施时间TraindateDate培训时间newAddressVarchar2(255)新地址变更、搬迁（目标）new CustcardChar(8)新磁卡号变更、搬迁（目标）NewcustcdChar(8)     新客户代码变更、搬迁（目标）AddressVarchar2(255)地址EidChar(13)设备代码　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+　　
+53) TSL10_SlBill：销售单表
+　　结构
+DB对象标识DB对象名称制作人制作日期TSL10_SlBill销售单主表说明： 
+表项标识类型名称说明PSLBillidChar(8)销售单号CustBillidVarchar2(20)客户订单号客户提供的订单号SlTypChar(2)销售类型XZ：新装；GX：更新；  CustCdChar(8)客户代码RgsDateDate订单日期生成订单的日期SendDateDate交货日期BusiTypChar(2)门店类型LS：自营门店，SH：社会客户等，PTimesInteger打印次数本单据可重复打印，但必须记录打印次数OperCdChar(6)操作员代码MemoVarchar2(255)备注GenDateDate生成日期AuditManChar(6)审批人AuditDateDate审批日期CheckMemo Varchar2(255)审批备注AuditFlgChar(1)审批标志0：未送审 1：送审中 2：已审批pcplanFlgChar(1)采购计划标记0：未生成 1：已生成 X：生成中RfpcplanidChar(8)采购计划单号RgsqtyNumber(12,0)订购数量 PlanqtyNumber(12,0)已计划数量OpenqtyNumber(12,0)已实施数量ClqtyNumber(12,0)已撤销销售数量UseFlgChar(1)有效标志0：未处理  1：开通计划完成（订购数量=已计划数量+撤销数量） 2：销售订单完成   9：作废ItemcdChar(6)机型　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+　　
+54) TWH01_WareHouse：仓库信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH01_WareHouse仓库信息表说明： 仓库支持多仓库，在做采购订单时，入库仓库是默认仓库
+表项标识类型名称说明PWhCdChar(2)仓库代码WhNmVarchar2(60)仓库名称WhTypChar(2)仓库类型AddressVarchar2(60)地址PhoneNoVarchar2(15)电话FaxVarchar2(15)传真LeaderChar(6)负责人代码DefaultFlgChar(1)缺省标志Y：缺省，N：非缺省RemoteFlgChar(1)远程标志0：本地仓库，1：远程仓库OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+55) TWH02_Location：仓位信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH02_Location仓位信息表说明： 
+表项标识类型名称说明PWhCdChar(2)仓库代码PLocCdChar(15)仓位代码LocNmVarchar2(60)仓位名称LocTypChar(2)仓位类型KeeperChar(6)保管员代码OperCdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效WhTransFlgChar(1)仓库传送标志1：需传送，0：已传送　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+56) TWH11_Detail：仓库库存表
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH11_Detail仓库库存表说明： 此表中只记录各种商品属性当前仓库库存，明细见TWH12_DetailDt
+表项标识类型名称说明PSeqNoInteger 流水号通过序列Seq_TWH11来产生PWhCdChar(2)仓库代码LocCdChar(15)仓位代码ItemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS'ItemCdChar(8)商品代码UnitCdChar(2)单位代码ItemQtyDecimal(12,4)库存数量PrdDateDate生产日期OpercdChar(6)操作员代码GenDateDate生成日期UpdDateDate更新日期UseFlgChar(1)有效标志1：有效，0：无效　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+57) TWH12_DetailDt：仓库库存明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH12_DetailDt仓库库存明细表说明： 
+表项标识类型名称说明PSeqNoInteger 流水号通过序列Seq_TWH12来产生PWhCdChar(2)仓库代码LocCdChar(15)仓位代码BillIdChar(8)业务单据号发生库存变化的单据，如进货、销售、损溢单据号等InvDateDate库存日期库存记帐日期InvTypChar(1)库存类型0：期初导入，1：采购，2：销售，3：一进一出采购，4：一进一出销售，5：损，6：溢，7：商品属性转入，8：商品属性转出等，9：差异单，A：理赔,B：生产日期转入，C：生产日期转出，D:差异单作废，E:理赔单作废ItemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS'ItemCdChar(8)商品代码UnitCdChar(2)单位代码ItemQtyDecimal(12,4)商品数量发生此业务后的库存数量PrdDateDate生产日期StoreQtyDecimal(12,4)库存数量OpercdChar(6)操作员代码GenDateDate生成日期UseFlgChar(1)有效标志1：有效，0：无效　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+58) TWH13_In：仓库入库主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH13_In仓库验收主表说明： 
+表项标识类型名称说明PWhCdChar(2)仓库代码inDateDate验收日期PInbillidChar(8)验收单据号invTypChar(1)入库类型固定1 refBillidChar(8)相关单号PtimesInteger打印次数MemoVarchar2(60)备注OperCdChar(6)操作员代码GenDateDate生成日期AuditflgChar(1)审核标志0：未审核 1：送审 2：已审批auditmanChar(6)审核人auditdatedate审核时间useflgChar(1)使用标志0：新建 1：已入库  9：作废HandlerChar(6)经手人AccepterChar(6)验收人　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+59) TWH14_CheckInDt：仓库验收明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH14_CheckInDt仓库验收主表说明： 
+表项标识类型名称说明PWhCdChar(2)仓库代码PinBillidChar(8)验收单据号PLineNoInteger验收单行号ItemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS' 固定 DJItemCdChar(6)商品代码PrdDateDate生产日期BatchIdVarchar2(50)批号inQtyDecimal(12,4)数量RefLineNoInteger相关单据行号　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+60) TWH15_Out：仓库发货主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH15_Out仓库出库主表说明： 
+表项标识类型名称说明PWhCdChar(2)仓库代码OutDateDate出库日期POutBillidChar(8)出库单据号invTypChar(1)出库类型PtimesInteger打印次数MemoVarchar2(255)备注OperCdChar(6)操作员代码GenDateDate生成日期AuditflgChar(1)审核标志auditmanChar(6)审核人auditdatedate审核时间OptypChar(2)商品类型YH：易耗品 PJ：配件、成品UseflgChar(1)使用标志targetwhcdChar(1)挑拨出库对应仓位HandlerChar(6)经手人AccepterChar(6)验收人　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+61) TWH16_OutDTprd：仓库出库批次明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH16_outDt仓库出库批次明细说明： 
+表项标识类型名称说明PWhCdChar(2)仓库代码POutBillidChar(8)出库单据号PLineNoInteger出库单行号itemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS'ItemCdChar(6)商品代码PrdDateDate生产日期OutQtyNumber（12）数量QcqtyNumber（12）已质检数　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+62) TWH16_OUTDTeid
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH16_outDteid仓库出库edi明细说明： 
+表项标识类型名称说明PWhCdChar(2)仓库代码POutBillidChar(8)出库单据号PLineNoInteger出库单行号itemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS'ItemCdChar(6)商品代码PrdDateDate生产日期eidChar(13)设备idOutQtyNumber（12）数量固定1QcqtyNumber（12）已质检数已质检数　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+　　
+63) TWH17_OverLost：溢缺调整主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH21_ArrToRoute溢缺调整主表说明： 
+表项标识类型名称说明PWhCdChar(2)仓库代码POlBillidChar(8)损溢单号整个损溢业务流程，不管是业务还是仓库，都是用一个单据号OlTypChar(2)损溢类型CG：常规，PD：盘点OlDateDate损溢日期CfDateDate确认日期审批日期也是真正记业务库存的日期MemoVarchar2(60)备注OperCdChar(6)操作员代码GenDateDate生成日期UseFlgChar(1)有效标志0：未送审，1：送审中，2：已审批，3：勾销完成
+ 9：作废cfercd CHAR(6)审批人OptypChar(2)商品类型YH：易耗品 PJ：配件、成品OlReasonChar(2)损溢原因　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+64) TWH18_OverLostDt：溢缺调整明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH18_OverLostDt溢缺调整明细表说明： 
+表项标识类型名称说明PWhCdChar(2)仓库代码POlBillidChar(8)损溢单号PLineNoInteger损溢单行号ItemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS'ItemCdChar(8)商品代码OlQtyDecimal(12,4)损溢数量PrddateDate生产月份MemoVarchar2(255)备注
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+65) TWH18_OverLosteid：溢缺调整明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TWH18_OverLosteid溢缺调整明细表说明： 
+表项标识类型名称说明PWhCdChar(2)仓库代码POlBillidChar(8)损溢单号PLineNoInteger损溢单行号ItemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS'ItemCdChar(8)商品代码OlQtyDecimal(12,4)损溢数量PrddateDate生产月份MemoVarchar2(255)备注eidChar(13)设备代码
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+
+
+66) TIV11_Detail：业务库存主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIV11_Detail锁定库存表说明：
+表项标识类型名称说明PSeqNoInteger 流水号通过序列Seq_TIV11来产生ItemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS'ItemCdChar(8)商品代码StoreQtyDecimal(12,4)库存数量OpercdChar(6)操作员代码GenDateDate生成日期UseFlgChar(1)有效标志1：有效，0：无效　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+
+67) TIV12_DetailDt：业务库存明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIV12_DetailDt锁定库存明细表说明： 
+表项标识类型名称说明PSeqNoInteger 流水号通过序列Seq_TIV12来产生WhCdChar(2)仓库代码考虑多仓库的情况BillIdChar(8)业务单据号发生库存变化的单据，如进货、销售、损溢单据号等InvDateDate库存日期库存记帐日期InvTypChar(1)库存类型0：期初导入，1：采购，2：销售，3：一进一出采购，4：一进一出销售，5：损，6：溢，7：商品属性转入，8：商品属性转出，9：返利等ItemTypChar(2)商品属性TMM32_SysCodesDt中CodeTyp='SS'ItemCdChar(8)商品代码ItemQtyDecimal(12,4)商品数量此业务单据中的商品数量StoreQtyDecimal(12,4)库存数量发生此业务后的库存数量OpercdChar(6)操作员代码GenDateDate生成日期UseFlgChar(1)有效标志1：有效，0：无效　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+无
+　　
+68) TXC03_Log通讯日志表
+　　结构
+DB对象标识DB对象名称制作人制作日期TXC03_Log通讯日志表说明： 每次通讯及时记录通讯情况
+表项标识类型名称说明PLogbillidInt日志单据号序列号由系统Sequences自动增加LogVarchar（800）通讯日志记录通讯日志，内容主要设计到通讯表、表记录数、成功与否、如果有错误也将记录在日志里OpercdChar（6）操作员GendateDate日志生成日期　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+69) PLAN_CUST预计划表
+　　结构
+DB对象标识DB对象名称制作人制作日期PLAN_CUST预计划表说明： 
+表项标识类型名称说明PPLANNOVARCHAR2 (10)计划单号PLANTYPVARCHAR2 (2)计划类型CUSTNEWVARCHAR2 (2)配置是否确认CUSTCARDVARCHAR2 (20)计划磁卡号CUSTCDCHAR (8)客户代码CUSTNMVARCHAR2 (80)客户名称CLASSCDVARCHAR2 (6)机构代码BUSITYPCHAR (2)客户类型PPTCODEVARCHAR2 (10)客户属性IS_CONTRACTVARCHAR2 (2)是否合同内ADDRESSVARCHAR2 (80)地址CONTACTORVARCHAR2 (10)联系人PHONENOVARCHAR2 (60)电话CUSTRNMVARCHAR2 (80)理论订货日JL_CONTACTORVARCHAR2 (10)客户经理JL_PHONENOVARCHAR2 (60)经理联系方式POS_FROMVARCHAR2 (6)设备来源POS_ITEMVARCHAR2 (6)设备机型POSIDVARCHAR2 (13)设备IDNEW_CUSTCARDVARCHAR2 (20)源磁卡号NEW_CUSTCDCHAR (8)源客户代码NEW_PHONENOVARCHAR2 (60)源联系方式NEW_ADDRESSVARCHAR2 (80)源地址NEW_CUSTNMVARCHAR2 (80)源客户名称NEW_POSITEMVARCHAR2 (6)源机型NEW_POSIDVARCHAR2 (13)源设备IDSOLVE_TYPEVARCHAR2 (2)旧机处理BACK_STATUSVARCHAR2 (2)取回状态CUST_USEFLGVARCHAR2 (2)客户标识处理PLAN_STATUSVARCHAR2 (2)计划呼出反馈SERVETYPVARCHAR2 (2)呼出类型PL_SERVE_TASKVARCHAR2 (200)呼出说明IMPLE_STATUSVARCHAR2 (2)实施呼出反馈COMMMODEVARCHAR2 (4)通讯方式SERVE_STATUSVARCHAR2 (2)呼出状态PLAN_REQUIREVARCHAR2 (200)计划要求备注IMPLE_DATEDATE实施日期SEND_DATEDATE送机日期TRAIN_DATEDATE培训日期IMPLE_MARKVARCHAR2 (200)实施备注IMPLE_RESULTVARCHAR2 (10)实施结果FAIL_REASONVARCHAR2 (200)失败原因IS_OUTFLAGVARCHAR2 (2)是否已发计划（实施部）STATUSVARCHAR2 (2)单据状态GENDATEDATE创建时间OPERCDCHAR (6)创建人PROPO_ITEMVARCHAR2 (20)建议机型大类SERVE_ERCDVARCHAR2 (6)呼出人员　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+70) PLAN_SERVE呼出记录表
+　　结构
+DB对象标识DB对象名称制作人制作日期PLAN_SERVER呼出记录表说明： 表项标识类型名称说明PDTLIDVARCHAR2(8)呼出IDPLANNONUMBER计划单号PLANTYPVARCHAR2 (2)计划类型SERVETYPVARCHAR2 (2)业务类型SERVE_TASKVARCHAR2(120)呼出说明SERVE_BACKVARCHAR2 (10)结果反馈SERVE_MARKVARCHAR2(120)结果备注COMMMODEVARCHAR2 (4)通讯方式STATUSVARCHAR2 (2)单据状态GENDATEDATE创建时间GENERCDCHAR(6)创建人员OPDATEDATE操作时间OPERCDCHAR(6)操作人员　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+71) SERVER_CALL日常问题记录表
+　　结构
+DB对象标识DB对象名称制作人制作日期SERVER_CALL日常问题记录表说明： 客户来电记录登记表项标识类型名称说明PIDVARCHAR2 (10)来电单号CALLTIMEDATE来电时间CUSTCDVARCHAR2 (8)客户代码CUSTCARDVARCHAR2 (20)磁卡号CALLFROMVARCHAR2 (2)来电范围CALLTYPVARCHAR2 (2)业务类别CALLITEMVARCHAR2 (2)业务子类QUESTIONVARCHAR2(250)问题描述SOLUTIONVARCHAR2(250)解决方案CLOSETIMEDATE关单时间STATUSVARCHAR2 (2)状态IS_BDVARCHAR2 (1)是否补单GENDATEDATE受理时间GENERCDCHAR (6)受理人PHONENOVARCHAR2 (60)电话FROMTYPEVARCHAR2 (2)记录来源　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+72) TIT10_MAINTENANCE_LIABILITY单据豁免信息表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT10_MAINTENANCE_LIABILITY单据豁免信息表说明： 表项标识类型名称说明PMAINTENANCE_IDVARCHAR2(8)维护单IDEXCEPTIONSCDVARCHAR2(10)免责条款EXCEPTIONSNMVARCHAR2(200)条款名称DEPTNMVARCHAR2(20)审核部门UPDDATEDATE操作日期OPERCDCHAR(6)操作员代码ASSESSFLGCHAR(1)是否考核EXEMPTFLGCHAR(1)是否豁免TYPECHAR(1)类型(1未完成2未达标)IS_FINISHCHAR(1)当前状态(0未处理 1已分配 2已处理 3已审核)USEFLGCHAR(1)有效标记SETFROMVARCHAR2(10)来源　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+73) TIT10_MAINTENANCEDAY日常维护单主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT10_MAINTENANCEDAY日常维护单表说明： 表项标识类型名称说明PMAINTENANCE_IDVARCHAR2(8)维护单IDCOMPANY_IDVARCHAR2(8)所属区域公司IDSTORE_IDVARCHAR2(8)门店IDTEMP_CONTRACTVARCHAR2(60)临时联系电话FAULT_TYPEVARCHAR2(8)故障类型SERVRITYCHAR(1)严重程度EMERGENCY_LEVELCHAR(1)紧急程度PRIORITYCHAR(1)优先级REQUESTERCHAR(6)请求人员REQUEST_TIMEDATE请求时间EXPECTED_COMPLETION_TIMEDATE合同要求完成时间DELIVER_NOVARCHAR2(8)送货单号SHORT_DESCRIPTIONVARCHAR2(80)故障简述DETAIL_DESCRIPTIONVARCHAR2(200)详细描述VIEW_TYPECHAR(1)视频操作类型MEMOVARCHAR2(200)备注DEVICE_IDCHAR(13)故障设备编号CURRENT_STATUSCHAR(1)当前状态IS_SUCCESSCHAR(1)成功标志IS_OLDCHAR(1)是否补单FAULTCODEVARCHAR2(80)故障编码CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人FIRSTORCHAR(6)第一次上门工程师IDFIRST_TIMEDATE第一次上门时间LEAVE_TIMEDATE第一次离店时间CLOSE_TIMEDATE关单时间REVISIT_TIMEDATE回访时间IS_ARCHIVECHAR(1)是否归档REQUSET_PAPER_IDVARCHAR2(8)计划单号　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+74) TIT10_POS_DETAIL维护单换机配件明细
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT10_POS_DETAIL维护单换机配件明细说明： 表项标识类型名称说明PBILL_IDVARCHAR2(8)维护单编号SM_IDNUMBERSM表IDNOFLGCHAR(1)新旧设备标记DEVICE_IDCHAR(13)整机IDITEMCDCHAR(6)配件类型ACCESSORIES_IDCHAR(13)配件编号CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+75) TIT11_MAINTENANCE_ATTC日常维护单附表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT11_MAINTENANCE_ATTC日常维护单附表说明： 现未投入使用,估计为调取录音/照片功能表项标识类型名称说明PMAINTENANCE_IDVARCHAR2(8)维护单IDBUSINESS_OPERATION_IDNUMBER业务流水操作表IDATTC_IDVARCHAR2(8)附件IDATTCNMVARCHAR2(40)附件名称ATTCBLOB附件CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+76) TIT12_MAINTENANCE_ARCHIVE维护单归档表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT12_MAINTENANCE_ARCHIVE日常维护归档表说明： 表项标识类型名称说明PMAINTENANCE_IDVARCHAR2(8)维护单IDBUSINESS_OPERATION_IDNUMBER业务流水操作表IDFAULTCDVARCHAR2(10)故障编码FAULTCD_AUDITVARCHAR2(10)故障编码(审核后)FAULT_TYPEVARCHAR2(10)故障大类FAULT_DETAIL_TYPEVARCHAR2(10)故障小类DESCRIPTIONVARCHAR2(200)描述USEFLGCHAR(1)有效标记IS_AUDITCHAR(1)审核标记CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+77) TIT13_MAINTENANCE_OPEN开通单主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT13_MAINTENANCE_OPEN新机开通维护单表说明： 表项标识类型名称说明PNEW_OPENING_IDVARCHAR2(8)新机开通表IDCOMPANY_IDVARCHAR2(8)所属区域公司IDSTORE_IDVARCHAR2(8)门店IDREQUEST_TIMEDATE请求时间REQUSET_PAPER_IDVARCHAR2(8)计划单号DEVICE_IDCHAR(13)整机编号COUNTNUMBER开通数量EXPECTED_COMPLETION_TIMEDATE合同要求完成时间DELIVER_NOVARCHAR2(8)送货单号SHORT_DESCRIPTIONVARCHAR2(80)简述DETAIL_DESCRIPTIONVARCHAR2(200)详细描述CURRENT_STATUSCHAR(1)当前状态IS_SUCCESSCHAR(1)成功标志IS_OLDCHAR(1)是否补单CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人FIRSTORCHAR(6)第一次上门工程师FIRST_TIMEDATE第一次上门时间LEAVE_TIMEDATE第一次离店时间CLOSE_TIMEDATE关单时间REVISIT_TIMEDATE回访时间　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+78) TIT14_EQUIPMENT_OPEN开单单明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT14_EQUIPMENT_OPEN新机开通设备附表说明： 表项标识类型名称说明PNEW_OPENING_IDVARCHAR2(8)新机开通IDBUSINESS_OPERATION_IDNUMBER业务流水操作表IDDEVICE_IDCHAR(13)整机IDPRICENUMBER(5,3)价格DELIVERYIDVARCHAR2(8)送货单号CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人IS_FINISHCHAR(1)是否完成IS_CHANGEVARCHAR2(1)配件来源0=无　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+79) TIT15_EQUIPMENT_RENOVATE翻新单明细表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT15_EQUIPMENT_RENOVATE旧机翻新设备附表说明： 表项标识类型名称说明PRENOVATE_IDVARCHAR2(8)旧机翻新IDBUSINESS_OPERATION_IDNUMBER业务流水操作表IDDEVICE_IDCHAR(13)旧机IDNEW_DEVICE_IDCHAR(13)新机IDPRICENUMBER(5,3)价格DELIVERYIDVARCHAR2(8)送货单号CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人IS_FINISHCHAR(1)是否完成　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+80) TIT15_MAINTENANCE_RENOVATE翻新单主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT15_MAINTENANCE_RENOVATE旧机翻新维护单说明： 表项标识类型名称说明PRENEW_IDVARCHAR2(8)旧机翻新表IDCOMPANY_IDVARCHAR2(8)所属区域公司IDSTORE_IDVARCHAR2(8)门店IDREQUEST_TIMEDATE请求时间REQUSET_PAPER_IDVARCHAR2(8)计划单号OLD_DEVICE_IDCHAR(13)旧设备编号NEW_DEVICE_IDCHAR(13)换新设备编号COUNTNUMBER变更数量EXPECTED_COMPLETION_TIMEDATE合同要求完成时间DELIVER_NOVARCHAR2(8)送货单号SHORT_DESCRIPTIONVARCHAR2(80)简述DETAIL_DESCRIPTIONVARCHAR2(200)详细描述CURRENT_STATUSCHAR(1)当前状态IS_SUCCESSCHAR(1)成功标志IS_OLDCHAR(1)是否补单IS_BACKCHAR(1)设备是否返回(YN)CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人FIRSTORCHAR(6)第一次上门工程师IDFIRST_TIMEDATE第一次上门时间LEAVE_TIMEDATE第一次离店时间CLOSE_TIMEDATE关单时间REVISIT_TIMEDATE回访时间　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+81) TIT16_DEVICE_CHANGE变更单主表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT16_DEVICE_CHANGE设备变更单说明： 表项标识类型名称说明PDEVICE_CHANGE_IDVARCHAR2(8)变更单IDSTORE_IDVARCHAR2(8)门店IDREQUSET_PAPER_IDVARCHAR2(8)计划单号CHANGE_TYPEVARCHAR2(8)变更类型DEVICE_IDCHAR(13)整机IDNEW_CONTACTORVARCHAR2(10)变更联系人NEW_TELVARCHAR2(20)变更电话NEW_ADDRESSVARCHAR2(200)变更后地址NEW_STORE_CARDVARCHAR2(8)变更后门店磁卡号NEW_STORE_IDVARCHAR2(8)变更后门店IS_STORE_INSIDE_CHANGECHAR(1)是否店内移机REQUEST_TIMEDATE请求时间EXPECTED_COMPLETION_TIMEDATE合同要求完成时间SHORT_DESCRIPTIONVARCHAR2(80)简述DETAIL_DESCRIPTIONVARCHAR2(200)详细描述CURRENT_STATUSCHAR(1)当前状态IS_SUCCESSCHAR(1)成功标志IS_OLDCHAR(1)是否补单CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人FIRSTORCHAR(6)第一次上门工程师IDFIRST_TIMEDATE第一次上门时间LEAVE_TIMEDATE第一次离店时间CLOSE_TIMEDATE关单时间REVISIT_TIMEDATE回访时间　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+82) TIT21_MAINTENANCE_DISPATCH分派表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT21_MAINTENANCE_DISPATCH维护单分派表说明： 表项标识类型名称说明PMAINTENANCE_IDVARCHAR2(8)维护单IDBUSINESS_OPERATION_IDNUMBER业务操作流水表IDMAINTENANCE_TYPECHAR(2)维护类型OPERATORCHAR(6)操作人ACCPECTD_GROUPCHAR(2)分派组ACCPECTDERCHAR(6)分派人DISPATCH_TIMEDATE分派时间CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+83) TIT22_FETION_SEND飞信发送表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT22_FETION_SEND飞信发送记录表说明： 表项标识类型名称说明PMAINTENANCE_IDVARCHAR2(8)维护单IDBUSINESS_OPERATION_IDNUMBER业务流水操作表IDDISPATCH_BUSINESS_IDNUMBER分派单操作流水RECEIVERCHAR(6)飞信接收人CONTENTVARCHAR2(500)飞信内容SENT_TIMEDATE发送时间SENT_COUNTINTEGER发送次数SENT_OPERATORCHAR(6)发送操作人SENT_STATUSCHAR(1)发送状态CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+84) TIT23_MAINTENANCE_D2D上门服务记录表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT23_MAINTENANCE_D2D维护单上门服务表说明： 表项标识类型名称说明PMAINTENANCE_IDVARCHAR2(8)维护单IDBUSINESS_OPERATION_IDNUMBER业务操作流水表IDD2D_ENGINEERCHAR(6)上门工程师ARRIVE_TIMEDATE到达时间LEAVE_TIMEDATE离店时间JJBZCHAR(1)解决标志D2D_DESCRIPITONVARCHAR2(200)处理过程描述D2D_PHONEVARCHAR2(60)电话OLD_BUSINESS_IDNUMBER原操作流水IDD2D_GROUPNUMBER分组D2D_TYPECHAR(1)类型(到店,离店)CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人USEFLGCHAR(1)有效状态　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+85) TIT24_MAINTENANCE_RV回访表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT24_MAINTENANCE_RV维护单客户回访表说明： 表项标识类型名称说明PMAINTENANCE_IDVARCHAR2(8)维护单IDBUSINESS_OPERATION_IDNUMBER业务操作流水表IDRV_TIMEDATE回访时间RV_OPERATORCHAR(20)回访人员FEEDBACKVARCHAR2(200)客户反馈SATISFACTIONCHAR(1)满意度CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+86) TIT25_ACCESSORIES_UPDATE更换记录表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT25_ACCESSORIES_UPDATE配件更换表说明： 表项标识类型名称说明PMAINTENANCE_IDVARCHAR2(8)维修单IDBUSINESS_OPERATION_IDNUMBER业务流水操作表IDSTORE_IDVARCHAR2(8)门店IDDEVICE_IDCHAR(13)整机IDOLD_ACCESSORIES_IDCHAR(13)旧配件IDACCESSORIES_TYPEVARCHAR2(60)配件类型名称NEW_ACCESSORIES_IDCHAR(13)新配件IDIS_NEWCHAR(1)新配件是否为新品DESCRIPTIONVARCHAR2(200)过程描述PRICENUMBER(5,3)价格ENGINEER_IDCHAR(6)工程师IDIN_WHCHAR(1)是否入库INVFLGCHAR(1)是否开票RECEIPTIDVARCHAR2(8)收据号DELIVERYIDVARCHAR2(8)送货单号CREATE_TIMEDATE创建时间CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人AUDITFLGCHAR(1)提交标志POSFLGCHAR(1)更换整机标志　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+87) TIT27_CLOSE_BILLS关单表
+　　结构
+DB对象标识DB对象名称制作人制作日期TIT27_CLOSE_BILLS关单表说明： 表项标识类型名称说明PMAINTENANCE_IDVARCHAR2(8)任务单IDBUSINESS_OPERATION_IDNUMBER业务操作流水表IDCLOSE_TIMEDATE关单时间CLOSE_TYPECHAR(2)关单类型DESCRIPTIONVARCHAR2(200)描述IS_OLDCHAR(1)是否补关单IS_ARCHIVECHAR(1)是否归档CREATE_TIMEDATE创建时间（系统时间）CREATORCHAR(6)创建人UPDATE_TIMEDATE更新时间UPDATORCHAR(6)更新人　　
+　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+88) THT01_HTGL合同表
+　　结构
+DB对象标识DB对象名称制作人制作日期THT01_HTGL合同表说明： 表项标识类型名称说明PHTBHVARCHAR2 (20)合同编号YEARSCHAR (4)年份CLASSCDVARCHAR2 (6)区域BUSITYPCHAR (2)合同属性FEETYPCHAR (2)费用类型QDISCHAR (1)签订与否QDDATEDATE签订日期HTBGRVARCHAR2 (20)合同保管人REMARKVARCHAR2 (200)备注OPERCDCHAR (6)更新人UPDDATEDATE更新时间YXQFROMDATE有效期起始YXQTODATE有效期截止HTAMOUNTNUMBER (10,2)合同金额　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+89) TAC01_FPSK发票与收款表
+　　结构
+DB对象标识DB对象名称制作人制作日期TAC01_FPSK发票与收款表说明： 表项标识类型名称说明PFPBHVARCHAR2 (30)发票编号YEARSCHAR (4)年份CLASSCDVARCHAR2 (6)区域BUSITYPCHAR (2)合同属性FEETYPCHAR (2)费用类型HTBHVARCHAR2 (20)合同编号HTQCHAR (2)合同期LSHVARCHAR2 (30)签收人KPDATEDATE流水号KPAMOUNTNUMBER (10,2)开票日期HKDATEDATE开票金额HKAMOUNTNUMBER (10,2)回款日期SPTYPECHAR (6)回款金额送票方式SPRCHAR (6)送票人HTQDISCHAR (1)合同签订与否HTAMOUNTNUMBER (10,2),合同金额REMARKVARCHAR2 (200)备注OPERCDCHAR (6)更新人UPDDATEDATE更新日期　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+
+90) SM_IN_OPEN_RESULT整机开通业务处理表
+　　结构
+DB对象标识DB对象名称制作人制作日期SM_IN_OPEN_RESULT业务配置确认表(整机)说明： 表项标识类型名称说明PIDNUMBERIDPLAN_NOVARCHAR2 (64)计划单号CASE_NOVARCHAR2 (64)业务单号CARDCODEVARCHAR2 (64)磁卡号SERIALNOVARCHAR2 (128)相关配置IDCOMPLETEDDATEDATE确认时间RESULTVARCHAR2 (512)详细描述INSERT_TIMEDATE生成时间SYN_TIMEDATE插入时间SYS_STATUSNUMBER状态AUDITERCDCHAR (6)确认人　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+91) SM_IN_PART_CHANGE日常维护业务处理表
+　　结构
+DB对象标识DB对象名称制作人制作日期SM_IN_PART_CHANGE业务配置确认表(配件)说明： 表项标识类型名称说明PIDNUMBER单据号CHANGETYPENUMBER业务类型NAMEVARCHAR2 (128)名称SERIALNOVARCHAR2 (128)相关配置IDMODELVARCHAR2 (128)配置名称OLD_NAMEVARCHAR2 (128)旧配置名称OLD_SERIALNOVARCHAR2 (128)旧配置IDOLD_MODELVARCHAR2 (128)旧配置类型CASE_NOVARCHAR2 (258)业务单号INSERT_TIMEDATE生成时间SYN_TIMEDATE插入时间SYS_STATUSNUMBER状态OPERFLGCHAR (1)是否入库MEMOVARCHAR2 (128)备注AUDITERCDCHAR (6)确认人　　索引
+　　 [说明该数据表的索引定义]
+　　触发器
+　　无
+5.3.2. 序列实体
+　　
+　　[以SQL语句的形式来说明数据库的序列实体的定义]
+   1) 序列1
+　　[SQL语句]
+   2) 序列2
+　　[SQL语句]
+......
+　　
+
+5.3.3. 视图实体
+　　
+　　
+   1) 视图1
+　　[SQL语句]
+   2) 视图2
+　　[SQL语句]
+　　......
+　　
+5.3.4. 存储过程实体
+　　
+　　[以SQL语句的形式来说明数据库的存储过程实体的定义]
+92) 存储过程1
+　　[SQL语句]
+93) 2) 存储过程2
+　　[SQL语句]
+　　......
+　　
+　　
+5.3.5. 程序包实体
+　　
+　　[以SQL语句的形式来说明数据库的程序包实体的定义]
+94) 程序包1
+　　[SQL语句]
+95) 程序包2
+　　[SQL语句]
+　　......
+　　
+　　
+6. 备注
+　　无。
+
+　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　
+
+
+                                                                     数据库设计说明书
+　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　
+
+
+
+
+
+Copyright@上海通方信息系统有限公司                                        第66页 共78页
+
+

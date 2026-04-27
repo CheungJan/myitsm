@@ -1,0 +1,14 @@
+SET SERVEROUTPUT ON;
+WHENEVER SQLERROR EXIT SQL.SQLCODE;
+
+DECLARE
+  v_file UTL_FILE.FILE_TYPE;
+BEGIN
+  v_file := UTL_FILE.FOPEN('DATA_PUMP_DIR', 'ccgl_utl_test.txt', 'W');
+  UTL_FILE.PUT_LINE(v_file, 'ok');
+  UTL_FILE.FCLOSE(v_file);
+  DBMS_OUTPUT.PUT_LINE('UTL_FILE write success');
+END;
+/
+
+EXIT;

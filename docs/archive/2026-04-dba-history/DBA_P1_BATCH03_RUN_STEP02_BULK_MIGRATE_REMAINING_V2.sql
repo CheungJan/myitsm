@@ -1,0 +1,171 @@
+SET ECHO ON;
+SET SERVEROUTPUT ON;
+WHENEVER SQLERROR EXIT SQL.SQLCODE;
+
+PROMPT === 0) 安全门禁：仅允许在 CCGL_MIG 服务执行 ===
+DECLARE
+  v_service_name VARCHAR2(128);
+BEGIN
+  SELECT UPPER(SYS_CONTEXT('USERENV', 'SERVICE_NAME'))
+    INTO v_service_name
+    FROM dual;
+
+  IF v_service_name <> 'CCGL_MIG' THEN
+    raise_application_error(-20161, 'Wrong service: ' || v_service_name || ', expected CCGL_MIG');
+  END IF;
+END;
+/
+
+PROMPT === 1) 前置门禁：BATCH03 剩余对象存在且为 PLANNED ===
+DECLARE
+  v_planned_cnt NUMBER := 0;
+BEGIN
+  SELECT COUNT(*)
+    INTO v_planned_cnt
+    FROM MIG_P1_OBJECT_WORKPACK
+   WHERE batch_no = 'P1_BATCH03'
+     AND wave_no = 'WAVE_01'
+     AND source_object_name IN (
+       'TIT05_REPAIRINFO',
+       'TIT06_USERAREA',
+       'TIT10_MAINTENANCEDAY',
+       'TIT10_MAINTENANCE_LIABILITY',
+       'TIT10_MAIN_TRACK',
+       'TIT10_POS_DETAIL',
+       'TIT11_MAINTENANCE_ATTC',
+       'TIT12_MAINTENANCE_ARCHIVE'
+     )
+     AND status = 'PLANNED';
+
+  IF v_planned_cnt < 8 THEN
+    raise_application_error(-20162, 'remaining planned objects not ready, cnt=' || v_planned_cnt);
+  END IF;
+END;
+/
+
+PROMPT === 2) 批量迁移剩余8个对象（短名映射，规避30字符限制） ===
+DECLARE
+  v_sql      CLOB;
+  v_src_name VARCHAR2(128);
+  v_tgt_name VARCHAR2(128);
+BEGIN
+  FOR r IN (
+    SELECT 'TIT05_REPAIRINFO' AS src_name, 'ITSM_C_T05_REPAIRINFO' AS tgt_name FROM dual
+    UNION ALL SELECT 'TIT06_USERAREA', 'ITSM_C_T06_USERAREA' FROM dual
+    UNION ALL SELECT 'TIT10_MAINTENANCEDAY', 'ITSM_C_T10_MAINT_DAY' FROM dual
+    UNION ALL SELECT 'TIT10_MAINTENANCE_LIABILITY', 'ITSM_C_T10_MAINT_LIAB' FROM dual
+    UNION ALL SELECT 'TIT10_MAIN_TRACK', 'ITSM_C_T10_MAIN_TRACK' FROM dual
+    UNION ALL SELECT 'TIT10_POS_DETAIL', 'ITSM_C_T10_POS_DETAIL' FROM dual
+    UNION ALL SELECT 'TIT11_MAINTENANCE_ATTC', 'ITSM_C_T11_MAINT_ATTC' FROM dual
+    UNION ALL SELECT 'TIT12_MAINTENANCE_ARCHIVE', 'ITSM_C_T12_MAINT_ARCH' FROM dual
+  ) LOOP
+    v_src_name := r.src_name;
+    v_tgt_name := r.tgt_name;
+
+    BEGIN
+      v_sql := 'CREATE TABLE ' || v_tgt_name || ' AS SELECT * FROM ' || v_src_name || ' WHERE 1=0';
+      EXECUTE IMMEDIATE v_sql;
+    EXCEPTION
+      WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN
+          RAISE;
+        END IF;
+    END;
+
+    v_sql := 'TRUNCATE TABLE ' || v_tgt_name;
+    EXECUTE IMMEDIATE v_sql;
+
+    v_sql := 'INSERT INTO ' || v_tgt_name || ' SELECT * FROM ' || v_src_name;
+    EXECUTE IMMEDIATE v_sql;
+
+    COMMIT;
+  END LOOP;
+END;
+/
+
+PROMPT === 3) 最小核验（行数一致） ===
+SELECT 'TIT05_REPAIRINFO' AS metric_name, COUNT(*) AS metric_value FROM TIT05_REPAIRINFO
+UNION ALL SELECT 'ITSM_C_T05_REPAIRINFO', COUNT(*) FROM ITSM_C_T05_REPAIRINFO
+UNION ALL SELECT 'TIT06_USERAREA', COUNT(*) FROM TIT06_USERAREA
+UNION ALL SELECT 'ITSM_C_T06_USERAREA', COUNT(*) FROM ITSM_C_T06_USERAREA
+UNION ALL SELECT 'TIT10_MAINTENANCEDAY', COUNT(*) FROM TIT10_MAINTENANCEDAY
+UNION ALL SELECT 'ITSM_C_T10_MAINT_DAY', COUNT(*) FROM ITSM_C_T10_MAINT_DAY
+UNION ALL SELECT 'TIT10_MAINTENANCE_LIABILITY', COUNT(*) FROM TIT10_MAINTENANCE_LIABILITY
+UNION ALL SELECT 'ITSM_C_T10_MAINT_LIAB', COUNT(*) FROM ITSM_C_T10_MAINT_LIAB
+UNION ALL SELECT 'TIT10_MAIN_TRACK', COUNT(*) FROM TIT10_MAIN_TRACK
+UNION ALL SELECT 'ITSM_C_T10_MAIN_TRACK', COUNT(*) FROM ITSM_C_T10_MAIN_TRACK
+UNION ALL SELECT 'TIT10_POS_DETAIL', COUNT(*) FROM TIT10_POS_DETAIL
+UNION ALL SELECT 'ITSM_C_T10_POS_DETAIL', COUNT(*) FROM ITSM_C_T10_POS_DETAIL
+UNION ALL SELECT 'TIT11_MAINTENANCE_ATTC', COUNT(*) FROM TIT11_MAINTENANCE_ATTC
+UNION ALL SELECT 'ITSM_C_T11_MAINT_ATTC', COUNT(*) FROM ITSM_C_T11_MAINT_ATTC
+UNION ALL SELECT 'TIT12_MAINTENANCE_ARCHIVE', COUNT(*) FROM TIT12_MAINTENANCE_ARCHIVE
+UNION ALL SELECT 'ITSM_C_T12_MAINT_ARCH', COUNT(*) FROM ITSM_C_T12_MAINT_ARCH;
+
+PROMPT === 4) 状态回写（日志 + 工作包） ===
+MERGE INTO MIG_P1_BATCH_LOG t
+USING (
+  SELECT 'P1_BATCH03' AS batch_no, 'TABLE' AS object_type, 'TIT05_REPAIRINFO' AS object_name, 'STEP2_BULK_MIGRATE' AS action_type, 'DONE' AS execute_status, 'bulk full-load to ITSM_C_T05_REPAIRINFO' AS note FROM dual
+  UNION ALL SELECT 'P1_BATCH03','TABLE','TIT06_USERAREA','STEP2_BULK_MIGRATE','DONE','bulk full-load to ITSM_C_T06_USERAREA' FROM dual
+  UNION ALL SELECT 'P1_BATCH03','TABLE','TIT10_MAINTENANCEDAY','STEP2_BULK_MIGRATE','DONE','bulk full-load to ITSM_C_T10_MAINT_DAY' FROM dual
+  UNION ALL SELECT 'P1_BATCH03','TABLE','TIT10_MAINTENANCE_LIABILITY','STEP2_BULK_MIGRATE','DONE','bulk full-load to ITSM_C_T10_MAINT_LIAB' FROM dual
+  UNION ALL SELECT 'P1_BATCH03','TABLE','TIT10_MAIN_TRACK','STEP2_BULK_MIGRATE','DONE','bulk full-load to ITSM_C_T10_MAIN_TRACK' FROM dual
+  UNION ALL SELECT 'P1_BATCH03','TABLE','TIT10_POS_DETAIL','STEP2_BULK_MIGRATE','DONE','bulk full-load to ITSM_C_T10_POS_DETAIL' FROM dual
+  UNION ALL SELECT 'P1_BATCH03','TABLE','TIT11_MAINTENANCE_ATTC','STEP2_BULK_MIGRATE','DONE','bulk full-load to ITSM_C_T11_MAINT_ATTC' FROM dual
+  UNION ALL SELECT 'P1_BATCH03','TABLE','TIT12_MAINTENANCE_ARCHIVE','STEP2_BULK_MIGRATE','DONE','bulk full-load to ITSM_C_T12_MAINT_ARCH' FROM dual
+) s
+ON (
+  t.batch_no = s.batch_no
+  AND t.object_type = s.object_type
+  AND t.object_name = s.object_name
+  AND t.action_type = s.action_type
+)
+WHEN MATCHED THEN
+  UPDATE SET t.execute_status = s.execute_status, t.note = s.note, t.executed_at = SYSDATE
+WHEN NOT MATCHED THEN
+  INSERT (batch_no, object_type, object_name, action_type, execute_status, note, executed_at)
+  VALUES (s.batch_no, s.object_type, s.object_name, s.action_type, s.execute_status, s.note, SYSDATE);
+/
+
+UPDATE MIG_P1_OBJECT_WORKPACK
+   SET target_object_name = CASE
+     WHEN source_object_name = 'TIT05_REPAIRINFO' THEN 'ITSM_C_T05_REPAIRINFO'
+     WHEN source_object_name = 'TIT06_USERAREA' THEN 'ITSM_C_T06_USERAREA'
+     WHEN source_object_name = 'TIT10_MAINTENANCEDAY' THEN 'ITSM_C_T10_MAINT_DAY'
+     WHEN source_object_name = 'TIT10_MAINTENANCE_LIABILITY' THEN 'ITSM_C_T10_MAINT_LIAB'
+     WHEN source_object_name = 'TIT10_MAIN_TRACK' THEN 'ITSM_C_T10_MAIN_TRACK'
+     WHEN source_object_name = 'TIT10_POS_DETAIL' THEN 'ITSM_C_T10_POS_DETAIL'
+     WHEN source_object_name = 'TIT11_MAINTENANCE_ATTC' THEN 'ITSM_C_T11_MAINT_ATTC'
+     WHEN source_object_name = 'TIT12_MAINTENANCE_ARCHIVE' THEN 'ITSM_C_T12_MAINT_ARCH'
+     ELSE target_object_name
+   END,
+   migration_strategy = 'FULL_LOAD_TABLE_BULK',
+   status = 'DONE',
+   updated_at = SYSDATE
+ WHERE batch_no = 'P1_BATCH03'
+   AND wave_no = 'WAVE_01'
+   AND source_object_name IN (
+       'TIT05_REPAIRINFO',
+       'TIT06_USERAREA',
+       'TIT10_MAINTENANCEDAY',
+       'TIT10_MAINTENANCE_LIABILITY',
+       'TIT10_MAIN_TRACK',
+       'TIT10_POS_DETAIL',
+       'TIT11_MAINTENANCE_ATTC',
+       'TIT12_MAINTENANCE_ARCHIVE'
+   );
+/
+
+PROMPT === 5) BATCH03 汇总状态 ===
+SELECT source_object_name, target_object_name, migration_strategy, status
+FROM MIG_P1_OBJECT_WORKPACK
+WHERE batch_no = 'P1_BATCH03'
+  AND wave_no = 'WAVE_01'
+ORDER BY source_object_name;
+
+SELECT action_type, execute_status, COUNT(*) AS cnt
+FROM MIG_P1_BATCH_LOG
+WHERE batch_no = 'P1_BATCH03'
+GROUP BY action_type, execute_status
+ORDER BY action_type, execute_status;
+
+EXIT;

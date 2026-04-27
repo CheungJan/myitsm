@@ -1,0 +1,7 @@
+SET PAGESIZE 50;
+SET LINESIZE 120;
+SELECT SYS_CONTEXT('USERENV','CON_NAME') AS con_name,
+       SYS_CONTEXT('USERENV','SERVICE_NAME') AS service_name,
+       USER AS session_user
+FROM dual;
+EXIT;

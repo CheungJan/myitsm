@@ -1,0 +1,19 @@
+SET ECHO OFF;
+SET PAGESIZE 200;
+SET LINESIZE 260;
+
+PROMPT === FINAL OPTIMIZATION STATUS ===
+PROMPT --- P3_STAGE11 EXEC SUMMARY ---
+SELECT exec_action, exec_status, COUNT(*) AS cnt FROM MIG_P3_FINAL_NAME_EXEC WHERE stage_no='P3_STAGE11' AND wave_no='WAVE_01' GROUP BY exec_action, exec_status ORDER BY exec_action, exec_status;
+
+PROMPT --- BUSINESS OBJECT SCALE ---
+SELECT COUNT(*) AS business_tables FROM user_tables WHERE table_name NOT LIKE 'MIG\_%' ESCAPE '\';
+SELECT COUNT(*) AS business_views  FROM user_views  WHERE view_name  NOT LIKE 'MIG\_%' ESCAPE '\';
+
+PROMPT --- MIG AUDIT TABLE SCALE ---
+SELECT COUNT(*) AS mig_tables FROM user_tables WHERE table_name LIKE 'MIG\_%' ESCAPE '\';
+
+PROMPT --- FINAL STATUS ---
+SELECT CASE WHEN EXISTS (SELECT 1 FROM MIG_P3_FINAL_NAME_EXEC WHERE stage_no='P3_STAGE11' AND wave_no='WAVE_01' AND exec_action='DROP_TARGET_DUP' AND exec_status='DONE') AND NOT EXISTS (SELECT 1 FROM MIG_P3_FINAL_NAME_EXEC WHERE stage_no='P3_STAGE11' AND wave_no='WAVE_01' AND exec_status='FAILED') THEN 'OPTIMIZED_DONE' ELSE 'OPTIMIZED_NOT_DONE' END AS final_status FROM dual;
+
+EXIT;

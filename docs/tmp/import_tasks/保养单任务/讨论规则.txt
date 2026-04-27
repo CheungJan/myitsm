@@ -1,0 +1,66 @@
+我们先讨论一些规则要求
+ 一：TIT17_MAINTENANCE表：
+1：保养单号从BY021601开始自增
+2: 门店磁卡号对应的custcd可以根据 tmm22_customers表custcard(门店磁卡号)和custcd关联
+2.1:报表中的磁卡号就是 tmm22_customers表custcard，这个表中custcard还会对应唯一的custcd
+2.2: TIT17_MAINTENANCE中store_id也就是 tmm22_customers中的custcd
+3：has_video_device都为N
+4：REQUEST_ENGINNER_ID为excel表格中磁卡号对应的上门工程师工号
+5：request_time为excel记录中对应的日期，excel中日期只到年月日，具体时间可以参考随机早上8::30到下午17:00之间。对应current_status=3,is_success=1,is_old=N,creator=2393,firstor为对应excel报表中对应磁卡号门店上门工程师工号的字段内容，总体时间第一次上门时间和开单时间可以一致，关单时间要在离店时间之后，关单和开单时间间隔半个小时左右，回访时间在关单时间之后5分钟内
+
+二： TIT23_MAINTENANCE_D2D 
+1:保养单的上门服务记录中需要有到店和离店两条记录(TIT23_MAINTENANCE_D2D)，对应业务流水是自增，我们只需要一次到店和离店记录，对应业务流水到店为1，离店为2，上门工程师字段对应为报表对应记录的上门工程师工号，创建时间为门店到达时间，离店时间和到店时间相差半小时左右
+2：creator为2393
+三： TIT17_CUST_POS_DAILY
+1：custcd为门店custcard对应的custcd，eid是通过custcd去关联 TMM35_cust_pos_rl r符合条件的eid
+2：其它相关时间内参考TIT17_MAINTENANCE规则，它们应该是一次性生成相关时间给不同的表中使用
+四： TIT24_MAINTENANCE_RV
+1:creator为2393
+2:回访时间和关单时间也参考TIT17_MAINTENANCE表中规则
+五：TIT27_CLOSE_BILLS
+1：close_type都为BY
+
+测试后发现问题
+1： TIT17_MAINTENANCE中create_time应该等于request_time,update_time应该为空，第一次上门时间first_time应该比create_time时间增加5分钟内，比如create_time和request_time时间是2026/1/13 12:30:30 那么first_time应该是2026/1/13 12:32:30 样子，detail_description字段不需要写入批量导入自动生成，空值就可以。
+2：TIT23_MAINTENANCE_D2D中到店和离店对应的d2d_description中描述到店为空值，离店对应记录这个字段根据新excel表格中的机型栏对应的内容+机器写入这个字段里，比如更新的表格中增加的机型字段某行内容为通方，那么这个离店记录d2d_description中写入的就是通方机器，
+如果机型字段为空则d2d_description字段值为关门，
+TIT23_MAINTENANCE_D2D中create_timey应该和这个表里的到达时间(arrive_time)一致
+3：TIT17_CUST_POS_DAILY 中详细信息(detail_description)字段不需要写入批量导入自动生成,保持为空值就行，另外写入的根据custcd关联的TMM35_cust_pos_rl r 比里只要写入这个表里对应useflg=1的记录到TIT17_CUST_POS_DAILY 表里就可以了
+4： TIT24_MAINTENANCE_RV  回访记录中update_time为空就可以，对应create_time时间应该等于rv_time时间。feedback字段内容为满意
+
+TIT24_MAINTENANCE_RV 中回访时间rv_time应该小于 DAILY_MAINTENANCE_ID中关单时间closed_time，大约小于1分钟，因为我们是保养单做完后就做回访，回访完后才关单
+优化后：
+你现在要执行的升级步骤（测试库）
+
+先补列（已初始化环境）：
+ALTER TABLE MIG_BY_IMPORT_STG ADD MACHINE_TYPE VARCHAR2(100);
+
+TRUNCATE TABLE MIG_BY_IMPORT_STG;
+
+
+
+
+-- 1) 子表先删
+DELETE FROM TIT27_CLOSE_BILLS
+ WHERE MAINTENANCE_ID IN ('BY021601','BY021602','BY021603','BY021604','BY021605',
+                          'BY021606','BY021607','BY021608','BY021609','BY021610');
+
+DELETE FROM TIT24_MAINTENANCE_RV
+ WHERE MAINTENANCE_ID IN ('BY021601','BY021602','BY021603','BY021604','BY021605',
+                          'BY021606','BY021607','BY021608','BY021609','BY021610');
+
+DELETE FROM TIT23_MAINTENANCE_D2D
+ WHERE MAINTENANCE_ID IN ('BY021601','BY021602','BY021603','BY021604','BY021605',
+                          'BY021606','BY021607','BY021608','BY021609','BY021610');
+
+DELETE FROM TIT17_CUST_POS_DAILY
+ WHERE DAILY_MAINTENANCE_ID IN ('BY021601','BY021602','BY021603','BY021604','BY021605',
+                                'BY021606','BY021607','BY021608','BY021609','BY021610');
+
+-- 2) 最后删主表
+DELETE FROM TIT17_MAINTENANCE
+ WHERE DAILY_MAINTENANCE_ID IN ('BY021601','BY021602','BY021603','BY021604','BY021605',
+                                'BY021606','BY021607','BY021608','BY021609','BY021610');
+
+COMMIT;
+

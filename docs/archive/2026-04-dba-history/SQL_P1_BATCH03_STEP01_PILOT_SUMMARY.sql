@@ -1,0 +1,24 @@
+SET PAGESIZE 200;
+SET LINESIZE 220;
+
+SELECT 'TIT03_SYSCODES' AS metric_name, COUNT(*) AS metric_value FROM TIT03_SYSCODES
+UNION ALL
+SELECT 'ITSM_CORE_TIT03_SYSCODES', COUNT(*) FROM ITSM_CORE_TIT03_SYSCODES
+UNION ALL
+SELECT 'TIT04_ARCHIVECODE', COUNT(*) FROM TIT04_ARCHIVECODE
+UNION ALL
+SELECT 'ITSM_CORE_TIT04_ARCHIVECODE', COUNT(*) FROM ITSM_CORE_TIT04_ARCHIVECODE;
+
+SELECT source_object_name, target_object_name, migration_strategy, status
+FROM MIG_P1_OBJECT_WORKPACK
+WHERE batch_no = 'P1_BATCH03'
+  AND wave_no = 'WAVE_01'
+ORDER BY source_object_name;
+
+SELECT action_type, execute_status, COUNT(*) AS cnt
+FROM MIG_P1_BATCH_LOG
+WHERE batch_no = 'P1_BATCH03'
+GROUP BY action_type, execute_status
+ORDER BY action_type, execute_status;
+
+EXIT;

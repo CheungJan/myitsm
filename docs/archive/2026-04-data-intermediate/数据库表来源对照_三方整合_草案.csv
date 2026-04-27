@@ -1,0 +1,171 @@
+﻿表名,是否代码命中,是否旧字典命中,代码命中文件数,代码来源示例(前5)
+all_list_v,是,否,8,itsm.pbl/dddw_item_choose.srd; itsm.pbl/w_r_itsm_accessup.srw; itsm.pbl/w_r_itsm_accessup4pos.srw; itsm.pbl/w_r_itsm_equ_open.srw; itsm.pbl/w_r_itsm_renovate.srw
+plan_biz_v,是,否,1,report.pbl/d_xs_openrep.srd
+plan_cust,是,是,29,itsm.pbl/u_itsm_open.sru; itsm.pbl/u_itsm_renovate.sru; itsm.pbl/w_r_itsm_d2d.srw; itsm02.pbl/u_itsm_device_change.sru; new_deposit.pbl/d_plan_cust_edit_n.srd
+sys_role_user,是,否,2,app_system.pbl/u_mc_user.sru; app_system.pbl/w_r_mc_areauser.srw
+sys_user,是,否,2,app_system.pbl/u_mc_user.sru; app_system.pbl/w_r_mc_areauser.srw
+tac01_acreceive,是,否,6,new_deposit.pbl/u_trans_in_ed1.sru; sale.pbl/nvo_saleservice.sru; trans.pbl/u_trans_in.sru; trans.pbl/u_trans_in_error.sru; trans.pbl/u_trans_in_error_change.sru
+tac01_fpsk,是,否,6,lsgldata.pbl/d_ac_fpsk_edit.srd; lsgldata.pbl/d_ac_fpsk_list.srd; lsgldata.pbl/d_ac_fpsk_report.srd; lsgldata.pbl/d_ht_htgl_list.srd; lsgldata.pbl/d_ht_htgl_query.srd
+tac11_paydays,是,否,3,base_cust.pbl/d_mm_customers_form.srd; base_cust.pbl/w_supplier_editdata.srw; base_cust.pbl/w_supplier_newdata.srw
+tac12_credlimit,是,否,22,base_cust.pbl/d_mm_customers_form.srd; base_cust.pbl/w_supplier_editdata.srw; base_cust.pbl/w_supplier_newdata.srw; itsm.pbl/w_r_itsm_d2d.srw; itsm.pbl/w_r_itsm_d2d_cdjl.srw
+tac13_credlimitdt,是,否,3,base_cust.pbl/d_mm_customers_form.srd; base_cust.pbl/w_supplier_editdata.srw; base_cust.pbl/w_supplier_newdata.srw
+tht01_htgl,是,否,5,lsgldata.pbl/d_ht_htgl_edit.srd; lsgldata.pbl/d_ht_htgl_list.srd; lsgldata.pbl/d_ht_htgl_query.srd; lsgldata.pbl/u_ac_fpsk.sru; lsgldata.pbl/u_ht_htgl.sru
+tip01_price,是,否,2,base_cust.pbl/d_ip_itemprice_grid.srd; base_cust.pbl/d_mm_items_list.srd
+tip03_adjprice,是,否,4,price.pbl/d_mm_adjprice_condition.srd; price.pbl/d_mm_adjprice_detail.srd; price.pbl/w_r_mm_adjprice.srw; purchase.pbl/d_pcplan_status_condition.srd
+tip05_custdiscount,是,否,12,base_cust.pbl/d_mm_customers_form.srd; base_cust.pbl/w_supplier_editdata.srw; base_cust.pbl/w_supplier_newdata.srw; itsm02.pbl/w_r_ex_gh.srw; sale.pbl/w_r_ex_audit_direct.srw
+tip07_costprictrack,是,否,6,new_deposit.pbl/u_plan_report.sru; report.pbl/u_pc_history.sru; report.pbl/u_pc_history_d.sru; report.pbl/u_sc_report_d.sru; report.pbl/u_sl_status.sru
+tip08_monthcost,是,否,1,wh_syc.pbl/w_r_wh_overlost.srw
+tit01_timepoint_area,是,否,5,base_srv.pbl/gf_gettimept.srf; base_srv.pbl/gf_gettimept_bk.srf; itsm02.pbl/d_itsm_tp_levels_free.srd; itsm02.pbl/d_itsm_tp_levels_list.srd; itsm02.pbl/d_itsm_tp_levels_list_query.srd
+tit01_timepoint_cust,是,否,1,base_srv.pbl/gf_gettimept_bk.srf
+tit02_liabilityreg,是,否,6,itsm.pbl/d_itsm_liab_free.srd; itsm.pbl/d_itsm_liab_list.srd; itsm.pbl/u_itsm_liab.sru; itsm02.pbl/dd_itsm_liab.srd; itsm02.pbl/u_itsm_liability_group.sru
+tit02_liabilityregdt,是,否,5,itsm.pbl/d_itsm_liabdt_free.srd; itsm.pbl/d_itsm_liabdt_list.srd; itsm.pbl/u_itsm_archivecode.sru; itsm.pbl/u_itsm_archivecode_bak.sru; itsm.pbl/u_itsm_liab.sru
+tit03_syscodes,是,否,3,itsm02.pbl/d_itsm_syscodes_form.srd; itsm02.pbl/u_itsm_maintenance_daily.sru; itsm02.pbl/u_itsm_maintenance_daily_yc.sru
+tit04_archivecode,是,否,12,itsm.pbl/d_itsm_archivecode_4_list.srd; itsm.pbl/d_itsm_archivecode_free.srd; itsm.pbl/d_itsm_archivecode_free_four.srd; itsm.pbl/d_itsm_archivecode_list.srd; itsm.pbl/dd_itsm_arch.srd
+tit05_repairinfo,是,否,4,itsm.pbl/d_itsm_repdt_list01.srd; itsm.pbl/d_itsm_repdt_list02.srd; itsm.pbl/u_itsm_repairinfo.sru; itsm.pbl/w_r_itsm_accessup.srw
+tit06_userarea,是,否,14,app_d.pbl/d_mc_areausers.srd; app_d.pbl/d_mc_userarea_grid.srd; app_system.pbl/u_mc_user.sru; app_system.pbl/w_r_mc_areauser.srw; itsm.pbl/d_divechange_report.srd
+tit10_main_track,是,否,2,itsm.pbl/d_whd_report_ex.srd; new_deposit.pbl/d_whd_report_startup.srd
+tit10_maintenance_liability,是,是,10,itsm.pbl/d_itsm_rep_comrate.srd; itsm.pbl/u_itsm_rcwh_h.sru; itsm.pbl/u_itsm_rcwh_ve.sru; itsm.pbl/w_r_itsm_d2d.srw; itsm.pbl/w_r_itsm_rv.srw
+tit10_maintenanceday,是,是,25,itsm.pbl/d_itsm_day_archive_free.srd; itsm.pbl/d_itsm_day_archive_list.srd; itsm.pbl/d_itsm_rep_archive_list.srd; itsm.pbl/d_maintenanceday_list.srd; itsm.pbl/d_myd_report.srd
+tit10_pos_detail,是,是,2,new_deposit.pbl/d_itsm_posdetail_ed1.srd; trans.pbl/d_itsm_posdetail.srd
+tit11_maintenance_attc,是,是,3,itsm.pbl/d_attc.srd; itsm.pbl/u_itsm_rcwh_ve.sru; kq.pbl/u_itsm_wzx.sru
+tit12_maintenance_archive,是,是,3,itsm.pbl/d_itsm_archive_free.srd; itsm.pbl/d_itsm_archive_list.srd; itsm.pbl/d_itsm_day_archive_list.srd
+tit13_maintenance_open,是,是,11,itsm.pbl/d_maintenance_open_free.srd; itsm.pbl/d_maintenance_open_list.srd; itsm.pbl/d_maintenance_open_one.srd; itsm.pbl/d_open_report.srd; new_deposit.pbl/d_deposit_confrim_d.srd
+tit14_equipment_open,是,是,8,itsm.pbl/d_itsm_equopen_free.srd; itsm.pbl/d_itsm_equopen_list.srd; itsm.pbl/u_itsm_open.sru; itsm.pbl/w_r_itsm_d2d.srw; itsm.pbl/w_r_itsm_equ_open.srw
+tit15_equipment_renovate,是,是,5,itsm.pbl/d_itsm_renovate_free.srd; itsm.pbl/d_itsm_renovate_list.srd; itsm.pbl/u_itsm_renovate.sru; itsm.pbl/w_r_itsm_d2d.srw; itsm.pbl/w_r_itsm_renovate.srw
+tit15_maintenance_renovate,是,是,9,itsm.pbl/d_maintenance_renovate_free.srd; itsm.pbl/d_maintenance_renovate_list.srd; itsm.pbl/d_maintenance_renovate_one.srd; itsm.pbl/d_renovat_report.srd; new_deposit.pbl/u_asset_report.sru
+tit16_device_change,是,是,8,itsm.pbl/d_divechange_report.srd; itsm02.pbl/d_itsm_device_change_grid.srd; itsm02.pbl/d_itsm_device_change_grid_list.srd; new_deposit.pbl/u_asset_report.sru; new_deposit.pbl/u_deposit_confrim.sru
+tit17_cust_pos_daily,是,否,2,itsm02.pbl/u_itsm_maintenance_daily.sru; itsm02.pbl/u_itsm_maintenance_daily_yc.sru
+tit17_maintenance,是,否,8,itsm02.pbl/d_itsm_maintenance_daily_form.srd; itsm02.pbl/d_itsm_maintenance_daily_form_yc.srd; itsm02.pbl/d_itsm_maintenance_daily_grid.srd; itsm02.pbl/d_itsm_maintenance_daily_grid_list.srd; itsm02.pbl/d_itsm_maintenance_daily_report.srd
+tit17_maintenance_plan,是,否,2,itsm02.pbl/d_itsm_maintenance_plan_ym_report.srd; itsm02.pbl/u_itsm_maintenance_plan.sru
+tit18_store_close,是,否,5,app_main.pbl/w_m_appmain.srw; itsm.pbl/d_storeclose_report.srd; itsm02.pbl/d_itsm_store_close_grid.srd; itsm02.pbl/d_itsm_store_close_grid_list.srd; itsm02.pbl/d_itsm_store_close_tx.srd
+tit19_on_choosedt,是,否,4,itsm02.pbl/d_itsm_pos_r_eid_choose.srd; itsm02.pbl/d_itsm_pos_r_eid_choose_new.srd; itsm02.pbl/d_itsm_pos_r_eid_choose_old.srd; itsm02.pbl/w_r_itsm_replace.srw
+tit21_maintenance_dispatch,是,是,6,itsm.pbl/d_dispatch.srd; itsm.pbl/d_dispatch_free.srd; itsm.pbl/u_itsm_rcwh_h.sru; itsm.pbl/u_itsm_rcwh_ve.sru; itsm02.pbl/d_itsm_dispatch_report.srd
+tit22_fetion_send,是,是,6,itsm.pbl/d_dispatch.srd; itsm.pbl/d_fetion.srd; itsm.pbl/d_fetion_free.srd; itsm.pbl/u_itsm_rcwh_h.sru; itsm.pbl/u_itsm_rcwh_ve.sru
+tit23_maintenance_d2d,是,是,26,itsm.pbl/d_divechange_report.srd; itsm.pbl/d_free_report.srd; itsm.pbl/d_maintenance_d2d.srd; itsm.pbl/d_maintenance_d2d_free.srd; itsm.pbl/d_open_report.srd
+tit24_maintenance_rv,是,是,12,itsm.pbl/d_maintenance_rv.srd; itsm.pbl/u_itsm_open.sru; itsm.pbl/u_itsm_rcwh_h.sru; itsm.pbl/u_itsm_rcwh_ve.sru; itsm.pbl/u_itsm_renovate.sru
+tit25_accessories_update,是,是,14,itsm.pbl/d_accessup.srd; itsm.pbl/d_accessup4pos_free.srd; itsm.pbl/d_accessup_free.srd; itsm.pbl/d_exception_list.srd; itsm.pbl/d_noclose.srd
+tit26_paylist,是,否,3,itsm.pbl/d_maintenance_pay.srd; itsm.pbl/d_maintenance_pay_free.srd; itsm02.pbl/d_itsm_accessories_update_report.srd
+tit27_close_bills,是,是,10,itsm.pbl/u_itsm_open.sru; itsm.pbl/u_itsm_rcwh_h.sru; itsm.pbl/u_itsm_rcwh_ve.sru; itsm.pbl/u_itsm_renovate.sru; itsm02.pbl/u_itsm_device_change.sru
+tit28_free_replace,是,否,6,itsm.pbl/d_free_report.srd; itsm02.pbl/d_itsm_free_replace_dt_list.srd; itsm02.pbl/d_itsm_free_replace_form.srd; itsm02.pbl/d_itsm_free_replace_grid.srd; itsm02.pbl/d_itsm_free_replace_grid_list.srd
+tit28_free_replace_dt,是,否,10,itsm.pbl/w_r_itsm_d2d.srw; itsm02.pbl/d_itsm_free_replace_dt_form.srd; itsm02.pbl/d_itsm_free_replace_dt_grid.srd; itsm02.pbl/d_itsm_free_replace_dt_list.srd; itsm02.pbl/u_itsm_device_change.sru
+tit29_noclose_track,是,否,4,itsm.pbl/d_itsm_noclose_track.srd; itsm.pbl/d_itsm_noclose_track_free.srd; itsm.pbl/d_noclose.srd; itsm.pbl/w_r_itsm_nocl_track.srw
+tiv01_invlimit,是,否,7,new_deposit.pbl/d_inv_limit_grid.srd; new_deposit.pbl/d_iv_invlimit.srd; new_deposit.pbl/u_inv_limit.sru; new_deposit.pbl/u_plan_rp_arg.sru; new_deposit.pbl/w_invlimit_edit.srw
+tiv02_invlimit_hi,是,否,1,new_deposit.pbl/w_invlimit_edit.srw
+tiv11_detail,是,否,28,itsm.pbl/w_r_itsm_accessup.srw; itsm.pbl/w_r_itsm_accessup4pos.srw; itsm.pbl/w_r_itsm_d2d.srw; itsm.pbl/w_r_itsm_d2d_cdjl.srw; itsm.pbl/w_r_itsm_dispatch.srw
+tiv12_detaildt,是,否,6,new_deposit.pbl/u_plan_report.sru; report.pbl/u_pc_history.sru; report.pbl/u_pc_history_d.sru; report.pbl/u_sc_report_d.sru; report.pbl/u_sl_status.sru
+tiv30_shopcheckplan,是,否,9,itsm02.pbl/w_r_ex_gh.srw; sale.pbl/w_r_ex_audit_direct.srw; sale.pbl/w_r_ex_bill.srw; sale.pbl/w_r_ex_bq.srw; sale.pbl/w_r_ex_ck.srw
+tiv33_ovbill,是,否,1,base_srv.pbl/d_iv_txovb.srd
+tkq01_attendance,是,否,3,kq.pbl/d_kq_free.srd; kq.pbl/dddd.srd; kq.pbl/u_kq_imp.sru
+tkq02_attendancecount,是,否,2,kq.pbl/d_kq_tj.srd; kq.pbl/d_kq_tj_bk.srd
+tmc01_menus,是,是,6,app_d.pbl/d_mc_funcd_groupright.srd; app_d.pbl/d_mc_menu_form.srd; app_d.pbl/d_mc_menu_right.srd; app_d.pbl/d_mc_usermenu_grid.srd; app_main.pbl/u_appbase.sru
+tmc02_menusdt,是,是,1,app_objects.pbl/nvo_appservice.sru
+tmc03_usermenus,是,是,3,app_d.pbl/d_mc_menus_user_list.srd; app_d.pbl/d_mc_usermenu_grid.srd; app_d.pbl/d_mc_usermenu_update.srd
+tmc11_departments,是,是,6,app_d.pbl/d_mc_dept_form.srd; app_d.pbl/d_mc_dept_list.srd; app_dddw.pbl/dd_mc_dept.srd; app_dddw.pbl/dd_mc_dept_valid.srd; itsm.pbl/d_whd_report_ex.srd
+tmc12_groups,是,是,6,app_d.pbl/d_mc_groups_form.srd; app_d.pbl/d_mc_groups_list.srd; app_d.pbl/d_mc_usergroup.srd; app_dddw.pbl/dd_mc_groups.srd; app_dddw.pbl/dd_mc_groups_valid.srd
+tmc13_users,是,是,63,app_d.pbl/d_mc_areausers.srd; app_d.pbl/d_mc_groupusers.srd; app_d.pbl/d_mc_user_form.srd; app_d.pbl/d_mc_users_list.srd; app_dddw.pbl/dd_mc_users.srd
+tmc21_usergroup,是,是,56,app_d.pbl/d_mc_groupuser_grid.srd; app_d.pbl/d_mc_groupusers.srd; app_d.pbl/d_mc_menu_right.srd; app_d.pbl/d_mc_menus_user_list.srd; app_d.pbl/d_mc_usergroup.srd
+tmc22_userbusityp,是,是,2,app_d.pbl/d_mc_busityp_form.srd; app_system.pbl/u_mc_user.sru
+tmc31_groupright,是,是,7,app_d.pbl/d_mc_funcd_groupright.srd; app_d.pbl/d_mc_groupright.srd; app_d.pbl/d_mc_menu_right.srd; app_d.pbl/d_mc_menus_user_list.srd; app_d.pbl/d_mc_usermenu_grid.srd
+tmc41_acclog,否,是,0,
+tmc42_connectinfo,是,否,1,app_objects.pbl/nvo_myappsrv.sru
+tmc43_logs,是,是,1,app_objects.pbl/nvo_appservice.sru
+tmc44_syslock,否,是,0,
+tmc51_verctrl,是,否,3,app_main.pbl/w_m_appmain.srw; app_objects.pbl/nvo_myappsrv.sru; app_system.pbl/u_mc_uploadfile.sru
+tmc71_sysparm,是,否,2,app_objects.pbl/nvo_myappsrv.sru; sale.pbl/nvo_saleservice.sru
+tmm01_company,是,是,6,app_d.pbl/d_mc_company.srd; app_objects.pbl/nvo_appservice.sru; app_objects.pbl/nvo_myappsrv.sru; base_cust.pbl/w_customers_editdata.srw; base_cust.pbl/w_supplier_editdata.srw
+tmm02_country,是,是,3,app_d.pbl/d_mm_country_form.srd; app_d.pbl/d_mm_country_list.srd; app_dddw.pbl/dd_mm_country.srd
+tmm03_province,是,是,6,app_d.pbl/d_mm_province_form.srd; app_d.pbl/d_mm_province_list.srd; app_dddw.pbl/dd_mm_province.srd; app_system.pbl/u_mm_city.sru; app_system.pbl/u_mm_country.sru
+tmm04_city,是,是,4,app_d.pbl/d_mm_city_form.srd; app_dddw.pbl/dd_mm_city.srd; app_system.pbl/u_mm_province.sru; app_system.pbl/u_mm_town.sru
+tmm05_town,是,是,3,app_d.pbl/d_mm_town_form.srd; app_d.pbl/d_mm_town_list.srd; app_system.pbl/u_mm_city.sru
+tmm11_itemclass,是,是,50,app_objects.pbl/nvo_app_selectdata.sru; base_cust.pbl/d_mm_bomclass_list.srd; base_cust.pbl/d_mm_itemclass_form.srd; base_cust.pbl/d_mm_itemclass_list.srd; base_cust.pbl/u_mm_bom_list.sru
+tmm12_items,是,是,167,app_dddw.pbl/dd_wh_itemname.srd; app_objects.pbl/nvo_app_selectdata.sru; appraisal.pbl/u_app_audit.sru; appraisal.pbl/u_app_manage.sru; base_cust.pbl/d_mm_bomclass_list.srd
+tmm13_itemunit,是,否,34,app_dddw.pbl/dd_mm_itemunit_inuse.srd; app_objects.pbl/d_itemunits_input.srd; base_cust.pbl/d_mm_itemunit_grid.srd; itsm.pbl/w_r_itsm_accessup.srw; itsm.pbl/w_r_itsm_accessup4pos.srw
+tmm14_itembar,是,否,1,base_cust.pbl/d_mm_itembar_grid.srd
+tmm15_itemtaxrate,是,否,10,base_cust.pbl/d_mm_itemtaxrate_list.srd; base_cust.pbl/w_r_mm_editbom.srw; base_cust.pbl/w_r_mm_edititem.srw; base_cust.pbl/w_r_mm_newbom.srw; base_cust.pbl/w_r_mm_newcommmode.srw
+tmm18_supplierclass,是,是,2,base_cust.pbl/d_mm_supplier_form.srd; base_cust.pbl/u_mm_supplier.sru
+tmm19_suppliers,是,是,9,app_objects.pbl/nvo_app_selectdata.sru; appraisal.pbl/u_app_audit.sru; appraisal.pbl/u_app_manage.sru; base_cust.pbl/d_mm_provider_list.srd; base_cust.pbl/w_supplier_newdata.srw
+tmm21_custclass,是,是,22,app_dddw.pbl/dd_mm_custclass_useflg.srd; app_objects.pbl/nvo_app_selectdata.sru; base_cust.pbl/d_mm_custclass_form.srd; base_cust.pbl/d_mm_custclass_list.srd; base_cust.pbl/u_mm_customer.sru
+tmm22_customers,是,是,250,app_dddw.pbl/dd_mm_cust_card.srd; app_dddw.pbl/dd_mm_custclass_anm.srd; app_objects.pbl/nvo_app_selectdata.sru; appraisal.pbl/u_app_audit.sru; appraisal.pbl/u_app_manage.sru
+tmm23_address,是,否,11,app_dddw.pbl/dd_mm_address.srd; base_cust.pbl/u_mm_address.sru; itsm02.pbl/w_r_ex_gh.srw; sale.pbl/w_r_ex_audit_direct.srw; sale.pbl/w_r_ex_bill.srw
+tmm24_custitems,是,是,2,app_objects.pbl/nvo_app_selectdata.sru; purchase.pbl/w_r_pc_register_input.srw
+tmm31_syscodes,是,是,62,app_d.pbl/d_mc_busityp_form.srd; app_d.pbl/d_mm_syscodes_form.srd; app_d.pbl/d_mm_syscodes_list.srd; app_dddw.pbl/dd_mm_billtyp_ap.srd; app_dddw.pbl/dd_mm_billtyp_ar.srd
+tmm32_syscodesdt,否,是,0,
+tmm32_syscodesdtcodetyp,否,是,0,
+tmm33_message,否,是,0,
+tmm34_idmaster,否,是,0,
+tmm35_cust_pos_rl,是,是,87,base_cust.pbl/d_mm_customers_form_1.srd; base_cust.pbl/w_customers_editdata.srw; itsm.pbl/d_custinfo_cs.srd; itsm.pbl/d_divechange_report.srd; itsm.pbl/d_exception_list.srd
+tmm36_cust_ve_rl,是,是,5,itsm.pbl/u_itsm_rcwh_ve.sru; itsm02.pbl/d_itsm_cust_ve_list.srd; itsm02.pbl/u_itsm_maintenance_daily.sru; itsm02.pbl/u_itsm_maintenance_daily_yc.sru; wh.pbl/w_wh_asset_c_a.srw
+tmm38_itemprice,否,是,0,
+tmm39_adjprice,否,是,0,
+tmm40_label,是,是,8,lsgldata.pbl/w_r_mm_label_zjpj.srw; price.pbl/d_mm_label_add.srd; price.pbl/d_mm_label_change_condition.srd; price.pbl/d_mm_label_condition.srd; price.pbl/d_mm_label_query.srd
+tmm41_bom,是,是,32,app_objects.pbl/nvo_app_selectdata.sru; base_cust.pbl/d_mm_itembom_grid.srd; itsm.pbl/w_r_itsm_accessup.srw; itsm.pbl/w_r_itsm_accessup4pos.srw; itsm.pbl/w_r_itsm_d2d.srw
+tmm41_bombom,否,是,0,
+tmm42_bomdt,是,是,4,app_objects.pbl/nvo_app_selectdata.sru; base_cust.pbl/d_mm_itembom_grid.srd; base_cust.pbl/u_mm_bom_new.sru; lsgldata.pbl/d_mm_bomitem_list_zjpj.srd
+tmm43_eid,是,是,34,app_objects.pbl/nvo_app_selectdata.sru; itsm.pbl/d_accessup.srd; itsm.pbl/d_itsm_rcwh_poseid.srd; itsm.pbl/dddw_newitem_choose.srd; itsm.pbl/w_r_itsm_accessup.srw
+tmm43_eid_track,是,否,2,report.pbl/d_tmm43_tract.srd; report.pbl/w_r_bom_change.srw
+tmm44_pos_r_eid,是,是,18,itsm.pbl/d_itsm_rcwh_poseid.srd; itsm.pbl/dddw_newpos_choose.srd; itsm.pbl/w_r_itsm_accessup4pos.srw; itsm.pbl/w_r_itsm_equ_open.srw; itsm.pbl/w_r_itsm_renovate.srw
+tmm45_suppappraisal,是,是,4,appraisal.pbl/d_supscoretype_bill.srd; appraisal.pbl/d_supscoretype_list_y.srd; appraisal.pbl/d_supscoretype_pop.srd; appraisal.pbl/u_mc_app_info.sru
+tmm46_area,是,否,9,app_d.pbl/d_mc_area_form.srd; app_d.pbl/d_mc_area_list.srd; itsm.pbl/u_itsm_repairinfo.sru; itsm02.pbl/d_itsm_paper_ave_form_report.srd; itsm02.pbl/u_itsm_maintenance_plan.sru
+tmm47_commode,是,否,22,app_dddw.pbl/dd_mm_commmode.srd; base_cust.pbl/d_mm_cmmmode_free.srd; base_cust.pbl/d_mm_cmmmode_list.srd; base_cust.pbl/d_mm_cmmmode_list_date.srd; base_cust.pbl/u_mm_cmmmode.sru
+tmm48_fixedasset,是,否,2,lsgldata.pbl/d_mm_fixedasset_list.srd; lsgldata.pbl/u_mm_fixedasset.sru
+tmm49_g3no,是,否,4,lsgldata.pbl/d_mm_g3no_list.srd; lsgldata.pbl/u_mm_cust_g3.sru; lsgldata.pbl/u_mm_g3no.sru; lsgldata.pbl/u_mm_mflog.sru
+tmm50_mflog,是,否,3,lsgldata.pbl/d_mm_mflog_list.srd; lsgldata.pbl/u_mm_cust_g3.sru; lsgldata.pbl/u_mm_mflog.sru
+tmm52_posstatus,是,否,3,app_objects.pbl/nvo_app_selectdata.sru; price.pbl/d_mc_posstatus.srd; price.pbl/d_mc_posstatus_form.srd
+tmm61_deposit,是,否,7,new_deposit.pbl/d_deposit_confrim_h.srd; new_deposit.pbl/d_deposit_report1.srd; new_deposit.pbl/d_deposit_report2.srd; new_deposit.pbl/d_deposit_report_graph.srd; new_deposit.pbl/u_plan_befor_new.sru
+tmm61_deposit_dtl,是,否,9,new_deposit.pbl/d_deposit_confrim_d.srd; new_deposit.pbl/d_deposit_confrim_d_ed2.srd; new_deposit.pbl/d_deposit_confrim_d_ed3.srd; new_deposit.pbl/d_deposit_confrim_h.srd; new_deposit.pbl/u_plan_befor_new.sru
+tmm61_deposit_io,是,否,1,new_deposit.pbl/d_deposit_confrim_io.srd
+tmm61_deposit_list,是,否,3,new_deposit.pbl/d_deposit_list_report.srd; new_deposit.pbl/d_deposit_report2.srd; new_deposit.pbl/w_plan_cust_befor_new.srw
+tmm61_deposit_posmodel,是,否,1,new_deposit.pbl/w_plan_cust_befor_new.srw
+tmm62_asset_attrib_list,是,否,6,itsm.pbl/dddw_item_choose.srd; itsm.pbl/w_r_itsm_accessup.srw; new_deposit.pbl/d_asset_cust_other.srd; new_deposit.pbl/d_asset_cust_parts_dtl.srd; new_deposit.pbl/d_asset_cust_pos.srd
+tmp14_checkindt,是,否,2,wh_syc.pbl/d_wh_whin_dt_inputcd.srd; wh_syc.pbl/d_wh_whin_dt_inputdt.srd
+tpc01_pcplan,是,是,5,purchase.pbl/d_pcplan_m.srd; purchase.pbl/d_pcplan_m_audit.srd; purchase.pbl/u_pc_plan.sru; purchase.pbl/w_r_pc_plan.srw; wh_syc.pbl/u_wh_overlost_add.sru
+tpc01_pcpromplan,是,否,1,purchase.pbl/u_pc_register_examine.sru
+tpc02_pcplandt,是,是,1,purchase.pbl/w_r_pc_plan.srw
+tpc03_pcplanstatus,是,是,2,app_objects.pbl/nvo_app_selectdata.sru; purchase.pbl/w_r_pc_register_input.srw
+tpc12_register,是,是,29,app_objects.pbl/nvo_app_selectdata.sru; purchase.pbl/d_pc_register_browse.srd; purchase.pbl/d_pc_register_browse_a.srd; purchase.pbl/d_pcregst_m.srd; purchase.pbl/w_r_pc_itemadd_new.srw
+tpc13_registerdt,是,是,3,purchase.pbl/u_pc_register_examine.sru; report.pbl/d_pc_history_d.srd; wh.pbl/d_wh_pcin_dt_input.srd
+tpc14_pcbill,是,否,2,purchase.pbl/w_r_pc_itemadd_new.srw; purchase.pbl/w_r_pc_itemmodify_new.srw
+tpc16_rpcbill,否,是,0,
+tpc17_rpcbilldt,否,是,0,
+tpc20_suppappraisal,是,是,2,appraisal.pbl/u_app_audit.sru; appraisal.pbl/u_app_manage.sru
+tpc20_suppappraisaldt,否,是,0,
+tpc21_suppappraisaldt,是,否,3,appraisal.pbl/d_supscoretype_bill.srd; appraisal.pbl/u_app_audit.sru; appraisal.pbl/u_app_manage.sru
+tps01_pipeline,是,否,5,new_deposit.pbl/u_trans_in_ed1.sru; trans.pbl/u_trans_in.sru; trans.pbl/u_trans_in_error.sru; trans.pbl/u_trans_in_error_change.sru; trans.pbl/u_trans_out.sru
+tqc10_result,是,是,6,app_objects.pbl/nvo_app_selectdata.sru; qc.pbl/d_qc_rec_cptj.srd; qc.pbl/d_qc_rec_result_cp.srd; qc.pbl/d_qc_rec_result_list.srd; qc.pbl/d_qc_result_m.srd
+tqc11_resultdt,是,是,1,app_objects.pbl/nvo_app_selectdata.sru
+tqc11_resultdteid,否,是,0,
+tqc11_resulteid,是,否,1,app_objects.pbl/nvo_app_selectdata.sru
+tqc12_resultdteid,否,是,0,
+tsl01_extend,是,是,29,app_objects.pbl/nvo_app_selectdata.sru; itsm.pbl/u_itsm_archive.sru; itsm.pbl/u_itsm_rep_archive.sru; itsm02.pbl/d_ex_gh_browse.srd; itsm02.pbl/u_ex_gh.sru
+tsl02_extenddt,是,是,20,app_objects.pbl/nvo_app_selectdata.sru; itsm.pbl/u_itsm_archive.sru; itsm.pbl/u_itsm_rep_archive.sru; itsm02.pbl/u_ex_gh.sru; itsm02.pbl/u_itsm_pos_r_eid_update.sru
+tsl05_slpromplan,是,否,28,itsm.pbl/w_r_itsm_accessup.srw; itsm.pbl/w_r_itsm_accessup4pos.srw; itsm.pbl/w_r_itsm_d2d.srw; itsm.pbl/w_r_itsm_d2d_cdjl.srw; itsm.pbl/w_r_itsm_dispatch.srw
+tsl10_slbill,是,是,35,app_objects.pbl/nvo_app_selectdata.sru; itsm.pbl/u_itsm_archive.sru; itsm.pbl/u_itsm_rep_archive.sru; itsm.pbl/w_r_itsm_d2d.srw; itsm.pbl/w_r_itsm_d2d_cdjl.srw
+tsl11_register,是,否,1,new_deposit.pbl/w_invlimit_edit.srw
+tsl11_slbillitem,是,否,29,appraisal.pbl/u_app_audit.sru; appraisal.pbl/u_app_manage.sru; purchase.pbl/u_pc_plan.sru; purchase.pbl/u_pc_plan_audit.sru; qc.pbl/u_qc_result_audit.sru
+tsl15_pickbill,是,否,31,appraisal.pbl/u_app_manage.sru; purchase.pbl/u_pc_plan.sru; purchase.pbl/u_pc_plan_audit.sru; qc.pbl/u_qc_rec_result_cp.sru; qc.pbl/u_qc_result_audit.sru
+tsl16_pickbilldt,是,否,2,report.pbl/d_wh_iremtiv.srd; wh.pbl/d_wh_iremtiv_print.srd
+tsl20_invoice,是,否,1,sale.pbl/nvo_saleservice.sru
+ttx01_txkmg,是,否,2,lsgldata.pbl/d_mm_txkmg_list.srd; lsgldata.pbl/u_mm_txkmg.sru
+twh01_warehouse,是,是,45,app_d.pbl/d_mc_warehouse_frm.srd; app_d.pbl/d_mc_warehouse_grid.srd; app_dddw.pbl/dd_mc_warehouse_valid.srd; app_objects.pbl/nvo_app_selectdata.sru; base_cust.pbl/w_r_mm_editbom.srw
+twh02_location,否,是,0,
+twh03_route,是,否,1,app_dddw.pbl/dd_route.srd
+twh11_detail,是,是,10,app_dddw.pbl/dd_itemprodate.srd; app_objects.pbl/nvo_app_selectdata.sru; new_deposit.pbl/d_asset_wh_other.srd; new_deposit.pbl/d_asset_wh_pos.srd; new_deposit.pbl/d_iv_invlimit.srd
+twh12_detaildt,是,是,2,report.pbl/d_wh_dayitemqty.srd; report.pbl/d_wh_dayitemqtyprint.srd
+twh13_in,是,是,12,qc.pbl/d_qc_rec_cptj.srd; report.pbl/d_pc_history_d.srd; wh.pbl/d_wh_ediewxfy.srd; wh.pbl/d_wh_pcin_dt_input.srd; wh.pbl/d_wh_pcin_eid_dt.srd
+twh14_checkindt,是,是,5,report.pbl/d_pc_history_d.srd; wh.pbl/d_wh_pcin_dt_input.srd; wh.pbl/d_wh_pcin_eid_dt.srd; wh.pbl/d_wh_qcin_dt_input.srd; wh.pbl/w_wh_editwxfy.srw
+twh14_indt,否,是,0,
+twh15_out,是,是,7,app_objects.pbl/nvo_app_selectdata.sru; qc.pbl/d_qc_input_select_h.srd; qc.pbl/w_qc_result_input.srw; wh.pbl/d_wh_allocateout_m.srd; wh.pbl/d_wh_qcout_m.srd
+twh16_outdt,否,是,0,
+twh16_outdteid,是,是,3,app_objects.pbl/nvo_app_selectdata.sru; qc.pbl/d_qc_input_select_h.srd; qc.pbl/w_qc_result_input.srw
+twh16_outdtprd,是,是,4,app_objects.pbl/nvo_app_selectdata.sru; qc.pbl/d_qc_input_select_h.srd; qc.pbl/d_qc_rec_cptj.srd; wh_syc.pbl/ds_wh_whin_dt_inputdt.srd
+twh17_overlost,是,是,3,wh_syc.pbl/d_wh_overlost_m_a.srd; wh_syc.pbl/d_wh_overlost_m_g.srd; wh_syc.pbl/u_wh_overlost_add.sru
+twh18_overlostdt,是,是,1,wh_syc.pbl/d_wh_overlost_d_g_new.srd
+twh18_overlosteid,否,是,0,
+twh19_asset_c_a,是,否,5,itsm02.pbl/u_itsm_pos_r_eid_update.sru; wh.pbl/d_asset_auditbill_browse.srd; wh.pbl/d_wh_asset_c_a.srd; wh.pbl/d_wh_asset_c_a_from.srd; wh.pbl/u_wh_asset_c_a.sru
+twh20_asset_c_a_dtl,是,否,3,itsm02.pbl/u_itsm_pos_r_eid_update.sru; wh.pbl/d_wh_asset_c_a_new.srd; wh.pbl/u_wh_asset_c_a_audit.sru
+twh21_arrtoroute,否,是,0,
+twh21_pos_change,是,否,2,lsgldata.pbl/d_wt_poschange.srd; lsgldata.pbl/w_r_poschange.srw
+twh22_arrtoroutedt,是,否,2,report.pbl/d_wh_iremtiv.srd; wh.pbl/d_wh_iremtiv_print.srd
+twh22_pos_change_dt,是,否,4,lsgldata.pbl/d_wt_poschange_dt.srd; lsgldata.pbl/d_wt_poschange_q.srd; lsgldata.pbl/dd_wt_pos_pj.srd; lsgldata.pbl/w_r_poschange.srw
+u_buttons_v,是,否,1,app_main.pbl/u_buttonsexample.sru
+whcd_item_v,是,否,1,wh.pbl/d_wh_stock_report.srd

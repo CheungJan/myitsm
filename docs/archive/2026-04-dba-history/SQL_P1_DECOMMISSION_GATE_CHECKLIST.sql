@@ -1,0 +1,87 @@
+SET ECHO ON;
+SET PAGESIZE 200;
+SET LINESIZE 220;
+
+PROMPT === P1 old-table decommission gate checklist ===
+
+PROMPT === 1) Row-count parity checks ===
+SELECT 'TIT01_TIMEPOINT_AREA_vs_ITSM_CORE_TIMEPOINT_RULE' AS check_item,
+       (SELECT COUNT(*) FROM TIT01_TIMEPOINT_AREA) AS src_count,
+       (SELECT COUNT(*) FROM ITSM_CORE_TIMEPOINT_RULE) AS tgt_count,
+       CASE WHEN (SELECT COUNT(*) FROM TIT01_TIMEPOINT_AREA) = (SELECT COUNT(*) FROM ITSM_CORE_TIMEPOINT_RULE)
+            THEN 'PASS' ELSE 'FAIL' END AS result
+FROM dual
+UNION ALL
+SELECT 'PLAN_CUST_vs_ITSM_CORE_PLAN_CUSTOMER_XREF',
+       (SELECT COUNT(*) FROM PLAN_CUST),
+       (SELECT COUNT(*) FROM ITSM_CORE_PLAN_CUSTOMER_XREF),
+       CASE WHEN (SELECT COUNT(*) FROM PLAN_CUST) = (SELECT COUNT(*) FROM ITSM_CORE_PLAN_CUSTOMER_XREF)
+            THEN 'PASS' ELSE 'FAIL' END
+FROM dual
+UNION ALL
+SELECT 'TIT02_LIABILITYREG_vs_ITSM_CORE_LIABILITY',
+       (SELECT COUNT(*) FROM TIT02_LIABILITYREG),
+       (SELECT COUNT(*) FROM ITSM_CORE_LIABILITY),
+       CASE WHEN (SELECT COUNT(*) FROM TIT02_LIABILITYREG) = (SELECT COUNT(*) FROM ITSM_CORE_LIABILITY)
+            THEN 'PASS' ELSE 'FAIL' END
+FROM dual
+UNION ALL
+SELECT 'TIT02_LIABILITYREGDT_vs_ITSM_CORE_LIABILITY_DTL',
+       (SELECT COUNT(*) FROM TIT02_LIABILITYREGDT),
+       (SELECT COUNT(*) FROM ITSM_CORE_LIABILITY_DTL),
+       CASE WHEN (SELECT COUNT(*) FROM TIT02_LIABILITYREGDT) = (SELECT COUNT(*) FROM ITSM_CORE_LIABILITY_DTL)
+            THEN 'PASS' ELSE 'FAIL' END
+FROM dual;
+
+PROMPT === 2) Key-field not-null checks ===
+SELECT 'ITSM_CORE_TIMEPOINT_RULE.source_object' AS check_item,
+       COUNT(*) AS null_count,
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS result
+FROM ITSM_CORE_TIMEPOINT_RULE
+WHERE source_object IS NULL
+UNION ALL
+SELECT 'ITSM_CORE_PLAN_CUSTOMER_XREF.source_object', COUNT(*),
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+FROM ITSM_CORE_PLAN_CUSTOMER_XREF
+WHERE source_object IS NULL
+UNION ALL
+SELECT 'ITSM_CORE_LIABILITY.source_object', COUNT(*),
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+FROM ITSM_CORE_LIABILITY
+WHERE source_object IS NULL
+UNION ALL
+SELECT 'ITSM_CORE_LIABILITY_DTL.source_object', COUNT(*),
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+FROM ITSM_CORE_LIABILITY_DTL
+WHERE source_object IS NULL;
+
+PROMPT === 3) Liability detail-parent coverage checks ===
+SELECT 'ITSM_CORE_LIABILITY_DTL.parent_coverage_miss' AS check_item,
+       COUNT(*) AS miss_count,
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS result
+FROM ITSM_CORE_LIABILITY_DTL d
+WHERE d.src_liabcd IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM ITSM_CORE_LIABILITY h
+    WHERE h.src_liabcd = d.src_liabcd
+  );
+
+PROMPT === 4) Batch log checks ===
+SELECT action_type,
+       execute_status,
+       COUNT(*) AS cnt
+FROM MIG_P1_BATCH_LOG
+WHERE batch_no = 'P1_BATCH01'
+GROUP BY action_type, execute_status
+ORDER BY action_type, execute_status;
+
+PROMPT === 5) Decision guide ===
+PROMPT PASS criteria:
+PROMPT - all row-count parity items are PASS;
+PROMPT - all key-field not-null items are PASS;
+PROMPT - liability detail-parent coverage is PASS;
+PROMPT - batch log has RUN_STEP01=DONE and RUN_STEP02=DONE.
+PROMPT If any FAIL exists, keep source tables and continue dual-track validation.
+
+EXIT;

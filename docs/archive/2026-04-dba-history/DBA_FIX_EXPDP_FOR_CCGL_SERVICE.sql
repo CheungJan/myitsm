@@ -1,0 +1,50 @@
+SET ECHO ON;
+SET SERVEROUTPUT ON;
+WHENEVER SQLERROR EXIT SQL.SQLCODE;
+
+COLUMN name FORMAT A30;
+COLUMN pdb FORMAT A20;
+COLUMN network_name FORMAT A50;
+SELECT name, pdb, network_name
+FROM cdb_services
+WHERE UPPER(name) = 'CCGL';
+
+DECLARE
+  v_pdb_name VARCHAR2(128);
+BEGIN
+  SELECT pdb
+    INTO v_pdb_name
+    FROM cdb_services
+   WHERE UPPER(name) = 'CCGL'
+     AND ROWNUM = 1;
+
+  EXECUTE IMMEDIATE 'ALTER SESSION SET CONTAINER = ' || v_pdb_name;
+END;
+/
+
+SHOW CON_NAME;
+
+BEGIN
+  EXECUTE IMMEDIATE q'[CREATE OR REPLACE DIRECTORY DPUMP_MIG_DIR AS 'E:\project\myitsm\src\docs\dpump']';
+END;
+/
+
+GRANT DATAPUMP_EXP_FULL_DATABASE TO CCGL;
+GRANT EXP_FULL_DATABASE TO CCGL;
+GRANT READ, WRITE ON DIRECTORY DPUMP_MIG_DIR TO CCGL;
+
+COLUMN granted_role FORMAT A35;
+SELECT granted_role
+FROM dba_role_privs
+WHERE grantee = 'CCGL'
+  AND granted_role IN ('DATAPUMP_EXP_FULL_DATABASE','EXP_FULL_DATABASE')
+ORDER BY granted_role;
+
+SELECT privilege
+FROM dba_tab_privs
+WHERE owner = 'SYS'
+  AND table_name = 'DPUMP_MIG_DIR'
+  AND grantee = 'CCGL'
+ORDER BY privilege;
+
+EXIT;

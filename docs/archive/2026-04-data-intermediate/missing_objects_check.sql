@@ -1,0 +1,81 @@
+
+set heading off
+set feedback off
+set verify off
+set echo off
+set termout off
+set pagesize 50000
+set linesize 4000
+set trimspool on
+
+spool e:/project/myitsm/src/docs/missing_objects_check_result_ccgl.csv
+select object_name||','||object_type||','||owner||','||status||','
+  from all_objects
+ where owner='CCGL'
+   and object_name in (
+'PLAN_BIZ_V',
+'TIT01_TIMEPOINT_CUST',
+'ALL_LIST_V',
+'TAC01_ACRECEIVE',
+'TAC11_PAYDAYS',
+'TAC12_CREDLIMIT',
+'TAC13_CREDLIMITDT',
+'TIP05_CUSTDISCOUNT',
+'TIP07_COSTPRICTRACK',
+'TIP08_MONTHCOST',
+'TIV30_SHOPCHECKPLAN',
+'TIV33_OVBILL',
+'TMM13_ITEMUNIT',
+'TMM14_ITEMBAR',
+'TMM15_ITEMTAXRATE',
+'TMM23_ADDRESS',
+'TPC01_PCPROMPLAN',
+'TPS01_PIPELINE',
+'TSL05_SLPROMPLAN',
+'TSL11_REGISTER',
+'TSL11_SLBILLITEM',
+'TSL15_PICKBILL',
+'TSL16_PICKBILLDT',
+'TSL20_INVOICE',
+'TWH03_ROUTE',
+'TWH22_ARRTOROUTEDT',
+'U_BUTTONS_V',
+'WHCD_ITEM_V'
+ )
+union all
+select synonym_name||',SYNONYM,'||owner||',VALID,'||table_owner||'.'||table_name
+  from all_synonyms
+ where owner in ('CCGL','PUBLIC')
+   and synonym_name in (
+'PLAN_BIZ_V',
+'TIT01_TIMEPOINT_CUST',
+'ALL_LIST_V',
+'TAC01_ACRECEIVE',
+'TAC11_PAYDAYS',
+'TAC12_CREDLIMIT',
+'TAC13_CREDLIMITDT',
+'TIP05_CUSTDISCOUNT',
+'TIP07_COSTPRICTRACK',
+'TIP08_MONTHCOST',
+'TIV30_SHOPCHECKPLAN',
+'TIV33_OVBILL',
+'TMM13_ITEMUNIT',
+'TMM14_ITEMBAR',
+'TMM15_ITEMTAXRATE',
+'TMM23_ADDRESS',
+'TPC01_PCPROMPLAN',
+'TPS01_PIPELINE',
+'TSL05_SLPROMPLAN',
+'TSL11_REGISTER',
+'TSL11_SLBILLITEM',
+'TSL15_PICKBILL',
+'TSL16_PICKBILLDT',
+'TSL20_INVOICE',
+'TWH03_ROUTE',
+'TWH22_ARRTOROUTEDT',
+'U_BUTTONS_V',
+'WHCD_ITEM_V'
+ )
+order by 1;
+spool off
+exit

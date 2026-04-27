@@ -1,0 +1,14 @@
+SET ECHO ON;
+SET PAGESIZE 200;
+SET LINESIZE 220;
+
+COLUMN name FORMAT A32;
+COLUMN type FORMAT A12;
+COLUMN text FORMAT A150;
+
+SELECT name, type, line, position, text
+FROM user_errors
+WHERE name IN ('TIT01_TIMEPOINT_CUST_B01', 'PLAN_BIZ_V_B01')
+ORDER BY name, sequence;
+
+EXIT;

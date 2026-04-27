@@ -1,0 +1,10 @@
+userid=ccgl/ccgl@localhost:1521/ccglpdb
+DIRECTORY=DATA_PUMP_DIR
+DUMPFILE=ccgl_full_%U.dmp
+LOGFILE=expdp_ccgl_full.log
+SCHEMAS=CCGL
+FLASHBACK_TIME=systimestamp
+PARALLEL=2
+COMPRESSION=ALL
+METRICS=Y
+REUSE_DUMPFILES=Y

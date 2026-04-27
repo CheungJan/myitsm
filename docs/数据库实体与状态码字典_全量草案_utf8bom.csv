@@ -1,0 +1,440 @@
+﻿模板类型,业务域,表名/代码集,中文名称,字段/状态码,字段中文名/状态名称,类型/长度,是否主键,是否必填,默认值,取值范围/状态流转,业务规则,来源PBL/对象,接口映射(预留),备注
+实体,视图/报表,all_list_v,,,,,,,,,,itsm.pbl/dddw_item_choose.srd; itsm.pbl/w_r_itsm_accessup.srw; itsm.pbl/w_r_itsm_accessup4pos.srw,,来源=代码/旧字典，待实库校验
+实体,ITSM,plan_biz_v,,,,,,,,,,report.pbl/d_xs_openrep.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,plan_cust,,,,,,,,,,itsm.pbl/u_itsm_open.sru; itsm.pbl/u_itsm_renovate.sru; itsm.pbl/w_r_itsm_d2d.srw,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,sys_role_user,,,,,,,,,,app_system.pbl/u_mc_user.sru; app_system.pbl/w_r_mc_areauser.srw,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,sys_user,,,,,,,,,,app_system.pbl/u_mc_user.sru; app_system.pbl/w_r_mc_areauser.srw,,来源=代码/旧字典，待实库校验
+实体,未分类,tac01_acreceive,,,,,,,,,,new_deposit.pbl/u_trans_in_ed1.sru; sale.pbl/nvo_saleservice.sru; trans.pbl/u_trans_in.sru,,来源=代码/旧字典，待实库校验
+实体,未分类,tac01_fpsk,,,,,,,,,,lsgldata.pbl/d_ac_fpsk_edit.srd; lsgldata.pbl/d_ac_fpsk_list.srd; lsgldata.pbl/d_ac_fpsk_report.srd,,来源=代码/旧字典，待实库校验
+实体,未分类,tac11_paydays,,,,,,,,,,base_cust.pbl/d_mm_customers_form.srd; base_cust.pbl/w_supplier_editdata.srw; base_cust.pbl/w_supplier_newdata.srw,,来源=代码/旧字典，待实库校验
+实体,未分类,tac12_credlimit,,,,,,,,,,base_cust.pbl/d_mm_customers_form.srd; base_cust.pbl/w_supplier_editdata.srw; base_cust.pbl/w_supplier_newdata.srw,,来源=代码/旧字典，待实库校验
+实体,未分类,tac13_credlimitdt,,,,,,,,,,base_cust.pbl/d_mm_customers_form.srd; base_cust.pbl/w_supplier_editdata.srw; base_cust.pbl/w_supplier_newdata.srw,,来源=代码/旧字典，待实库校验
+实体,未分类,tht01_htgl,,,,,,,,,,lsgldata.pbl/d_ht_htgl_edit.srd; lsgldata.pbl/d_ht_htgl_list.srd; lsgldata.pbl/d_ht_htgl_query.srd,,来源=代码/旧字典，待实库校验
+实体,未分类,tip01_price,,,,,,,,,,base_cust.pbl/d_ip_itemprice_grid.srd; base_cust.pbl/d_mm_items_list.srd,,来源=代码/旧字典，待实库校验
+实体,未分类,tip03_adjprice,,,,,,,,,,price.pbl/d_mm_adjprice_condition.srd; price.pbl/d_mm_adjprice_detail.srd; price.pbl/w_r_mm_adjprice.srw,,来源=代码/旧字典，待实库校验
+实体,未分类,tip05_custdiscount,,,,,,,,,,base_cust.pbl/d_mm_customers_form.srd; base_cust.pbl/w_supplier_editdata.srw; base_cust.pbl/w_supplier_newdata.srw,,来源=代码/旧字典，待实库校验
+实体,未分类,tip07_costprictrack,,,,,,,,,,new_deposit.pbl/u_plan_report.sru; report.pbl/u_pc_history.sru; report.pbl/u_pc_history_d.sru,,来源=代码/旧字典，待实库校验
+实体,未分类,tip08_monthcost,,,,,,,,,,wh_syc.pbl/w_r_wh_overlost.srw,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit01_timepoint_area,,,,,,,,,,base_srv.pbl/gf_gettimept.srf; base_srv.pbl/gf_gettimept_bk.srf; itsm02.pbl/d_itsm_tp_levels_free.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit01_timepoint_cust,,,,,,,,,,base_srv.pbl/gf_gettimept_bk.srf,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit02_liabilityreg,,,,,,,,,,itsm.pbl/d_itsm_liab_free.srd; itsm.pbl/d_itsm_liab_list.srd; itsm.pbl/u_itsm_liab.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit02_liabilityregdt,,,,,,,,,,itsm.pbl/d_itsm_liabdt_free.srd; itsm.pbl/d_itsm_liabdt_list.srd; itsm.pbl/u_itsm_archivecode.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit03_syscodes,,,,,,,,,,itsm02.pbl/d_itsm_syscodes_form.srd; itsm02.pbl/u_itsm_maintenance_daily.sru; itsm02.pbl/u_itsm_maintenance_daily_yc.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit04_archivecode,,,,,,,,,,itsm.pbl/d_itsm_archivecode_4_list.srd; itsm.pbl/d_itsm_archivecode_free.srd; itsm.pbl/d_itsm_archivecode_free_four.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit05_repairinfo,,,,,,,,,,itsm.pbl/d_itsm_repdt_list01.srd; itsm.pbl/d_itsm_repdt_list02.srd; itsm.pbl/u_itsm_repairinfo.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit06_userarea,,,,,,,,,,app_d.pbl/d_mc_areausers.srd; app_d.pbl/d_mc_userarea_grid.srd; app_system.pbl/u_mc_user.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit10_main_track,,,,,,,,,,itsm.pbl/d_whd_report_ex.srd; new_deposit.pbl/d_whd_report_startup.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit10_maintenance_liability,,,,,,,,,,itsm.pbl/d_itsm_rep_comrate.srd; itsm.pbl/u_itsm_rcwh_h.sru; itsm.pbl/u_itsm_rcwh_ve.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit10_maintenanceday,,,,,,,,,,itsm.pbl/d_itsm_day_archive_free.srd; itsm.pbl/d_itsm_day_archive_list.srd; itsm.pbl/d_itsm_rep_archive_list.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit10_pos_detail,,,,,,,,,,new_deposit.pbl/d_itsm_posdetail_ed1.srd; trans.pbl/d_itsm_posdetail.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit11_maintenance_attc,,,,,,,,,,itsm.pbl/d_attc.srd; itsm.pbl/u_itsm_rcwh_ve.sru; kq.pbl/u_itsm_wzx.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit12_maintenance_archive,,,,,,,,,,itsm.pbl/d_itsm_archive_free.srd; itsm.pbl/d_itsm_archive_list.srd; itsm.pbl/d_itsm_day_archive_list.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit13_maintenance_open,,,,,,,,,,itsm.pbl/d_maintenance_open_free.srd; itsm.pbl/d_maintenance_open_list.srd; itsm.pbl/d_maintenance_open_one.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit14_equipment_open,,,,,,,,,,itsm.pbl/d_itsm_equopen_free.srd; itsm.pbl/d_itsm_equopen_list.srd; itsm.pbl/u_itsm_open.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit15_equipment_renovate,,,,,,,,,,itsm.pbl/d_itsm_renovate_free.srd; itsm.pbl/d_itsm_renovate_list.srd; itsm.pbl/u_itsm_renovate.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit15_maintenance_renovate,,,,,,,,,,itsm.pbl/d_maintenance_renovate_free.srd; itsm.pbl/d_maintenance_renovate_list.srd; itsm.pbl/d_maintenance_renovate_one.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit16_device_change,,,,,,,,,,itsm.pbl/d_divechange_report.srd; itsm02.pbl/d_itsm_device_change_grid.srd; itsm02.pbl/d_itsm_device_change_grid_list.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit17_cust_pos_daily,,,,,,,,,,itsm02.pbl/u_itsm_maintenance_daily.sru; itsm02.pbl/u_itsm_maintenance_daily_yc.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit17_maintenance,,,,,,,,,,itsm02.pbl/d_itsm_maintenance_daily_form.srd; itsm02.pbl/d_itsm_maintenance_daily_form_yc.srd; itsm02.pbl/d_itsm_maintenance_daily_grid.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit17_maintenance_plan,,,,,,,,,,itsm02.pbl/d_itsm_maintenance_plan_ym_report.srd; itsm02.pbl/u_itsm_maintenance_plan.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit18_store_close,,,,,,,,,,app_main.pbl/w_m_appmain.srw; itsm.pbl/d_storeclose_report.srd; itsm02.pbl/d_itsm_store_close_grid.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit19_on_choosedt,,,,,,,,,,itsm02.pbl/d_itsm_pos_r_eid_choose.srd; itsm02.pbl/d_itsm_pos_r_eid_choose_new.srd; itsm02.pbl/d_itsm_pos_r_eid_choose_old.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit21_maintenance_dispatch,,,,,,,,,,itsm.pbl/d_dispatch.srd; itsm.pbl/d_dispatch_free.srd; itsm.pbl/u_itsm_rcwh_h.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit22_fetion_send,,,,,,,,,,itsm.pbl/d_dispatch.srd; itsm.pbl/d_fetion.srd; itsm.pbl/d_fetion_free.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit23_maintenance_d2d,,,,,,,,,,itsm.pbl/d_divechange_report.srd; itsm.pbl/d_free_report.srd; itsm.pbl/d_maintenance_d2d.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit24_maintenance_rv,,,,,,,,,,itsm.pbl/d_maintenance_rv.srd; itsm.pbl/u_itsm_open.sru; itsm.pbl/u_itsm_rcwh_h.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit25_accessories_update,,,,,,,,,,itsm.pbl/d_accessup.srd; itsm.pbl/d_accessup4pos_free.srd; itsm.pbl/d_accessup_free.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit26_paylist,,,,,,,,,,itsm.pbl/d_maintenance_pay.srd; itsm.pbl/d_maintenance_pay_free.srd; itsm02.pbl/d_itsm_accessories_update_report.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit27_close_bills,,,,,,,,,,itsm.pbl/u_itsm_open.sru; itsm.pbl/u_itsm_rcwh_h.sru; itsm.pbl/u_itsm_rcwh_ve.sru,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit28_free_replace,,,,,,,,,,itsm.pbl/d_free_report.srd; itsm02.pbl/d_itsm_free_replace_dt_list.srd; itsm02.pbl/d_itsm_free_replace_form.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit28_free_replace_dt,,,,,,,,,,itsm.pbl/w_r_itsm_d2d.srw; itsm02.pbl/d_itsm_free_replace_dt_form.srd; itsm02.pbl/d_itsm_free_replace_dt_grid.srd,,来源=代码/旧字典，待实库校验
+实体,ITSM,tit29_noclose_track,,,,,,,,,,itsm.pbl/d_itsm_noclose_track.srd; itsm.pbl/d_itsm_noclose_track_free.srd; itsm.pbl/d_noclose.srd,,来源=代码/旧字典，待实库校验
+实体,未分类,tiv01_invlimit,,,,,,,,,,new_deposit.pbl/d_inv_limit_grid.srd; new_deposit.pbl/d_iv_invlimit.srd; new_deposit.pbl/u_inv_limit.sru,,来源=代码/旧字典，待实库校验
+实体,未分类,tiv02_invlimit_hi,,,,,,,,,,new_deposit.pbl/w_invlimit_edit.srw,,来源=代码/旧字典，待实库校验
+实体,未分类,tiv11_detail,,,,,,,,,,itsm.pbl/w_r_itsm_accessup.srw; itsm.pbl/w_r_itsm_accessup4pos.srw; itsm.pbl/w_r_itsm_d2d.srw,,来源=代码/旧字典，待实库校验
+实体,未分类,tiv12_detaildt,,,,,,,,,,new_deposit.pbl/u_plan_report.sru; report.pbl/u_pc_history.sru; report.pbl/u_pc_history_d.sru,,来源=代码/旧字典，待实库校验
+实体,未分类,tiv30_shopcheckplan,,,,,,,,,,itsm02.pbl/w_r_ex_gh.srw; sale.pbl/w_r_ex_audit_direct.srw; sale.pbl/w_r_ex_bill.srw,,来源=代码/旧字典，待实库校验
+实体,未分类,tiv33_ovbill,,,,,,,,,,base_srv.pbl/d_iv_txovb.srd,,来源=代码/旧字典，待实库校验
+实体,未分类,tkq01_attendance,,,,,,,,,,kq.pbl/d_kq_free.srd; kq.pbl/dddd.srd; kq.pbl/u_kq_imp.sru,,来源=代码/旧字典，待实库校验
+实体,未分类,tkq02_attendancecount,,,,,,,,,,kq.pbl/d_kq_tj.srd; kq.pbl/d_kq_tj_bk.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc01_menus,,,,,,,,,,app_d.pbl/d_mc_funcd_groupright.srd; app_d.pbl/d_mc_menu_form.srd; app_d.pbl/d_mc_menu_right.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc02_menusdt,,,,,,,,,,app_objects.pbl/nvo_appservice.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc03_usermenus,,,,,,,,,,app_d.pbl/d_mc_menus_user_list.srd; app_d.pbl/d_mc_usermenu_grid.srd; app_d.pbl/d_mc_usermenu_update.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc11_departments,,,,,,,,,,app_d.pbl/d_mc_dept_form.srd; app_d.pbl/d_mc_dept_list.srd; app_dddw.pbl/dd_mc_dept.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc12_groups,,,,,,,,,,app_d.pbl/d_mc_groups_form.srd; app_d.pbl/d_mc_groups_list.srd; app_d.pbl/d_mc_usergroup.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc13_users,,,,,,,,,,app_d.pbl/d_mc_areausers.srd; app_d.pbl/d_mc_groupusers.srd; app_d.pbl/d_mc_user_form.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc21_usergroup,,,,,,,,,,app_d.pbl/d_mc_groupuser_grid.srd; app_d.pbl/d_mc_groupusers.srd; app_d.pbl/d_mc_menu_right.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc22_userbusityp,,,,,,,,,,app_d.pbl/d_mc_busityp_form.srd; app_system.pbl/u_mc_user.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc31_groupright,,,,,,,,,,app_d.pbl/d_mc_funcd_groupright.srd; app_d.pbl/d_mc_groupright.srd; app_d.pbl/d_mc_menu_right.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc41_acclog,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc42_connectinfo,,,,,,,,,,app_objects.pbl/nvo_myappsrv.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc43_logs,,,,,,,,,,app_objects.pbl/nvo_appservice.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc44_syslock,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc51_verctrl,,,,,,,,,,app_main.pbl/w_m_appmain.srw; app_objects.pbl/nvo_myappsrv.sru; app_system.pbl/u_mc_uploadfile.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmc71_sysparm,,,,,,,,,,app_objects.pbl/nvo_myappsrv.sru; sale.pbl/nvo_saleservice.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm01_company,,,,,,,,,,app_d.pbl/d_mc_company.srd; app_objects.pbl/nvo_appservice.sru; app_objects.pbl/nvo_myappsrv.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm02_country,,,,,,,,,,app_d.pbl/d_mm_country_form.srd; app_d.pbl/d_mm_country_list.srd; app_dddw.pbl/dd_mm_country.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm03_province,,,,,,,,,,app_d.pbl/d_mm_province_form.srd; app_d.pbl/d_mm_province_list.srd; app_dddw.pbl/dd_mm_province.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm04_city,,,,,,,,,,app_d.pbl/d_mm_city_form.srd; app_dddw.pbl/dd_mm_city.srd; app_system.pbl/u_mm_province.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm05_town,,,,,,,,,,app_d.pbl/d_mm_town_form.srd; app_d.pbl/d_mm_town_list.srd; app_system.pbl/u_mm_city.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm11_itemclass,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; base_cust.pbl/d_mm_bomclass_list.srd; base_cust.pbl/d_mm_itemclass_form.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm12_items,,,,,,,,,,app_dddw.pbl/dd_wh_itemname.srd; app_objects.pbl/nvo_app_selectdata.sru; appraisal.pbl/u_app_audit.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm13_itemunit,,,,,,,,,,app_dddw.pbl/dd_mm_itemunit_inuse.srd; app_objects.pbl/d_itemunits_input.srd; base_cust.pbl/d_mm_itemunit_grid.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm14_itembar,,,,,,,,,,base_cust.pbl/d_mm_itembar_grid.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm15_itemtaxrate,,,,,,,,,,base_cust.pbl/d_mm_itemtaxrate_list.srd; base_cust.pbl/w_r_mm_editbom.srw; base_cust.pbl/w_r_mm_edititem.srw,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm18_supplierclass,,,,,,,,,,base_cust.pbl/d_mm_supplier_form.srd; base_cust.pbl/u_mm_supplier.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm19_suppliers,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; appraisal.pbl/u_app_audit.sru; appraisal.pbl/u_app_manage.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm21_custclass,,,,,,,,,,app_dddw.pbl/dd_mm_custclass_useflg.srd; app_objects.pbl/nvo_app_selectdata.sru; base_cust.pbl/d_mm_custclass_form.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm22_customers,,,,,,,,,,app_dddw.pbl/dd_mm_cust_card.srd; app_dddw.pbl/dd_mm_custclass_anm.srd; app_objects.pbl/nvo_app_selectdata.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm23_address,,,,,,,,,,app_dddw.pbl/dd_mm_address.srd; base_cust.pbl/u_mm_address.sru; itsm02.pbl/w_r_ex_gh.srw,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm24_custitems,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; purchase.pbl/w_r_pc_register_input.srw,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm31_syscodes,,,,,,,,,,app_d.pbl/d_mc_busityp_form.srd; app_d.pbl/d_mm_syscodes_form.srd; app_d.pbl/d_mm_syscodes_list.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm32_syscodesdt,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm32_syscodesdtcodetyp,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm33_message,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm34_idmaster,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm35_cust_pos_rl,,,,,,,,,,base_cust.pbl/d_mm_customers_form_1.srd; base_cust.pbl/w_customers_editdata.srw; itsm.pbl/d_custinfo_cs.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm36_cust_ve_rl,,,,,,,,,,itsm.pbl/u_itsm_rcwh_ve.sru; itsm02.pbl/d_itsm_cust_ve_list.srd; itsm02.pbl/u_itsm_maintenance_daily.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm38_itemprice,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm39_adjprice,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm40_label,,,,,,,,,,lsgldata.pbl/w_r_mm_label_zjpj.srw; price.pbl/d_mm_label_add.srd; price.pbl/d_mm_label_change_condition.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm41_bom,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; base_cust.pbl/d_mm_itembom_grid.srd; itsm.pbl/w_r_itsm_accessup.srw,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm41_bombom,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm42_bomdt,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; base_cust.pbl/d_mm_itembom_grid.srd; base_cust.pbl/u_mm_bom_new.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm43_eid,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; itsm.pbl/d_accessup.srd; itsm.pbl/d_itsm_rcwh_poseid.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm43_eid_track,,,,,,,,,,report.pbl/d_tmm43_tract.srd; report.pbl/w_r_bom_change.srw,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm44_pos_r_eid,,,,,,,,,,itsm.pbl/d_itsm_rcwh_poseid.srd; itsm.pbl/dddw_newpos_choose.srd; itsm.pbl/w_r_itsm_accessup4pos.srw,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm45_suppappraisal,,,,,,,,,,appraisal.pbl/d_supscoretype_bill.srd; appraisal.pbl/d_supscoretype_list_y.srd; appraisal.pbl/d_supscoretype_pop.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm46_area,,,,,,,,,,app_d.pbl/d_mc_area_form.srd; app_d.pbl/d_mc_area_list.srd; itsm.pbl/u_itsm_repairinfo.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm47_commode,,,,,,,,,,app_dddw.pbl/dd_mm_commmode.srd; base_cust.pbl/d_mm_cmmmode_free.srd; base_cust.pbl/d_mm_cmmmode_list.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm48_fixedasset,,,,,,,,,,lsgldata.pbl/d_mm_fixedasset_list.srd; lsgldata.pbl/u_mm_fixedasset.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm49_g3no,,,,,,,,,,lsgldata.pbl/d_mm_g3no_list.srd; lsgldata.pbl/u_mm_cust_g3.sru; lsgldata.pbl/u_mm_g3no.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm50_mflog,,,,,,,,,,lsgldata.pbl/d_mm_mflog_list.srd; lsgldata.pbl/u_mm_cust_g3.sru; lsgldata.pbl/u_mm_mflog.sru,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm52_posstatus,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; price.pbl/d_mc_posstatus.srd; price.pbl/d_mc_posstatus_form.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm61_deposit,,,,,,,,,,new_deposit.pbl/d_deposit_confrim_h.srd; new_deposit.pbl/d_deposit_report1.srd; new_deposit.pbl/d_deposit_report2.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm61_deposit_dtl,,,,,,,,,,new_deposit.pbl/d_deposit_confrim_d.srd; new_deposit.pbl/d_deposit_confrim_d_ed2.srd; new_deposit.pbl/d_deposit_confrim_d_ed3.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm61_deposit_io,,,,,,,,,,new_deposit.pbl/d_deposit_confrim_io.srd,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm61_deposit_list,,,,,,,,,,new_deposit.pbl/d_deposit_list_report.srd; new_deposit.pbl/d_deposit_report2.srd; new_deposit.pbl/w_plan_cust_befor_new.srw,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm61_deposit_posmodel,,,,,,,,,,new_deposit.pbl/w_plan_cust_befor_new.srw,,来源=代码/旧字典，待实库校验
+实体,系统管理/基础信息,tmm62_asset_attrib_list,,,,,,,,,,itsm.pbl/dddw_item_choose.srd; itsm.pbl/w_r_itsm_accessup.srw; new_deposit.pbl/d_asset_cust_other.srd,,来源=代码/旧字典，待实库校验
+实体,未分类,tmp14_checkindt,,,,,,,,,,wh_syc.pbl/d_wh_whin_dt_inputcd.srd; wh_syc.pbl/d_wh_whin_dt_inputdt.srd,,来源=代码/旧字典，待实库校验
+实体,采购,tpc01_pcplan,,,,,,,,,,purchase.pbl/d_pcplan_m.srd; purchase.pbl/d_pcplan_m_audit.srd; purchase.pbl/u_pc_plan.sru,,来源=代码/旧字典，待实库校验
+实体,采购,tpc01_pcpromplan,,,,,,,,,,purchase.pbl/u_pc_register_examine.sru,,来源=代码/旧字典，待实库校验
+实体,采购,tpc02_pcplandt,,,,,,,,,,purchase.pbl/w_r_pc_plan.srw,,来源=代码/旧字典，待实库校验
+实体,采购,tpc03_pcplanstatus,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; purchase.pbl/w_r_pc_register_input.srw,,来源=代码/旧字典，待实库校验
+实体,采购,tpc12_register,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; purchase.pbl/d_pc_register_browse.srd; purchase.pbl/d_pc_register_browse_a.srd,,来源=代码/旧字典，待实库校验
+实体,采购,tpc13_registerdt,,,,,,,,,,purchase.pbl/u_pc_register_examine.sru; report.pbl/d_pc_history_d.srd; wh.pbl/d_wh_pcin_dt_input.srd,,来源=代码/旧字典，待实库校验
+实体,采购,tpc14_pcbill,,,,,,,,,,purchase.pbl/w_r_pc_itemadd_new.srw; purchase.pbl/w_r_pc_itemmodify_new.srw,,来源=代码/旧字典，待实库校验
+实体,采购,tpc16_rpcbill,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,采购,tpc17_rpcbilldt,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,采购,tpc20_suppappraisal,,,,,,,,,,appraisal.pbl/u_app_audit.sru; appraisal.pbl/u_app_manage.sru,,来源=代码/旧字典，待实库校验
+实体,采购,tpc20_suppappraisaldt,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,采购,tpc21_suppappraisaldt,,,,,,,,,,appraisal.pbl/d_supscoretype_bill.srd; appraisal.pbl/u_app_audit.sru; appraisal.pbl/u_app_manage.sru,,来源=代码/旧字典，待实库校验
+实体,未分类,tps01_pipeline,,,,,,,,,,new_deposit.pbl/u_trans_in_ed1.sru; trans.pbl/u_trans_in.sru; trans.pbl/u_trans_in_error.sru,,来源=代码/旧字典，待实库校验
+实体,质检,tqc10_result,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; qc.pbl/d_qc_rec_cptj.srd; qc.pbl/d_qc_rec_result_cp.srd,,来源=代码/旧字典，待实库校验
+实体,质检,tqc11_resultdt,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru,,来源=代码/旧字典，待实库校验
+实体,质检,tqc11_resultdteid,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,质检,tqc11_resulteid,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru,,来源=代码/旧字典，待实库校验
+实体,质检,tqc12_resultdteid,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,销售,tsl01_extend,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; itsm.pbl/u_itsm_archive.sru; itsm.pbl/u_itsm_rep_archive.sru,,来源=代码/旧字典，待实库校验
+实体,销售,tsl02_extenddt,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; itsm.pbl/u_itsm_archive.sru; itsm.pbl/u_itsm_rep_archive.sru,,来源=代码/旧字典，待实库校验
+实体,销售,tsl05_slpromplan,,,,,,,,,,itsm.pbl/w_r_itsm_accessup.srw; itsm.pbl/w_r_itsm_accessup4pos.srw; itsm.pbl/w_r_itsm_d2d.srw,,来源=代码/旧字典，待实库校验
+实体,销售,tsl10_slbill,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; itsm.pbl/u_itsm_archive.sru; itsm.pbl/u_itsm_rep_archive.sru,,来源=代码/旧字典，待实库校验
+实体,销售,tsl11_register,,,,,,,,,,new_deposit.pbl/w_invlimit_edit.srw,,来源=代码/旧字典，待实库校验
+实体,销售,tsl11_slbillitem,,,,,,,,,,appraisal.pbl/u_app_audit.sru; appraisal.pbl/u_app_manage.sru; purchase.pbl/u_pc_plan.sru,,来源=代码/旧字典，待实库校验
+实体,销售,tsl15_pickbill,,,,,,,,,,appraisal.pbl/u_app_manage.sru; purchase.pbl/u_pc_plan.sru; purchase.pbl/u_pc_plan_audit.sru,,来源=代码/旧字典，待实库校验
+实体,销售,tsl16_pickbilldt,,,,,,,,,,report.pbl/d_wh_iremtiv.srd; wh.pbl/d_wh_iremtiv_print.srd,,来源=代码/旧字典，待实库校验
+实体,销售,tsl20_invoice,,,,,,,,,,sale.pbl/nvo_saleservice.sru,,来源=代码/旧字典，待实库校验
+实体,未分类,ttx01_txkmg,,,,,,,,,,lsgldata.pbl/d_mm_txkmg_list.srd; lsgldata.pbl/u_mm_txkmg.sru,,来源=代码/旧字典，待实库校验
+实体,仓储,twh01_warehouse,,,,,,,,,,app_d.pbl/d_mc_warehouse_frm.srd; app_d.pbl/d_mc_warehouse_grid.srd; app_dddw.pbl/dd_mc_warehouse_valid.srd,,来源=代码/旧字典，待实库校验
+实体,仓储,twh02_location,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,仓储,twh03_route,,,,,,,,,,app_dddw.pbl/dd_route.srd,,来源=代码/旧字典，待实库校验
+实体,仓储,twh11_detail,,,,,,,,,,app_dddw.pbl/dd_itemprodate.srd; app_objects.pbl/nvo_app_selectdata.sru; new_deposit.pbl/d_asset_wh_other.srd,,来源=代码/旧字典，待实库校验
+实体,仓储,twh12_detaildt,,,,,,,,,,report.pbl/d_wh_dayitemqty.srd; report.pbl/d_wh_dayitemqtyprint.srd,,来源=代码/旧字典，待实库校验
+实体,仓储,twh13_in,,,,,,,,,,qc.pbl/d_qc_rec_cptj.srd; report.pbl/d_pc_history_d.srd; wh.pbl/d_wh_ediewxfy.srd,,来源=代码/旧字典，待实库校验
+实体,仓储,twh14_checkindt,,,,,,,,,,report.pbl/d_pc_history_d.srd; wh.pbl/d_wh_pcin_dt_input.srd; wh.pbl/d_wh_pcin_eid_dt.srd,,来源=代码/旧字典，待实库校验
+实体,仓储,twh14_indt,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,仓储,twh15_out,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; qc.pbl/d_qc_input_select_h.srd; qc.pbl/w_qc_result_input.srw,,来源=代码/旧字典，待实库校验
+实体,仓储,twh16_outdt,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,仓储,twh16_outdteid,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; qc.pbl/d_qc_input_select_h.srd; qc.pbl/w_qc_result_input.srw,,来源=代码/旧字典，待实库校验
+实体,仓储,twh16_outdtprd,,,,,,,,,,app_objects.pbl/nvo_app_selectdata.sru; qc.pbl/d_qc_input_select_h.srd; qc.pbl/d_qc_rec_cptj.srd,,来源=代码/旧字典，待实库校验
+实体,仓储,twh17_overlost,,,,,,,,,,wh_syc.pbl/d_wh_overlost_m_a.srd; wh_syc.pbl/d_wh_overlost_m_g.srd; wh_syc.pbl/u_wh_overlost_add.sru,,来源=代码/旧字典，待实库校验
+实体,仓储,twh18_overlostdt,,,,,,,,,,wh_syc.pbl/d_wh_overlost_d_g_new.srd,,来源=代码/旧字典，待实库校验
+实体,仓储,twh18_overlosteid,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,仓储,twh19_asset_c_a,,,,,,,,,,itsm02.pbl/u_itsm_pos_r_eid_update.sru; wh.pbl/d_asset_auditbill_browse.srd; wh.pbl/d_wh_asset_c_a.srd,,来源=代码/旧字典，待实库校验
+实体,仓储,twh20_asset_c_a_dtl,,,,,,,,,,itsm02.pbl/u_itsm_pos_r_eid_update.sru; wh.pbl/d_wh_asset_c_a_new.srd; wh.pbl/u_wh_asset_c_a_audit.sru,,来源=代码/旧字典，待实库校验
+实体,仓储,twh21_arrtoroute,,,,,,,,,,,,来源=代码/旧字典，待实库校验
+实体,仓储,twh21_pos_change,,,,,,,,,,lsgldata.pbl/d_wt_poschange.srd; lsgldata.pbl/w_r_poschange.srw,,来源=代码/旧字典，待实库校验
+实体,仓储,twh22_arrtoroutedt,,,,,,,,,,report.pbl/d_wh_iremtiv.srd; wh.pbl/d_wh_iremtiv_print.srd,,来源=代码/旧字典，待实库校验
+实体,仓储,twh22_pos_change_dt,,,,,,,,,,lsgldata.pbl/d_wt_poschange_dt.srd; lsgldata.pbl/d_wt_poschange_q.srd; lsgldata.pbl/dd_wt_pos_pj.srd,,来源=代码/旧字典，待实库校验
+实体,视图/报表,u_buttons_v,,,,,,,,,,app_main.pbl/u_buttonsexample.sru,,来源=代码/旧字典，待实库校验
+实体,视图/报表,whcd_item_v,,,,,,,,,,wh.pbl/d_wh_stock_report.srd,,来源=代码/旧字典，待实库校验
+状态码,通用,childflg,,childflg='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,childflg,,childflg='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,current_status,,current_status<>'9',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,current_status,,"current_status='""+ls_status +""'",,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,current_status,,current_status='3',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,current_status,,current_status='5',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,current_status,,current_status='9',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,current_status,,"current_statusIN(""+ LEFT(LS_STATUS,LEN(LS_STATUS)",,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_add,,is_add='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_add,,is_add='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_addtext,,is_addtext='新增(&A)',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_appcommandline,,is_appcommandline='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_appid,,is_appid='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_archgroup,,is_archgroup='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_audit,,is_audit='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_audit,,is_audit='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billid,,is_billid='其他',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billno,,is_billno='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billstatus,,is_billstatus='N',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billtype,,is_billtype='BG',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billtype,,is_billtype='BY',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billtype,,is_billtype='GB',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billtype,,is_billtype='GH',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billtype,,is_billtype='LD',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billtype,,is_billtype='MD',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billtype,,is_billtype='MO',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billtype,,is_billtype='MR',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_billtype,,is_billtype='PL',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_bomcd,,is_bomcd='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_cancel,,is_cancel='N',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_cancel,,is_cancel='Y',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_choose,,is_choose='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_choosecolumn,,is_choosecolumn='chooseflag',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_classcd,,is_classcd='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_classcds,,is_classcds='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_classcds1,,is_classcds1='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_classnms,,is_classnms='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_closetext,,is_closetext='关闭(&C)',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_col_rowno,,is_col_rowno='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_col_rowno,,is_col_rowno='rowno',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_col_seqno,,is_col_seqno='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_col_seqno,,is_col_seqno='billno',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_column,,is_column='获取第',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_companycd,,is_companycd='00',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_consume,,is_consume='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_consume,,is_consume='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_consume,,is_consume='X',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_costtype,,is_costtype='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_costtype,,is_costtype='2',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_currentitemlabel,,is_currentitemlabel='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_custcd,,is_custcd<>'',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_custcd,,is_custcd='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_dataobject,,is_dataobject='d_itsm_tp_cust_free',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_dataobject,,is_dataobject='d_itsm_tp_levels_free',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_dataobject,,is_dataobject='d_ju_lsgl_customers_form',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_dataobject,,is_dataobject='d_jy_lsgl_customers_form',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_dataobject,,is_dataobject='d_jy_ssb_customers_edit',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_dataobject,,is_dataobject='d_mm_customers_form_1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_dataobject,,is_dataobject='d_mm_supplier_form_1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_datatype,,is_datatype='获取',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_datatype,,is_datatype='获取第',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_dateformat,,is_dateformat='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='上门人员:',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='上门人员描述',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='修改上门人员:',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='修改上门人员及解决方案:',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='催单时间: ',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='免费更换:',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='分派人员:',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='分派人员描述',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='回访:',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='工程师:',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='已提交 ',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='已提交 : 旧设备序列号: ',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='归档人员:',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='归档描述',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='旧机翻新:',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='记录信息时间: ',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='记录回访信息',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='记录开通设备信息',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='记录更换设备信息',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='记录翻新设备信息',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='记录计费信息',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='记录配件更换信息',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='设备开通:',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_decription,,is_decription='配件更换:',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_deletetext,,is_deletetext='删除(&D)',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_delimiter,,is_delimiter='&',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_direction,,is_direction='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_direction,,is_direction='Down',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_direction,,is_direction='Up',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_edit,,is_edit='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_edit,,is_edit='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_edit,,is_edit='3',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_editstyle,,is_editstyle='dddw',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_editstyle,,is_editstyle='ddlb',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_edittext,,is_edittext='修改(&E)',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_eid,,is_eid='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_extyp,,is_extyp='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_extyp,,is_extyp='BG',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_extyp,,is_extyp='BQ',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_extyp,,is_extyp='BY',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_extyp,,is_extyp='GB',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_extyp,,is_extyp='GH',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_extyp,,is_extyp='MD',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_extyp,,is_extyp='MO',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_extyp,,is_extyp='MR',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_fault_type,,is_fault_type<>'2',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_fault_type,,is_fault_type='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_fault_type,,is_fault_type='3',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_filter,,is_filter='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_filter,,is_filter='?',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_filterlabel,,is_filterlabel='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_find,,is_find='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_findexpression,,is_findexpression='!',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_findtext,,is_findtext='查找(&F)',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_finish,,is_finish<>'0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_finish,,is_finish='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_finish,,is_finish='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_finish,,is_finish='2',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_finish,,is_finish='3',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_finish,,"is_finishin('1','2')",,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_gdtye,,is_gdtye='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_gdtye,,is_gdtye='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_group,,is_group<>'Y',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_group,,is_group='N',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_group,,is_group='X',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_group,,is_group='Y',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_gzlx,,is_gzlx='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_gzlx,,is_gzlx='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_gzlx,,is_gzlx='2',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_gzlx,,is_gzlx='3',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_hd_djbh,,is_hd_djbh='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_hd_djbh,,is_hd_djbh='djbh',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_hd_seqno,,is_hd_seqno='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_hd_seqno,,is_hd_seqno='billno',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_id,,is_id='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_invtyp,,is_invtyp='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_invtyp,,is_invtyp='2',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_invtyp,,is_invtyp='3',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_invtyp,,is_invtyp='4',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_invtyp,,is_invtyp='5',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_invtyp,,is_invtyp='6',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_invtyp,,is_invtyp='7',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_invtyp,,is_invtyp='8',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_invtyp,,is_invtyp='9',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_invtyp,,is_invtyp='S',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_itemcd,,is_itemcd='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_itemcd,,is_itemcd='~',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_itemcds,,is_itemcds='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_itemcds1,,is_itemcds1='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_itemclasscds,,is_itemclasscds='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_itemclassnms,,is_itemclassnms='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_itemnms,,is_itemnms='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_itemtyp,,is_itemtyp='JP',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_location,,is_location='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_mfidfilter,,is_mfidfilter=' 1=1 ',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_mid,,is_mid='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_mktfilter,,is_mktfilter=' 1=1 ',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_msg,,is_msg<>'YCBY',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_new,,"is_new='""+ls_tmp+""'",,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_no,,is_no='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_old,,is_old='Y',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_opbillid,,is_opbillid='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_oper,,is_oper<>'',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_operation,,is_operation='上门人员',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_operation,,is_operation='免费更换',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_operation,,is_operation='分派人员',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_operation,,is_operation='单据归档',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_operation,,is_operation='回访',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_operation,,is_operation='旧机翻新',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_operation,,is_operation='计费',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_operation,,is_operation='设备开通',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_operation,,is_operation='配件更换',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_opertyp,,is_opertyp='new',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_optyp,,is_optyp='C1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_paperbinname,,is_paperbinname='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_papername,,is_papername='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_parm,,is_parm='A',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_parm,,is_parm='DL',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_pctyp,,is_pctyp<>'TH',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_pctyp,,is_pctyp='CG',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_pctyp,,is_pctyp='ID',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_pctyp,,is_pctyp='JP',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_pctyp,,is_pctyp='TH',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_pctyp,,is_pctyp='TS',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_pctyp,,is_pctyp='ZC',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_posid,,is_posid='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_prefocuscolumn,,is_prefocuscolumn<>'@@@@@@',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_prefocuscolumn,,is_prefocuscolumn='@@@@@@',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_presentation,,is_presentation='style(type=grid) ',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_prninifile,,is_prninifile='print_setup.ini',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_prnname,,is_prnname='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_rec,,is_rec='null',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_replacetext,,is_replacetext='替换(&R)',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_replacewith,,is_replacewith='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_rs,,is_rs='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_savetext,,is_savetext='保存(&S)',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_setupname,,is_setupname='默认配置',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_sorttext,,is_sorttext='排序(&O)',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_status,,is_status='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_status,,is_status='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_success,,is_success='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_success,,is_success='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_successfilename,,is_successfilename='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_taskid,,is_taskid='S01',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_textprev,,is_textprev='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title<>'分配',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='3G卡号编辑',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='仓库',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='供应商',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='修改',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='催单',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='分配',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='到店',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='发票管理编辑',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='发送',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='合同管理编辑',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='回访',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='固定资产信息',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='客户3G信息维护',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='导入Excel提示',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='开通',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='撤销',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='数据',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='新增',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='更换',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='查看',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='汇总',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='离店',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='翻新',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='考勤',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='计费',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='记录',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='跟踪',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='通讯卡信息',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_title,,is_title='部门',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_typ,,is_typ='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_type,,is_type='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_type,,is_type='2',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_typeof,,is_typeof='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_value,,is_value<>'',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_value,,is_value='获取',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_value,,is_value='获取第',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_viewtext,,is_viewtext='查看(&V)',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_waitobject,,is_waitobject='wait',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_wh_filter,,is_wh_filter='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,is_whcd,,is_whcd='',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,status,,status<>'0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,status,,status<>'09',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,status,,status='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,status,,status='00',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,status,,status='01',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,status,,status='02',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,status,,status='03',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,status,,status='09',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,useflg<>'0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,useflg<>'2',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,useflg<>'9',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,"useflg='"" + ls_status + ""'",,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,"useflg='""+ls_temp+""'",,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,"useflg='""+ls_tmp+""'",,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,useflg='0',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,useflg='1',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,useflg='9',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,useflg='N',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,useflg='Y',,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,useflg=1,,,,,,,,代码抽取,,来源=代码，待业务确认
+状态码,通用,useflg,,"useflgin('1','2')",,,,,,,,代码抽取,,来源=代码，待业务确认
