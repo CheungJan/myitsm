@@ -22,6 +22,14 @@ def app() -> Generator[Flask, None, None]:
         _db.drop_all()
 
 
+@pytest.fixture(autouse=True)
+def _rollback(app: Flask) -> Generator[None, None, None]:
+    """每个测试结束后回滚，保证隔离。"""
+    with app.app_context():
+        yield
+        _db.session.rollback()
+
+
 @pytest.fixture()
 def client(app: Flask) -> FlaskClient:
     """创建测试客户端。"""

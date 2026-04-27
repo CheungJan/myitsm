@@ -49,12 +49,20 @@ def _register_blueprints(app: Flask) -> None:
     from app.api.auth import auth_bp
     from app.api.health import health_bp
     from app.api.itsm import itsm_bp
+    from app.api.procurement import procurement_bp
+    from app.api.sales import sales_bp
+    from app.api.sla import sla_bp
     from app.api.system import system_bp
+    from app.api.warehouse import warehouse_bp
 
     app.register_blueprint(health_bp, url_prefix="/api/v1")
     app.register_blueprint(auth_bp, url_prefix="/api/v1")
     app.register_blueprint(system_bp, url_prefix="/api/v1")
     app.register_blueprint(itsm_bp, url_prefix="/api/v1/itsm")
+    app.register_blueprint(warehouse_bp, url_prefix="/api/v1/warehouse")
+    app.register_blueprint(procurement_bp, url_prefix="/api/v1/procurement")
+    app.register_blueprint(sales_bp, url_prefix="/api/v1/sales")
+    app.register_blueprint(sla_bp, url_prefix="/api/v1/sla")
 
 
 def _make_error_body(code: int, message: str) -> dict[str, Any]:

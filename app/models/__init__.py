@@ -51,6 +51,28 @@ from app.models.master import (
     SupplierClass,
     SysCode,
 )
+from app.models.procurement import (
+    PurchaseBill,
+    PurchasePlan,
+    PurchasePlanDt,
+    PurchasePlanStatus,
+    PurchaseRegister,
+    PurchaseRegisterDt,
+    ReturnPurchaseBill,
+    ReturnPurchaseBillDt,
+    SupplierAppraisal,
+    SupplierAppraisalDt,
+)
+from app.models.sales import (
+    PlanCust,
+    SalesBill,
+    SalesExtend,
+    SalesExtendDt,
+)
+from app.models.sla import (
+    SlaDefinition,
+    SlaTicket,
+)
 from app.models.system import (
     AccLog,
     Department,
@@ -63,6 +85,23 @@ from app.models.system import (
     UserBusiTyp,
     UserGroup,
     UserMenu,
+)
+from app.models.warehouse import (
+    AssetCheckAccept,
+    AssetCheckAcceptDtl,
+    OverLost,
+    OverLostDt,
+    OverLostEid,
+    PosChange,
+    PosChangeDt,
+    StockDetail,
+    StockDetailDt,
+    StockIn,
+    StockInDetail,
+    StockOut,
+    StockOutDetailEid,
+    StockOutDetailPrd,
+    Warehouse,
 )
 
 __all__ = [
@@ -139,4 +178,39 @@ __all__ = [
     "RecycleTaskDtl",
     # ITSM 未关单跟踪
     "NoCloseTrack",
+    # 仓储管理
+    "Warehouse",
+    "StockDetail",
+    "StockDetailDt",
+    "StockIn",
+    "StockInDetail",
+    "StockOut",
+    "StockOutDetailEid",
+    "StockOutDetailPrd",
+    "OverLost",
+    "OverLostDt",
+    "OverLostEid",
+    "AssetCheckAccept",
+    "AssetCheckAcceptDtl",
+    "PosChange",
+    "PosChangeDt",
+    # 采购管理
+    "PurchasePlan",
+    "PurchasePlanDt",
+    "PurchasePlanStatus",
+    "PurchaseRegister",
+    "PurchaseRegisterDt",
+    "PurchaseBill",
+    "ReturnPurchaseBill",
+    "ReturnPurchaseBillDt",
+    "SupplierAppraisal",
+    "SupplierAppraisalDt",
+    # 销售管理
+    "PlanCust",
+    "SalesBill",
+    "SalesExtend",
+    "SalesExtendDt",
+    # SLA 服务级别管理（Tier-1）
+    "SlaDefinition",
+    "SlaTicket",
 ]
