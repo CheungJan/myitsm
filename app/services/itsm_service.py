@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from app.extensions import db
@@ -41,6 +42,8 @@ class _BaseMaintenanceService:
             return {"success": False, "error": result.get("error", "状态流转验证失败")}
 
         record.current_status = to_status
+        record.update_time = datetime.now(UTC)
+        record.updator = operator
 
         if track_fn is not None:
             pk_value: str = getattr(record, pk_field)
@@ -52,7 +55,6 @@ class _BaseMaintenanceService:
                 remark=remark,
             )
 
-        db.session.commit()
         return {
             "success": True,
             "from_status": from_status,
@@ -112,7 +114,7 @@ class MaintenanceDailyService(_BaseMaintenanceService):
         record = MaintenanceDailyRepository.get_by_id(maintenance_id)
         if record is None:
             return {"success": False, "error": "维护单不存在"}
-        return self._do_transition(
+        result = self._do_transition(
             record,
             to_status,
             operator,
@@ -120,6 +122,9 @@ class MaintenanceDailyService(_BaseMaintenanceService):
             track_fn=MaintenanceDailyRepository.add_track,
             pk_field="maintenance_id",
         )
+        if result.get("success"):
+            db.session.commit()
+        return result
 
 
 class MaintenanceOpenService(_BaseMaintenanceService):
@@ -165,7 +170,10 @@ class MaintenanceOpenService(_BaseMaintenanceService):
         record = MaintenanceOpenRepository.get_by_id(opening_id)
         if record is None:
             return {"success": False, "error": "开通单不存在"}
-        return self._do_transition(record, to_status, operator, remark, pk_field="new_opening_id")
+        result = self._do_transition(record, to_status, operator, remark, pk_field="new_opening_id")
+        if result.get("success"):
+            db.session.commit()
+        return result
 
 
 class MaintenanceRenovateService(_BaseMaintenanceService):
@@ -211,7 +219,10 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
         record = MaintenanceRenovateRepository.get_by_id(renew_id)
         if record is None:
             return {"success": False, "error": "翻新单不存在"}
-        return self._do_transition(record, to_status, operator, remark, pk_field="renew_id")
+        result = self._do_transition(record, to_status, operator, remark, pk_field="renew_id")
+        if result.get("success"):
+            db.session.commit()
+        return result
 
 
 class DeviceChangeService(_BaseMaintenanceService):
@@ -267,16 +278,17 @@ class DeviceChangeService(_BaseMaintenanceService):
             record, to_status, operator, remark, pk_field="device_change_id"
         )
 
-        if result.get("success") and to_status == "05" and record.change_type == "CK":
-            DeviceChangeRepository.save_customer_history(
-                {
-                    "cust_cd": record.store_id or "",
-                    "change_type": "CK",
-                    "old_value": record.new_store_card,
-                    "new_value": record.new_store_card,
-                    "oper_cd": operator,
-                }
-            )
+        if result.get("success"):
+            if to_status == "05" and record.change_type == "CK":
+                DeviceChangeRepository.save_customer_history(
+                    {
+                        "cust_cd": record.store_id or "",
+                        "change_type": "CK",
+                        "old_value": record.new_store_card,
+                        "new_value": record.new_store_card,
+                        "oper_cd": operator,
+                    }
+                )
             db.session.commit()
 
         return result
@@ -325,7 +337,10 @@ class StoreCloseService(_BaseMaintenanceService):
         record = StoreCloseRepository.get_by_id(close_id)
         if record is None:
             return {"success": False, "error": "关闭单不存在"}
-        return self._do_transition(record, to_status, operator, remark, pk_field="store_close_id")
+        result = self._do_transition(record, to_status, operator, remark, pk_field="store_close_id")
+        if result.get("success"):
+            db.session.commit()
+        return result
 
 
 # ---------------------------------------------------------------------------
