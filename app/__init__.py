@@ -46,9 +46,14 @@ def _init_extensions(app: Flask) -> None:
 
 def _register_blueprints(app: Flask) -> None:
     """注册蓝图。"""
+    from app.api.attendance import attendance_bp
     from app.api.auth import auth_bp
+    from app.api.contract import contract_bp
+    from app.api.deposit import deposit_bp
     from app.api.health import health_bp
+    from app.api.inventory import inventory_bp
     from app.api.itsm import itsm_bp
+    from app.api.notification import notification_bp
     from app.api.procurement import procurement_bp
     from app.api.sales import sales_bp
     from app.api.sla import sla_bp
@@ -63,6 +68,11 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(procurement_bp, url_prefix="/api/v1/procurement")
     app.register_blueprint(sales_bp, url_prefix="/api/v1/sales")
     app.register_blueprint(sla_bp, url_prefix="/api/v1/sla")
+    app.register_blueprint(attendance_bp, url_prefix="/api/v1/attendance")
+    app.register_blueprint(inventory_bp, url_prefix="/api/v1/inventory")
+    app.register_blueprint(deposit_bp, url_prefix="/api/v1/deposit")
+    app.register_blueprint(contract_bp, url_prefix="/api/v1/contract")
+    app.register_blueprint(notification_bp, url_prefix="/api/v1/notification")
 
 
 def _make_error_body(code: int, message: str) -> dict[str, Any]:
