@@ -63,7 +63,7 @@ def update_template(template_id: str):  # type: ignore[no-untyped-def]
     body = NotificationTemplateUpdate(**request.get_json(force=True))
     user_cd: str = g.current_user
     data = NotificationTemplateService.update(
-        template_id, body.model_dump(exclude_none=True), user_cd
+        template_id, body.model_dump(exclude_unset=True), user_cd
     )
     if data is None:
         return error_response(message="模板不存在", code=404)

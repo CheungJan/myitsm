@@ -65,7 +65,7 @@ def create_deposit():  # type: ignore[no-untyped-def]
 def update_deposit(custcd: str):  # type: ignore[no-untyped-def]
     """更新押金记录。"""
     body = DepositUpdate(**request.get_json(force=True))
-    data = DepositService.update(custcd, body.model_dump(exclude_none=True))
+    data = DepositService.update(custcd, body.model_dump(exclude_unset=True))
     if data is None:
         return error_response(message="押金记录不存在", code=404)
     return success_response(data=data, message="更新成功")
@@ -118,7 +118,7 @@ def create_deposit_model():  # type: ignore[no-untyped-def]
 def update_deposit_model(model_cd: str):  # type: ignore[no-untyped-def]
     """更新设备型号押金标准。"""
     body = DepositPosModelUpdate(**request.get_json(force=True))
-    data = DepositPosModelService.update(model_cd, body.model_dump(exclude_none=True))
+    data = DepositPosModelService.update(model_cd, body.model_dump(exclude_unset=True))
     if data is None:
         return error_response(message="型号标准不存在", code=404)
     return success_response(data=data, message="更新成功")

@@ -70,12 +70,11 @@ class TestPriceAPI:
             headers=auth_header,
         )
         resp = client.put(
-            "/api/v1/inventory/inventory-limits/NOTEXIST",
-            json={"invhigh": 200},
+            "/api/v1/inventory/prices/IT004/01",
+            json={"itemprice": 150},
             headers=auth_header,
         )
-        # This tests a non-existent record case
-        assert resp.status_code == 404
+        assert resp.status_code == 200
 
 
 class TestAdjustPriceAPI:
