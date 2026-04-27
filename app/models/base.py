@@ -20,7 +20,7 @@ class TimestampMixin:
     )
 
 
-class BaseModel(db.Model, TimestampMixin):  # type: ignore[name-defined]
+class BaseModel(db.Model, TimestampMixin):  # type: ignore[misc, name-defined]
     """抽象基类，提供 to_dict 方法。"""
 
     __abstract__ = True
