@@ -22,7 +22,7 @@ def success_response(
                 "request_id": getattr(g, "request_id", ""),
             }
         ),
-        200,
+        code,
     )
 
 

@@ -21,7 +21,6 @@ class AuthRepository:
 
     @staticmethod
     def add_access_log(user_cd: str, action: str, detail: str) -> None:
-        """写入访问日志并提交。"""
+        """写入访问日志。"""
         log = AccLog(user_cd=user_cd, action=action, detail=detail)
         db.session.add(log)
-        db.session.commit()

@@ -42,7 +42,7 @@ class TestMaintenanceDaily:
             },
             headers,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         body = resp.get_json()
         assert body["code"] == 201
         mid = body["data"]["maintenance_id"]
@@ -137,7 +137,7 @@ class TestD2D:
             },
             headers,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
 
         resp2 = client.get("/api/v1/itsm/d2d/MD000001", headers=headers)
         assert resp2.status_code == 200
@@ -156,7 +156,7 @@ class TestCloseBill:
             {"maintenance_id": "MD000002", "close_type": "01", "description": "正常关单"},
             headers,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
 
         resp2 = client.get("/api/v1/itsm/close-bill/MD000002", headers=headers)
         assert resp2.status_code == 200
@@ -179,7 +179,7 @@ class TestDispatch:
             },
             headers,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
 
         resp2 = client.get("/api/v1/itsm/dispatch/MD000003", headers=headers)
         assert resp2.status_code == 200
@@ -206,7 +206,7 @@ class TestDeviceChange:
             },
             headers,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         body = resp.get_json()
         assert body["data"]["change_type"] == "CK"
 

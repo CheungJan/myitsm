@@ -34,7 +34,7 @@ class _BaseMaintenanceService:
         pk_field: str = "maintenance_id",
     ) -> dict[str, object]:
         """执行状态流转。"""
-        from_status: str = record.current_status or "0"
+        from_status: str = record.current_status or "00"
         result = StateMachine.validate_transition(from_status, to_status)
         if not result["valid"]:
             return {"success": False, "error": result.get("error", "状态流转验证失败")}
@@ -271,8 +271,8 @@ class DeviceChangeService(_BaseMaintenanceService):
                 {
                     "cust_cd": record.store_id or "",
                     "change_type": "CK",
-                    "old_card": record.new_store_card,
-                    "device_change_id": record.device_change_id,
+                    "old_value": record.new_store_card,
+                    "new_value": record.new_store_card,
                     "oper_cd": operator,
                 }
             )

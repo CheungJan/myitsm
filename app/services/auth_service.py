@@ -10,6 +10,7 @@ import jwt
 from flask import current_app
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from app.extensions import db
 from app.repositories.auth_repository import AuthRepository
 
 __all__ = ["AuthService"]
@@ -43,6 +44,7 @@ class AuthService:
         token = _generate_token(user_id)
 
         _repo.add_access_log(user_cd=user_id, action="LOGIN", detail="用户登录")
+        db.session.commit()
 
         return {
             "token": token,
