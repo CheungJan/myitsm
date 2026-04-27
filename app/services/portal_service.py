@@ -33,8 +33,8 @@ class PortalUserService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = PortalUserRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = PortalUserRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -80,8 +80,8 @@ class RepairRequestService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = RepairRequestRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = RepairRequestRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -99,10 +99,8 @@ class ServiceRatingService:
     """服务评价服务。"""
 
     @staticmethod
-    def list_by_customer(custcd: str, page: int = 1, per_page: int = 20) -> dict[str, Any]:
-        items, total = ServiceRatingRepository.list_by_customer(
-            custcd, page=page, per_page=per_page
-        )
+    def list_all(custcd: str | None = None, page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = ServiceRatingRepository.list_all(custcd=custcd, page=page, per_page=per_page)
         return {
             "items": [r.to_dict() for r in items],
             "total": total,
@@ -111,7 +109,7 @@ class ServiceRatingService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = ServiceRatingRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = ServiceRatingRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()

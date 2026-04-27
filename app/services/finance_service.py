@@ -32,8 +32,8 @@ class AccountService:
         return [r.to_dict() for r in records]
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = AccountRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = AccountRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -79,8 +79,8 @@ class ReceivableService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = ReceivableRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = ReceivableRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -126,8 +126,8 @@ class PayableService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = PayableRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = PayableRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -163,8 +163,8 @@ class PaymentService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = PaymentRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = PaymentRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -190,8 +190,8 @@ class DepreciationService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = DepreciationRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = DepreciationRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 

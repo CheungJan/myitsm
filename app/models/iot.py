@@ -67,6 +67,8 @@ class DeviceData(BaseModel):
     data_unit = db.Column(db.String(20), comment="数据单位")
     report_time = db.Column(db.DateTime, nullable=False, comment="上报时间")
     quality = db.Column(db.String(10), default="GOOD", comment="数据质量（GOOD/BAD/UNCERTAIN）")
+    opercd = db.Column(db.String(6), comment="操作人")
+    upddate = db.Column(db.DateTime, comment="更新日期")
 
 
 # ---------------------------------------------------------------------------
@@ -126,3 +128,5 @@ class AlertLog(BaseModel):
     ack_user = db.Column(db.String(20), comment="确认人")
     resolve_time = db.Column(db.DateTime, comment="解决时间")
     remark = db.Column(db.String(200), comment="备注")
+    opercd = db.Column(db.String(6), comment="操作人")
+    upddate = db.Column(db.DateTime, comment="更新日期")

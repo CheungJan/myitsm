@@ -41,8 +41,8 @@ class WorkOrderService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = WorkOrderRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = WorkOrderRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -69,8 +69,8 @@ class ProcessDefService:
         return [r.to_dict() for r in records]
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = ProcessDefRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = ProcessDefRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -97,8 +97,8 @@ class WorkProcessService:
         return [r.to_dict() for r in records]
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = WorkProcessRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = WorkProcessRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -121,7 +121,7 @@ class MaterialConsumeService:
         return [r.to_dict() for r in records]
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = MaterialConsumeRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = MaterialConsumeRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()

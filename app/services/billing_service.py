@@ -38,8 +38,8 @@ class BillingRuleService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = BillingRuleRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = BillingRuleRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -91,8 +91,9 @@ class BillService:
     def create(
         data: dict[str, Any],
         details: list[dict[str, Any]] | None = None,
+        creator: str | None = None,
     ) -> dict[str, Any]:
-        bill = BillRepository.create(data)
+        bill = BillRepository.create(data, creator)
         if details:
             for dtl in details:
                 dtl["bill_id"] = bill.bill_id
@@ -135,8 +136,8 @@ class BillingBatchService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = BillingBatchRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = BillingBatchRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 

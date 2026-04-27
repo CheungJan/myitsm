@@ -59,7 +59,8 @@ def get_connection(conn_id: str):  # type: ignore[no-untyped-def]
 def create_connection():  # type: ignore[no-untyped-def]
     """创建设备接入。"""
     body = DeviceConnCreate(**request.get_json(force=True))
-    data = DeviceConnService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = DeviceConnService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -94,7 +95,8 @@ def list_device_data(eid: str):  # type: ignore[no-untyped-def]
 def report_data():  # type: ignore[no-untyped-def]
     """上报设备数据。"""
     body = DeviceDataCreate(**request.get_json(force=True))
-    data = DeviceDataService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = DeviceDataService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="上报成功", code=201)
 
 
@@ -114,7 +116,8 @@ def list_alert_rules():  # type: ignore[no-untyped-def]
 def create_alert_rule():  # type: ignore[no-untyped-def]
     """创建报警规则。"""
     body = AlertRuleCreate(**request.get_json(force=True))
-    data = AlertRuleService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = AlertRuleService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 

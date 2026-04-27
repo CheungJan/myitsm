@@ -40,8 +40,8 @@ class DeviceConnService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = DeviceConnRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = DeviceConnRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -80,8 +80,8 @@ class DeviceDataService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = DeviceDataRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = DeviceDataRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -95,8 +95,8 @@ class AlertRuleService:
         return [r.to_dict() for r in records]
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = AlertRuleRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = AlertRuleRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
@@ -135,8 +135,8 @@ class AlertLogService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any]) -> dict[str, Any]:
-        record = AlertLogRepository.create(data)
+    def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        record = AlertLogRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 

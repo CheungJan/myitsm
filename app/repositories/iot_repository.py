@@ -36,8 +36,9 @@ class DeviceConnRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> DeviceConn:
-        record = DeviceConn(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> DeviceConn:
+        now = datetime.now(UTC)
+        record = DeviceConn(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -79,8 +80,9 @@ class DeviceDataRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> DeviceData:
-        record = DeviceData(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> DeviceData:
+        now = datetime.now(UTC)
+        record = DeviceData(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -100,8 +102,9 @@ class AlertRuleRepository:
         return query.order_by(AlertRule.rule_id).all()
 
     @staticmethod
-    def create(data: dict[str, Any]) -> AlertRule:
-        record = AlertRule(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> AlertRule:
+        now = datetime.now(UTC)
+        record = AlertRule(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -145,8 +148,9 @@ class AlertLogRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> AlertLog:
-        record = AlertLog(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> AlertLog:
+        now = datetime.now(UTC)
+        record = AlertLog(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 

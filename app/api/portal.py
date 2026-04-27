@@ -56,7 +56,8 @@ def get_portal_user(portal_uid: str):  # type: ignore[no-untyped-def]
 def create_portal_user():  # type: ignore[no-untyped-def]
     """创建门户用户。"""
     body = PortalUserCreate(**request.get_json(force=True))
-    data = PortalUserService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = PortalUserService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -102,7 +103,8 @@ def get_repair(request_id: str):  # type: ignore[no-untyped-def]
 def create_repair():  # type: ignore[no-untyped-def]
     """创建报修工单。"""
     body = RepairRequestCreate(**request.get_json(force=True))
-    data = RepairRequestService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = RepairRequestService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -124,10 +126,10 @@ def update_repair(request_id: str):  # type: ignore[no-untyped-def]
 @login_required
 def list_ratings():  # type: ignore[no-untyped-def]
     """服务评价列表。"""
-    custcd = request.args.get("custcd", "")
+    custcd = request.args.get("custcd")
     page = int(request.args.get("page", "1"))
     per_page = int(request.args.get("per_page", "20"))
-    data = ServiceRatingService.list_by_customer(custcd, page=page, per_page=per_page)
+    data = ServiceRatingService.list_all(custcd=custcd, page=page, per_page=per_page)
     return success_response(data=data)
 
 
@@ -136,5 +138,6 @@ def list_ratings():  # type: ignore[no-untyped-def]
 def create_rating():  # type: ignore[no-untyped-def]
     """创建服务评价。"""
     body = ServiceRatingCreate(**request.get_json(force=True))
-    data = ServiceRatingService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = ServiceRatingService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)

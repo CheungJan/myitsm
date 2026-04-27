@@ -61,7 +61,8 @@ def get_account(account_cd: str):  # type: ignore[no-untyped-def]
 def create_account():  # type: ignore[no-untyped-def]
     """创建科目。"""
     body = AccountCreate(**request.get_json(force=True))
-    data = AccountService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = AccountService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -107,7 +108,8 @@ def get_receivable(ar_id: str):  # type: ignore[no-untyped-def]
 def create_receivable():  # type: ignore[no-untyped-def]
     """创建应收。"""
     body = ReceivableCreate(**request.get_json(force=True))
-    data = ReceivableService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = ReceivableService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -153,7 +155,8 @@ def get_payable(ap_id: str):  # type: ignore[no-untyped-def]
 def create_payable():  # type: ignore[no-untyped-def]
     """创建应付。"""
     body = PayableCreate(**request.get_json(force=True))
-    data = PayableService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = PayableService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -188,7 +191,8 @@ def list_payments():  # type: ignore[no-untyped-def]
 def create_payment():  # type: ignore[no-untyped-def]
     """创建收付款。"""
     body = PaymentCreate(**request.get_json(force=True))
-    data = PaymentService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = PaymentService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -220,7 +224,8 @@ def get_depreciation(eid: str):  # type: ignore[no-untyped-def]
 def create_depreciation():  # type: ignore[no-untyped-def]
     """创建折旧记录。"""
     body = DepreciationCreate(**request.get_json(force=True))
-    data = DepreciationService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = DepreciationService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 

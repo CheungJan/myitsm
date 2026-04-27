@@ -33,8 +33,9 @@ class PortalUserRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> PortalUser:
-        record = PortalUser(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> PortalUser:
+        now = datetime.now(UTC)
+        record = PortalUser(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -82,8 +83,9 @@ class RepairRequestRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> RepairRequest:
-        record = RepairRequest(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> RepairRequest:
+        now = datetime.now(UTC)
+        record = RepairRequest(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -99,10 +101,12 @@ class ServiceRatingRepository:
     """服务评价数据访问。"""
 
     @staticmethod
-    def list_by_customer(
-        custcd: str, page: int = 1, per_page: int = 20
+    def list_all(
+        custcd: str | None = None, page: int = 1, per_page: int = 20
     ) -> tuple[list[ServiceRating], int]:
-        query = db.session.query(ServiceRating).filter(ServiceRating.custcd == custcd)
+        query = db.session.query(ServiceRating)
+        if custcd is not None:
+            query = query.filter(ServiceRating.custcd == custcd)
         total: int = query.count()
         items: list[ServiceRating] = (
             query.order_by(ServiceRating.rating_time.desc())
@@ -113,7 +117,8 @@ class ServiceRatingRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> ServiceRating:
-        record = ServiceRating(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> ServiceRating:
+        now = datetime.now(UTC)
+        record = ServiceRating(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record

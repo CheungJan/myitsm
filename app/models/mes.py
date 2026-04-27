@@ -102,6 +102,8 @@ class WorkProcess(BaseModel):
     end_time = db.Column(db.DateTime, comment="结束时间")
     worker_cd = db.Column(db.String(20), comment="操作工")
     remark = db.Column(db.String(200), comment="备注")
+    opercd = db.Column(db.String(6), comment="操作人")
+    upddate = db.Column(db.DateTime, comment="更新日期")
 
     work_order = db.relationship("WorkOrder", back_populates="processes")
 

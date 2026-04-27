@@ -35,8 +35,9 @@ class WorkOrderRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> WorkOrder:
-        record = WorkOrder(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> WorkOrder:
+        now = datetime.now(UTC)
+        record = WorkOrder(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -70,8 +71,9 @@ class ProcessDefRepository:
         return query.order_by(ProcessDef.sort_no).all()
 
     @staticmethod
-    def create(data: dict[str, Any]) -> ProcessDef:
-        record = ProcessDef(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> ProcessDef:
+        now = datetime.now(UTC)
+        record = ProcessDef(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -103,8 +105,9 @@ class WorkProcessRepository:
         )
 
     @staticmethod
-    def create(data: dict[str, Any]) -> WorkProcess:
-        record = WorkProcess(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> WorkProcess:
+        now = datetime.now(UTC)
+        record = WorkProcess(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -133,7 +136,8 @@ class MaterialConsumeRepository:
         )
 
     @staticmethod
-    def create(data: dict[str, Any]) -> MaterialConsume:
-        record = MaterialConsume(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> MaterialConsume:
+        now = datetime.now(UTC)
+        record = MaterialConsume(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record

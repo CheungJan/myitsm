@@ -77,6 +77,8 @@ class RepairRequest(BaseModel):
     accept_time = db.Column(db.DateTime, comment="受理时间")
     complete_time = db.Column(db.DateTime, comment="完成时间")
     remark = db.Column(db.String(200), comment="备注")
+    opercd = db.Column(db.String(6), comment="操作人")
+    upddate = db.Column(db.DateTime, comment="更新日期")
 
 
 # ---------------------------------------------------------------------------
@@ -100,3 +102,5 @@ class ServiceRating(BaseModel):
     attitude_rating = db.Column(db.Integer, comment="服务态度评分（1-5）")
     comment = db.Column(db.String(500), comment="评价内容")
     rating_time = db.Column(db.DateTime, comment="评价时间")
+    opercd = db.Column(db.String(6), comment="操作人")
+    upddate = db.Column(db.DateTime, comment="更新日期")

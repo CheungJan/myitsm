@@ -29,8 +29,9 @@ class AccountRepository:
         return query.order_by(Account.account_cd).all()
 
     @staticmethod
-    def create(data: dict[str, Any]) -> Account:
-        record = Account(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> Account:
+        now = datetime.now(UTC)
+        record = Account(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -78,8 +79,9 @@ class ReceivableRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> Receivable:
-        record = Receivable(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> Receivable:
+        now = datetime.now(UTC)
+        record = Receivable(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -127,8 +129,9 @@ class PayableRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> Payable:
-        record = Payable(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> Payable:
+        now = datetime.now(UTC)
+        record = Payable(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -173,8 +176,9 @@ class PaymentRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> Payment:
-        record = Payment(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> Payment:
+        now = datetime.now(UTC)
+        record = Payment(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -196,8 +200,9 @@ class DepreciationRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> Depreciation:
-        record = Depreciation(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> Depreciation:
+        now = datetime.now(UTC)
+        record = Depreciation(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 

@@ -32,8 +32,9 @@ class BillingRuleRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> BillingRule:
-        record = BillingRule(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> BillingRule:
+        now = datetime.now(UTC)
+        record = BillingRule(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -81,8 +82,9 @@ class BillRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> Bill:
-        record = Bill(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> Bill:
+        now = datetime.now(UTC)
+        record = Bill(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 
@@ -140,8 +142,9 @@ class BillingBatchRepository:
         return items, total
 
     @staticmethod
-    def create(data: dict[str, Any]) -> BillingBatch:
-        record = BillingBatch(**data)
+    def create(data: dict[str, Any], creator: str | None = None) -> BillingBatch:
+        now = datetime.now(UTC)
+        record = BillingBatch(opercd=creator, upddate=now, **data)
         db.session.add(record)
         return record
 

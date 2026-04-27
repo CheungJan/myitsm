@@ -57,7 +57,8 @@ def get_rule(rule_id: str):  # type: ignore[no-untyped-def]
 def create_rule():  # type: ignore[no-untyped-def]
     """创建结算规则。"""
     body = BillingRuleCreate(**request.get_json(force=True))
-    data = BillingRuleService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = BillingRuleService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -103,9 +104,10 @@ def get_bill(bill_id: str):  # type: ignore[no-untyped-def]
 def create_bill():  # type: ignore[no-untyped-def]
     """创建账单。"""
     body = BillCreate(**request.get_json(force=True))
+    user_cd: str = g.current_user
     bill_data = body.model_dump(exclude_none=True)
     details = bill_data.pop("details", None)
-    data = BillService.create(bill_data, details)
+    data = BillService.create(bill_data, details, user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -149,7 +151,8 @@ def get_batch(batch_id: str):  # type: ignore[no-untyped-def]
 def create_batch():  # type: ignore[no-untyped-def]
     """创建结算批次。"""
     body = BillingBatchCreate(**request.get_json(force=True))
-    data = BillingBatchService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = BillingBatchService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 

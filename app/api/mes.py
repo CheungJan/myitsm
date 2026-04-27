@@ -60,7 +60,8 @@ def get_work_order(wo_id: str):  # type: ignore[no-untyped-def]
 def create_work_order():  # type: ignore[no-untyped-def]
     """创建工单。"""
     body = WorkOrderCreate(**request.get_json(force=True))
-    data = WorkOrderService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = WorkOrderService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -92,7 +93,8 @@ def list_processes():  # type: ignore[no-untyped-def]
 def create_process():  # type: ignore[no-untyped-def]
     """创建工序定义。"""
     body = ProcessDefCreate(**request.get_json(force=True))
-    data = ProcessDefService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = ProcessDefService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -124,7 +126,8 @@ def list_work_processes(wo_id: str):  # type: ignore[no-untyped-def]
 def create_work_process():  # type: ignore[no-untyped-def]
     """创建工单工序。"""
     body = WorkProcessCreate(**request.get_json(force=True))
-    data = WorkProcessService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = WorkProcessService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -155,5 +158,6 @@ def list_materials(wo_id: str):  # type: ignore[no-untyped-def]
 def create_material():  # type: ignore[no-untyped-def]
     """创建物料消耗。"""
     body = MaterialConsumeCreate(**request.get_json(force=True))
-    data = MaterialConsumeService.create(body.model_dump(exclude_none=True))
+    user_cd: str = g.current_user
+    data = MaterialConsumeService.create(body.model_dump(exclude_none=True), user_cd)
     return success_response(data=data, message="创建成功", code=201)
