@@ -159,14 +159,13 @@ class SlaTicketRepository:
                 .count()
             )
 
-        avg_response = (
-            db.session.query(func.avg(SlaTicket.response_elapsed_minutes))
-            .filter(
-                SlaTicket.useflg == "1",
-                SlaTicket.sla_status == "99",
-            )
-            .scalar()
+        avg_query = db.session.query(func.avg(SlaTicket.response_elapsed_minutes)).filter(
+            SlaTicket.useflg == "1",
+            SlaTicket.sla_status == "99",
         )
+        if sla_id:
+            avg_query = avg_query.filter(SlaTicket.sla_id == sla_id)
+        avg_response = avg_query.scalar()
 
         return {
             "total_closed": total_closed,

@@ -182,7 +182,7 @@ class ReturnPurchaseBill(BaseModel):
     ptimes = db.Column(db.Integer, comment="打印次数")
     opercd = db.Column(db.String(6), comment="操作员")
     memo = db.Column(db.String(255), comment="备注")
-    usseflg = db.Column(db.String(1), default="1", comment="有效标志")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
     gendate = db.Column(db.DateTime, comment="创建日期")
 
     details = db.relationship("ReturnPurchaseBillDt", back_populates="bill", lazy="dynamic")
