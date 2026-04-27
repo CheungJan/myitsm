@@ -155,10 +155,16 @@ class AlertLogRepository:
         return record
 
     @staticmethod
-    def update(record: AlertLog, data: dict[str, Any]) -> AlertLog:
+    def update(
+        record: AlertLog,
+        data: dict[str, Any],
+        creator: str | None = None,
+    ) -> AlertLog:
         for key, value in data.items():
             if value is not None:
                 setattr(record, key, value)
+        if creator:
+            record.opercd = creator
         record.upddate = datetime.now(UTC)
         return record
 

@@ -103,11 +103,15 @@ class WorkProcessService:
         return record.to_dict()
 
     @staticmethod
-    def update(wp_id: int, data: dict[str, Any]) -> dict[str, Any] | None:
+    def update(
+        wp_id: int,
+        data: dict[str, Any],
+        creator: str | None = None,
+    ) -> dict[str, Any] | None:
         record = WorkProcessRepository.get_by_id(wp_id)
         if record is None:
             return None
-        WorkProcessRepository.update(record, data)
+        WorkProcessRepository.update(record, data, creator)
         db.session.commit()
         return record.to_dict()
 

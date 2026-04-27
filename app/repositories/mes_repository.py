@@ -112,10 +112,16 @@ class WorkProcessRepository:
         return record
 
     @staticmethod
-    def update(record: WorkProcess, data: dict[str, Any]) -> WorkProcess:
+    def update(
+        record: WorkProcess,
+        data: dict[str, Any],
+        creator: str | None = None,
+    ) -> WorkProcess:
         for key, value in data.items():
             if value is not None:
                 setattr(record, key, value)
+        if creator:
+            record.opercd = creator
         record.upddate = datetime.now(UTC)
         return record
 

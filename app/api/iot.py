@@ -153,7 +153,11 @@ def list_alerts():  # type: ignore[no-untyped-def]
 def acknowledge_alert(log_id: int):  # type: ignore[no-untyped-def]
     """确认/解决报警。"""
     body = AlertAcknowledge(**request.get_json(force=True))
-    data = AlertLogService.acknowledge(log_id, body.model_dump(exclude_unset=True))
+    user_cd: str = g.current_user
+    ack_data = body.model_dump(exclude_unset=True)
+    if "ack_user" not in ack_data:
+        ack_data["ack_user"] = user_cd
+    data = AlertLogService.acknowledge(log_id, ack_data, user_cd)
     if data is None:
         return error_response(message="报警记录不存在", code=404)
     return success_response(data=data, message="操作成功")

@@ -113,7 +113,8 @@ def create_repair():  # type: ignore[no-untyped-def]
 def update_repair(request_id: str):  # type: ignore[no-untyped-def]
     """更新报修工单。"""
     body = RepairRequestUpdate(**request.get_json(force=True))
-    data = RepairRequestService.update(request_id, body.model_dump(exclude_unset=True))
+    user_cd: str = g.current_user
+    data = RepairRequestService.update(request_id, body.model_dump(exclude_unset=True), user_cd)
     if data is None:
         return error_response(message="报修工单不存在", code=404)
     return success_response(data=data, message="更新成功")

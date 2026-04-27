@@ -90,10 +90,16 @@ class RepairRequestRepository:
         return record
 
     @staticmethod
-    def update(record: RepairRequest, data: dict[str, Any]) -> RepairRequest:
+    def update(
+        record: RepairRequest,
+        data: dict[str, Any],
+        creator: str | None = None,
+    ) -> RepairRequest:
         for key, value in data.items():
             if value is not None:
                 setattr(record, key, value)
+        if creator:
+            record.opercd = creator
         record.upddate = datetime.now(UTC)
         return record
 

@@ -141,10 +141,14 @@ class AlertLogService:
         return record.to_dict()
 
     @staticmethod
-    def acknowledge(log_id: int, data: dict[str, Any]) -> dict[str, Any] | None:
+    def acknowledge(
+        log_id: int,
+        data: dict[str, Any],
+        creator: str | None = None,
+    ) -> dict[str, Any] | None:
         record = AlertLogRepository.get_by_id(log_id)
         if record is None:
             return None
-        AlertLogRepository.update(record, data)
+        AlertLogRepository.update(record, data, creator)
         db.session.commit()
         return record.to_dict()

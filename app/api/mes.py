@@ -136,7 +136,8 @@ def create_work_process():  # type: ignore[no-untyped-def]
 def update_work_process(wp_id: int):  # type: ignore[no-untyped-def]
     """更新工单工序。"""
     body = WorkProcessUpdate(**request.get_json(force=True))
-    data = WorkProcessService.update(wp_id, body.model_dump(exclude_unset=True))
+    user_cd: str = g.current_user
+    data = WorkProcessService.update(wp_id, body.model_dump(exclude_unset=True), user_cd)
     if data is None:
         return error_response(message="工序不存在", code=404)
     return success_response(data=data, message="更新成功")

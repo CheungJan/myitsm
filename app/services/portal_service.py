@@ -91,11 +91,15 @@ class RepairRequestService:
         return record.to_dict()
 
     @staticmethod
-    def update(request_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
+    def update(
+        request_id: str,
+        data: dict[str, Any],
+        creator: str | None = None,
+    ) -> dict[str, Any] | None:
         record = RepairRequestRepository.get_by_id(request_id)
         if record is None:
             return None
-        RepairRequestRepository.update(record, data)
+        RepairRequestRepository.update(record, data, creator)
         db.session.commit()
         return record.to_dict()
 
