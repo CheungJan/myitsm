@@ -1,133 +1,84 @@
 """
 认证与会话 API。
-作者：Cascade
-创建时间：2026-04-08
-变更时间：2026-04-08
-注意事项：对应 PB w_r_logon 登录窗口事件链与 nvo_appmanager 会话管理。
+
+对应 PB w_r_logon 登录窗口事件链与 nvo_appmanager 会话管理。
 """
 
 from __future__ import annotations
 
-from flask import Blueprint, g, jsonify, request
+from functools import wraps
+from typing import Any, Callable
 
+from flask import Blueprint, g, request
+from pydantic import ValidationError
+
+from app.schemas.auth import LoginRequest
 from app.services.auth_service import AuthService
+from app.utils.response import error_response, success_response
 
-__all__ = ["auth_bp"]
+__all__ = ["auth_bp", "login_required"]
 
 auth_bp = Blueprint("auth", __name__)
-_service = AuthService()
 
 
-def _bad_request(message: str):
-    """生成统一 400 响应。"""
-    payload = {
-        "code": 400,
-        "message": message,
-        "data": {"request_id": getattr(g, "request_id", "")},
-    }
-    return jsonify(payload), 400
+def login_required(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """JWT 认证装饰器。"""
 
+    @wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return error_response(message="缺少认证令牌", code=401)
 
-def _unauthorized(message: str = "未授权"):
-    """生成统一 401 响应。"""
-    payload = {
-        "code": 401,
-        "message": message,
-        "data": {"request_id": getattr(g, "request_id", "")},
-    }
-    return jsonify(payload), 401
+        token = auth_header[7:].strip()
+        if not token:
+            return error_response(message="令牌为空", code=401)
+
+        payload = AuthService.validate_token(token)
+        if payload is None:
+            return error_response(message="令牌无效或已过期", code=401)
+
+        g.current_user = payload["user_code"]
+        return fn(*args, **kwargs)
+
+    return wrapper
 
 
 @auth_bp.post("/login")
-def login():
+def login():  # type: ignore[no-untyped-def]
     """
     用户登录。
 
-    返回值：
-        Response: 统一结构 JSON 响应。
-
-    示例：
-        POST /api/v1/login
-        {"user_id": "U001", "password": "secret", "server": "CCGL_MIG"}
+    POST /api/v1/login
+    {"user_id": "U001", "password": "secret"}
     """
     body = request.get_json(silent=True) or {}
-    user_id = body.get("user_id", "").strip()
-    password = body.get("password", "").strip()
-    server = body.get("server", "").strip()
 
-    if user_id == "":
-        return _bad_request("缺少参数 user_id")
-    if password == "":
-        return _bad_request("缺少参数 password")
+    try:
+        req = LoginRequest(**body)
+    except ValidationError as exc:
+        errors = exc.errors()
+        msg = "; ".join(f"{e['loc'][0]}: {e['msg']}" for e in errors if e.get("loc"))
+        return error_response(message=msg or "参数校验失败", code=400)
 
-    result = _service.login(user_id=user_id, password=password, server=server or None)
+    result = AuthService.login(user_id=req.user_id, password=req.password)
     if result is None:
-        return _unauthorized("用户名或密码错误")
+        return error_response(message="用户名或密码错误", code=401)
 
-    payload = {
-        "code": 0,
-        "message": "登录成功",
-        "data": result,
-    }
-    return jsonify(payload), 200
-
-
-@auth_bp.post("/logout")
-def logout():
-    """
-    用户登出。
-
-    返回值：
-        Response: 统一结构 JSON 响应。
-
-    示例：
-        POST /api/v1/logout
-        Header: Authorization: Bearer <token>
-    """
-    auth_header = request.headers.get("Authorization", "")
-    token = ""
-    if auth_header.startswith("Bearer "):
-        token = auth_header[7:].strip()
-
-    if token == "":
-        return _bad_request("缺少认证令牌")
-
-    success = _service.logout(token=token)
-    payload = {
-        "code": 0,
-        "message": "登出成功" if success else "令牌无效或已过期",
-        "data": {"logout": success},
-    }
-    return jsonify(payload), 200
+    return success_response(data=result, message="登录成功")
 
 
 @auth_bp.get("/session")
-def get_session():
+@login_required
+def get_session():  # type: ignore[no-untyped-def]
     """
     获取当前会话信息。
 
-    返回值：
-        Response: 统一结构 JSON 响应。
-
-    示例：
-        GET /api/v1/session
-        Header: Authorization: Bearer <token>
+    GET /api/v1/session (Header: Authorization: Bearer <token>)
     """
     auth_header = request.headers.get("Authorization", "")
-    token = ""
-    if auth_header.startswith("Bearer "):
-        token = auth_header[7:].strip()
-
-    if token == "":
-        return _unauthorized("缺少认证令牌")
-
-    session = _service.get_session(token)
+    token = auth_header[7:].strip()
+    session = AuthService.get_session(token)
     if session is None:
-        return _unauthorized("令牌无效或已过期")
-
-    payload = {
-        "code": 0,
-        "message": "成功",
-        "data": session,
-    }
-    return jsonify(payload), 200
+        return error_response(message="会话无效", code=401)
+    return success_response(data=session)

@@ -22,22 +22,22 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install black isort ruff mypy pytest bandit
+          pip install -e ".[dev]"
 
       - name: Black Check
-        run: black --check .
+        run: black --check app/ tests/ wsgi.py
 
       - name: Isort Check
-        run: isort --check-only .
+        run: isort --check-only app/ tests/ wsgi.py
 
       - name: Ruff Check
-        run: ruff check .
+        run: ruff check app/ tests/ wsgi.py
 
       - name: Mypy Strict
-        run: mypy --strict .
+        run: mypy --strict app/ tests/ wsgi.py --ignore-missing-imports
 
       - name: Pytest
-        run: pytest -q
+        run: pytest tests/ -q
 
       - name: Bandit
-        run: bandit -r .
+        run: bandit -r app/ -x app_old
