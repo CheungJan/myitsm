@@ -15,7 +15,7 @@ class PortalUserCreate(BaseModel):
     portal_uid: str = Field(..., max_length=20, description="门户用户ID")
     custcd: str = Field(..., max_length=10, description="关联客户编码")
     login_name: str = Field(..., max_length=50, description="登录名")
-    password_hash: str = Field(..., max_length=128, description="密码哈希")
+    password: str = Field(..., max_length=128, description="密码")
     contact_name: str | None = Field(None, max_length=50, description="联系人")
     phone: str | None = Field(None, max_length=20, description="手机号")
     email: str | None = Field(None, max_length=100, description="邮箱")

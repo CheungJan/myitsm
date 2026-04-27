@@ -17,7 +17,7 @@ class TestPortalUserAPI:
                 "portal_uid": "PU001",
                 "custcd": "C001",
                 "login_name": "customer1",
-                "password_hash": "hashed_pw_123",
+                "password": "Test@12345",
                 "contact_name": "张三",
             },
             headers=auth_header,
@@ -33,7 +33,7 @@ class TestPortalUserAPI:
                 "portal_uid": "PU002",
                 "custcd": "C002",
                 "login_name": "customer2",
-                "password_hash": "hashed_pw_456",
+                "password": "Test@12345",
             },
             headers=auth_header,
         )
@@ -47,7 +47,7 @@ class TestPortalUserAPI:
                 "portal_uid": "PU003",
                 "custcd": "C003",
                 "login_name": "customer3",
-                "password_hash": "hashed_pw_789",
+                "password": "Test@12345",
             },
             headers=auth_header,
         )

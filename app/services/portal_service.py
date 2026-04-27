@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from werkzeug.security import generate_password_hash
+
 from app.extensions import db
 from app.repositories.portal_repository import (
     PortalUserRepository,
@@ -34,6 +36,9 @@ class PortalUserService:
 
     @staticmethod
     def create(data: dict[str, Any], creator: str | None = None) -> dict[str, Any]:
+        plain_pw = data.pop("password", None)
+        if plain_pw is not None:
+            data["password_hash"] = generate_password_hash(str(plain_pw))
         record = PortalUserRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()

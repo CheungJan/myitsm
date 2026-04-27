@@ -142,7 +142,7 @@ class Depreciation(BaseModel):
     __tablename__ = "tfn05_depreciation"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    eid = db.Column(db.String(50), nullable=False, comment="设备序列号")
+    eid = db.Column(db.String(50), nullable=False, unique=True, comment="设备序列号")
     item_cd = db.Column(db.String(20), comment="物料编码")
     original_value = db.Column(db.Numeric(12, 2), comment="原值")
     salvage_value = db.Column(db.Numeric(12, 2), default=0, comment="残值")
