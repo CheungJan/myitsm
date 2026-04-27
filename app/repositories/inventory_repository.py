@@ -42,10 +42,14 @@ class InventoryLimitRepository:
         return record
 
     @staticmethod
-    def update(record: InventoryLimit, data: dict[str, Any]) -> InventoryLimit:
+    def update(
+        record: InventoryLimit, data: dict[str, Any], creator: str | None = None
+    ) -> InventoryLimit:
         for key, value in data.items():
             if value is not None:
                 setattr(record, key, value)
+        if creator:
+            record.opercd = creator
         record.upddate = datetime.now(UTC)
         return record
 

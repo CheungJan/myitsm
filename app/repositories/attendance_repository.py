@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
 from app.extensions import db
@@ -45,7 +44,6 @@ class AttendanceRepository:
         for key, value in data.items():
             if value is not None:
                 setattr(record, key, value)
-        record.update_time = datetime.now(UTC)
         return record
 
 

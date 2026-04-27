@@ -39,7 +39,7 @@ class InventoryLimitService:
         if record is None:
             return None
         InventoryLimitRepository.save_history(record)
-        InventoryLimitRepository.update(record, data)
+        InventoryLimitRepository.update(record, data, creator)
         db.session.commit()
         return record.to_dict()
 
