@@ -29,8 +29,8 @@
 未完成以上核对前，不得开始模块代码迁移与提交。
 
 ## 项目阶段与目标
-- 当前阶段：数据库三方整合已完成，进入 PB 代码向 Python 重构阶段。
-- 核心目标：在不改变业务语义前提下，完成 PB 到 Python 的等价迁移，并逐步提升可维护性。
+- 当前阶段：数据库三方整合已完成（原 Oracle 双库合并为单一 PostgreSQL），进入 PB 代码向 Python 重构阶段。
+- 核心目标：在不改变业务语义前提下，完成 PB 到 Python（Flask + PostgreSQL）的等价迁移，并逐步提升可维护性。
 
 ## 重构总原则（必须遵守）
 1. 等价迁移优先（实现阶段）：在完成源码分析与优化点识别后，先保证行为一致，再实施优化。
@@ -56,10 +56,11 @@
 ## 数据库与 SQL 迁移约定
 - 统一使用 SQLAlchemy + Flask-Migrate（Alembic）。
 - 数据库连接仅来自环境变量，禁止硬编码账号密码。
-- 本项目 PB→Python 重构主库固定为 Oracle（三方整合版本，业务 Schema：`CCGL_MIG`）。
+- 本项目 PB→Python 重构数据库固定为 PostgreSQL（原 CCGLPDB 业务主库 + LGREPORTPDB 零售库合并为单一 PostgreSQL 数据库）。
+- 原双库架构中所有 `@CCGL_23`、`@CCGL_24` DB Link 跨库引用已消除，统一为单库内直接查询。
 - 未经明确评审与文档变更，不得将 SQLite 作为业务重构数据库口径。
 - SQLite 仅可用于本地临时测试或示例，不得作为迁移验收与发布依据。
-- 应用连接变量统一为：`ORACLE_USER`、`ORACLE_PASSWORD`、`ORACLE_DSN`、`TNS_ADMIN`（或兼容别名 `DB_USER`、`DB_PASSWORD`、`DB_DSN`、`ORACLE_TNS_ADMIN`）。
+- 应用连接变量统一为：`DATABASE_URL`（格式：`postgresql://user:password@host:port/dbname`）。
 - 事务统一在 service 层管理，避免隐式自动提交。
 - 每条关键 PB SQL 必须沉淀“映射关系”：
   - 来源：PB 模块/函数/SQL 片段。
