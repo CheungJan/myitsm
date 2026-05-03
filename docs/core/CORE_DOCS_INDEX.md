@@ -22,29 +22,33 @@
    - `docs/core/系统功能对比分析与扩展规划.md`
    - 版本：v1.1 | 创建：2026-04-27
 
-4. **阶段1 模型字段核对报告**（32张骨架表与数据库字典逐表核对）
+4. **全阶段模型字段核对报告**（阶段1-5全部124个模型与数据库字典逐表核对）
+   - `docs/core/全阶段模型字段核对报告.md`
+   - 版本：v1.0 | 创建：2026-04-27
+
+5. **阶段1 模型字段核对报告**（32张骨架表与数据库字典逐表核对，历史参考）
    - `docs/core/阶段1_模型字段核对报告.md`
 
 ## B 类：技术参考文档（重构基线）
 
-5. **重构优化需求基线**（P0-P4 优化方案）
+6. **重构优化需求基线**（P0-P4 优化方案）
    - `docs/core/PB_TO_PYTHON_OPTIMIZATION_REQUIREMENTS.md`
 
-6. **数据库字典主口径**（表结构、字段语义、字段说明）
+7. **数据库字典主口径**（表结构、字段语义、字段说明）
    - `docs/core/数据库字典_精简后_最终版.md`
 
-7. **PB 模块映射主清单**（25个 PB 模块 → Python 模块映射）
+8. **PB 模块映射主清单**（25个 PB 模块 → Python 模块映射）
    - `docs/core/PB_TO_PYTHON_MODULE_MAPPING.csv`
 
-8. **PB SQL 映射主清单**（关键 SQL 语句迁移映射）
+9. **PB SQL 映射主清单**（关键 SQL 语句迁移映射）
    - `docs/core/PB_TO_PYTHON_SQL_MAPPING.csv`
 
 ## C 类：交付与验收文档
 
-9. **迁移验收清单（DoD）**
+10. **迁移验收清单（DoD）**
    - `docs/core/PB_TO_PYTHON_DOD_CHECKLIST.md`
 
-10. **发布与回滚清单**
+11. **发布与回滚清单**
     - `docs/core/PB_TO_PYTHON_RELEASE_ROLLBACK_CHECKLIST.md`
 
 ---
