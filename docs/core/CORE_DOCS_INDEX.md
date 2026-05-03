@@ -29,27 +29,49 @@
 5. **阶段1 模型字段核对报告**（32张骨架表与数据库字典逐表核对，历史参考）
    - `docs/core/阶段1_模型字段核对报告.md`
 
+6. **变更日志**（全部版本变更记录，遵循 Keep a Changelog 格式）
+   - `docs/core/CHANGELOG.md`
+   - 版本：v1.0 | 创建：2026-04-27
+
 ## B 类：技术参考文档（重构基线）
 
-6. **重构优化需求基线**（P0-P4 优化方案）
-   - `docs/core/PB_TO_PYTHON_OPTIMIZATION_REQUIREMENTS.md`
+7. **API 接口文档**（18个蓝图183个端点完整说明）
+   - `docs/core/API接口文档.md`
+   - 版本：v1.0 | 创建：2026-04-27
 
-7. **数据库字典主口径**（表结构、字段语义、字段说明）
-   - `docs/core/数据库字典_精简后_最终版.md`
+8. **数据库 ER 关系文档**（124个模型跨域关联与 Mermaid ER 图）
+   - `docs/core/数据库ER关系文档.md`
+   - 版本：v1.0 | 创建：2026-04-27
 
-8. **PB 模块映射主清单**（25个 PB 模块 → Python 模块映射）
-   - `docs/core/PB_TO_PYTHON_MODULE_MAPPING.csv`
+9. **测试策略文档**（128个测试用例覆盖分析、命名约定、质量门禁）
+   - `docs/core/测试策略文档.md`
+   - 版本：v1.0 | 创建：2026-04-27
 
-9. **PB SQL 映射主清单**（关键 SQL 语句迁移映射）
-   - `docs/core/PB_TO_PYTHON_SQL_MAPPING.csv`
+10. **重构优化需求基线**（P0-P4 优化方案）
+    - `docs/core/PB_TO_PYTHON_OPTIMIZATION_REQUIREMENTS.md`
+
+11. **数据库字典主口径**（表结构、字段语义、字段说明）
+    - `docs/core/数据库字典_精简后_最终版.md`
+
+12. **PB 模块映射主清单**（25个 PB 模块 → Python 模块映射）
+    - `docs/core/PB_TO_PYTHON_MODULE_MAPPING.csv`
+
+13. **PB SQL 映射主清单**（关键 SQL 语句迁移映射）
+    - `docs/core/PB_TO_PYTHON_SQL_MAPPING.csv`
 
 ## C 类：交付与验收文档
 
-10. **迁移验收清单（DoD）**
-   - `docs/core/PB_TO_PYTHON_DOD_CHECKLIST.md`
+14. **迁移验收清单（DoD）**
+    - `docs/core/PB_TO_PYTHON_DOD_CHECKLIST.md`
 
-11. **发布与回滚清单**
+15. **发布与回滚清单**
     - `docs/core/PB_TO_PYTHON_RELEASE_ROLLBACK_CHECKLIST.md`
+
+## D 类：项目入口文档
+
+16. **README.md**（开发环境搭建指南、项目结构、快速开始）
+    - `README.md`（位于项目根目录）
+    - 版本：v1.0 | 创建：2026-04-27
 
 ---
 
@@ -72,6 +94,7 @@
 ```
 myitsm/
 ├── AGENTS.md                 # 项目规则与约定
+├── README.md                 # 开发环境搭建指南
 ├── app/                      # 重构后的 Python 后端代码（Flask）
 │   ├── api/                  # API 蓝图层（18个模块）
 │   ├── models/               # SQLAlchemy 数据模型（124个）
