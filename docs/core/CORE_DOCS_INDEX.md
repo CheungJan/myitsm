@@ -74,7 +74,7 @@ myitsm/
 ├── AGENTS.md                 # 项目规则与约定
 ├── app/                      # 重构后的 Python 后端代码（Flask）
 │   ├── api/                  # API 蓝图层（18个模块）
-│   ├── models/               # SQLAlchemy 数据模型（126个）
+│   ├── models/               # SQLAlchemy 数据模型（124个）
 │   ├── services/             # 业务逻辑层
 │   ├── repositories/         # 数据访问层
 │   ├── schemas/              # Pydantic 请求/响应校验
