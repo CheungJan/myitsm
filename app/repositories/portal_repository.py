@@ -86,6 +86,7 @@ class RepairRequestRepository:
     def create(data: dict[str, Any], creator: str | None = None) -> RepairRequest:
         now = datetime.now(UTC)
         record = RepairRequest(opercd=creator, upddate=now, **data)
+        record.submit_time = now
         db.session.add(record)
         return record
 
@@ -127,5 +128,6 @@ class ServiceRatingRepository:
     def create(data: dict[str, Any], creator: str | None = None) -> ServiceRating:
         now = datetime.now(UTC)
         record = ServiceRating(opercd=creator, upddate=now, **data)
+        record.rating_time = now
         db.session.add(record)
         return record
