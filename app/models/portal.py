@@ -28,7 +28,7 @@ class PortalUser(BaseModel):
     portal_uid = db.Column(db.String(20), primary_key=True, comment="门户用户ID")
     custcd = db.Column(db.String(10), nullable=False, comment="关联客户编码")
     login_name = db.Column(db.String(50), nullable=False, unique=True, comment="登录名")
-    password_hash = db.Column(db.String(128), nullable=False, comment="密码哈希")
+    password_hash = db.Column(db.String(256), nullable=False, comment="密码哈希")
     contact_name = db.Column(db.String(50), comment="联系人姓名")
     phone = db.Column(db.String(20), comment="手机号")
     email = db.Column(db.String(100), comment="邮箱")
