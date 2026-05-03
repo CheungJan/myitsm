@@ -96,12 +96,18 @@ class RepairRequestRepository:
         data: dict[str, Any],
         creator: str | None = None,
     ) -> RepairRequest:
+        now = datetime.now(UTC)
+        new_status = data.get("status")
+        if new_status == "ACCEPTED" and record.accept_time is None:
+            record.accept_time = now
+        if new_status == "COMPLETED" and record.complete_time is None:
+            record.complete_time = now
         for key, value in data.items():
             if value is not None:
                 setattr(record, key, value)
         if creator:
             record.opercd = creator
-        record.upddate = datetime.now(UTC)
+        record.upddate = now
         return record
 
 

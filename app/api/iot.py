@@ -157,6 +157,14 @@ def acknowledge_alert(log_id: int):  # type: ignore[no-untyped-def]
     ack_data = body.model_dump(exclude_unset=True)
     if "ack_user" not in ack_data:
         ack_data["ack_user"] = user_cd
+    if ack_data.get("status") == "ACKNOWLEDGED" and "ack_time" not in ack_data:
+        from datetime import UTC, datetime
+
+        ack_data["ack_time"] = datetime.now(UTC)
+    if ack_data.get("status") == "RESOLVED" and "resolve_time" not in ack_data:
+        from datetime import UTC, datetime
+
+        ack_data["resolve_time"] = datetime.now(UTC)
     data = AlertLogService.acknowledge(log_id, ack_data, user_cd)
     if data is None:
         return error_response(message="报警记录不存在", code=404)
