@@ -49,8 +49,7 @@ class DeviceConnRepository:
         creator: str | None = None,
     ) -> DeviceConn:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)
@@ -115,8 +114,7 @@ class AlertRuleRepository:
         creator: str | None = None,
     ) -> AlertRule:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)
@@ -161,8 +159,7 @@ class AlertLogRepository:
         creator: str | None = None,
     ) -> AlertLog:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)

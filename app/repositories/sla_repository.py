@@ -55,8 +55,7 @@ class SlaDefinitionRepository:
     @staticmethod
     def update(record: SlaDefinition, data: dict[str, Any]) -> SlaDefinition:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         record.upddate = datetime.now(UTC)
         return record
 
@@ -112,8 +111,7 @@ class SlaTicketRepository:
     @staticmethod
     def update(record: SlaTicket, data: dict[str, Any]) -> SlaTicket:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         record.upddate = datetime.now(UTC)
         return record
 

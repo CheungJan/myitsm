@@ -46,8 +46,7 @@ class InventoryLimitRepository:
         record: InventoryLimit, data: dict[str, Any], creator: str | None = None
     ) -> InventoryLimit:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)
@@ -100,8 +99,7 @@ class PriceRepository:
     @staticmethod
     def update(record: Price, data: dict[str, Any], creator: str | None = None) -> Price:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)

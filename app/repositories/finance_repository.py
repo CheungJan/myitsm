@@ -42,8 +42,7 @@ class AccountRepository:
         creator: str | None = None,
     ) -> Account:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)
@@ -92,8 +91,7 @@ class ReceivableRepository:
         creator: str | None = None,
     ) -> Receivable:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)
@@ -142,8 +140,7 @@ class PayableRepository:
         creator: str | None = None,
     ) -> Payable:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)
@@ -213,8 +210,7 @@ class DepreciationRepository:
         creator: str | None = None,
     ) -> Depreciation:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)

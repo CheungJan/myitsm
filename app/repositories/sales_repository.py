@@ -70,8 +70,7 @@ class PlanCustRepository:
     @staticmethod
     def update(record: PlanCust, data: dict[str, Any]) -> PlanCust:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         return record
 
 

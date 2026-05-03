@@ -46,8 +46,7 @@ class PortalUserRepository:
         creator: str | None = None,
     ) -> PortalUser:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)
@@ -103,8 +102,7 @@ class RepairRequestRepository:
         if new_status == "COMPLETED" and record.complete_time is None:
             record.complete_time = now
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = now

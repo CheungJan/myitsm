@@ -48,8 +48,7 @@ class WorkOrderRepository:
         creator: str | None = None,
     ) -> WorkOrder:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)
@@ -84,8 +83,7 @@ class ProcessDefRepository:
         creator: str | None = None,
     ) -> ProcessDef:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)
@@ -118,8 +116,7 @@ class WorkProcessRepository:
         creator: str | None = None,
     ) -> WorkProcess:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)
