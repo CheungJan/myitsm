@@ -115,6 +115,8 @@ class ArchiveCode(BaseModel):
     arch_group = db.Column(db.String(1), comment="故障分组")
     fault_type = db.Column(db.String(10), comment="故障类型")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    # --- Oracle 原表恢复字段 ---
+    uncheck = db.Column(db.String(1), comment="未审核标志")
 
 
 class RepairInfo(BaseModel):
@@ -270,6 +272,9 @@ class PosDetail(BaseModel):
     item_cd = db.Column(db.String(6), comment="配件类型")
     accessories_id = db.Column(db.String(13), comment="配件编号")
     status = db.Column(db.String(1), comment="状态")
+    # --- Oracle 原表恢复字段 ---
+    create_time = db.Column(db.DateTime, comment="创建时间")
+    creator = db.Column(db.String(6), comment="创建人")
 
     maintenance = db.relationship("MaintenanceDaily", back_populates="pos_details")
 
@@ -288,6 +293,8 @@ class MaintenanceAttc(BaseModel):
     creator = db.Column(db.String(6), comment="创建人")
     update_time = db.Column(db.DateTime, comment="更新时间")
     updator = db.Column(db.String(6), comment="更新人")
+    # --- Oracle 原表恢复字段 ---
+    attc = db.Column(db.LargeBinary, comment="附件内容")
 
 
 class MaintenanceArchive(BaseModel):
@@ -956,6 +963,7 @@ class NoCloseTrack(BaseModel):
     idnum = db.Column(db.Integer, comment="编号")
     dispos_dept = db.Column(db.String(20), comment="处理部门")
     cause_main = db.Column(db.String(20), comment="原因大类")
+    cause_mian = db.Column(db.String(20), comment="原因大类（Oracle原字段名）")
     cause_detail = db.Column(db.String(20), comment="原因小类")
     cause_memo = db.Column(db.String(200), comment="原因说明")
     description = db.Column(db.String(250), comment="详情")

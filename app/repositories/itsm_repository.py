@@ -75,8 +75,7 @@ class MaintenanceDailyRepository:
     @staticmethod
     def update(record: MaintenanceDaily, data: dict[str, Any], updator: str) -> MaintenanceDaily:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         record.update_time = datetime.now(UTC)
         record.updator = updator
         return record

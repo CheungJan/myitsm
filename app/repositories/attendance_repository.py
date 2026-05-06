@@ -42,8 +42,7 @@ class AttendanceRepository:
     @staticmethod
     def update(record: Attendance, data: dict[str, Any]) -> Attendance:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         return record
 
 
@@ -72,6 +71,5 @@ class AttendanceCountRepository:
     @staticmethod
     def update(record: AttendanceCount, data: dict[str, Any]) -> AttendanceCount:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         return record

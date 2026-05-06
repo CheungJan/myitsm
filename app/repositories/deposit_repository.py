@@ -37,8 +37,7 @@ class DepositRepository:
     @staticmethod
     def update(record: Deposit, data: dict[str, Any]) -> Deposit:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         record.updatetime = datetime.now(UTC)
         return record
 
@@ -93,6 +92,5 @@ class DepositPosModelRepository:
     @staticmethod
     def update(record: DepositPosModel, data: dict[str, Any]) -> DepositPosModel:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         return record

@@ -26,6 +26,10 @@ class User(BaseModel):
     dept_cd = db.Column(db.String(20), db.ForeignKey("tmc11_departments.dept_cd"), comment="部门")
     phone = db.Column(db.String(30), comment="电话")
     email = db.Column(db.String(100), comment="邮箱")
+    # --- Oracle 原表恢复字段 ---
+    passwd = db.Column(db.String(128), comment="原始密码（数据迁移用）")
+    credamt = db.Column(db.Numeric(12, 2), comment="信用额度")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
     groups = db.relationship("UserGroup", back_populates="user", lazy="dynamic")
 
@@ -39,6 +43,12 @@ class Department(BaseModel):
     dept_nm = db.Column(db.String(50), nullable=False, comment="部门名称")
     parent_cd = db.Column(db.String(20), comment="上级部门编码")
     status = db.Column(db.String(1), default="1", comment="状态")
+    # --- Oracle 原表恢复字段（5个） ---
+    levelcd = db.Column(db.String(1), comment="部门层级")
+    parent = db.Column(db.String(6), comment="上级部门（Oracle原字段）")
+    leader = db.Column(db.String(6), comment="部门领导")
+    childflg = db.Column(db.String(1), comment="子节点标志")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
 
 class Group(BaseModel):
@@ -49,6 +59,8 @@ class Group(BaseModel):
     group_cd = db.Column(db.String(20), primary_key=True, comment="组编码")
     group_nm = db.Column(db.String(50), nullable=False, comment="组名称")
     status = db.Column(db.String(1), default="1", comment="状态")
+    # --- Oracle 原表恢复字段 ---
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
     members = db.relationship("UserGroup", back_populates="group", lazy="dynamic")
     rights = db.relationship("GroupRight", back_populates="group", lazy="dynamic")
@@ -89,6 +101,14 @@ class Menu(BaseModel):
     parent_cd = db.Column(db.String(20), comment="上级菜单编码")
     menu_order = db.Column(db.Integer, default=0, comment="排序号")
     status = db.Column(db.String(1), default="1", comment="状态")
+    # --- Oracle 原表恢复字段（7个） ---
+    levelcd = db.Column(db.String(1), comment="菜单层级")
+    parent = db.Column(db.String(6), comment="父级菜单（Oracle原字段）")
+    picname = db.Column(db.String(30), comment="图标名称")
+    ordno = db.Column(db.Integer, comment="排序号（Oracle原字段）")
+    openflg = db.Column(db.String(1), comment="开放标志")
+    childflg = db.Column(db.String(1), comment="子节点标志")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
     details = db.relationship("MenuDetail", back_populates="menu", lazy="dynamic")
 
@@ -102,6 +122,8 @@ class MenuDetail(BaseModel):
     menu_cd = db.Column(db.String(20), db.ForeignKey("tmc01_menus.menu_cd"), nullable=False)
     func_cd = db.Column(db.String(50), comment="功能编码")
     func_nm = db.Column(db.String(100), comment="功能名称")
+    # --- Oracle 原表恢复字段 ---
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
     menu = db.relationship("Menu", back_populates="details")
 
@@ -114,6 +136,9 @@ class UserMenu(BaseModel):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_cd = db.Column(db.String(20), db.ForeignKey("tmc13_users.user_cd"), nullable=False)
     menu_cd = db.Column(db.String(20), db.ForeignKey("tmc01_menus.menu_cd"), nullable=False)
+    # --- Oracle 原表恢复字段 ---
+    ordno = db.Column(db.Integer, comment="排序号")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
 
 class GroupRight(BaseModel):
@@ -126,6 +151,9 @@ class GroupRight(BaseModel):
     menu_cd = db.Column(db.String(20), nullable=False, comment="菜单编码")
     func_cd = db.Column(db.String(50), comment="功能编码")
     right_flg = db.Column(db.String(1), default="1", comment="权限标志")
+    # --- Oracle 原表恢复字段 ---
+    scale = db.Column(db.String(1), comment="权限范围")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
     group = db.relationship("Group", back_populates="rights")
 
@@ -139,6 +167,16 @@ class SysParm(BaseModel):
     parm_nm = db.Column(db.String(100), comment="参数名称")
     parm_val = db.Column(db.String(500), comment="参数值")
     parm_desc = db.Column(db.String(200), comment="参数说明")
+    # --- Oracle 原表恢复字段（9个） ---
+    pk = db.Column(db.String(50), comment="参数主键")
+    costtype = db.Column(db.String(1), comment="成本类型")
+    autobackpath = db.Column(db.String(200), comment="自动备份路径")
+    invoicesharepath = db.Column(db.String(200), comment="发票共享路径")
+    poinvaliddays = db.Column(db.Integer, comment="采购失效天数")
+    soinvaliddays = db.Column(db.Integer, comment="销售失效天数")
+    allowmultilogon = db.Column(db.String(1), comment="允许多点登录")
+    shopbilltype = db.Column(db.String(1), comment="店铺单据类型")
+    centralwarehouse = db.Column(db.String(4), comment="中心仓库编码")
 
 
 class AccLog(BaseModel):
@@ -151,3 +189,5 @@ class AccLog(BaseModel):
     action = db.Column(db.String(50), comment="操作类型")
     detail = db.Column(db.Text, comment="操作明细")
     ip_addr = db.Column(db.String(50), comment="IP地址")
+    # --- Oracle 原表恢复字段 ---
+    startdate = db.Column(db.DateTime, comment="开始日期")

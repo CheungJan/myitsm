@@ -52,8 +52,7 @@ class NotificationTemplateRepository:
         creator: str | None = None,
     ) -> NotificationTemplate:
         for key, value in data.items():
-            if value is not None:
-                setattr(record, key, value)
+            setattr(record, key, value)
         if creator:
             record.opercd = creator
         record.upddate = datetime.now(UTC)

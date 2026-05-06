@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from app.extensions import db
@@ -34,7 +35,11 @@ class BaseModel(db.Model, TimestampMixin):  # type: ignore[misc, name-defined]
             if column.name in self._hidden_fields:
                 continue
             value = getattr(self, column.name)
-            if isinstance(value, datetime):
+            if isinstance(value, (datetime, date)):
                 value = value.isoformat()
+            elif isinstance(value, Decimal):
+                value = float(value)
+            elif isinstance(value, bytes):
+                value = None
             result[column.name] = value
         return result

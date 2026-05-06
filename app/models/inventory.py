@@ -87,4 +87,52 @@ class AdjustPrice(BaseModel):
     newprice = db.Column(db.Numeric(16, 8), comment="新价")
     opercd = db.Column(db.String(6), comment="操作员")
     gendate = db.Column(db.DateTime, comment="创建日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志（AdjustPrice）")
+
+
+# ---------------------------------------------------------------------------
+# 库存明细（TIV11/TIV12）— Oracle 业务必须表，用于库存预警模块
+# ---------------------------------------------------------------------------
+
+
+class InventoryDetail(BaseModel):
+    """库存明细（TIV11_DETAIL）。"""
+
+    __tablename__ = "tiv11_detail"
+
+    itemcd = db.Column(db.String(8), primary_key=True, comment="物料编码")
+    whcd = db.Column(db.String(2), comment="仓库编码")
+    itemtyp = db.Column(db.String(2), comment="物料类型")
+    storeqty = db.Column(db.Numeric(12, 0), comment="库存数量")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+    detail_logs = db.relationship(
+        "InventoryDetailDt", back_populates="inventory_detail", lazy="dynamic"
+    )
+
+
+class InventoryDetailDt(BaseModel):
+    """库存明细流水（TIV12_DETAILDT）。"""
+
+    __tablename__ = "tiv12_detaildt"
+
+    seqno = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="流水号")
+    itemcd = db.Column(
+        db.String(8),
+        db.ForeignKey("tiv11_detail.itemcd"),
+        comment="物料编码",
+    )
+    whcd = db.Column(db.String(2), comment="仓库编码")
+    itemtyp = db.Column(db.String(2), comment="物料类型")
+    billid = db.Column(db.String(8), comment="单号")
+    invdate = db.Column(db.DateTime, comment="库存日期")
+    invtyp = db.Column(db.String(1), comment="出入库类型")
+    itemqty = db.Column(db.Numeric(12, 0), comment="本次数量")
+    storeqty = db.Column(db.Numeric(12, 0), comment="库存数量")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+    inventory_detail = db.relationship("InventoryDetail", back_populates="detail_logs")

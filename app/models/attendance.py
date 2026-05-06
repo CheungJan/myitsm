@@ -38,6 +38,9 @@ class Attendance(BaseModel):
     week = db.Column(db.String(2), comment="星期")
     useflg = db.Column(db.String(1), default="1", comment="有效标记")
     imp_date = db.Column(db.DateTime, comment="导入日期")
+    # --- Oracle 原表恢复字段 ---
+    update_time = db.Column(db.DateTime, comment="更新时间")
+    updator = db.Column(db.String(10), comment="更新人")
 
 
 # ---------------------------------------------------------------------------
@@ -89,3 +92,9 @@ class AttendanceCount(BaseModel):
     leavecount = db.Column(db.Integer, default=0, comment="早退次数")
     absentcount = db.Column(db.Integer, default=0, comment="缺勤次数")
     useflg = db.Column(db.String(1), default="1", comment="有效标记")
+    # --- Oracle 原表恢复字段（5个） ---
+    memo = db.Column(db.String(200), comment="备注")
+    imp_num = db.Column(db.Integer, comment="导入次数")
+    imp_date = db.Column(db.DateTime, comment="导入日期")
+    update_time = db.Column(db.DateTime, comment="更新时间")
+    updator = db.Column(db.String(10), comment="更新人")

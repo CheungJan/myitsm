@@ -8,6 +8,12 @@ from app.models.auxiliary import (
     Contract,
     Invoice,
 )
+from app.models.billing import (
+    Bill,
+    BillDetail,
+    BillingBatch,
+    BillingRule,
+)
 from app.models.deposit import (
     Deposit,
     DepositDetail,
@@ -15,11 +21,26 @@ from app.models.deposit import (
     DepositList,
     DepositPosModel,
 )
+from app.models.finance import (
+    Account,
+    Depreciation,
+    Payable,
+    Payment,
+    Receivable,
+)
 from app.models.inventory import (
     AdjustPrice,
+    InventoryDetail,
+    InventoryDetailDt,
     InventoryLimit,
     InventoryLimitHistory,
     Price,
+)
+from app.models.iot import (
+    AlertLog,
+    AlertRule,
+    DeviceConn,
+    DeviceData,
 )
 from app.models.itsm import (
     AccessoriesUpdate,
@@ -59,12 +80,19 @@ from app.models.itsm import (
 )
 from app.models.master import (
     Area,
+    AssetAttribList,
+    Bom,
+    BomDt,
     ComMode,
     Company,
     CustClass,
+    CustItems,
     Customer,
     CustomerHistory,
     CustPosRl,
+    CustVeRl,
+    Eid,
+    EidTrack,
     IdMaster,
     Item,
     ItemClass,
@@ -72,12 +100,24 @@ from app.models.master import (
     SupplierClass,
     SysCode,
 )
+from app.models.mes import (
+    MaterialConsume,
+    ProcessDef,
+    WorkOrder,
+    WorkProcess,
+)
 from app.models.notification import (
     Notification,
     NotificationTemplate,
 )
+from app.models.portal import (
+    PortalUser,
+    RepairRequest,
+    ServiceRating,
+)
 from app.models.procurement import (
     PurchaseBill,
+    PurchaseCheckInDt,
     PurchasePlan,
     PurchasePlanDt,
     PurchasePlanStatus,
@@ -119,6 +159,9 @@ from app.models.warehouse import (
     OverLostEid,
     PosChange,
     PosChangeDt,
+    QcResult,
+    QcResultDt,
+    QcResultEid,
     StockDetail,
     StockDetailDt,
     StockIn,
@@ -126,6 +169,7 @@ from app.models.warehouse import (
     StockOut,
     StockOutDetailEid,
     StockOutDetailPrd,
+    TransferAccount,
     Warehouse,
 )
 
@@ -155,6 +199,13 @@ __all__ = [
     "Supplier",
     "SupplierClass",
     "SysCode",
+    "Eid",
+    "EidTrack",
+    "Bom",
+    "BomDt",
+    "CustItems",
+    "CustVeRl",
+    "AssetAttribList",
     "IdMaster",
     # ITSM 字典/配置
     "TimepointArea",
@@ -219,6 +270,12 @@ __all__ = [
     "AssetCheckAcceptDtl",
     "PosChange",
     "PosChangeDt",
+    # 质检管理
+    "QcResult",
+    "QcResultDt",
+    "QcResultEid",
+    # 调拨科目管理
+    "TransferAccount",
     # 采购管理
     "PurchasePlan",
     "PurchasePlanDt",
@@ -230,6 +287,7 @@ __all__ = [
     "ReturnPurchaseBillDt",
     "SupplierAppraisal",
     "SupplierAppraisalDt",
+    "PurchaseCheckInDt",
     # 销售管理
     "PlanCust",
     "SalesBill",
@@ -246,6 +304,8 @@ __all__ = [
     "InventoryLimitHistory",
     "Price",
     "AdjustPrice",
+    "InventoryDetail",
+    "InventoryDetailDt",
     # 押金管理
     "Deposit",
     "DepositDetail",
@@ -258,4 +318,29 @@ __all__ = [
     # 通知系统（Tier-1）
     "NotificationTemplate",
     "Notification",
+    # 租金/费用结算（Tier-2 G4）
+    "BillingRule",
+    "Bill",
+    "BillDetail",
+    "BillingBatch",
+    # 财务应收应付（Tier-2 G5）
+    "Account",
+    "Receivable",
+    "Payable",
+    "Payment",
+    "Depreciation",
+    # 客户自助服务门户（Tier-2 G9）
+    "PortalUser",
+    "RepairRequest",
+    "ServiceRating",
+    # 生产制造MES（Tier-3 G7）
+    "WorkOrder",
+    "ProcessDef",
+    "WorkProcess",
+    "MaterialConsume",
+    # IoT数据监控（Tier-3 G8）
+    "DeviceConn",
+    "DeviceData",
+    "AlertRule",
+    "AlertLog",
 ]
