@@ -13,6 +13,7 @@
 | 数据库 | PostgreSQL 16+（CCGLPDB + LGREPORTPDB 双库合并） |
 | 请求校验 | Pydantic v2 |
 | 认证 | JWT（PyJWT） |
+| 包管理 | [uv](https://docs.astral.sh/uv/)（快速依赖管理 + 虚拟环境 + lockfile） |
 | 质量门禁 | black / isort / ruff / mypy --strict / pytest / bandit |
 
 ## 项目结构
@@ -38,6 +39,7 @@ myitsm/
 ├── PBsrc/                    # PB 原始源码（25个 .pbl 模块）
 ├── _backup/                  # 备份（旧重构代码）
 ├── pyproject.toml            # Python 项目配置
+├── uv.lock                   # uv 依赖锁文件（确保团队版本一致）
 ├── wsgi.py                   # WSGI 入口
 └── .env.example              # 环境变量模板
 ```
@@ -48,33 +50,41 @@ myitsm/
 
 - Python 3.11+
 - PostgreSQL 16+
-- pip（项目使用 pyproject.toml + setuptools 管理依赖）
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)（Python 包管理器）
 
-### 1. 克隆仓库
+### 1. 安装 uv
+
+```bash
+# Linux/macOS
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# 验证安装
+uv --version
+```
+
+### 2. 克隆仓库
 
 ```bash
 git clone https://github.com/CheungJan/myitsm.git
 cd myitsm
 ```
 
-### 2. 创建虚拟环境并安装依赖
+### 3. 安装依赖（自动创建虚拟环境）
 
 ```bash
-# 创建虚拟环境
-python3.11 -m venv .venv
-
-# 激活虚拟环境
-source .venv/bin/activate    # Linux/macOS
-# .venv\Scripts\activate     # Windows
-
-# 安装项目依赖（含开发工具）
-pip install -e ".[dev]"
+# 一条命令完成：创建 .venv 虚拟环境 + 安装全部依赖（含开发工具）
+uv sync --extra dev
 ```
 
-> **注意**：每次打开新终端都需要先激活虚拟环境（`source .venv/bin/activate`），否则无法使用项目依赖。
-> 项目使用 `pyproject.toml` 管理依赖，不使用 `requirements.txt`。
+> **说明**：
+> - `uv sync` 会自动创建 `.venv` 虚拟环境并安装所有依赖，无需手动创建或激活。
+> - 依赖版本由 `uv.lock` 锁定，确保团队所有成员版本一致。
+> - 后续执行命令统一使用 `uv run <命令>` 前缀，无需手动激活虚拟环境。
 
-### 3. 环境变量配置
+### 4. 环境变量配置
 
 ```bash
 cp .env.example .env
@@ -91,7 +101,7 @@ TEST_DATABASE_URL=postgresql://cheungjan@localhost:5432/myitsm_test
 
 > 数据库连接格式：`postgresql://用户名:密码@主机:端口/数据库名`，密码为空时省略 `:密码` 部分。
 
-### 4. 数据库初始化
+### 5. 数据库初始化
 
 ```bash
 # 创建数据库（用户名按实际配置）
@@ -99,39 +109,38 @@ createdb -U cheungjan myitsm
 createdb -U cheungjan myitsm_test
 
 # 运行迁移（自动创建全部 124 张业务表）
-export FLASK_APP=wsgi:app
-flask db upgrade
+uv run flask db upgrade
 ```
 
-### 5. 启动开发服务器
+### 6. 启动开发服务器
 
 ```bash
-flask run --debug
+uv run flask run --debug
 # 或
-python wsgi.py
+uv run python wsgi.py
 ```
 
 服务启动后访问 `http://localhost:5000/api/v1/health` 验证。
 
-### 6. 运行测试
+### 7. 运行测试
 
 ```bash
-pytest
+uv run pytest
 ```
 
-### 7. 代码质量检查
+### 8. 代码质量检查
 
 ```bash
 # 格式化
-black app/ tests/
-isort app/ tests/
+uv run black app/ tests/
+uv run isort app/ tests/
 
 # 静态检查
-ruff check app/ tests/
-mypy --strict app/
+uv run ruff check app/ tests/
+uv run mypy --strict app/
 
 # 安全检查
-bandit -r app/ -c pyproject.toml
+uv run bandit -r app/ -c pyproject.toml
 ```
 
 ## API 概览

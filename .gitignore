@@ -60,7 +60,6 @@ htmlcov/
 # PDM
 .pdm-python/
 .pdm-build/
-*.lock
 
 # OS
 Thumbs.db
