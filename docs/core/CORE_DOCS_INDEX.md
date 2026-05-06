@@ -61,15 +61,19 @@
 
 ## C 类：交付与验收文档
 
-14. **迁移验收清单（DoD）**
+14. **数据迁移方案文档**（Oracle→PostgreSQL 迁移策略、分批导入、校验方案）
+    - `docs/core/数据迁移方案文档.md`
+    - 版本：v1.0 | 创建：2026-04-27
+
+15. **迁移验收清单（DoD）**
     - `docs/core/PB_TO_PYTHON_DOD_CHECKLIST.md`
 
-15. **发布与回滚清单**
+16. **发布与回滚清单**
     - `docs/core/PB_TO_PYTHON_RELEASE_ROLLBACK_CHECKLIST.md`
 
 ## D 类：项目入口文档
 
-16. **README.md**（开发环境搭建指南、项目结构、快速开始）
+17. **README.md**（开发环境搭建指南、项目结构、快速开始）
     - `README.md`（位于项目根目录）
     - 版本：v1.0 | 创建：2026-04-27
 
