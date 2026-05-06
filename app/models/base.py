@@ -39,5 +39,7 @@ class BaseModel(db.Model, TimestampMixin):  # type: ignore[misc, name-defined]
                 value = value.isoformat()
             elif isinstance(value, Decimal):
                 value = float(value)
+            elif isinstance(value, bytes):
+                value = None
             result[column.name] = value
         return result
