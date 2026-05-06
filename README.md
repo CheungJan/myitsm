@@ -48,7 +48,7 @@ myitsm/
 
 - Python 3.11+
 - PostgreSQL 16+
-- pip / virtualenv
+- pip（项目使用 pyproject.toml + setuptools 管理依赖）
 
 ### 1. 克隆仓库
 
@@ -57,47 +57,53 @@ git clone https://github.com/CheungJan/myitsm.git
 cd myitsm
 ```
 
-### 2. 创建虚拟环境
+### 2. 创建虚拟环境并安装依赖
 
 ```bash
+# 创建虚拟环境
 python3.11 -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# .venv\Scripts\activate   # Windows
-```
 
-### 3. 安装依赖
+# 激活虚拟环境
+source .venv/bin/activate    # Linux/macOS
+# .venv\Scripts\activate     # Windows
 
-```bash
+# 安装项目依赖（含开发工具）
 pip install -e ".[dev]"
 ```
 
-### 4. 环境变量配置
+> **注意**：每次打开新终端都需要先激活虚拟环境（`source .venv/bin/activate`），否则无法使用项目依赖。
+> 项目使用 `pyproject.toml` 管理依赖，不使用 `requirements.txt`。
+
+### 3. 环境变量配置
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env` 文件：
+编辑 `.env` 文件（按实际数据库配置修改）：
 
 ```ini
 FLASK_ENV=development
 SECRET_KEY=your-random-secret-key
-DATABASE_URL=postgresql://itsm:itsm@localhost:5432/itsm
-TEST_DATABASE_URL=postgresql://itsm:itsm@localhost:5432/itsm_test
+DATABASE_URL=postgresql://cheungjan@localhost:5432/myitsm
+TEST_DATABASE_URL=postgresql://cheungjan@localhost:5432/myitsm_test
 ```
 
-### 5. 数据库初始化
+> 数据库连接格式：`postgresql://用户名:密码@主机:端口/数据库名`，密码为空时省略 `:密码` 部分。
+
+### 4. 数据库初始化
 
 ```bash
-# 创建数据库
-createdb itsm
-createdb itsm_test
+# 创建数据库（用户名按实际配置）
+createdb -U cheungjan myitsm
+createdb -U cheungjan myitsm_test
 
-# 运行迁移
+# 运行迁移（自动创建全部 124 张业务表）
+export FLASK_APP=wsgi:app
 flask db upgrade
 ```
 
-### 6. 启动开发服务器
+### 5. 启动开发服务器
 
 ```bash
 flask run --debug
@@ -107,13 +113,13 @@ python wsgi.py
 
 服务启动后访问 `http://localhost:5000/api/v1/health` 验证。
 
-### 7. 运行测试
+### 6. 运行测试
 
 ```bash
 pytest
 ```
 
-### 8. 代码质量检查
+### 7. 代码质量检查
 
 ```bash
 # 格式化
