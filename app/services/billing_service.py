@@ -99,7 +99,11 @@ class BillService:
                 dtl["bill_id"] = bill.bill_id
                 BillDetailRepository.create(dtl)
         db.session.commit()
-        return bill.to_dict()
+        result = bill.to_dict()
+        if details:
+            created_details = BillDetailRepository.list_by_bill(bill.bill_id)
+            result["details"] = [d.to_dict() for d in created_details]
+        return result
 
     @staticmethod
     def update(
