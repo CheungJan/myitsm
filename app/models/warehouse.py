@@ -416,3 +416,115 @@ class PosChangeDt(BaseModel):
     remark = db.Column(db.String(100), comment="备注")
 
     pos_change = db.relationship("PosChange", back_populates="details")
+
+
+# ---------------------------------------------------------------------------
+# 质检管理（TQC*）— Oracle 业务必须表
+# ---------------------------------------------------------------------------
+
+
+class QcResult(BaseModel):
+    """质检结果主表（TQC10_RESULT）。"""
+
+    __tablename__ = "tqc10_result"
+
+    qcbillid = db.Column(db.String(8), primary_key=True, comment="质检单号")
+    optyp = db.Column(db.String(2), comment="操作类型")
+    refbillid = db.Column(db.String(8), comment="关联单号")
+    itemcd = db.Column(db.String(6), comment="物料编码")
+    eid = db.Column(db.String(13), comment="设备序列号")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    auditman = db.Column(db.String(6), comment="审核人")
+    auditflg = db.Column(db.String(1), comment="审核标志")
+    auditdate = db.Column(db.DateTime, comment="审核日期")
+    qcstatus = db.Column(db.String(2), comment="质检状态")
+
+    detail_items = db.relationship("QcResultDt", back_populates="qc_result", lazy="dynamic")
+    detail_eids = db.relationship("QcResultEid", back_populates="qc_result", lazy="dynamic")
+
+
+class QcResultDt(BaseModel):
+    """质检结果明细-按产品（TQC11_RESULTDT）。"""
+
+    __tablename__ = "tqc11_resultdt"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="主键")
+    qcbillid = db.Column(
+        db.String(8),
+        db.ForeignKey("tqc10_result.qcbillid"),
+        nullable=False,
+        comment="质检单号",
+    )
+    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    itemtyp = db.Column(db.String(2), comment="物料类型")
+    prddate = db.Column(db.DateTime, comment="生产日期")
+    qcqty = db.Column(db.Numeric(12, 0), comment="质检数量")
+    qcstatus = db.Column(db.String(2), comment="质检状态")
+    inqty = db.Column(db.Numeric(12, 0), comment="入库数量")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    lineno = db.Column(db.Integer, comment="行号")
+    fault_desc = db.Column(db.String(50), comment="故障描述")
+    maintain_desc = db.Column(db.String(50), comment="维修描述")
+    inspector = db.Column(db.String(8), comment="检验员")
+    qc_source = db.Column(db.String(1), comment="质检来源")
+    remark = db.Column(db.String(100), comment="备注")
+
+    qc_result = db.relationship("QcResult", back_populates="detail_items")
+
+
+class QcResultEid(BaseModel):
+    """质检结果明细-按设备序列号（TQC11_RESULTEID）。"""
+
+    __tablename__ = "tqc11_resulteid"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="主键")
+    qcbillid = db.Column(
+        db.String(8),
+        db.ForeignKey("tqc10_result.qcbillid"),
+        nullable=False,
+        comment="质检单号",
+    )
+    itemcd = db.Column(db.String(6), comment="物料编码")
+    itemtyp = db.Column(db.String(2), comment="物料类型")
+    prddate = db.Column(db.DateTime, comment="生产日期")
+    qcqty = db.Column(db.Numeric(12, 0), comment="质检数量")
+    qcstatus = db.Column(db.String(2), comment="质检状态")
+    inqty = db.Column(db.Numeric(12, 0), comment="入库数量")
+    eid = db.Column(db.String(13), nullable=False, comment="设备序列号")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    opercd = db.Column(db.String(6), comment="操作员")
+    lineno = db.Column(db.Integer, comment="行号")
+    fault_desc = db.Column(db.String(100), comment="故障描述")
+    maintain_desc = db.Column(db.String(100), comment="维修描述")
+    inspector = db.Column(db.String(8), comment="检验员")
+    qc_source = db.Column(db.String(1), comment="质检来源")
+    remark = db.Column(db.String(100), comment="备注")
+    manuf_seq = db.Column(db.String(100), comment="制造序列号")
+
+    qc_result = db.relationship("QcResult", back_populates="detail_eids")
+
+
+# ---------------------------------------------------------------------------
+# 调拨科目管理（TTX01_TXKMG）
+# ---------------------------------------------------------------------------
+
+
+class TransferAccount(BaseModel):
+    """调拨科目管理（TTX01_TXKMG）。"""
+
+    __tablename__ = "ttx01_txkmg"
+
+    txkno = db.Column(db.String(30), primary_key=True, comment="调拨科目编号")
+    commmode = db.Column(db.String(10), comment="通讯方式")
+    remark = db.Column(db.String(100), comment="备注")
+    by1 = db.Column(db.String(10), comment="备用字段1")
+    by2 = db.Column(db.String(10), comment="备用字段2")
+    opercd = db.Column(db.String(6), comment="操作员")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")

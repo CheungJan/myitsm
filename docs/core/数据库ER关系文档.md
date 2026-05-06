@@ -2,7 +2,7 @@
 
 **版本**: v2.0  
 **更新日期**: 2026-04-27  
-**模型总数**: 124个业务模型（BaseModel 为公共基类，不计入）
+**模型总数**: 138个业务模型（BaseModel 为公共基类，不计入）
 
 > **v2.0 变更说明**：修正所有表名为实际 `__tablename__` 值，与 Oracle 数据库字典保持一致；
 > 新增"Oracle 遗留表评估"章节，标注重构后不再需要的表。
@@ -409,24 +409,26 @@ TWH01_WAREHOUSE (Warehouse)
 | TMM04_CITY | 城市字典 | 同上 |
 | TMM05_TOWN | 乡镇字典 | 同上 |
 
-### 4.3 建议后续建模（当前无直接引用，但业务完整性需要，共14张）
+### 4.3 ~~建议后续建模~~ → 已完成建模（业务必须，共14张）
 
-| Oracle 表 | 字段数 | 原用途 | 建议时机 |
-|-----------|--------|--------|---------|
-| TMM43_EID | 17 | 设备 SN 码主表 | 前端ITSM联调时（设备查询/关联） |
-| TMM43_EID_TRACK | 31 | 设备 SN 变更追踪 | 同上 |
-| TMM41_BOM | 6 | BOM 清单主表 | 生产/物料管理联调时 |
-| TMM42_BOMDT | 7 | BOM 明细 | 同上 |
-| TMM24_CUSTITEMS | 13 | 客户-物品关联 | 客户资产管理联调时 |
-| TMM36_CUST_VE_RL | 17 | 客户-车辆关联 | 外勤/派车管理联调时 |
-| TMM62_ASSET_ATTRIB_LIST | 7 | 资产属性清单 | 资产盘点联调时 |
-| TQC10_RESULT | 13 | 质检结果主表 | 仓储质检联调时 |
-| TQC11_RESULTDT | 16 | 质检结果明细 | 同上 |
-| TQC11_RESULTEID | 18 | 质检设备结果 | 同上 |
-| TMP14_CHECKINDT | 9 | 采购验收明细 | 采购验收联调时 |
-| TTX01_TXKMG | 8 | 调拨科目管理 | 调拨管理联调时 |
-| TIV11_DETAIL | 7 | 库存明细（预警模块） | 库存预警联调时 |
-| TIV12_DETAILDT | 12 | 库存明细流水（预警模块） | 同上 |
+> **已全部建模完成**。这14张表均为业务核心所需（设备管理、BOM、质检、库存明细等），不应推迟。
+
+| Oracle 表 | 字段数 | 用途 | Python 模型 | 所在文件 |
+|-----------|--------|------|-------------|---------|
+| TMM43_EID | 17 | 设备 SN 码主表 | Eid | master.py |
+| TMM43_EID_TRACK | 31 | 设备 SN 变更追踪 | EidTrack | master.py |
+| TMM41_BOM | 6 | BOM 清单主表 | Bom | master.py |
+| TMM42_BOMDT | 7 | BOM 明细 | BomDt | master.py |
+| TMM24_CUSTITEMS | 13 | 客户-物品关联 | CustItems | master.py |
+| TMM36_CUST_VE_RL | 17 | 客户-车辆关联 | CustVeRl | master.py |
+| TMM62_ASSET_ATTRIB_LIST | 7 | 资产属性清单 | AssetAttribList | master.py |
+| TQC10_RESULT | 13 | 质检结果主表 | QcResult | warehouse.py |
+| TQC11_RESULTDT | 16 | 质检结果明细 | QcResultDt | warehouse.py |
+| TQC11_RESULTEID | 18 | 质检设备结果 | QcResultEid | warehouse.py |
+| TMP14_CHECKINDT | 9 | 采购验收明细 | PurchaseCheckInDt | procurement.py |
+| TTX01_TXKMG | 8 | 调拨科目管理 | TransferAccount | warehouse.py |
+| TIV11_DETAIL | 7 | 库存明细（预警模块） | InventoryDetail | inventory.py |
+| TIV12_DETAILDT | 12 | 库存明细流水（预警模块） | InventoryDetailDt | inventory.py |
 
 ### 4.4 可选/业务价值较低（共8张）
 
@@ -446,11 +448,11 @@ TWH01_WAREHOUSE (Warehouse)
 
 | 类别 | 数量 |
 |------|------|
-| 当前已实现的业务模型 | 124 |
+| 当前已实现的业务模型 | 138（含14张新增业务必须表） |
 | Oracle 等价迁移表（已完全匹配） | 69 |
-| Oracle 等价迁移表（有字段缺失，需补全） | 28（共155字段） |
+| Oracle 等价迁移表（有字段缺失，已补全） | 28（共155+10字段已恢复） |
+| 4.3节业务必须表（已建模） | 14 |
 | 重构新增表（优化方案+Tier扩展） | 27 |
 | Oracle 遗留表（已替代/淘汰，不建模） | 7 |
 | Oracle 遗留表（地理参考，暂不建模） | 4 |
-| Oracle 遗留表（建议后续建模） | 14 |
 | Oracle 遗留表（可选/低价值） | 8 |

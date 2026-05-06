@@ -343,4 +343,168 @@ class IdMaster(BaseModel):
     curbillid = db.Column(db.String(30), comment="当前流水号")
     maxbillid = db.Column(db.String(30), comment="最大流水号")
     loops = db.Column(db.String(1), comment="循环标志")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志（IdMaster）")
+
+
+# ---------------------------------------------------------------------------
+# 以下为 Oracle 数据库字典中业务必须但此前未建模的 7 张主数据表
+# ---------------------------------------------------------------------------
+
+
+class Eid(BaseModel):
+    """设备SN码主表（TMM43_EID）。"""
+
+    __tablename__ = "tmm43_eid"
+    __table_args__ = (db.PrimaryKeyConstraint("itemcd", "eid"),)
+
+    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    eid = db.Column(db.String(13), nullable=False, comment="设备序列号")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    etyp = db.Column(db.String(1), comment="设备类型")
+    sflg = db.Column(db.String(1), comment="状态标志")
+    refid = db.Column(db.String(8), comment="关联单号")
+    qcflg = db.Column(db.String(2), comment="质检标志")
+    whcd = db.Column(db.String(2), comment="仓库编码")
+    prddate = db.Column(db.DateTime, comment="生产日期")
+    itemtyp = db.Column(db.String(2), comment="物料类型")
+    new_old = db.Column(db.String(1), comment="新旧标志")
+    remark = db.Column(db.String(200), comment="备注")
+    manuf_seq = db.Column(db.String(100), comment="制造序列号")
+    old_degree = db.Column(db.Numeric, comment="旧化程度")
+    isunit = db.Column(db.String(1), comment="是否整机")
+
+
+class EidTrack(BaseModel):
+    """设备SN码变更追踪（TMM43_EID_TRACK）。"""
+
+    __tablename__ = "tmm43_eid_track"
+
+    seqno = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="序号")
+    type = db.Column(db.String(1), comment="变更类型")
+    change_date = db.Column(db.DateTime, comment="变更日期")
+    itemcd = db.Column(db.String(6), comment="物料编码")
+    eid = db.Column(db.String(13), comment="设备序列号")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    useflg = db.Column(db.String(1), comment="有效标志")
+    etyp = db.Column(db.String(1), comment="设备类型")
+    sflg = db.Column(db.String(1), comment="状态标志")
+    refid = db.Column(db.String(8), comment="关联单号")
+    qcflg = db.Column(db.String(2), comment="质检标志")
+    whcd = db.Column(db.String(2), comment="仓库编码")
+    prddate = db.Column(db.DateTime, comment="生产日期")
+    itemtyp = db.Column(db.String(2), comment="物料类型")
+    new_old = db.Column(db.String(1), comment="新旧标志")
+    n_sflg = db.Column(db.String(1), comment="新状态标志")
+    n_refid = db.Column(db.String(8), comment="新关联单号")
+    n_qcflg = db.Column(db.String(2), comment="新质检标志")
+    n_whcd = db.Column(db.String(2), comment="新仓库编码")
+    n_prddate = db.Column(db.DateTime, comment="新生产日期")
+    n_itemtyp = db.Column(db.String(2), comment="新物料类型")
+    n_new_old = db.Column(db.String(1), comment="新新旧标志")
+    n_itemcd = db.Column(db.String(6), comment="新物料编码")
+    n_etyp = db.Column(db.String(1), comment="新设备类型")
+    remark = db.Column(db.String(200), comment="备注")
+    n_remark = db.Column(db.String(200), comment="新备注")
+    manuf_seq = db.Column(db.String(100), comment="制造序列号")
+    n_manf_seq = db.Column(db.String(100), comment="新制造序列号")
+    old_degree = db.Column(db.Numeric, comment="旧化程度")
+    n_old_degree = db.Column(db.Numeric, comment="新旧化程度")
+
+
+class Bom(BaseModel):
+    """BOM清单主表（TMM41_BOM）。"""
+
+    __tablename__ = "tmm41_bom"
+
+    bomcd = db.Column(db.String(6), primary_key=True, comment="BOM编码")
+    bomnm = db.Column(db.String(50), comment="BOM名称")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+    details = db.relationship("BomDt", back_populates="bom", lazy="dynamic")
+
+
+class BomDt(BaseModel):
+    """BOM明细（TMM42_BOMDT）。"""
+
+    __tablename__ = "tmm42_bomdt"
+    __table_args__ = (db.PrimaryKeyConstraint("bomcd", "itemcd"),)
+
+    bomcd = db.Column(
+        db.String(6),
+        db.ForeignKey("tmm41_bom.bomcd"),
+        nullable=False,
+        comment="BOM编码",
+    )
+    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    bomqty = db.Column(db.Numeric(12, 0), comment="BOM数量")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    itemtyp = db.Column(db.String(1), comment="物料类型")
+
+    bom = db.relationship("Bom", back_populates="details")
+
+
+class CustItems(BaseModel):
+    """客户物品关联（TMM24_CUSTITEMS）。"""
+
+    __tablename__ = "tmm24_custitems"
+    __table_args__ = (db.PrimaryKeyConstraint("itemcd", "custcd"),)
+
+    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    custcd = db.Column(db.String(8), nullable=False, comment="客户编码")
+    dfltflg = db.Column(db.String(1), comment="默认标志")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    delivercycle = db.Column(db.Numeric, comment="配送周期")
+    servicecycle = db.Column(db.Numeric, comment="服务周期")
+    guaranteeperiod = db.Column(db.Numeric, comment="保修期")
+    backup = db.Column(db.String(200), comment="备注")
+
+
+class CustVeRl(BaseModel):
+    """客户车辆关联（TMM36_CUST_VE_RL）。"""
+
+    __tablename__ = "tmm36_cust_ve_rl"
+    __table_args__ = (db.PrimaryKeyConstraint("custcd", "eid", "itemcd"),)
+
+    custcd = db.Column(db.String(8), nullable=False, comment="客户编码")
+    eid = db.Column(db.String(13), nullable=False, comment="设备序列号")
+    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    startdate = db.Column(db.DateTime, comment="开始日期")
+    sysinfo = db.Column(db.String(30), comment="系统信息")
+    softinfo = db.Column(db.String(30), comment="软件信息")
+    posupddate = db.Column(db.DateTime, comment="POS更新日期")
+    posinfo = db.Column(db.String(30), comment="POS信息")
+    area = db.Column(db.String(2), comment="区域")
+    status = db.Column(db.String(1), comment="状态")
+    typflg = db.Column(db.String(2), comment="类型标志")
+    maintenancedate = db.Column(db.String(6), comment="维护日期")
+    maintenancetyp = db.Column(db.DateTime, comment="维护类型")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+
+class AssetAttribList(BaseModel):
+    """资产属性清单（TMM62_ASSET_ATTRIB_LIST）。"""
+
+    __tablename__ = "tmm62_asset_attrib_list"
+    __table_args__ = (db.PrimaryKeyConstraint("itemcd", "eid"),)
+
+    itemcd = db.Column(db.String(10), nullable=False, comment="物料编码")
+    eid = db.Column(db.String(30), nullable=False, comment="设备序列号")
+    c_type = db.Column(db.String(10), comment="分类类型")
+    updatetime = db.Column(db.DateTime, comment="更新时间")
+    c_address = db.Column(db.String(200), comment="地址")
+    remark = db.Column(db.String(200), comment="备注")
+    asset_type = db.Column(db.String(10), comment="资产类型")

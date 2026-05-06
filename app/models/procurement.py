@@ -255,3 +255,25 @@ class SupplierAppraisalDt(BaseModel):
     appflg = db.Column(db.String(1), comment="评价标志")
 
     appraisal = db.relationship("SupplierAppraisal", back_populates="details")
+
+
+# ---------------------------------------------------------------------------
+# 采购验收明细（TMP14_CHECKINDT）— Oracle 业务必须表
+# ---------------------------------------------------------------------------
+
+
+class PurchaseCheckInDt(BaseModel):
+    """采购验收明细（TMP14_CHECKINDT）。"""
+
+    __tablename__ = "tmp14_checkindt"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="主键")
+    inbillid = db.Column(db.String(8), comment="入库单号")
+    whcd = db.Column(db.String(2), comment="仓库编码")
+    lineno = db.Column(db.Integer, comment="行号")
+    itemtyp = db.Column(db.String(2), comment="物料类型")
+    itemcd = db.Column(db.String(6), comment="物料编码")
+    prddate = db.Column(db.DateTime, comment="生产日期")
+    batchid = db.Column(db.String(50), comment="批次号")
+    inqty = db.Column(db.Numeric(12, 0), comment="入库数量")
+    reflineno = db.Column(db.Integer, comment="关联行号")

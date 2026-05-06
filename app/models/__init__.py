@@ -30,6 +30,8 @@ from app.models.finance import (
 )
 from app.models.inventory import (
     AdjustPrice,
+    InventoryDetail,
+    InventoryDetailDt,
     InventoryLimit,
     InventoryLimitHistory,
     Price,
@@ -78,12 +80,19 @@ from app.models.itsm import (
 )
 from app.models.master import (
     Area,
+    AssetAttribList,
+    Bom,
+    BomDt,
     ComMode,
     Company,
     CustClass,
+    CustItems,
     Customer,
     CustomerHistory,
     CustPosRl,
+    CustVeRl,
+    Eid,
+    EidTrack,
     IdMaster,
     Item,
     ItemClass,
@@ -108,6 +117,7 @@ from app.models.portal import (
 )
 from app.models.procurement import (
     PurchaseBill,
+    PurchaseCheckInDt,
     PurchasePlan,
     PurchasePlanDt,
     PurchasePlanStatus,
@@ -149,6 +159,9 @@ from app.models.warehouse import (
     OverLostEid,
     PosChange,
     PosChangeDt,
+    QcResult,
+    QcResultDt,
+    QcResultEid,
     StockDetail,
     StockDetailDt,
     StockIn,
@@ -156,6 +169,7 @@ from app.models.warehouse import (
     StockOut,
     StockOutDetailEid,
     StockOutDetailPrd,
+    TransferAccount,
     Warehouse,
 )
 
@@ -185,6 +199,13 @@ __all__ = [
     "Supplier",
     "SupplierClass",
     "SysCode",
+    "Eid",
+    "EidTrack",
+    "Bom",
+    "BomDt",
+    "CustItems",
+    "CustVeRl",
+    "AssetAttribList",
     "IdMaster",
     # ITSM 字典/配置
     "TimepointArea",
@@ -249,6 +270,12 @@ __all__ = [
     "AssetCheckAcceptDtl",
     "PosChange",
     "PosChangeDt",
+    # 质检管理
+    "QcResult",
+    "QcResultDt",
+    "QcResultEid",
+    # 调拨科目管理
+    "TransferAccount",
     # 采购管理
     "PurchasePlan",
     "PurchasePlanDt",
@@ -260,6 +287,7 @@ __all__ = [
     "ReturnPurchaseBillDt",
     "SupplierAppraisal",
     "SupplierAppraisalDt",
+    "PurchaseCheckInDt",
     # 销售管理
     "PlanCust",
     "SalesBill",
@@ -276,6 +304,8 @@ __all__ = [
     "InventoryLimitHistory",
     "Price",
     "AdjustPrice",
+    "InventoryDetail",
+    "InventoryDetailDt",
     # 押金管理
     "Deposit",
     "DepositDetail",
