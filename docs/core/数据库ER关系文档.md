@@ -1,8 +1,11 @@
 # 数据库 ER 关系文档
 
-**版本**: v1.0  
+**版本**: v2.0  
 **更新日期**: 2026-04-27  
 **模型总数**: 124个业务模型（BaseModel 为公共基类，不计入）
+
+> **v2.0 变更说明**：修正所有表名为实际 `__tablename__` 值，与 Oracle 数据库字典保持一致；
+> 新增"Oracle 遗留表评估"章节，标注重构后不再需要的表。
 
 ---
 
@@ -17,379 +20,349 @@
 
 ### 1.2 主键策略
 
-- **等价迁移表**：保留 PB 原始业务主键（如 `custcd`、`eid`、`maintenance_id`）
-- **新增扩展表**：使用代理主键（自增 Integer 或 UUID String）
+- **等价迁移表**：保留 Oracle 原始业务主键（如 `custcd`、`maintenance_id`）
+- **新增扩展表**：使用代理主键（自增 Integer）
 - **原复合主键**：改为代理主键 + 唯一约束
 
 ### 1.3 外键约定
 
 - 模型层通过 `db.ForeignKey` 声明关联关系
 - 通过 `db.relationship` + `back_populates` 实现双向导航
-- 级联删除仅在明细表上使用（`cascade="all, delete-orphan"`）
+- 级联删除仅在明细表上使用
 
 ---
 
-## 二、业务域 ER 关系
+## 二、业务域 ER 关系（按实际表名）
 
-### 2.1 系统管理域（11个模型）
+### 2.1 系统管理域（9个模型，system.py）
 
-```mermaid
-erDiagram
-    TMC01_USER ||--o{ TMC05_USER_GROUP_MEMBER : "用户→用户组成员"
-    TMC04_USER_GROUP ||--o{ TMC05_USER_GROUP_MEMBER : "用户组→成员"
-    TMC01_USER ||--o{ TMC06_USER_ROLE : "用户→角色"
-    TMC03_ROLE ||--o{ TMC06_USER_ROLE : "角色→用户"
-    TMC03_ROLE ||--o{ TMC07_ROLE_MENU : "角色→菜单权限"
-    TMC02_MENU ||--o{ TMC07_ROLE_MENU : "菜单→角色权限"
-    TMC02_MENU ||--o{ TMC02_MENU : "菜单→子菜单(parent_id)"
-    TMC08_DEPT ||--o{ TMC01_USER : "部门→用户"
+```
+TMC01_MENUS (Menu)
+  ├── TMC02_MENUSDT (MenuDetail) — 菜单明细
+  └── TMC03_USERMENUS (UserMenu) — 用户菜单权限
+
+TMC11_DEPARTMENTS (Department) — 部门
+
+TMC12_GROUPS (Group) — 用户组
+  └── TMC21_USERGROUP (UserGroup) — 用户-组关联
+  └── TMC31_GROUPRIGHT (GroupRight) — 组权限
+
+TMC13_USERS (User) — 系统用户
+  └── TMC22_USERBUSITYP (UserBusiTyp) — 用户业务类型
+
+TMC41_ACCLOG (AccLog) — 访问日志
+TMC71_SYSPARM (SysParm) — 系统参数
 ```
 
-| 模型 | 表名 | 主键 | 说明 |
-|------|------|------|------|
-| User | TMC01_USER | user_cd | 系统用户 |
-| Menu | TMC02_MENU | menu_id | 菜单（支持树形） |
-| Role | TMC03_ROLE | role_cd | 角色 |
-| UserGroup | TMC04_USER_GROUP | group_cd | 用户组 |
-| UserGroupMember | TMC05_USER_GROUP_MEMBER | id | 用户组成员（多对多） |
-| UserRole | TMC06_USER_ROLE | id | 用户角色（多对多） |
-| RoleMenu | TMC07_ROLE_MENU | id | 角色菜单权限（多对多） |
-| Department | TMC08_DEPT | dept_cd | 部门 |
-| SysParm | TMC09_SYSPARM | parm_cd | 系统参数 |
-| CodeTable | TMC10_CODE_TABLE | code_type + code_value | 编码表 |
-| AuditLog | TMC11_AUDIT_LOG | id | 审计日志 |
+| 模型 | 实际表名 | 主键 | 说明 |
+|------|---------|------|------|
+| Menu | tmc01_menus | menucd | 系统菜单 |
+| MenuDetail | tmc02_menusdt | id | 菜单明细 |
+| UserMenu | tmc03_usermenus | id | 用户菜单权限 |
+| Department | tmc11_departments | deptcd | 部门 |
+| Group | tmc12_groups | groupcd | 用户组 |
+| User | tmc13_users | usercd | 系统用户 |
+| UserGroup | tmc21_usergroup | id | 用户-组关联 |
+| UserBusiTyp | tmc22_userbusityp | id | 用户业务类型 |
+| GroupRight | tmc31_groupright | id | 组权限 |
+| AccLog | tmc41_acclog | id | 访问日志 |
+| SysParm | tmc71_sysparm | parmcd | 系统参数 |
 
 ---
 
-### 2.2 主数据域（13个模型）
+### 2.2 主数据域（13个模型，master.py）
 
-```mermaid
-erDiagram
-    TMM30_CUSTOMER ||--o{ TMM35_CUST_POS_RL : "客户→设备关联"
-    TMM34_POS_MODEL ||--o{ TMM35_CUST_POS_RL : "设备型号→设备关联"
-    TMM30_CUSTOMER ||--o{ TMM22_CUSTOMERS_HISTORY : "客户→磁卡号变更历史"
-    TMM30_CUSTOMER ||--o{ TMM36_CUSTOMER_HISTORY : "客户→状态变更历史"
-    TMM31_STORE ||--o{ TMM30_CUSTOMER : "门店→客户"
-    TMM32_PRODUCT ||--o{ TMM33_PRODUCT_PRICE : "产品→价格"
+```
+TMM01_COMPANY (Company) — 公司
+
+TMM22_CUSTOMERS (Customer)
+  ├── TMM35_CUST_POS_RL (CustPosRl) — 客户-设备关联
+  └── TMM22_CUSTOMERS_HISTORY (CustomerHistory) — 磁卡号变更历史
+
+TMM12_ITEMS (Item) — 物料
+  └── TMM11_ITEMCLASS (ItemClass) — 物料分类
+
+TMM19_SUPPLIERS (Supplier) — 供应商
+  └── TMM18_SUPPLIERCLASS (SupplierClass) — 供应商分类
+
+TMM21_CUSTCLASS (CustClass) — 客户分类
+TMM31_SYSCODES (SysCode) — 系统编码
+TMM34_IDMASTER (IdMaster) — ID生成器
+TMM46_AREA (Area) — 区域
+TMM47_COMMODE (ComMode) — 通讯方式
 ```
 
-| 模型 | 表名 | 主键 | 说明 |
-|------|------|------|------|
-| Customer | TMM30_CUSTOMER | custcd | 客户主数据 |
-| Store | TMM31_STORE | storecd | 门店 |
-| Product | TMM32_PRODUCT | prdcd | 产品 |
-| ProductPrice | TMM33_PRODUCT_PRICE | id | 产品价格 |
-| PosModel | TMM34_POS_MODEL | model_cd | 设备型号 |
-| CustPosRl | TMM35_CUST_POS_RL | eid | 客户-设备关联（资产台账） |
-| CustomerHistory | TMM36_CUSTOMER_HISTORY | id | 客户状态变更历史 |
-| CustomersHistory | TMM22_CUSTOMERS_HISTORY | id | 磁卡号变更历史（P0优化） |
-| Area | TMM40_AREA | area_cd | 区域 |
-| Engineer | TMM41_ENGINEER | engr_cd | 工程师 |
-| Supplier | TMM42_SUPPLIER | suppliercd | 供应商 |
-| Equipment | TMM43_EQUIPMENT | eid | 设备主数据 |
-| EquipmentType | TMM44_EQUIPMENT_TYPE | type_cd | 设备类型 |
+| 模型 | 实际表名 | 主键 | 说明 |
+|------|---------|------|------|
+| Company | tmm01_company | companycd | 公司主数据 |
+| ItemClass | tmm11_itemclass | classcd | 物料分类 |
+| Item | tmm12_items | itemcd | 物料/商品 |
+| SupplierClass | tmm18_supplierclass | classcd | 供应商分类 |
+| Supplier | tmm19_suppliers | suppcd | 供应商 |
+| CustClass | tmm21_custclass | classcd | 客户分类 |
+| Customer | tmm22_customers | cust_cd | 客户/门店主表 |
+| CustomerHistory | tmm22_customers_history | id | 磁卡号变更历史（P0优化） |
+| SysCode | tmm31_syscodes | codetyp+codecd | 系统编码字典 |
+| IdMaster | tmm34_idmaster | id | ID 流水号生成器 |
+| CustPosRl | tmm35_cust_pos_rl | id | 客户-设备关联（资产台账） |
+| Area | tmm46_area | areacd | 区域 |
+| ComMode | tmm47_commode | commodecd | 通讯方式 |
 
 ---
 
-### 2.3 ITSM 核心域（34个模型）
+### 2.3 ITSM 核心域（30个模型，itsm.py + sales.py）
 
 #### 核心主子表关系
 
-```mermaid
-erDiagram
-    TIT10_MAINTENANCEDAY ||--o{ TIT10_POS_DETAIL : "维护单→配件明细"
-    TIT10_MAINTENANCEDAY ||--o{ TIT10_MAIN_TRACK : "维护单→状态轨迹"
-    TIT10_MAINTENANCEDAY ||--o{ TIT23_D2D : "维护单→上门服务"
-    TIT10_MAINTENANCEDAY ||--o{ TIT25_ACCESSORIES : "维护单→配件更新"
+```
+TIT10_MAINTENANCEDAY (MaintenanceDaily) — 日常维护单
+  ├── TIT10_POS_DETAIL (PosDetail) — 维护单配件明细
+  ├── TIT10_MAIN_TRACK (MaintenanceDailyTrack) — 状态轨迹
+  ├── TIT10_MAINTENANCE_LIABILITY — 豁免信息
+  ├── TIT23_MAINTENANCE_D2D — 上门服务（公用）
+  └── TIT25_ACCESSORIES_UPDATE — 配件更新
 
-    TIT13_MAINTENANCE_OPEN ||--o{ TIT14_EQUIPMENT_OPEN : "开通单→设备附表"
+TIT13_MAINTENANCE_OPEN (MaintenanceOpen) — 新机开通单
+  └── TIT14_EQUIPMENT_OPEN (EquipmentOpen)
 
-    TIT15_MAINTENANCE_RENOVATE ||--o{ TIT15_EQUIPMENT_RENOVATE : "翻新单→设备附表"
+TIT15_MAINTENANCE_RENOVATE (MaintenanceRenovate) — 旧机翻新单
+  └── TIT15_EQUIPMENT_RENOVATE (EquipmentRenovate)
 
-    TIT17_MAINTENANCE ||--o{ TIT17_CUST_POS_DAILY : "保养单→设备明细"
-    TIT17_MAINTENANCE ||--o{ TIT23_D2D : "保养单→上门服务"
-    TIT17_MAINTENANCE ||--o{ TIT24_RV : "保养单→回访记录"
-    TIT17_MAINTENANCE ||--o{ TIT27_CLOSE_BILLS : "保养单→关单记录"
+TIT16_DEVICE_CHANGE (DeviceChange) — 设备变更单
+  └── TMM22_CUSTOMERS_HISTORY — 磁卡号变更记录
 
-    TIT16_DEVICE_CHANGE ||--o{ TMM22_CUSTOMERS_HISTORY : "变更单→磁卡号历史"
+TIT17_MAINTENANCE (Maintenance) — 日常保养单
+  ├── TIT17_CUST_POS_DAILY (CustPosDaily)
+  └── TIT17_MAINTENANCE_PLAN (MaintenancePlan)
 
-    TIT20_RECYCLE_TASK ||--o{ TIT20_RECYCLE_TASK_DTL : "回收任务→明细"
+TIT18_STORE_CLOSE (StoreClose) — 门店关闭
+TIT20_RECYCLE_TASK → TIT20_RECYCLE_TASK_DTL — 回收任务（P0优化新增）
+TIT28_FREE_REPLACE → TIT28_FREE_REPLACE_DT — 免费更换
+TIT29_NOCLOSE_TRACK — 未关单跟踪
+
+PLAN_CUST (PlanCust) — 预计划
 ```
 
-#### 主表（6个）— 共享统一状态机
+#### 主表（共享 MaintenanceState 状态机）
 
-| 模型 | 表名 | 主键 | 关联键 |
-|------|------|------|--------|
-| MaintenanceDaily | TIT10_MAINTENANCEDAY | maintenance_id | → PosDetail, Track, D2D, Accessories |
-| MaintenanceOpen | TIT13_MAINTENANCE_OPEN | new_opening_id | → EquipmentOpen |
-| MaintenanceRenovate | TIT15_MAINTENANCE_RENOVATE | renovate_id | → EquipmentRenovate |
-| DeviceChange | TIT16_DEVICE_CHANGE | change_id | → CustomersHistory(CK类型) |
-| Maintenance | TIT17_MAINTENANCE | maintenance_id | → CustPosDaily, D2D, RV, CloseBill |
-| RecycleTask | TIT20_RECYCLE_TASK | recycle_id | → RecycleTaskDtl |
+| 模型 | 实际表名 | 主键 |
+|------|---------|------|
+| MaintenanceDaily | tit10_maintenanceday | maintenance_id |
+| MaintenanceOpen | tit13_maintenance_open | new_opening_id |
+| MaintenanceRenovate | tit15_maintenance_renovate | renovate_id |
+| DeviceChange | tit16_device_change | change_id |
+| Maintenance | tit17_maintenance | maintenance_id |
+| StoreClose | tit18_store_close | store_close_id |
+| RecycleTask | tit20_recycle_task | recycle_id |
 
-#### 子表/明细表（8个）
+#### 子表/明细表
 
-| 模型 | 表名 | 关联主表 | 关联字段 |
-|------|------|---------|---------|
-| PosDetail | TIT10_POS_DETAIL | MaintenanceDaily | maintenance_id |
-| MainTrack | TIT10_MAIN_TRACK | MaintenanceDaily | maintenance_id |
-| EquipmentOpen | TIT14_EQUIPMENT_OPEN | MaintenanceOpen | new_opening_id |
-| EquipmentRenovate | TIT15_EQUIPMENT_RENOVATE | MaintenanceRenovate | renovate_id |
-| CustPosDaily | TIT17_CUST_POS_DAILY | Maintenance | maintenance_id |
-| RecycleTaskDtl | TIT20_RECYCLE_TASK_DTL | RecycleTask | recycle_id |
-| StoreClose | TIT18_STORE_CLOSE | — | close_id（独立单据） |
-| FreeReplace | TIT19_FREE_REPLACE | — | replace_id（独立单据） |
+| 模型 | 实际表名 | 关联主表 |
+|------|---------|---------|
+| PosDetail | tit10_pos_detail | MaintenanceDaily |
+| MaintenanceDailyTrack | tit10_main_track | MaintenanceDaily |
+| MaintenanceLiability | tit10_maintenance_liability | MaintenanceDaily |
+| EquipmentOpen | tit14_equipment_open | MaintenanceOpen |
+| EquipmentRenovate | tit15_equipment_renovate | MaintenanceRenovate |
+| CustPosDaily | tit17_cust_pos_daily | Maintenance |
+| MaintenancePlan | tit17_maintenance_plan | Maintenance |
+| RecycleTaskDtl | tit20_recycle_task_dtl | RecycleTask |
+| FreeReplaceDt | tit28_free_replace_dt | FreeReplace |
 
-#### 公用附表（5个）— 跨业务单据复用
+#### 公用附表（跨业务单据复用）
 
-| 模型 | 表名 | 关联方式 | 说明 |
-|------|------|---------|------|
-| D2D | TIT23_MAINTENANCE_D2D | maintenance_id + maintenance_type | 上门服务记录 |
-| RV | TIT24_MAINTENANCE_RV | maintenance_id + maintenance_type | 客户回访记录 |
-| AccessoriesUpdate | TIT25_ACCESSORIES_UPDATE | maintenance_id | 配件更新记录 |
-| Dispatch | TIT26_DISPATCH | maintenance_id + maintenance_type | 工单分派记录 |
-| CloseBill | TIT27_CLOSE_BILLS | maintenance_id + maintenance_type | 关单记录 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| MaintenanceD2D | tit23_maintenance_d2d | 上门服务记录 |
+| MaintenanceRV | tit24_maintenance_rv | 客户回访记录 |
+| AccessoriesUpdate | tit25_accessories_update | 配件更新记录 |
+| MaintenanceDispatch | tit21_maintenance_dispatch | 工单分派记录 |
+| PayList | tit26_paylist | 收费记录 |
+| CloseBills | tit27_close_bills | 关单记录 |
 
-#### 字典表（6个）
+#### 字典表
 
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| FaultType | TIT01_FAULT_TYPE | 故障类型字典 |
-| ServiceType | TIT02_SERVICE_TYPE | 服务类型字典 |
-| Priority | TIT03_PRIORITY | 优先级字典 |
-| StatusDef | TIT04_STATUS_DEF | 状态定义字典 |
-| ChangeType | TIT05_CHANGE_TYPE | 变更类型字典 |
-| PosType | TIT06_POS_TYPE | 设备类型字典 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| TimepointArea | tit01_timepoint_area | 响应时间等级 |
+| LiabilityReg | tit02_liabilityreg | 免责条例 |
+| LiabilityRegDt | tit02_liabilityregdt | 免责条例明细 |
+| ItsmSysCode | tit03_syscodes | ITSM 字典 |
+| ArchiveCode | tit04_archivecode | 归档字典 |
+| RepairInfo | tit05_repairinfo | 返修范围 |
+| UserArea | tit06_userarea | 区域人员 |
+| MaintenanceAttc | tit11_maintenance_attc | 维护单附表 |
+| MaintenanceArchive | tit12_maintenance_archive | 归档表 |
+| OnChooseDt | tit19_on_choosedt | 配件选取明细 |
+| NoCloseTrack | tit29_noclose_track | 未关单跟踪 |
 
 ---
 
-### 2.4 仓储域（15个模型）
+### 2.4 仓储域（14个模型，warehouse.py）
 
-```mermaid
-erDiagram
-    TWH01_WAREHOUSE ||--o{ TWH10_STOCK_IN : "仓库→入库单"
-    TWH01_WAREHOUSE ||--o{ TWH20_STOCK_OUT : "仓库→出库单"
-    TWH01_WAREHOUSE ||--o{ TWH40_STOCK_BALANCE : "仓库→库存余额"
-    TWH10_STOCK_IN ||--o{ TWH11_STOCK_IN_DTL_EID : "入库单→设备明细"
-    TWH10_STOCK_IN ||--o{ TWH12_STOCK_IN_DTL_PRD : "入库单→产品明细"
-    TWH20_STOCK_OUT ||--o{ TWH21_STOCK_OUT_DTL_EID : "出库单→设备明细"
-    TWH20_STOCK_OUT ||--o{ TWH22_STOCK_OUT_DTL_PRD : "出库单→产品明细"
+```
+TWH01_WAREHOUSE (Warehouse)
+  ├── TWH13_IN (StockIn) → TWH14_CHECKINDT (StockInDetail)
+  ├── TWH15_OUT (StockOut) → TWH16_OUTDTEID / TWH16_OUTDTPRD
+  ├── TWH17_OVERLOST (OverLost) → TWH18_OVERLOSTDT / TWH18_OVERLOSTEID
+  ├── TWH11_DETAIL (StockDetail) → TWH12_DETAILDT (StockDetailDt)
+  ├── TWH19_ASSET_C_A → TWH20_ASSET_C_A_DTL (资产盘点)
+  └── TWH21_POS_CHANGE → TWH22_POS_CHANGE_DT (POS变更)
 ```
 
-| 模型 | 表名 | 主键 | 说明 |
-|------|------|------|------|
-| Warehouse | TWH01 | whcd | 仓库主数据 |
-| WarehouseZone | TWH02 | zone_id | 库区 |
-| WarehouseLocation | TWH03 | loc_id | 库位 |
-| StockIn | TWH10 | inbillid | 入库单主表 |
-| StockInDtlEid | TWH11 | id | 入库设备明细 |
-| StockInDtlPrd | TWH12 | id | 入库产品明细 |
-| StockOut | TWH20 | outbillid | 出库单主表 |
-| StockOutDtlEid | TWH21 | id | 出库设备明细 |
-| StockOutDtlPrd | TWH22 | id | 出库产品明细 |
-| StockBalance | TWH40 | id | 库存余额 |
-| StockFlow | TWH41 | id | 库存流水 |
-| StockCheck | TWH50 | check_id | 盘点单 |
-| StockCheckDtl | TWH51 | id | 盘点明细 |
-| Transfer | TWH60 | trans_id | 调拨单 |
-| TransferDtl | TWH61 | id | 调拨明细 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| Warehouse | twh01_warehouse | 仓库主数据 |
+| StockDetail | twh11_detail | 库存明细 |
+| StockDetailDt | twh12_detaildt | 库存流水 |
+| StockIn | twh13_in | 入库单（8种类型统一） |
+| StockInDetail | twh14_checkindt | 入库明细 |
+| StockOut | twh15_out | 出库单 |
+| StockOutDetailEid | twh16_outdteid | 出库设备明细 |
+| StockOutDetailPrd | twh16_outdtprd | 出库产品明细 |
+| OverLost | twh17_overlost | 盘盈盘亏 |
+| OverLostDt | twh18_overlostdt | 盘盈盘亏明细 |
+| OverLostEid | twh18_overlosteid | 盘盈盘亏设备 |
+| AssetCheckAccept | twh19_asset_c_a | 资产盘点 |
+| AssetCheckAcceptDtl | twh20_asset_c_a_dtl | 盘点明细 |
+| PosChange | twh21_pos_change | POS设备变更 |
+| PosChangeDt | twh22_pos_change_dt | POS变更明细 |
 
 ---
 
-### 2.5 采购域（10个模型）
+### 2.5 采购域（10个模型，procurement.py）
 
-```mermaid
-erDiagram
-    TPC10_PURCHASE_PLAN ||--o{ TPC11_PURCHASE_PLAN_DTL : "采购计划→明细"
-    TPC20_PURCHASE_REGISTER ||--o{ TPC21_PURCHASE_REGISTER_DTL : "采购登记→明细"
-    TPC30_SUPPLIER_APPRAISAL ||--o{ TPC31_SUPPLIER_APPRAISAL_DTL : "供应商评价→明细"
-    TMM42_SUPPLIER ||--o{ TPC20_PURCHASE_REGISTER : "供应商→采购登记"
-```
-
-| 模型 | 表名 | 主键 | 说明 |
-|------|------|------|------|
-| PurchasePlan | TPC10 | pcplanid | 采购计划 |
-| PurchasePlanDtl | TPC11 | id | 采购计划明细 |
-| PurchaseRegister | TPC20 | rgstbillid | 采购登记 |
-| PurchaseRegisterDtl | TPC21 | id | 采购登记明细 |
-| PurchaseBill | TPC30 | pcbillid | 采购单据 |
-| PurchaseReturn | TPC40 | rtbillid | 采购退货 |
-| PurchaseReturnDtl | TPC41 | id | 退货明细 |
-| SupplierAppraisal | TPC50 | appid | 供应商评价 |
-| SupplierAppraisalDtl | TPC51 | id | 评价明细 |
-| PurchaseContract | TPC60 | pccontractid | 采购合同 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| PurchasePlan | tpc01_pcplan | 采购计划 |
+| PurchasePlanDt | tpc02_pcplandt | 计划明细 |
+| PurchasePlanStatus | tpc03_pcplanstatus | 计划状态 |
+| PurchaseRegister | tpc12_register | 采购登记 |
+| PurchaseRegisterDt | tpc13_registerdt | 登记明细 |
+| PurchaseBill | tpc14_pcbill | 采购单据 |
+| ReturnPurchaseBill | tpc16_rpcbill | 退货单 |
+| ReturnPurchaseBillDt | tpc17_rpcbilldt | 退货明细 |
+| SupplierAppraisal | tpc20_suppappraisal | 供应商评价 |
+| SupplierAppraisalDt | tpc21_suppappraisaldt | 评价明细 |
 
 ---
 
-### 2.6 销售域（4个模型）
+### 2.6 销售域（4个模型，sales.py + itsm.py）
 
-```mermaid
-erDiagram
-    TSL10_PLAN_CUST ||--o{ TSL30_SALES_EXTEND : "预计划→延期"
-    TSL30_SALES_EXTEND ||--o{ TSL31_SALES_EXTEND_DTL : "延期→明细"
-    TMM30_CUSTOMER ||--o{ TSL10_PLAN_CUST : "客户→预计划"
-```
-
-| 模型 | 表名 | 主键 | 说明 |
-|------|------|------|------|
-| PlanCust | TSL10 | planno | 预计划 |
-| SalesBill | TSL20 | slbillid | 销售单据 |
-| SalesExtend | TSL30 | opbillid | 延期 |
-| SalesExtendDtl | TSL31 | id | 延期明细 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| PlanCust | plan_cust | 预计划 |
+| SalesBill | tsl10_slbill | 销售单据 |
+| SalesExtend | tsl01_extend | 销售延期 |
+| SalesExtendDt | tsl02_extenddt | 延期明细 |
 
 ---
 
-### 2.7 辅助管理域（15个模型）
+### 2.7 辅助管理域
 
-#### 考勤（2个）
+#### 考勤（2个，attendance.py）
 
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| Attendance | TKQ01 | 考勤记录 |
-| AttendanceCount | TKQ02 | 考勤月度汇总 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| Attendance | tkq01_attendance | 考勤记录 |
+| AttendanceCount | tkq02_attendancecount | 考勤月度汇总 |
 
-#### 库存预警 + 价格（4个）
+#### 库存预警 + 价格（4个，inventory.py）
 
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| InventoryLimit | TIV01 | 库存预警规则 |
-| InventoryAlert | TIV02 | 库存预警记录 |
-| Price | TIP01 | 价格规则 |
-| AdjustPrice | TIP03 | 调价记录 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| Price | tip01_price | 价格规则 |
+| AdjustPrice | tip03_adjprice | 调价记录 |
+| InventoryLimit | tiv01_invlimit | 库存预警规则 |
+| InventoryLimitHistory | tiv02_invlimit_hi | 库存预警历史 |
 
-#### 押金（5个）
+#### 押金（5个，deposit.py）
 
-```mermaid
-erDiagram
-    TMM61_DEPOSIT ||--o{ TMM61_DEPOSIT_DTL : "押金→变更明细"
-    TMM34_POS_MODEL ||--o{ TMM61_DEPOSIT_POS_MODEL : "型号→押金标准"
-```
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| Deposit | tmm61_deposit | 押金主表 |
+| DepositDetail | tmm61_deposit_dtl | 押金变更明细 |
+| DepositIO | tmm61_deposit_io | 押金出入记录 |
+| DepositList | tmm61_deposit_list | 押金清单 |
+| DepositPosModel | tmm61_deposit_posmodel | 型号押金标准 |
 
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| Deposit | TMM61 | 押金主表 |
-| DepositDetail | TMM61_DTL | 押金变更明细 |
-| DepositPosModel | TMM61_POS_MODEL | 型号押金标准 |
-| DepositRefund | TMM61_REFUND | 退押金记录 |
-| DepositFrozen | TMM61_FROZEN | 押金冻结记录 |
+#### 合同 + 发票（2个，auxiliary.py）
 
-#### 合同 + 发票（2个）
-
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| Contract | THT01 | 合同 |
-| Invoice | TAC01 | 发票 |
-
-#### 通知系统（2个）
-
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| NotificationTemplate | TNTF01 | 通知模板 |
-| Notification | TNTF02 | 通知记录 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| Contract | tht01_htgl | 合同管理 |
+| Invoice | tac01_fpsk | 发票收款 |
 
 ---
 
-### 2.8 SLA 服务级别域（2个模型）
+### 2.8 Tier-1 扩展域
 
-```mermaid
-erDiagram
-    TSLA01_DEFINITION ||--o{ TSLA02_TICKET : "SLA定义→工单监控"
-```
+#### SLA 服务级别（2个，sla.py）
 
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| SlaDefinition | TSLA01 | SLA定义（响应/解决时限） |
-| SlaTicket | TSLA02 | SLA工单监控记录 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| SlaDefinition | sla_definition | SLA 定义 |
+| SlaTicket | sla_ticket | SLA 工单监控 |
 
----
+#### 通知系统（2个，notification.py）
 
-### 2.9 结算域（4个模型，Tier-2 G4）
-
-```mermaid
-erDiagram
-    TBIL01_BILLING_RULE ||--o{ TBIL02_BILL : "规则→账单"
-    TBIL02_BILL ||--o{ TBIL03_BILL_DETAIL : "账单→明细"
-    TBIL04_BILLING_BATCH ||--o{ TBIL02_BILL : "批次→账单"
-```
-
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| BillingRule | TBIL01 | 结算规则 |
-| Bill | TBIL02 | 账单主表 |
-| BillDetail | TBIL03 | 账单明细 |
-| BillingBatch | TBIL04 | 结算批次 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| NotificationTemplate | tntf01_template | 通知模板 |
+| Notification | tntf02_notification | 通知记录 |
 
 ---
 
-### 2.10 财务域（5个模型，Tier-2 G5）
+### 2.9 Tier-2 扩展域
 
-```mermaid
-erDiagram
-    TFIN01_ACCOUNT ||--o{ TFIN02_RECEIVABLE : "科目→应收"
-    TFIN01_ACCOUNT ||--o{ TFIN03_PAYABLE : "科目→应付"
-    TFIN02_RECEIVABLE ||--o{ TFIN04_PAYMENT : "应收→收款"
-    TFIN03_PAYABLE ||--o{ TFIN04_PAYMENT : "应付→付款"
-```
+#### 结算（4个，billing.py）
 
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| Account | TFIN01 | 会计科目 |
-| Receivable | TFIN02 | 应收 |
-| Payable | TFIN03 | 应付 |
-| Payment | TFIN04 | 收付款 |
-| Depreciation | TFIN05 | 设备折旧 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| BillingRule | tbl01_billing_rule | 结算规则 |
+| Bill | tbl02_bill | 账单主表 |
+| BillDetail | tbl03_bill_detail | 账单明细 |
+| BillingBatch | tbl04_billing_batch | 结算批次 |
 
----
+#### 财务（5个，finance.py）
 
-### 2.11 客户门户域（3个模型，Tier-2 G9）
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| Account | tfn01_account | 会计科目 |
+| Receivable | tfn02_receivable | 应收 |
+| Payable | tfn03_payable | 应付 |
+| Payment | tfn04_payment | 收付款 |
+| Depreciation | tfn05_depreciation | 设备折旧 |
 
-```mermaid
-erDiagram
-    TPTL01_PORTAL_USER ||--o{ TPTL02_REPAIR_REQUEST : "门户用户→报修"
-    TPTL02_REPAIR_REQUEST ||--o{ TPTL03_SERVICE_RATING : "报修→评价"
-```
+#### 门户（3个，portal.py）
 
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| PortalUser | TPTL01 | 门户用户 |
-| RepairRequest | TPTL02 | 自助报修 |
-| ServiceRating | TPTL03 | 服务评价 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| PortalUser | tpt01_portal_user | 门户用户 |
+| RepairRequest | tpt02_repair_request | 自助报修 |
+| ServiceRating | tpt03_service_rating | 服务评价 |
 
 ---
 
-### 2.12 MES 制造域（4个模型，Tier-3 G7）
+### 2.10 Tier-3 扩展域
 
-```mermaid
-erDiagram
-    TMES01_WORK_ORDER ||--o{ TMES03_WORK_PROCESS : "工单→工序"
-    TMES01_WORK_ORDER ||--o{ TMES04_MATERIAL_CONSUME : "工单→物料消耗"
-    TMES02_PROCESS_DEF ||--o{ TMES03_WORK_PROCESS : "工序定义→工单工序"
-```
+#### MES 制造（4个，mes.py）
 
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| WorkOrder | TMES01 | 生产工单 |
-| ProcessDef | TMES02 | 工序定义 |
-| WorkProcess | TMES03 | 工单工序 |
-| MaterialConsume | TMES04 | 物料消耗 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| WorkOrder | tms01_work_order | 生产工单 |
+| ProcessDef | tms02_process_def | 工序定义 |
+| WorkProcess | tms03_work_process | 工单工序 |
+| MaterialConsume | tms04_material_consume | 物料消耗 |
 
----
+#### IoT 监控（4个，iot.py）
 
-### 2.13 IoT 监控域（4个模型，Tier-3 G8）
-
-```mermaid
-erDiagram
-    TIOT01_DEVICE_CONN ||--o{ TIOT02_DEVICE_DATA : "设备接入→数据"
-    TIOT03_ALERT_RULE ||--o{ TIOT04_ALERT_LOG : "报警规则→报警记录"
-    TIOT01_DEVICE_CONN ||--o{ TIOT04_ALERT_LOG : "设备→报警记录"
-```
-
-| 模型 | 表名 | 说明 |
-|------|------|------|
-| DeviceConn | TIOT01 | 设备接入 |
-| DeviceData | TIOT02 | 设备数据 |
-| AlertRule | TIOT03 | 报警规则 |
-| AlertLog | TIOT04 | 报警记录 |
+| 模型 | 实际表名 | 说明 |
+|------|---------|------|
+| DeviceConn | tio01_device_conn | 设备接入 |
+| DeviceData | tio02_device_data | 设备数据 |
+| AlertRule | tio03_alert_rule | 报警规则 |
+| AlertLog | tio04_alert_log | 报警记录 |
 
 ---
 
@@ -397,43 +370,87 @@ erDiagram
 
 | 源域 | 目标域 | 关联路径 | 说明 |
 |------|--------|---------|------|
-| ITSM | 主数据 | maintenance.custcd → Customer.custcd | 工单关联客户 |
-| ITSM | 主数据 | maintenance.store_id → Store.storecd | 工单关联门店 |
-| ITSM | 主数据 | device_change → CustomersHistory | 设备变更记录磁卡号历史 |
-| 仓储 | 主数据 | stock_in/out.itemcd → Product/Equipment | 出入库关联物品 |
-| 采购 | 主数据 | register.suppliercd → Supplier.suppliercd | 采购关联供应商 |
-| 销售 | 主数据 | plan_cust.custcd → Customer.custcd | 预计划关联客户 |
-| 押金 | 主数据 | deposit.custcd → Customer.custcd | 押金关联客户 |
-| 押金 | 主数据 | deposit_pos_model.model_cd → PosModel | 押金关联设备型号 |
-| SLA | ITSM | sla_ticket.maintenance_id → 各主表 | SLA监控关联工单 |
-| 结算 | 主数据 | bill.custcd → Customer.custcd | 账单关联客户 |
-| 财务 | 主数据 | receivable.custcd → Customer.custcd | 应收关联客户 |
-| 财务 | 主数据 | payable.supp_cd → Supplier.suppliercd | 应付关联供应商 |
-| 门户 | ITSM | repair_request → MaintenanceDaily | 自助报修转工单 |
-| IoT | 主数据 | device_conn.eid → Equipment.eid | IoT设备关联资产 |
-| MES | 主数据 | material_consume.itemcd → Product | 物料消耗关联产品 |
+| ITSM | 主数据 | maintenance.custcd → tmm22_customers.cust_cd | 工单关联客户 |
+| ITSM | 主数据 | device_change → tmm22_customers_history | 设备变更→磁卡号历史 |
+| ITSM | 主数据 | cust_pos_rl.cust_cd → tmm22_customers.cust_cd | 设备关联客户 |
+| 仓储 | 主数据 | stock_in/out.itemcd → tmm12_items.itemcd | 出入库关联物料 |
+| 仓储 | 主数据 | stock_in/out.suppcd → tmm19_suppliers.suppcd | 出入库关联供应商 |
+| 采购 | 主数据 | register.suppcd → tmm19_suppliers.suppcd | 采购关联供应商 |
+| 销售 | 主数据 | plan_cust.custcd → tmm22_customers.cust_cd | 预计划关联客户 |
+| 押金 | 主数据 | deposit_list.custcd → tmm22_customers.cust_cd | 押金关联客户 |
+| SLA | ITSM | sla_ticket.maintenance_id → 各主表 | SLA 监控关联工单 |
+| 门户 | ITSM | repair_request → tit10_maintenanceday | 自助报修转工单 |
 
 ---
 
-## 四、模型数量汇总
+## 四、Oracle 遗留表评估（33张无模型表）
 
-| 业务域 | 模型数 | 阶段 |
-|--------|--------|------|
-| 系统管理 | 11 | 阶段1 |
-| 主数据 | 13 | 阶段1 |
-| ITSM 核心 | 34 | 阶段2 |
-| 仓储 | 15 | 阶段3 |
-| 采购 | 10 | 阶段3 |
-| 销售 | 4 | 阶段3 |
-| SLA | 2 | 阶段3 |
-| 考勤 | 2 | 阶段4 |
-| 库存价格 | 4 | 阶段4 |
-| 押金 | 5 | 阶段4 |
-| 合同发票 | 2 | 阶段4 |
-| 通知 | 2 | 阶段4 |
-| 结算 | 4 | 阶段5 |
-| 财务 | 5 | 阶段5 |
-| 门户 | 3 | 阶段5 |
-| MES | 4 | 阶段5 |
-| IoT | 4 | 阶段5 |
-| **合计** | **124** | |
+以下为 `数据库字典_精简后_最终版.md` 中存在但当前无 Python 模型的表。
+按重构后实际需要分为四类，**避免过度恢复不需要的表**。
+
+### 4.1 已被替代/淘汰（不需要建模，共7张）
+
+| Oracle 表 | 原用途 | 替代方案 | 不建模原因 |
+|-----------|--------|---------|-----------|
+| SYS_USER | 零售系统用户 | TMC13_USERS | 旧系统独立用户表，已合并到 TMC13 |
+| SYS_ROLE_USER | 零售角色关联 | TMC21_USERGROUP + TMC31_GROUPRIGHT | 已合并到统一权限体系 |
+| TIT22_FETION_SEND | 飞信发送记录 | TNTF02_NOTIFICATION | 飞信已于2021年停用，由通知系统替代 |
+| TMC42_CONNECTINFO | PB连接信息 | Flask 会话管理 | PB 专属的 C/S 连接管理，B/S 架构不需要 |
+| TMC43_LOGS | PB操作日志 | TMC41_ACCLOG | 旧日志表，统一到访问日志 |
+| TMC44_SYSLOCK | PB并发锁 | 数据库行级锁 | PB 专属的表级锁机制，PostgreSQL 自带行锁 |
+| TMC51_VERCTRL | PB版本控制 | Git + Flask-Migrate | PB 客户端版本管理，B/S 架构不需要 |
+
+### 4.2 地理参考数据（可按需导入，暂不建模，共4张）
+
+| Oracle 表 | 原用途 | 说明 |
+|-----------|--------|------|
+| TMM02_COUNTRY | 国家字典 | 标准地理参考数据，可作为 CSV 导入或在线接口 |
+| TMM03_PROVINCE | 省份字典 | 同上 |
+| TMM04_CITY | 城市字典 | 同上 |
+| TMM05_TOWN | 乡镇字典 | 同上 |
+
+### 4.3 建议后续建模（当前无直接引用，但业务完整性需要，共14张）
+
+| Oracle 表 | 字段数 | 原用途 | 建议时机 |
+|-----------|--------|--------|---------|
+| TMM43_EID | 17 | 设备 SN 码主表 | 前端ITSM联调时（设备查询/关联） |
+| TMM43_EID_TRACK | 31 | 设备 SN 变更追踪 | 同上 |
+| TMM41_BOM | 6 | BOM 清单主表 | 生产/物料管理联调时 |
+| TMM42_BOMDT | 7 | BOM 明细 | 同上 |
+| TMM24_CUSTITEMS | 13 | 客户-物品关联 | 客户资产管理联调时 |
+| TMM36_CUST_VE_RL | 17 | 客户-车辆关联 | 外勤/派车管理联调时 |
+| TMM62_ASSET_ATTRIB_LIST | 7 | 资产属性清单 | 资产盘点联调时 |
+| TQC10_RESULT | 13 | 质检结果主表 | 仓储质检联调时 |
+| TQC11_RESULTDT | 16 | 质检结果明细 | 同上 |
+| TQC11_RESULTEID | 18 | 质检设备结果 | 同上 |
+| TMP14_CHECKINDT | 9 | 采购验收明细 | 采购验收联调时 |
+| TTX01_TXKMG | 8 | 调拨科目管理 | 调拨管理联调时 |
+| TIV11_DETAIL | 7 | 库存明细（预警模块） | 库存预警联调时 |
+| TIV12_DETAILDT | 12 | 库存明细流水（预警模块） | 同上 |
+
+### 4.4 可选/业务价值较低（共8张）
+
+| Oracle 表 | 字段数 | 原用途 | 说明 |
+|-----------|--------|--------|------|
+| TMM48_FIXEDASSET | 9 | 固定资产 | 简单台账，可用 CustPosRl 替代部分功能 |
+| TMM40_LABEL | 6 | 标签管理 | PB 打印标签，B/S 暂无直接需求 |
+| TMM45_SUPPAPPRAISAL | 7 | 供应商考核主表 | 已有 TPC20/21，可能重复 |
+| TMM49_G3NO | 8 | 3G 号码管理 | 3G 技术过时，仅历史数据参考 |
+| TMM50_MFLOG | 6 | 制造流转日志 | PB 专属流转标记 |
+| TMM52_POSSTATUS | 9 | POS 状态码表 | 可用 TMM31_SYSCODES 编码表替代 |
+| TMM33_MESSAGE | 8 | 系统消息 | 已有 TNTF01/02 通知系统替代 |
+
+---
+
+## 五、统计汇总
+
+| 类别 | 数量 |
+|------|------|
+| 当前已实现的业务模型 | 124 |
+| Oracle 等价迁移表（已完全匹配） | 69 |
+| Oracle 等价迁移表（有字段缺失，需补全） | 28（共155字段） |
+| 重构新增表（优化方案+Tier扩展） | 27 |
+| Oracle 遗留表（已替代/淘汰，不建模） | 7 |
+| Oracle 遗留表（地理参考，暂不建模） | 4 |
+| Oracle 遗留表（建议后续建模） | 14 |
+| Oracle 遗留表（可选/低价值） | 8 |
