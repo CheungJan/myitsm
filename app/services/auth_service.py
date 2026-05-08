@@ -37,7 +37,16 @@ class AuthService:
         if user is None or user.status != "1":
             return None
 
-        if not check_password_hash(user.password, password):
+        # 1. 哈希比对（已升级的密码）
+        if check_password_hash(user.password or "", password):
+            pass
+        # 2. 明文比对（从旧系统迁移未升级）+ 自动升级为哈希
+        elif user.password and user.password == password:
+            user.password = generate_password_hash(password, method="pbkdf2:sha256")
+            user.passwd = None  # 清除明文备份
+            db.session.flush()
+            logger.info("用户 %s 密码已从明文升级为哈希", user_id)
+        else:
             return None
 
         groups = _repo.get_user_groups(user_id)
@@ -97,8 +106,8 @@ class AuthService:
 
     @staticmethod
     def hash_password(plain: str) -> str:
-        """生成密码哈希。"""
-        return generate_password_hash(plain)
+        """生成密码哈希（pbkdf2:sha256，适配 VARCHAR(128) 列）。"""
+        return generate_password_hash(plain, method="pbkdf2:sha256")
 
 
 def _generate_token(user_id: str) -> str:
