@@ -44,6 +44,30 @@ const router = createRouter({
                     name: 'SysParams',
                     component: () => import('@/views/system/ParamsList.vue'),
                     meta: { title: '系统参数' }
+                },
+                {
+                    path: 'master/items',
+                    name: 'Items',
+                    component: () => import('@/views/master/ItemList.vue'),
+                    meta: { title: '物料管理' }
+                },
+                {
+                    path: 'master/customers',
+                    name: 'Customers',
+                    component: () => import('@/views/master/CustomerList.vue'),
+                    meta: { title: '客户管理' }
+                },
+                {
+                    path: 'master/eid',
+                    name: 'EidList',
+                    component: () => import('@/views/master/EidList.vue'),
+                    meta: { title: 'EID 管理' }
+                },
+                {
+                    path: 'master/assets',
+                    name: 'Assets',
+                    component: () => import('@/views/master/AssetList.vue'),
+                    meta: { title: '资产台账' }
                 }
             ]
         },
