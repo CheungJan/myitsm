@@ -1,8 +1,8 @@
 # API 接口文档
 
-**版本**: v1.0  
+**版本**: v1.1  
 **基础路径**: `/api/v1`  
-**更新日期**: 2026-04-27
+**更新日期**: 2026-05-07
 
 ---
 
@@ -677,7 +677,9 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | portal | /api/v1/portal | 9 | 阶段5 |
 | mes | /api/v1/mes | 10 | 阶段5 |
 | iot | /api/v1/iot | 10 | 阶段5 |
-| **合计** | | **183** | |
+| transactions | /api/v1/transactions | 4 | 阶段6 |
+| reports | /api/v1/reports | 8 | 阶段6 |
+| **合计** | | **195** | |
 
 ---
 
@@ -703,3 +705,5 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | `portal.py` | portal（PortalUserCreate/Update、RepairRequestCreate/Update、ServiceRatingCreate） |
 | `mes.py` | mes（WorkOrderCreate/Update、ProcessDefCreate/Update、WorkProcessCreate/Update、MaterialConsumeCreate） |
 | `iot.py` | iot（DeviceConnCreate/Update、DeviceDataCreate、AlertRuleCreate/Update、AlertAcknowledge） |
+| `transaction.py` | transactions（AllBillQuery、ErrorCorrectionCreate、StockSummaryQuery） |
+| `report.py` | reports（InventorySnapshotQuery、MovementLogQuery、EidLifecycleQuery、SalesReportQuery、BOMTreeQuery） |

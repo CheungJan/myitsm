@@ -21,6 +21,8 @@ from app.schemas.warehouse import (
     WarehouseUpdate,
 )
 from app.services.warehouse_service import (
+    AssetCheckService,
+    PosChangeService,
     StockBalanceService,
     StockInService,
     StockOutService,
@@ -198,3 +200,106 @@ def list_stock():  # type: ignore[no-untyped-def]
             whcd=params.whcd, page=params.page, per_page=params.per_page
         )
     return success_response(data=data)
+
+
+# ---- 资产盘点 ----
+
+
+@warehouse_bp.get("/asset-check")
+@login_required
+def list_asset_checks():  # type: ignore[no-untyped-def]
+    """资产盘点列表。"""
+    page: int = request.args.get("page", 1, type=int)
+    per_page: int = request.args.get("per_page", 20, type=int)
+    data = AssetCheckService.list_records(
+        page=page, per_page=per_page
+    )
+    return success_response(data=data)
+
+
+@warehouse_bp.get("/asset-check/<opbillid>")
+@login_required
+def get_asset_check(opbillid: str):  # type: ignore[no-untyped-def]
+    """资产盘点详情。"""
+    record = AssetCheckService.get(opbillid)
+    if record is None:
+        return error_response("盘点单不存在", code=404)
+    return success_response(data=record)
+
+
+@warehouse_bp.post("/asset-check")
+@login_required
+def create_asset_check():  # type: ignore[no-untyped-def]
+    """创建资产盘点单。"""
+    body = request.get_json(silent=True) or {}
+    creator: str = g.current_user
+    record = AssetCheckService.create(body, creator)
+    return success_response(data=record, code=201)
+
+
+@warehouse_bp.put("/asset-check/<opbillid>")
+@login_required
+def update_asset_check(opbillid: str):  # type: ignore[no-untyped-def]
+    """更新资产盘点单。"""
+    body = request.get_json(silent=True) or {}
+    record = AssetCheckService.update(opbillid, body)
+    if record is None:
+        return error_response("盘点单不存在", code=404)
+    return success_response(data=record)
+
+
+@warehouse_bp.post("/asset-check/<opbillid>/audit")
+@login_required
+def audit_asset_check(opbillid: str):  # type: ignore[no-untyped-def]
+    """审核资产盘点单。"""
+    auditor: str = g.current_user
+    record = AssetCheckService.audit(opbillid, auditor)
+    if record is None:
+        return error_response("盘点单不存在", code=404)
+    return success_response(data=record)
+
+
+# ---- POS设备变更 ----
+
+
+@warehouse_bp.get("/pos-change")
+@login_required
+def list_pos_changes():  # type: ignore[no-untyped-def]
+    """POS设备变更列表。"""
+    page: int = request.args.get("page", 1, type=int)
+    per_page: int = request.args.get("per_page", 20, type=int)
+    data = PosChangeService.list_records(
+        page=page, per_page=per_page
+    )
+    return success_response(data=data)
+
+
+@warehouse_bp.get("/pos-change/<int:pk>")
+@login_required
+def get_pos_change(pk: int):  # type: ignore[no-untyped-def]
+    """POS设备变更详情。"""
+    record = PosChangeService.get(pk)
+    if record is None:
+        return error_response("变更记录不存在", code=404)
+    return success_response(data=record)
+
+
+@warehouse_bp.post("/pos-change")
+@login_required
+def create_pos_change():  # type: ignore[no-untyped-def]
+    """创建POS设备变更。"""
+    body = request.get_json(silent=True) or {}
+    creator: str = g.current_user
+    record = PosChangeService.create(body, creator)
+    return success_response(data=record, code=201)
+
+
+@warehouse_bp.put("/pos-change/<int:pk>")
+@login_required
+def update_pos_change(pk: int):  # type: ignore[no-untyped-def]
+    """更新POS设备变更。"""
+    body = request.get_json(silent=True) or {}
+    record = PosChangeService.update(pk, body)
+    if record is None:
+        return error_response("变更记录不存在", code=404)
+    return success_response(data=record)

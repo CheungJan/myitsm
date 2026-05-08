@@ -10,6 +10,10 @@ from sqlalchemy import desc
 
 from app.extensions import db
 from app.models.warehouse import (
+    AssetCheckAccept,
+    AssetCheckAcceptDtl,
+    PosChange,
+    PosChangeDt,
     StockDetail,
     StockIn,
     StockInDetail,
@@ -261,3 +265,114 @@ class StockDetailRepository:
             record.itemqty = current_qty + qty_delta
             record.upddate = now
         return record
+
+
+# ---------------------------------------------------------------------------
+# 资产盘点
+# ---------------------------------------------------------------------------
+
+
+class AssetCheckRepository:
+    """资产盘点主表（twh19_asset_c_a）数据访问。"""
+
+    @staticmethod
+    def get_by_id(opbillid: str) -> AssetCheckAccept | None:
+        return db.session.get(AssetCheckAccept, opbillid)
+
+    @staticmethod
+    def list_all(
+        page: int = 1, per_page: int = 20, useflg: str | None = "1"
+    ) -> tuple[list[AssetCheckAccept], int]:
+        query = db.session.query(AssetCheckAccept)
+        if useflg is not None:
+            query = query.filter(AssetCheckAccept.useflg == useflg)
+        total: int = query.count()
+        items: list[AssetCheckAccept] = (
+            query.order_by(desc(AssetCheckAccept.gendate))
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+        return items, total
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> AssetCheckAccept:
+        now = datetime.now(UTC)
+        record = AssetCheckAccept(
+            gendate=now, opercd=creator, useflg="1", auditflg="0", **data
+        )
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: AssetCheckAccept, data: dict[str, Any]) -> AssetCheckAccept:
+        for key, value in data.items():
+            setattr(record, key, value)
+        return record
+
+    @staticmethod
+    def audit(record: AssetCheckAccept, auditor: str) -> AssetCheckAccept:
+        record.auditflg = "1"
+        record.auditman = auditor
+        record.auditdate = datetime.now(UTC)
+        return record
+
+    @staticmethod
+    def add_detail(
+        opbillid: str, data: dict[str, Any]
+    ) -> AssetCheckAcceptDtl:
+        detail = AssetCheckAcceptDtl(opbillid=opbillid, useflg="1", **data)
+        db.session.add(detail)
+        return detail
+
+
+# ---------------------------------------------------------------------------
+# POS设备变更
+# ---------------------------------------------------------------------------
+
+
+class PosChangeRepository:
+    """POS设备变更（twh21_pos_change / twh22_pos_change_dt）数据访问。"""
+
+    @staticmethod
+    def get_by_id(pk: int) -> PosChange | None:
+        return db.session.get(PosChange, pk)
+
+    @staticmethod
+    def list_all(
+        page: int = 1, per_page: int = 20, useflg: str | None = "1"
+    ) -> tuple[list[PosChange], int]:
+        query = db.session.query(PosChange)
+        if useflg is not None:
+            query = query.filter(PosChange.useflg == useflg)
+        total: int = query.count()
+        items: list[PosChange] = (
+            query.order_by(desc(PosChange.upddate))
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+        return items, total
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> PosChange:
+        now = datetime.now(UTC)
+        record = PosChange(upddate=now, opercd=creator, useflg="1", **data)
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: PosChange, data: dict[str, Any]) -> PosChange:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.upddate = datetime.now(UTC)
+        return record
+
+    @staticmethod
+    def add_detail(operation_id: int, data: dict[str, Any]) -> PosChangeDt:
+        now = datetime.now(UTC)
+        detail = PosChangeDt(
+            operation_id=operation_id, upddate=now, useflg="1", **data
+        )
+        db.session.add(detail)
+        return detail
