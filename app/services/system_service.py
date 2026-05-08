@@ -51,3 +51,17 @@ class SystemService:
         """获取指定系统参数。"""
         parm = self._repo.get_sysparm_by_cd(parm_cd)
         return parm.to_dict() if parm else None
+
+    # ——— 基础数据 ———
+
+    def list_items(self, page: int = 1, per_page: int = 20) -> list[dict[str, Any]]:
+        return [i.to_dict() for i in self._repo.get_items(page, per_page)]
+
+    def list_customers(self, page: int = 1, per_page: int = 20) -> list[dict[str, Any]]:
+        return [c.to_dict() for c in self._repo.get_customers(page, per_page)]
+
+    def list_eid(self, page: int = 1, per_page: int = 20) -> list[dict[str, Any]]:
+        return [e.to_dict() for e in self._repo.get_eid_list(page, per_page)]
+
+    def list_assets(self, page: int = 1, per_page: int = 20) -> list[dict[str, Any]]:
+        return [a.to_dict() for a in self._repo.get_cust_pos_rl(page, per_page)]

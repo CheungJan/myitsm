@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.extensions import db
+from app.models.master import CustPosRl, Customer, Eid, Item
 from app.models.system import Department, Group, Menu, SysParm, User, UserGroup
 
 
@@ -56,3 +57,25 @@ class SystemRepository:
     def get_sysparm_by_cd(parm_cd: str) -> SysParm | None:
         """按编码获取系统参数。"""
         return db.session.get(SysParm, parm_cd)
+
+    # ——— 基础数据查询 ———
+
+    @staticmethod
+    def get_items(page: int = 1, per_page: int = 20) -> list[Item]:
+        q = db.session.query(Item).order_by(Item.item_cd)
+        return q.offset((page - 1) * per_page).limit(per_page).all()
+
+    @staticmethod
+    def get_customers(page: int = 1, per_page: int = 20) -> list[Customer]:
+        q = db.session.query(Customer).order_by(Customer.cust_cd)
+        return q.offset((page - 1) * per_page).limit(per_page).all()
+
+    @staticmethod
+    def get_eid_list(page: int = 1, per_page: int = 20) -> list[Eid]:
+        q = db.session.query(Eid).order_by(Eid.eid)
+        return q.offset((page - 1) * per_page).limit(per_page).all()
+
+    @staticmethod
+    def get_cust_pos_rl(page: int = 1, per_page: int = 20) -> list[CustPosRl]:
+        q = db.session.query(CustPosRl).order_by(CustPosRl.eid)
+        return q.offset((page - 1) * per_page).limit(per_page).all()

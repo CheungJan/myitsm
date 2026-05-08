@@ -95,3 +95,43 @@ def get_sysparm(parm_cd: str):  # type: ignore[no-untyped-def]
     if parm is None:
         return error_response(message="参数不存在", code=404)
     return success_response(data=parm)
+
+
+@system_bp.get("/items")
+@login_required
+def list_items():  # type: ignore[no-untyped-def]
+    """物料列表。"""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    items = _service.list_items(page=page, per_page=per_page)
+    return success_response(data=items)
+
+
+@system_bp.get("/customers")
+@login_required
+def list_customers():  # type: ignore[no-untyped-def]
+    """客户列表（tmm22_customers）。"""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    customers = _service.list_customers(page=page, per_page=per_page)
+    return success_response(data=customers)
+
+
+@system_bp.get("/eid")
+@login_required
+def list_eid():  # type: ignore[no-untyped-def]
+    """EID 设备列表。"""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    eids = _service.list_eid(page=page, per_page=per_page)
+    return success_response(data=eids)
+
+
+@system_bp.get("/assets")
+@login_required
+def list_assets():  # type: ignore[no-untyped-def]
+    """资产台账列表（tmm35_cust_pos_rl）。"""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    assets = _service.list_assets(page=page, per_page=per_page)
+    return success_response(data=assets)
