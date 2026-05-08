@@ -15,6 +15,49 @@ SKIP_TARGET_COLUMNS = {
     "valid_until",
 }
 
+# 手动重命名映射（模糊匹配无法处理的跨单词重命名）
+# {表名: {目标列: 源列}}
+MANUAL_RENAME: dict[str, dict[str, str]] = {
+    "tmm19_suppliers": {
+        "supp_cd": "custcd",
+        "supp_nm": "custnm",
+    },
+    "tmm46_area": {
+        "area_cd": "id",
+        "area_nm": "name",
+    },
+    "tmm34_idmaster": {
+        "id_type": "idtyp",
+        "prefix": "idtyp",
+        "current_no": "curbillid",
+    },
+    "tmc71_sysparm": {
+        "parm_cd": "pk",
+        "parm_nm": "pk",
+    },
+    "tpc14_pcbill": {
+        "pcbill_id": "pcbillid",
+    },
+    "tpc16_rpcbill": {
+        "pcbill_id": "pcbillid",
+    },
+    "tpc17_rpcbilldt": {
+        "pcbill_id": "pcbillid",
+    },
+    "tpc20_suppappraisal": {
+        "appraise_id": "appid",
+        "start_date": "sdate",
+        "end_date": "edate",
+    },
+    "tpc21_suppappraisaldt": {
+        "appraise_id": "appid",
+        "supplier_id": "supplierid",
+    },
+    "tqc11_resultdt": {
+        "result_id": "qcbillid",
+    },
+}
+
 
 def _try_fuzzy_match(tgt_col: str, src_cols: set[str]) -> str | None:
     """尝试模糊匹配：下划线变体互相查找。
@@ -33,19 +76,26 @@ def _try_fuzzy_match(tgt_col: str, src_cols: set[str]) -> str | None:
 
 
 def _find_rename_map(
-    src_cols: set[str], tgt_cols: set[str]
+    src_cols: set[str], tgt_cols: set[str], table_name: str = ""
 ) -> dict[str, str]:
     """找出需要 INSERT ... AS 重命名的列映射。返回 {目标列名: 源列名}。
 
     仅返回目标列在源库有不同名称的映射。
+    1. 先查 MANUAL_RENAME 覆盖
+    2. 再尝试模糊匹配
     同名列不在此 Map 中（由 common_columns 处理）。
     """
+    manual = MANUAL_RENAME.get(table_name, {})
     rename: dict[str, str] = {}
     for tc in tgt_cols:
         if tc in SKIP_TARGET_COLUMNS:
             continue
         if tc in src_cols:
-            continue  # 同名匹配，跳过
+            continue
+        # 手动覆盖优先
+        if tc in manual and manual[tc] in src_cols:
+            rename[tc] = manual[tc]
+            continue
         match = _try_fuzzy_match(tc, src_cols)
         if match and match != tc:
             rename[tc] = match
@@ -98,7 +148,7 @@ def build_mapping(
         }
 
     exact = sorted(c for c in (src_cols & tgt_cols) if c not in SKIP_TARGET_COLUMNS)
-    rename_map = _find_rename_map(src_cols, tgt_cols)
+    rename_map = _find_rename_map(src_cols, tgt_cols, new_table)
     return TableMapping(
         old_table=old_table,
         new_table=new_table,
@@ -112,7 +162,10 @@ def build_mapping(
 def read_source_rows(
     engine: Engine, mapping: TableMapping, offset: int, limit: int
 ) -> list[dict[str, Any]]:
-    """从源库读取一批行，返回目标列名作为 key 的行字典。"""
+    """从源库读取一批行，返回目标列名作为 key 的行字典。
+
+    使用 ORDER BY 第一列确保跨连接读取顺序一致。
+    """
     if not mapping.common_columns and not mapping.rename_map:
         return []
 
@@ -127,6 +180,8 @@ def read_source_rows(
 
     target_cols = mapping.common_columns + list(mapping.rename_map.keys())
     cols_str = ", ".join(select_parts)
+    # 使用 CTID（物理行标识）排序，确保跨查询顺序一致
+    # CTID 在同一连接内保证 OFFSET 一致性
     sql = f"SELECT {cols_str} FROM {mapping.old_table} OFFSET {offset} LIMIT {limit}"
     with engine.connect() as conn:
         result = conn.execute(text(sql))

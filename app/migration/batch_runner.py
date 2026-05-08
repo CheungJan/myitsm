@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from app.migration.config import MigrationConfig
 from app.migration.field_mapper import (
@@ -118,8 +118,8 @@ class BatchRunner:
             self.connector.target,
             table_name, table_name, batch,
         )
-        if not mapping.common_columns:
-            logger.info("  无公共列，跳过")
+        if not mapping.common_columns and not mapping.rename_map:
+            logger.info("  无映射列，跳过")
             self._stats[table_name] = 0
             return
 
@@ -128,19 +128,22 @@ class BatchRunner:
         # 3. 清空目标表
         truncate_table(self.connector.target, table_name)
 
-        # 4. 分批读取并写入
-        offset = 0
+        # 4. 使用同一个源库连接分批读取（保证 OFFSET 一致性）
+        from app.migration.field_mapper import write_target_rows as write_rows
+
         total = 0
-        while offset < src_count:
-            rows = read_source_rows(
-                self.connector.source, mapping, offset, self.config.batch_size
-            )
-            if not rows:
-                break
-            inserted = write_target_rows(self.connector.target, mapping, rows)
-            total += inserted
-            offset += self.config.batch_size
-            logger.info("  进度: %d / %d", min(offset, src_count), src_count)
+        offset = 0
+        batch_size = self.config.batch_size
+
+        with self.connector.source.connect() as src_conn:
+            while offset < src_count:
+                rows = _read_batch_from_conn(src_conn, mapping, offset, batch_size)
+                if not rows:
+                    break
+                inserted = write_rows(self.connector.target, mapping, rows)
+                total += inserted
+                offset += batch_size
+                logger.info("  进度: %d / %d", min(offset, src_count), src_count)
 
         # 5. 同步序列
         sync_sequence(self.connector.target, table_name)
@@ -150,3 +153,23 @@ class BatchRunner:
 
     def dispose(self) -> None:
         self.connector.dispose()
+
+
+def _read_batch_from_conn(
+    conn, mapping, offset: int, limit: int
+) -> list[dict[str, object]]:
+    """从已打开的源库连接读取一批行。"""
+    if not mapping.common_columns and not mapping.rename_map:
+        return []
+
+    select_parts: list[str] = []
+    for col in mapping.common_columns:
+        select_parts.append(col)
+    for tgt_col, src_col in mapping.rename_map.items():
+        select_parts.append(f"{src_col} AS {tgt_col}")
+
+    target_cols = mapping.common_columns + list(mapping.rename_map.keys())
+    cols_str = ", ".join(select_parts)
+    sql = f"SELECT {cols_str} FROM {mapping.old_table} OFFSET {offset} LIMIT {limit}"
+    result = conn.execute(text(sql))
+    return [dict(zip(target_cols, row)) for row in result.fetchall()]
