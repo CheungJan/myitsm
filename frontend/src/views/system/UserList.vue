@@ -3,25 +3,24 @@
         <el-card>
             <template #header>
                 <div class="page-header">
-                    <span>用户管理（共 {{ users.length }} 人）</span>
-                    <el-button type="primary" size="small">新增用户</el-button>
+                    <span>用户管理（共 {{ total }} 条）</span>
+                    <div class="filter-bar">
+                        <el-input v-model="search" placeholder="搜索用户名" clearable style="width:180px" @keyup.enter="loadData" />
+                        <el-button type="primary" size="small" style="margin-left:8px" @click="loadData">查询</el-button>
+                    </div>
                 </div>
             </template>
             <el-table :data="users" v-loading="loading" stripe>
-                <el-table-column prop="user_cd" label="用户编码" width="120" />
-                <el-table-column prop="user_nm" label="用户名" width="120" />
+                <el-table-column prop="user_cd" label="编码" width="100" />
+                <el-table-column prop="user_nm" label="姓名" width="120" />
                 <el-table-column prop="dept_cd" label="部门" width="100" />
-                <el-table-column prop="phone" label="电话" width="140" />
-                <el-table-column prop="email" label="邮箱" width="180" />
+                <el-table-column prop="phone" label="电话" width="130" />
+                <el-table-column prop="email" label="邮箱" width="160" />
                 <el-table-column prop="status" label="状态" width="80" />
-                <el-table-column prop="created_at" label="创建时间" min-width="160" />
-                <el-table-column label="操作" width="150" fixed="right">
-                    <template #default>
-                        <el-button type="primary" link size="small">编辑</el-button>
-                        <el-button type="danger" link size="small">禁用</el-button>
-                    </template>
-                </el-table-column>
+                <el-table-column prop="created_at" label="创建时间" min-width="150" />
             </el-table>
+            <el-pagination v-model:current-page="page" :total="total" :page-size="20"
+                layout="total, prev, pager, next" @current-change="loadData" style="margin-top:16px;justify-content:flex-end" />
         </el-card>
     </div>
 </template>
@@ -31,20 +30,28 @@ import { ref, onMounted } from 'vue'
 import { fetchUsers } from '@/api/system'
 
 const users = ref<Record<string,unknown>[]>([])
-const loading = ref(false)
+const loading = ref(false); const search = ref(''); const page = ref(1); const total = ref(0)
 
-onMounted(async () => {
+onMounted(() => loadData())
+
+async function loadData() {
     loading.value = true
     try {
         const res = await fetchUsers()
-        users.value = (res.data || []) as never[]
-    } finally {
-        loading.value = false
-    }
-})
+        let list = (res.data || []) as Record<string,unknown>[]
+        if (search.value) {
+            const q = search.value.toLowerCase()
+            list = list.filter(r => (r as Record<string,string>).user_nm?.toLowerCase().includes(q))
+        }
+        total.value = list.length
+        const start = (page.value - 1) * 20
+        users.value = list.slice(start, start + 20)
+    } finally { loading.value = false }
+}
 </script>
 
 <style lang="scss" scoped>
 .page { padding: 16px; }
 .page-header { display: flex; justify-content: space-between; align-items: center; }
+.filter-bar { display: flex; align-items: center; }
 </style>
