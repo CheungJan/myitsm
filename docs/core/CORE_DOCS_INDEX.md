@@ -31,11 +31,11 @@
 
 6. **变更日志**（全部版本变更记录，遵循 Keep a Changelog 格式）
    - `docs/core/CHANGELOG.md`
-   - 版本：v1.1 | 更新：2026-05-07（v0.6.0 事务查询与报表模块）
+   - 版本：v1.1 | 更新：2026-05-08（v0.7.0 数据迁移完成 + 资产盘点/POS变更模块）
 
 ## B 类：技术参考文档（重构基线）
 
-7. **API 接口文档**（19个蓝图195个端点完整说明）
+7. **API 接口文档**（20个蓝图，含本次补全的资产盘点+POS变更端点）
    - `docs/core/API接口文档.md`
    - 版本：v1.1 | 创建：2026-04-27
 
@@ -43,9 +43,9 @@
    - `docs/core/数据库ER关系文档.md`
    - 版本：v1.0 | 创建：2026-04-27
 
-9. **测试策略文档**（128个测试用例覆盖分析、命名约定、质量门禁）
+9. **测试策略文档**（145+测试用例覆盖分析、命名约定、质量门禁）
    - `docs/core/测试策略文档.md`
-   - 版本：v1.0 | 创建：2026-04-27
+   - 版本：v1.0 | 创建：2026-04-27 | 更新：2026-05-08（新增迁移测试）
 
 10. **重构优化需求基线**（P0-P4 优化方案）
     - `docs/core/PB_TO_PYTHON_OPTIMIZATION_REQUIREMENTS.md`
@@ -59,25 +59,40 @@
 13. **PB SQL 映射主清单**（关键 SQL 语句迁移映射）
     - `docs/core/PB_TO_PYTHON_SQL_MAPPING.csv`
 
-## C 类：交付与验收文档
+## C 类：数据迁移文档（已完成）
 
-14. **数据迁移方案文档**（Oracle→PostgreSQL 迁移策略、分批导入、校验方案）
-    - `docs/core/数据迁移方案文档.md`
-    - 版本：v1.0 | 创建：2026-04-27
+14. **数据迁移执行方案 v2**（最终执行版，含实际差异记录）
+    - `docs/core/数据迁移执行方案_v2.md`
+    - 版本：v2.0 | 创建：2026-05-08 | 状态：✅ 已执行（99.6%）
 
-15. **迁移验收清单（DoD）**
+15. **数据迁移问题解决报告**（7 大问题修复记录 + Oracle 核查与导出指南）
+    - `docs/core/数据迁移问题解决报告.md`
+    - 版本：v1.0 | 创建：2026-05-08
+
+16. **数据迁移实施计划**（writing-plans skill 生成，含实际执行差异）
+    - `docs/superpowers/plans/2026-05-08-ortopbitsmdb-to-myitsm-migration.md`
+    - 版本：v1.0 | 创建：2026-05-08 | 状态：✅ 已执行
+
+17. **迁移工具代码**（双 PG 连接器 + 动态字段映射 + 分批执行引擎）
+    - `app/migration/`（config/connector/field_mapper/batch_runner/special_handlers）
+    - `migrate_data.py`（CLI 入口）
+    - `tests/test_migration_*.py`（3 个测试文件，20 单元 + 14 校验）
+
+## D 类：交付与验收文档
+
+18. **迁移验收清单（DoD）**
     - `docs/core/PB_TO_PYTHON_DOD_CHECKLIST.md`
 
-16. **发布与回滚清单**
+19. **发布与回滚清单**
     - `docs/core/PB_TO_PYTHON_RELEASE_ROLLBACK_CHECKLIST.md`
 
-17. **PB→Python 重构执行模版**（通用方法论，可供未来项目复用）
+20. **PB→Python 重构执行模版**（通用方法论，可供未来项目复用）
     - `docs/core/PB_TO_PYTHON_MIGRATION_TEMPLATE.md`
     - 版本：v1.0 | 创建：2026-05-07
 
-## D 类：项目入口文档
+## E 类：项目入口文档
 
-17. **README.md**（开发环境搭建指南、项目结构、快速开始）
+21. **README.md**（开发环境搭建指南、项目结构、快速开始）
     - `README.md`（位于项目根目录）
     - 版本：v1.0 | 创建：2026-04-27
 
@@ -104,13 +119,14 @@ myitsm/
 ├── AGENTS.md                 # 项目规则与约定
 ├── README.md                 # 开发环境搭建指南
 ├── app/                      # 重构后的 Python 后端代码（Flask）
-│   ├── api/                  # API 蓝图层（18个模块）
+│   ├── api/                  # API 蓝图层（20个模块）
 │   ├── models/               # SQLAlchemy 数据模型（138个）
 │   ├── services/             # 业务逻辑层
 │   ├── repositories/         # 数据访问层
 │   ├── schemas/              # Pydantic 请求/响应校验
+│   ├── migration/            # 数据迁移工具（双PG连接器+动态映射+分批执行）
 │   └── extensions/           # Flask 扩展初始化
-├── tests/                    # 测试用例（128个）
+├── tests/                    # 测试用例（145+）
 ├── migrations/               # Flask-Migrate 数据库迁移
 ├── docs/
 │   ├── core/                 # 核心文档（本索引所在目录）
