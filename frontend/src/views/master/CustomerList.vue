@@ -76,7 +76,7 @@ async function loadData() {
     try {
         const params: Record<string,string> = { page: String(page.value), per_page: '20' }
         const res = await fetchCustomers(params)
-        let list = ((res.data as { items: Record<string,unknown>[] }).items || []) as Record<string,unknown>[]
+        let list = ((res.data as { items: Record<string,unknown>[] }).items || []) as never[]
         if (classFilter.value) list = list.filter(r => (r as Record<string,string>).class_cd === classFilter.value)
         if (search.value) {
             const q = search.value.toLowerCase()

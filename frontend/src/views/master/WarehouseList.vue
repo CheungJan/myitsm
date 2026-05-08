@@ -40,7 +40,7 @@ async function loadData() {
     loading.value = true
     try {
         const res = await fetchWarehouses()
-        const list = (res.data || []) as Record<string,unknown>[]
+        const list = (res.data || []) as never[]
         total.value = list.length
         warehouses.value = list.slice((page.value-1)*20, page.value*20)
     } finally { loading.value = false }

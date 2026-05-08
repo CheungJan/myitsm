@@ -38,7 +38,7 @@ async function loadData() {
     loading.value = true
     try {
         const res = await fetchUsers()
-        let list = (res.data || []) as Record<string,unknown>[]
+        let list = (res.data || []) as never[]
         if (search.value) {
             const q = search.value.toLowerCase()
             list = list.filter(r => (r as Record<string,string>).user_nm?.toLowerCase().includes(q))
