@@ -65,17 +65,20 @@ const dialogVisible = ref(false); const editing = ref<Record<string,string>|null
 const form = reactive({ cust_cd: '', cust_nm: '', class_cd: '', busi_typ: '', phone_no: '', contactor: '', address: '' })
 
 onMounted(async () => {
-    await loadData()
-    // 从数据中提取分类选项
-    const all = customers.value.map(r => (r as Record<string,string>).class_cd).filter(Boolean)
+    // 先拉全量提取分类选项
+    const res = await fetchCustomers({ page: '1', per_page: '100000' })
+    const all = ((res.data as { items: Record<string,unknown>[] }).items || []).map(r => (r as Record<string,string>).class_cd).filter(Boolean)
     classOptions.value = [...new Set(all)].sort()
+    await loadData()
 })
 
 async function loadData() {
     loading.value = true
     try {
-        const params: Record<string,string> = { page: String(page.value), per_page: '20' }
-        const res = await fetchCustomers(params)
+        const hasFilter = classFilter.value || search.value
+        // 有筛选条件时拉全量做客户端筛选；无筛选时用后端分页
+        const perPage = hasFilter ? 100000 : 20
+        const res = await fetchCustomers({ page: '1', per_page: String(perPage) })
         let list = ((res.data as { items: Record<string,unknown>[] }).items || []) as never[]
         if (classFilter.value) list = list.filter(r => (r as Record<string,string>).class_cd === classFilter.value)
         if (search.value) {
@@ -85,8 +88,12 @@ async function loadData() {
                 return (d.cust_cd||'').toLowerCase().includes(q) || (d.cust_nm||'').toLowerCase().includes(q)
             })
         }
-        customers.value = list
         total.value = list.length
+        if (hasFilter) {
+            customers.value = list.slice((page.value-1)*20, page.value*20)
+        } else {
+            customers.value = list
+        }
     } finally { loading.value = false }
 }
 
