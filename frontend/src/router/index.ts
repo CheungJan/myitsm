@@ -20,6 +20,30 @@ const router = createRouter({
                     name: 'Dashboard',
                     component: () => import('@/views/dashboard/DashboardView.vue'),
                     meta: { title: '首页' }
+                },
+                {
+                    path: 'system/users',
+                    name: 'Users',
+                    component: () => import('@/views/system/UserList.vue'),
+                    meta: { title: '用户管理' }
+                },
+                {
+                    path: 'system/departments',
+                    name: 'Departments',
+                    component: () => import('@/views/system/DepartmentList.vue'),
+                    meta: { title: '部门管理' }
+                },
+                {
+                    path: 'system/groups',
+                    name: 'Groups',
+                    component: () => import('@/views/system/GroupList.vue'),
+                    meta: { title: '用户组管理' }
+                },
+                {
+                    path: 'system/params',
+                    name: 'SysParams',
+                    component: () => import('@/views/system/ParamsList.vue'),
+                    meta: { title: '系统参数' }
                 }
             ]
         },
