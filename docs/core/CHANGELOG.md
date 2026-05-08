@@ -4,6 +4,26 @@
 
 ---
 
+## [v0.6.0] — 2026-05-07 — 阶段6 事务查询与报表模块
+
+### 新增
+- **全模块单据统一查询**：跨 9 种单据类型 UNION ALL 联合查询，支持按类型/门店/状态/日期/关键字筛选
+- **错账更正（红蓝单冲销）**：原单标记冲销（redflg）+ 审计日志记录
+- **进销存汇总**：按物料+仓库聚合期初/入库/出库/期末
+- **库存报表**（3端点）：库存快照 + 库存预警清单 + 库存变动流水
+- **EID 追踪报表**（2端点）：EID 全生命周期追踪 + 单个 EID 变更追溯明细
+- **销售报表**（2端点）：销售状态汇总统计 + 未结单据清单
+- **BOM 结构树报表**
+
+### 文件
+- `app/api/transactions.py` — 事务查询蓝图（4端点）
+- `app/api/reports.py` — 报表蓝图（8端点）
+- `app/services/transaction_service.py` / `report_service.py`
+- `app/repositories/transaction_repository.py` / `report_repository.py`
+- `app/schemas/transaction.py` / `report.py`
+
+---
+
 ## [v0.5.0] — 2026-04-27 — 阶段5 Tier-2/3 完整实现
 
 **PR**: [#6](https://github.com/CheungJan/myitsm/pull/6)

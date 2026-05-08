@@ -31,13 +31,13 @@
 
 6. **变更日志**（全部版本变更记录，遵循 Keep a Changelog 格式）
    - `docs/core/CHANGELOG.md`
-   - 版本：v1.0 | 创建：2026-04-27
+   - 版本：v1.1 | 更新：2026-05-07（v0.6.0 事务查询与报表模块）
 
 ## B 类：技术参考文档（重构基线）
 
-7. **API 接口文档**（18个蓝图183个端点完整说明）
+7. **API 接口文档**（19个蓝图195个端点完整说明）
    - `docs/core/API接口文档.md`
-   - 版本：v1.0 | 创建：2026-04-27
+   - 版本：v1.1 | 创建：2026-04-27
 
 8. **数据库 ER 关系文档**（138个模型跨域关联与 Mermaid ER 图）
    - `docs/core/数据库ER关系文档.md`
@@ -70,6 +70,10 @@
 
 16. **发布与回滚清单**
     - `docs/core/PB_TO_PYTHON_RELEASE_ROLLBACK_CHECKLIST.md`
+
+17. **PB→Python 重构执行模版**（通用方法论，可供未来项目复用）
+    - `docs/core/PB_TO_PYTHON_MIGRATION_TEMPLATE.md`
+    - 版本：v1.0 | 创建：2026-05-07
 
 ## D 类：项目入口文档
 

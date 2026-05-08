@@ -60,9 +60,11 @@ def _register_blueprints(app: Flask) -> None:
     from app.api.notification import notification_bp
     from app.api.portal import portal_bp
     from app.api.procurement import procurement_bp
+    from app.api.reports import report_bp
     from app.api.sales import sales_bp
     from app.api.sla import sla_bp
     from app.api.system import system_bp
+    from app.api.transactions import transaction_bp
     from app.api.warehouse import warehouse_bp
 
     app.register_blueprint(health_bp, url_prefix="/api/v1")
@@ -85,6 +87,9 @@ def _register_blueprints(app: Flask) -> None:
     # Tier-3 扩展
     app.register_blueprint(mes_bp, url_prefix="/api/v1/mes")
     app.register_blueprint(iot_bp, url_prefix="/api/v1/iot")
+    # 事务查询与报表
+    app.register_blueprint(transaction_bp, url_prefix="/api/v1/transactions")
+    app.register_blueprint(report_bp, url_prefix="/api/v1/reports")
 
 
 def _make_error_body(code: int, message: str) -> dict[str, Any]:
