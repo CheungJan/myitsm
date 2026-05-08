@@ -1,10 +1,31 @@
 # myitsm 前端开发方案（Vue 3 + Element Plus）
 
-> **Status**: 待确认 | **融合**: frontend-vue-development skill + 项目整体实施计划 §5
+> **Status**: 待确认 | **融合**: frontend-vue-development skill + 项目整体实施计划 §5 + 愿景全覆盖
 
-**Goal**: 从零搭建 Vue 3 + Element Plus 管理后台，覆盖 20 个 API 蓝图 205 个端点，含登录认证、系统管理、ITSM 工单、仓储、采购、销售、合同、财务、报表等 18 个业务模块。
+**Goal**: 从零搭建 Vue 3 + Element Plus 管理后台，覆盖全部 35 个子模块，205 个 API 端点。按"地基→业务主链→配套增强→打磨上线"四阶段推进，F2 结束即可端到端跑通核心业务流。
 
 **Tech Stack**: Vue 3.4+ | Vite | Element Plus | Pinia | Vue Router 4 | Axios | SCSS | TypeScript
+
+---
+
+## 核心业务流 vs 前端阶段映射
+
+```
+基础数据(型号/BOM/EID)              ──→ F1 地基
+    ↓
+预计划 → 话务台(客户确认)           ──→ F2 业务主链
+    ↓
+资产决策:
+  ├─ 有库存 → 仓库出库              ──→ F2
+  ├─ 有配件 → MES生产               ──→ F3
+  └─ 无库存 → 采购 → 质检 → 入库    ──→ F2
+    ↓
+实施执行 → 设备流转                ──→ F2 (ITSM)
+    ↓
+ITSM运维(维护/保养/翻新/变更/回收)  ──→ F2
+    ↓
+配套: 押金/资产/考核/IoT/报表       ──→ F3
+```
 
 ---
 
@@ -12,348 +33,253 @@
 
 ```
 frontend/
-├── index.html
-├── package.json
-├── vite.config.ts
-├── tsconfig.json
+├── index.html / package.json / vite.config.ts / tsconfig.json
 ├── src/
-│   ├── main.ts
-│   ├── App.vue
-│   ├── router/
-│   │   └── index.ts               # 路由配置 + 守卫
+│   ├── main.ts / App.vue
+│   ├── router/index.ts             # 路由 + beforeEach 守卫
 │   ├── stores/
-│   │   ├── auth.ts                # 认证状态（Pinia）
-│   │   ├── app.ts                 # 全局（侧边栏+标签页）
-│   │   └── tabs.ts                # 多标签页状态
+│   │   ├── auth.ts                 # JWT + 用户信息 + 权限列表
+│   │   ├── app.ts                  # 侧边栏折叠 + 语言
+│   │   └── tabs.ts                 # 多标签页状态
 │   ├── api/
-│   │   ├── request.ts             # Axios 封装（JWT+错误拦截）
-│   │   └── *.ts                   # 按蓝图拆分（auth/system/itsm/warehouse/...）
-│   ├── layouts/
-│   │   └── MainLayout.vue         # 主布局（侧边栏+标签页+顶栏+内容区）
-│   ├── views/                     # 按模块分目录
+│   │   ├── request.ts              # Axios（JWT 注入 + 统一拦截 + 401跳转）
+│   │   ├── auth.ts / system.ts     # 地基
+│   │   ├── itsm.ts / warehouse.ts  # 业务主链
+│   │   ├── procurement.ts / sales.ts / qc.ts
+│   │   ├── deposit.ts / billing.ts / finance.ts / portal.ts
+│   │   ├── mes.ts / iot.ts / sla.ts / attendance.ts
+│   │   └── transaction.ts / report.ts
+│   ├── layouts/MainLayout.vue      # 侧边栏 + 标签页 + 顶栏 + 内容区
+│   ├── views/                      # 按阶段分目录
 │   │   ├── login/
-│   │   ├── dashboard/
-│   │   ├── system/                # 用户/部门/角色/菜单
-│   │   ├── itsm/                  # 7类ITSM工单
-│   │   ├── warehouse/             # 仓库/出入库/盘点/POS变更
-│   │   ├── procurement/           # 采购
-│   │   ├── sales/                 # 销售
-│   │   ├── contract/              # 合同+发票
-│   │   ├── deposit/               # 押金
-│   │   ├── billing/               # 结算
-│   │   ├── finance/               # 财务
-│   │   ├── portal/                # 门户
-│   │   ├── attendance/            # 考勤
-│   │   ├── inventory/             # 预警+价格
-│   │   ├── sla/                   # SLA
-│   │   ├── notification/          # 通知
-│   │   ├── mes/                   # MES
-│   │   ├── iot/                   # IoT
-│   │   ├── transactions/          # 事务查询
-│   │   └── reports/               # 报表
+│   │   ├── system/                 # F1: 用户/部门/角色/菜单
+│   │   ├── master/                 # F1: 客户/资产/EID/物料BOM
+│   │   ├── itsm/                   # F2: 10类工单
+│   │   ├── warehouse/              # F2: 仓库/出入库/盘点/POS
+│   │   ├── procurement/            # F2: 采购
+│   │   ├── sales/                  # F2: 预计划/销售/话务台
+│   │   ├── qc/                     # F2: 质检
+│   │   ├── deposit/                # F3: 押金
+│   │   ├── billing/                # F3: 结算
+│   │   ├── finance/                # F3: 财务
+│   │   ├── portal/                 # F3: 门户
+│   │   ├── sla/                    # F3: SLA
+│   │   ├── notification/           # F3: 通知
+│   │   ├── mes/                    # F3: MES
+│   │   ├── iot/                    # F3: IoT
+│   │   ├── attendance/             # F3: 考勤
+│   │   ├── inventory/              # F3: 预警/价格
+│   │   └── reports/                # F3: 报表
 │   ├── components/
-│   │   ├── AppMenu.vue            # 动态菜单（权限过滤）
-│   │   ├── AppTabs.vue            # 多标签页导航
-│   │   ├── PageHeader.vue         # 页面标题+面包屑
-│   │   ├── StatusTransition.vue   # ITSM 状态流转（可复用）
-│   │   ├── GlobalSearch.vue       # 全局搜索
-│   │   └── common/                # 通用组件（表格/表单/搜索/导出）
-│   ├── directives/
-│   │   └── permission.ts          # v-permission 按钮级权限指令
-│   └── styles/
-│       ├── variables.scss
-│       └── global.scss
+│   │   ├── AppMenu.vue             # 动态菜单（权限过滤）
+│   │   ├── AppTabs.vue             # 多标签页导航
+│   │   ├── PageHeader.vue          # 面包屑
+│   │   ├── StatusTransition.vue    # ITSM 状态流转（可复用）
+│   │   ├── GlobalSearch.vue        # 全局搜索 (Ctrl+K)
+│   │   └── common/                 # TablePage / FormDialog / AuditButton / ExportButton
+│   ├── directives/permission.ts    # v-permission 按钮级权限
+│   └── styles/variables.scss / global.scss
 ```
 
 ---
 
-## 阶段 F1：核心框架 + P0 页面（4-6 周）
+## 阶段 F1：地基（5-6 周）
 
-### F1.1 项目脚手架（1 周）
+> 目标：登录可用，权限就绪，基础数据全部就位。F1 结束即可独立演示系统管理 + 基础数据 CRUD。
+
+### F1.1 脚手架 + 布局 + 登录（1 周）
 
 ```bash
 npm create vite@latest frontend -- --template vue-ts
-cd frontend
 npm install element-plus pinia vue-router axios
 npm install -D sass @types/node
 ```
 
-### F1.2 布局框架（与 F1.1 并行）
+- `api/request.ts`：Axios 封装（JWT 注入 → 401 跳转 → `{code,message,data}` 拦截）
+- `stores/auth.ts`：token + userInfo + permissions
+- `layouts/MainLayout.vue`：侧边栏(AppMenu) + 标签页(AppTabs) + 面包屑 + 顶栏(用户/退出)
+- `router/index.ts`：`beforeEach` 守卫（无 token → login，已登录 → home）
+- `views/login/`：用户名密码 → `POST /login` → 存 token → 跳转
 
-**主布局**（侧边栏 + 标签页 + 面包屑 + 顶栏）：
+### F1.2 权限控制（与 F1.1 并行）
 
-```
-┌─────────────────────────────────────┐
-│ 🏷 日常维护 / 新机开通 / 设备变更    │ ← 标签页导航 (AppTabs)
-├──────────┬──────────────────────────┤
-│ 📋 工单   │  ┌───────────────────┐  │
-│  - 日常   │  │  面包屑: 首页>ITSM │  │
-│  - 开通   │  ├───────────────────┤  │
-│  - 翻新   │  │                   │  │
-│ 📦 仓储   │  │   <router-view>   │  │
-│ 💰 采购   │  │                   │  │
-│ ...       │  │                   │  │
-└──────────┴──────────────────────────┘
-```
+- **菜单级**：`GET /menus` 获取菜单树 → `AppMenu` 递归渲染，无权限节点不展示
+- **按钮级**：`v-permission` 指令，无权限按钮自动移除
 
-### F1.3 登录认证 + 路由守卫
+### F1.3 系统管理（1 周）
 
-- 登录页 → `POST /login` → token 存入 Pinia + localStorage
-- `router.beforeEach` 守卫：无 token → 跳转 `/login`
-- Axios 响应拦截：401 → 自动退出 + 跳转登录
+| 页面 | 路由 | API |
+|------|------|-----|
+| 用户管理 | `/system/users` | `/users` CRUD |
+| 部门管理 | `/system/departments` | `/departments` 树形 |
+| 用户组管理 | `/system/groups` | `/groups` |
+| 菜单/权限配置 | `/system/menus` | `/menus` 权限编辑 |
+| 系统参数 | `/system/params` | `/sysparms` |
 
-```typescript
-// router/index.ts
-router.beforeEach((to, _from, next) => {
-  const authStore = useAuthStore()
-  if (to.path !== '/login' && !authStore.token) {
-    next('/login')
-  } else if (to.path === '/login' && authStore.token) {
-    next('/')  // 已登录 → 首页
-  } else {
-    next()
-  }
-})
-```
+### F1.4 基础数据 — 客户/资产/EID/物料（1.5 周）
 
-### F1.4 权限控制
+> 对应业务流起点：创建型号 → BOM → EID → 客户。后续所有操作依赖此层。
 
-**菜单级**：从后端 `GET /menus` 获取用户菜单树，`AppMenu` 递归渲染且有权限的节点。
+| 页面 | 路由 | 数据表 | 说明 |
+|------|------|--------|------|
+| 物料/BOM | `/master/items` | TMM11/12 + TMM41/42 | 型号分类 + BOM结构树 |
+| 客户主数据 | `/master/customers` | TMM22 + TMM21 | 客户列表+分类 |
+| EID 管理 | `/master/eid` | TMM43 + TMM43_TRACK | 设备SN码+变更追踪 |
+| 资产台账 | `/master/assets` | TMM35 + TMM62 | 设备-客户关联+asset_type |
+| 仓库主数据 | `/master/warehouses` | TWH01 | 仓库基础信息 |
 
-**按钮级**：自定义 `v-permission` 指令，比对用户权限列表。
+---
 
-```typescript
-// directives/permission.ts
-app.directive('permission', {
-  mounted(el, binding) {
-    const { value } = binding  // 如 'user:create'
-    const permissions = useAuthStore().permissions
-    if (!permissions.includes(value)) {
-      el.parentNode?.removeChild(el)
-    }
-  }
-})
-```
+## 阶段 F2：业务主链（5-6 周）
 
-### F1.5 系统管理页面（8 端点）
+> 目标：端到端走通"预计划→资产决策→实施→ITSM运维"全流程。F2 结束系统即可上线试运行。
 
-| 页面 | 路由 | Element Plus 组件 |
-|------|------|-------------------|
-| 用户列表 | `/system/users` | el-table + el-pagination + el-input 搜索 |
-| 用户编辑 | `/system/users/:id` | el-form + el-dialog |
-| 部门管理 | `/system/departments` | el-tree + el-table |
-| 用户组管理 | `/system/groups` | el-table + el-tag |
-| 菜单/权限 | `/system/menus` | el-tree（编辑权限） |
-| 系统参数 | `/system/params` | el-table |
+### F2.1 销售管理（预计划 → 话务台，1 周）
 
-### F1.6 ITSM 工单页面（36 端点）
+> 业务流起点：市场部创建预计划 → 话务台呼出确认客户信息
 
-**复用模式**：所有 ITSM 工单共享 `StatusTransition` + 通用列表/详情/创建模式。
+| 页面 | 路由 | API |
+|------|------|-----|
+| 预计划 | `/sales/plans` | `/sales/plans` CRUD |
+| 话务台 | `/sales/calls` | — 呼出管理 |
+| 销售单据 | `/sales/bills` | `/sales/bills` + 审核 |
+| 延期管理 | `/sales/extends` | `/sales/extends` |
+
+### F2.2 仓储管理 — 库存决策（1 周）
+
+> 资产决策核心：查库存 → 有成品则出库；无成品则触发 MES/采购
+
+| 页面 | 路由 | 说明 |
+|------|------|------|
+| 入库单 | `/warehouse/stock-in` | 8种入库类型，创建(含明细)+审核 |
+| 出库单 | `/warehouse/stock-out` | 8种出库类型 |
+| 库存查询 | `/warehouse/stock` | 实时库存+筛选 |
+| 盘盈盘亏 | `/warehouse/overlost` | 差异处理 |
+| POS设备变更 | `/warehouse/pos-change` | 门店端设备变更 ✅ |
+| 资产盘点 | `/warehouse/asset-check` | 设备级盘点 ✅ |
+
+### F2.3 采购管理 + 质检（1.5 周）
+
+> 无库存时触发采购 → 到货质检 → 合格入库。采购也可独立提前做计划。
+
+| 页面 | 路由 | 说明 |
+|------|------|------|
+| 供应商主数据 | `/procurement/suppliers` | TMM18/19 |
+| 采购计划 | `/procurement/plans` | 计划+明细+审核 |
+| 采购登记 | `/procurement/registers` | 到货登记+审批 |
+| 采购单据 | `/procurement/bills` | 正式采购单 |
+| 退货管理 | `/procurement/returns` | 采购退货 |
+| 供应商评价 | `/procurement/appraisals` | 考评+明细 |
+| 质检结果 | `/qc/results` | 质检主记录+明细+设备关联 |
+
+### F2.4 ITSM 工单 — 实施 + 运维（2 周）
+
+> 实施执行 + 设备流转 + ITSM 运维。**最核心模块**。
 
 | 工单类型 | 路由 | 说明 |
 |---------|------|------|
 | 日常维护单 | `/itsm/maintenance-daily` | 核心工单，含配件明细 (TIT10) |
 | 新机开通 | `/itsm/maintenance-open` | 设备安装开通 (TIT13) |
 | 旧机翻新 | `/itsm/maintenance-renovate` | 旧机→新机映射 (TIT15) |
-| 设备变更 | `/itsm/device-change` | CK/BQ/BG 三种类型，磁卡号变更自动保存历史 (TIT16) |
-| 门店关闭 | `/itsm/store-close` | 门店关闭流程 (TIT18) |
-| 回收任务 | `/itsm/recycle-task` | P0-1新增，取机回收独立化 (TIT20) |
-| 日常保养 | `/itsm/maintenance` | 保养计划+执行+设备明细 (TIT17) |
-| 免费更换 | `/itsm/free-replace` | 免费更换维护单+设备附表 (TIT28) |
-| 未关单跟踪 | `/itsm/unclose-track` | 超时未关单监控 (TIT29) |
-| 公用附表 | 内嵌于详情页 | 上门服务(TIT23)/回访(TIT24)/配件更新(TIT25)/关单(TIT27)/分派(TIT21)/收费(TIT26) |
+| 设备变更 | `/itsm/device-change` | CK/BQ/BG，磁卡号变更存历史 (TIT16) |
+| 门店关闭 | `/itsm/store-close` | 门店关闭 (TIT18) |
+| 回收任务 | `/itsm/recycle-task` | P0-1 取机回收 (TIT20) |
+| 日常保养 | `/itsm/maintenance` | 保养计划+执行 (TIT17) |
+| 免费更换 | `/itsm/free-replace` | 免费更换 (TIT28) |
+| 未关单跟踪 | `/itsm/unclose-track` | 超时监控 (TIT29) |
+| 公用附表 | 嵌入详情页 | 上门/回访/配件/关单/分派/收费 |
 
-### F1.7 仓储管理页面（23 端点）
+**复用组件**: `StatusTransition` — 状态流转弹窗（所有工单共享）
+
+---
+
+## 阶段 F3：配套增强（4-5 周）
+
+> 目标：补全配套模块，覆盖押金/资产/财务/考核/IoT/报表等增强功能。
+
+### F3.1 押金 + 资产（1 周）
 
 | 页面 | 路由 | 说明 |
 |------|------|------|
-| 仓库管理 | `/warehouse/warehouses` | CRUD |
-| 入库单 | `/warehouse/stock-in` | 8种入库类型，列表+创建（含明细）+审核 |
-| 出库单 | `/warehouse/stock-out` | 8种出库类型，同上 |
-| 库存查询 | `/warehouse/stock` | 库存明细表格+多条件筛选 |
-| 盘盈盘亏 | `/warehouse/overlost` | 盘点差异处理 (TWH17/18) |
-| 资产盘点 | `/warehouse/asset-check` | 设备级资产盘点，列表+创建+审核 ✅ |
-| POS设备变更 | `/warehouse/pos-change` | 1新增/2替换/3删除/4查询，列表+创建 ✅ |
+| 押金主记录 | `/deposit/deposits` | 客户押金余额+明细 |
+| 押金型号标准 | `/deposit/models` | 按型号定义押金/租金 |
+| 资产属性 | `/master/asset-attrib` | 扩展属性管理 |
 
-### F1.8 客户/资产管理（6 子模块）
+### F3.2 合同 + 发票 + 结算 + 财务（1.5 周）
 
-数据来源于 `base_cust.pbl`，是 ITSM 和仓储的核心基础数据。
-
-| 页面 | 路由 | API | 说明 |
-|------|------|-----|------|
-| 客户主数据 | `/master/customers` | system.py (`/users` 蓝图) | 客户列表+搜索+详情+编辑，含生命周期状态 (TMM22) |
-| 客户分类 | `/master/cust-class` | — | 分类树 (TMM21) |
-| 资产台账 | `/master/assets` | — | 设备-客户关联，含 asset_type/recycle_status (TMM35) |
-| EID 管理 | `/master/eid` | — | 设备 SN 码管理+变更追踪 (TMM43+TMM43_TRACK) |
-| 资产属性 | `/master/asset-attrib` | — | 资产扩展属性 (TMM62) |
-| 物料/BOM | `/master/items` | reports.py (BOM树) | 物料清单+BOM结构树 (TMM12+TMM41/42) |
-
-> EID（设备唯一标识）体系是连接仓储→资产→ITSM→IoT 的关键纽带。
-
-### F1.9 质检管理（3 子模块）
-
-| 页面 | 路由 | 说明 |
+| 模块 | 路由 | 说明 |
 |------|------|------|
-| 质检结果 | `/qc/results` | 质检主记录列表+创建+审核 (TQC10) |
-| 质检明细 | 内嵌详情页 | 检项明细 (TQC11_RESULTDT) |
-| 质检设备 | 内嵌详情页 | 按 SN 码关联质检设备 (TQC11_RESULTEID) |
+| 合同管理 | `/contract/contracts` | 合同 CRUD |
+| 发票管理 | `/contract/invoices` | 发票 CRUD + 合同关联 |
+| 结算规则 | `/billing/rules` | 租金/费用规则 |
+| 账单管理 | `/billing/bills` | 账单生成+明细+批次 |
+| 会计科目 | `/finance/accounts` | 科目管理 |
+| 应收/应付 | `/finance/receivables` `/finance/payables` | 客户/供应商对账 |
+| 收付款 | `/finance/payments` | 收付款记录 |
+| 设备折旧 | `/finance/depreciations` | 折旧管理 |
+
+### F3.3 客户门户 + SLA + 通知（1 周）
+
+| 模块 | 路由 | 说明 |
+|------|------|------|
+| 门户用户 | `/portal/users` | 客户自助账户 |
+| 自助报修 | `/portal/repairs` | 报修+查询 |
+| 服务评价 | `/portal/ratings` | 客户评价 |
+| SLA 定义 | `/sla/definitions` | 响应/解决时间 |
+| SLA 监控 | `/sla/tickets` | 绑定+响应+解决+达标率 |
+| 通知模板 | `/notification/templates` | 模板 CRUD |
+| 通知记录 | `/notification/notifications` | 记录+发送 |
+
+### F3.4 考勤 + 考核 + 预警/价格（1 周）
+
+| 模块 | 路由 | 说明 |
+|------|------|------|
+| 考勤记录 | `/attendance/records` | 按月查询+汇总 |
+| 考核评价 | `/system/appraisals` | 供应商/人员考核 |
+| 库存预警 | `/inventory/limits` | 上下限规则 |
+| 价格规则 | `/inventory/prices` | 价格+调价 |
+
+### F3.5 MES + IoT + 调拨 + 报表（1.5 周）
+
+| 模块 | 路由 | 说明 |
+|------|------|------|
+| MES 工单 | `/mes/work-orders` | 生产工单+工序+物料 |
+| IoT 设备 | `/iot/connections` | 设备接入+数据+报警 |
+| 调拨流转 | `/transactions/transfers` | 跨仓调拨 |
+| 事务查询 | `/transactions/bills` | 全模块单据查询+错账更正+进销存 |
+| 报表 | `/reports/*` | 库存/EID/销售/BOM 图表(ECharts)+导出 |
+
+### F3.6 全局搜索 + 通用组件提取
+
+- **全局搜索**: `Ctrl+K` 唤起，搜索工单/客户/设备
+- **通用组件**: `TablePage` / `FormDialog` / `AuditButton` / `ExportButton` / `SearchBar`
 
 ---
 
-## 阶段 F2：P1 业务页面 + 通用组件（4-5 周）
+## 阶段 F4：打磨上线（2-3 周）
 
-### F2.1 采购管理（13 端点）
-
-采购计划 → 登记审批 → 采购单据 → 退货 → 供应商评价。含审核流程。
-
-### F2.2 销售管理（11 端点）
-
-预计划 → 销售单据 → 延期管理 + 话务台呼出。含审核流程。
-
-### F2.3 合同 + 发票（8 端点）
-
-合同 CRUD + 发票 CRUD，合同-发票关联展示。
-
-### F2.4 押金管理（9 端点）
-
-押金主记录 + 变更明细 + 设备型号押金标准。
-
-### F2.5 结算管理（12 端点，Tier-2 G4）
-
-结算规则 → 账单（含明细） → 结算批次。
-
-### F2.6 财务管理（15 端点，Tier-2 G5）
-
-会计科目 + 应收 + 应付 + 收付款 + 设备折旧。
-
-### F2.7 客户门户（9 端点，Tier-2 G9）
-
-门户用户 + 自助报修 + 服务评价。
-
-### F2.8 调拨流转 + 考核评价
-
-| 页面 | 路由 | API | 说明 |
-|------|------|-----|------|
-| 调拨流转 | `/transactions/transfers` | transactions.py | 跨仓调拨 (trans.pbl) |
-| 考核评价 | `/system/appraisals` | — | 供应商/人员考核 (TMM45) |
-
-### F2.9 通用组件沉淀
-
-本阶段从重复模式中提取：
-
-| 组件 | 用途 | 覆盖模块 |
-|------|------|---------|
-| `TablePage` | 列表页壳（搜索栏+表格+分页） | 所有模块 |
-| `FormDialog` | 创建/编辑弹窗（表单+校验） | 所有模块 |
-| `AuditButton` | 审核按钮（确认弹窗+调用audit接口） | 采购/销售/仓储 |
-| `ExportButton` | 导出按钮（调用后端导出接口） | 报表/列表页 |
-| `SearchBar` | 多条件搜索栏（el-form inline） | 所有列表页 |
-
----
-
-## 阶段 F3：P2 辅助页面 + 报表（3-4 周）
-
-### F3.1 库存预警/价格管理（8 端点）
-
-预警规则 CRUD + 价格规则 + 调价记录。
-
-### F3.2 考勤管理（3 端点）
-
-按月查询考勤记录 + 考勤汇总。
-
-### F3.3 SLA 管理（8 端点）
-
-SLA 定义 + 工单监控（绑定/响应/解决） + 达标率统计。
-
-### F3.4 通知管理（7 端点）
-
-通知模板 CRUD + 通知记录 + 发送。
-
-### F3.5 MES（10 端点，Tier-3）
-
-生产工单 + 工序定义 + 工单工序 + 物料消耗。
-
-### F3.6 IoT（10 端点，Tier-3）
-
-设备接入 + 数据采集 + 报警规则 + 报警记录。
-
-### F3.7 事务查询 + 报表（12 端点）
-
-- **事务查询**: 全模块单据联合查询 + 错账更正 + 进销存汇总
-- **报表**: 库存/EID/销售/BOM 图表 + 数据导出（推荐 ECharts）
-
-### F3.8 全局搜索 + 消息通知
-
-- **全局搜索**: 顶部搜索框 `Ctrl+K` 唤起，搜索工单/客户/设备
-- **消息通知**: 顶栏通知铃铛，拉取未读通知，点击查看详情
-
----
-
-## 阶段 F4：优化与联调（2-3 周）
-
-### F4.1 性能优化
-
-- **路由懒加载**: `() => import('@/views/itsm/MaintenanceList.vue')`
-- **虚拟滚动**: 大表（>1000行）用 `el-table-v2`
-- **Pinia 持久化**: 标签页/侧边栏状态 localStorage
-
-### F4.2 前后端联调
-
-- 逐模块对接真实 API
-- Mock 数据 → 真实接口切换
-- 异常场景测试（超时/500/401）
-
-### F4.3 UI/UX 打磨
-
-- 统一间距/字号/颜色变量
-- 表单校验提示语优化
-- 空状态 / 加载态 / 错误态 覆盖
-
-### F4.4 多浏览器兼容
-
-- Chrome / Edge / Safari 最新两个版本
-- Element Plus 默认支持
-
-### F4.5 部署配置
-
-```nginx
-# Nginx 反向代理
-location /api/v1 {
-    proxy_pass http://127.0.0.1:5000;    # Flask 后端
-}
-location / {
-    root /var/www/myitsm-frontend/dist;   # Vue 静态文件
-    try_files $uri $uri/ /index.html;     # SPA history mode
-}
-```
+| 任务 | 说明 |
+|------|------|
+| 性能优化 | 路由懒加载 + 虚拟滚动(el-table-v2) + Pinia 持久化 |
+| 前后端联调 | 逐模块 Mock→真实 API，异常场景全覆盖 |
+| UI/UX 打磨 | 统一间距/字号/颜色变量，空/加载/错误三态 |
+| 多浏览器兼容 | Chrome/Edge/Safari 最新两版 |
+| Nginx 部署 | SPA history mode + `/api/v1` 反向代理 Flask |
 
 ---
 
 ## 技术约定
 
-### 代码风格（与 frontend-vue-development skill 一致）
-
+**代码风格**（frontend-vue-development skill）：
 - 4 空格缩进，无分号
-- 组件 kebab-case 命名
-- Props 完整 type+default，数组/对象用工厂函数
-- 禁止 v-html（防 XSS）
-- Scoped 样式
+- 组件 kebab-case.vue
+- Props 完整 type+default，数组/对象工厂函数
+- 禁止 v-html | Scoped 样式
 
-### 项目特有
-
-- API 响应 `{ code, message, data }`，`code === 200` 表示成功
-- JWT `Authorization: Bearer <token>`
+**项目特有**：
+- API 响应 `{code, message, data}`，`code===200` 成功
+- JWT `Bearer <token>` | 401 → 跳转登录
 - Element Plus 中文语言包
-
-### 命名约定
-
-| 类型 | 模式 | 示例 |
-|------|------|------|
-| 组件文件 | kebab-case.vue | `maintenance-list.vue` |
-| API 方法 | 动词+名词 | `fetchUsers()`, `createMaintenance()` |
-| 事件处理 | handle* | `handleSubmit()`, `handleDelete()` |
-| 初始化 | init* | `initTableData()` |
-| 路由路径 | 模块前缀 | `/itsm/maintenance-daily` |
 
 ---
 
@@ -361,12 +287,17 @@ location / {
 
 | 阶段 | 内容 | 时间 |
 |------|------|------|
-| **F1** | 脚手架+布局+登录+权限+系统管理+ITSM(10类)+仓储(7)+客户资产(6)+质检(3) | 6 周 |
-| **F2** | 采购(6)+销售(4)+合同+押金+结算+财务+门户+调拨+考核+通用组件 | 5 周 |
-| **F3** | 预警+考勤+SLA+通知+MES+IoT+报表+全局搜索 | 3 周 |
-| **F4** | 性能+联调+UI打磨+兼容+部署 | 2 周 |
-| **合计** | 覆盖 **35 个子模块**（原 PB 25 个 + Tier-1/2/3 新增 10 个） | **16 周** |
+| **F1 地基** | 脚手架+登录+权限+系统管理+基础数据(客户/资产/EID/物料/仓库) | 5 周 |
+| **F2 业务主链** | 销售(预计划+话务台)+仓储(出入库+盘点+POS)+采购+质检+ITSM(10类工单) | 6 周 |
+| **F3 配套增强** | 押金+合同/发票+结算/财务+门户/SLA/通知+考勤/考核/预警+MES/IoT+报表 | 4 周 |
+| **F4 打磨上线** | 性能+联调+UI+兼容+Nginx部署 | 2 周 |
+| **合计** | 35 子模块 | **17 周** |
 
-> **移动端适配 (G10)** 不在本期范围——后端 API 已就绪，待小程序/PWA 前端独立项目启动。
+> **F2 结束即可试运行**：预计划→库存决策→采购/质检→ITSM 全链路已通。
+> **移动端 (G10)** 不在本期范围，后端 API 已就绪，独立立项。
 
 ---
+
+## 下一步
+
+确认方案后，从 F1.1 开始：`npm create vite` → Axios 封装 → 登录页 + 主布局。

@@ -92,7 +92,15 @@
 
 ## E 类：项目入口文档
 
-21. **README.md**（开发环境搭建指南、项目结构、快速开始）
+--- **前端开发文档** ---
+
+22. **前端开发方案**（Vue 3 + Element Plus，35子模块全覆盖，含愿景核对）
+    - `docs/superpowers/plans/2026-05-08-frontend-vue3-setup.md`
+    - 版本：v1.0 | 创建：2026-05-08 | 状态：待确认
+
+## E 类：项目入口文档
+
+23. **README.md**（开发环境搭建指南、项目结构、快速开始）
     - `README.md`（位于项目根目录）
     - 版本：v1.0 | 创建：2026-04-27
 
@@ -130,6 +138,7 @@ myitsm/
 ├── migrations/               # Flask-Migrate 数据库迁移
 ├── docs/
 │   ├── core/                 # 核心文档（本索引所在目录）
+│   ├── superpowers/plans/    # 实施计划（数据迁移+前端方案）
 │   └── archive/              # 归档文档（旧重构资料）
 ├── PBsrc/                    # PB 原始源码（25个 .pbl 模块 + 参考数据）
 ├── _backup/                  # 备份（旧重构代码 app_old/）
