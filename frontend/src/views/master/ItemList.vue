@@ -45,6 +45,7 @@
 
 <script lang="ts" setup>
 import { ref, reactive, onMounted } from 'vue'
+import { watch } from 'vue'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchItems, createItem, updateItem, deleteItem } from '@/api/master'
@@ -54,6 +55,9 @@ const loading = ref(false); const search = ref(''); const page = ref(1); const p
 const dialogVisible = ref(false); const editing = ref<Record<string,string>|null>(null); const saving = ref(false)
 const form = reactive({ item_cd: '', item_nm: '', class_cd: '', itemanm: '', unit: '' })
 
+
+watch(page, () => loadData())
+watch(perPage, () => { page.value = 1; loadData() })
 onMounted(() => loadData())
 
 async function loadData() {

@@ -28,12 +28,16 @@
 
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
+import { watch } from 'vue'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { fetchWarehouses } from '@/api/warehouse'
 
 const warehouses = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const page = ref(1); const perPage = ref(20); const total = ref(0)
 
+
+watch(page, () => loadData())
+watch(perPage, () => { page.value = 1; loadData() })
 onMounted(() => loadData())
 
 async function loadData() {

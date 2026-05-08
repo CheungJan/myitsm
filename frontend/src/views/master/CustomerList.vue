@@ -52,6 +52,7 @@
 
 <script lang="ts" setup>
 import { ref, reactive, onMounted } from 'vue'
+import { watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchCustomers, createCustomer, updateCustomer, deleteCustomer } from '@/api/master'
 import AppPagination from '@/components/common/AppPagination.vue'
@@ -63,6 +64,9 @@ const classOptions = ref<string[]>([])
 const dialogVisible = ref(false); const editing = ref<Record<string,string>|null>(null); const saving = ref(false)
 const form = reactive({ cust_cd: '', cust_nm: '', class_cd: '', busi_typ: '', phone_no: '', contactor: '', address: '' })
 
+
+watch(page, () => doLoad(classFilter.value || search.value ? true : false))
+watch(perPage, () => { page.value = 1; doLoad(classFilter.value || search.value ? true : false) })
 onMounted(async () => {
     const res = await fetchCustomers({ page: '1', per_page: '100000' })
     const all = ((res.data as { items: Record<string,unknown>[] }).items || []).map(r => (r as Record<string,string>).class_cd).filter(Boolean)

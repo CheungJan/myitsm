@@ -20,21 +20,26 @@
 
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
+import { watch } from 'vue'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { fetchGroups } from '@/api/system'
 
 const groups = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const page = ref(1); const perPage = ref(20); const total = ref(0)
 
-onMounted(async () => {
+
+onMounted(() => loadData())
+watch(page, () => loadData())
+watch(perPage, () => { page.value = 1; loadData() })
+
+async function loadData() {
     loading.value = true
     try {
         const res = await fetchGroups()
-        const list = (res.data || []) as never[]; total.value = list.length; groups.value = list.slice((page.value-1)*perPage.value, page.value*perPage.value)
-    } finally {
-        loading.value = false
-    }
-})
+        const list = (res.data || []) as never[]; total.value = list.length
+        groups.value = list.slice((page.value-1)*perPage.value, page.value*perPage.value)
+    } finally { loading.value = false }
+}
 </script>
 
 <style lang="scss" scoped>
