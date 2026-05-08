@@ -100,38 +100,110 @@ def get_sysparm(parm_cd: str):  # type: ignore[no-untyped-def]
 @system_bp.get("/items")
 @login_required
 def list_items():  # type: ignore[no-untyped-def]
-    """物料列表。"""
+    """物料列表（分页）。"""
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
-    items = _service.list_items(page=page, per_page=per_page)
-    return success_response(data=items)
+    result = _service.list_items(page=page, per_page=per_page)
+    return success_response(data={"items": result["items"], "total": result["total"]})
+
+
+@system_bp.post("/items")
+@login_required
+def create_item():  # type: ignore[no-untyped-def]
+    """新增物料。"""
+    body = request.get_json(silent=True) or {}
+    return success_response(data=_service.create_item(body), code=201)
+
+
+@system_bp.put("/items/<item_cd>")
+@login_required
+def update_item(item_cd: str):  # type: ignore[no-untyped-def]
+    """更新物料。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_item(item_cd, body)
+    return success_response(data=r) if r else error_response("不存在", 404)
+
+
+@system_bp.delete("/items/<item_cd>")
+@login_required
+def delete_item(item_cd: str):  # type: ignore[no-untyped-def]
+    """删除物料。"""
+    return success_response() if _service.delete_item(item_cd) else error_response("不存在", 404)
 
 
 @system_bp.get("/customers")
 @login_required
 def list_customers():  # type: ignore[no-untyped-def]
-    """客户列表（tmm22_customers）。"""
+    """客户列表（分页）。"""
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
-    customers = _service.list_customers(page=page, per_page=per_page)
-    return success_response(data=customers)
+    result = _service.list_customers(page=page, per_page=per_page)
+    return success_response(data={"items": result["items"], "total": result["total"]})
+
+
+@system_bp.post("/customers")
+@login_required
+def create_customer():  # type: ignore[no-untyped-def]
+    """新增客户。"""
+    body = request.get_json(silent=True) or {}
+    return success_response(data=_service.create_customer(body), code=201)
+
+
+@system_bp.put("/customers/<cust_cd>")
+@login_required
+def update_customer(cust_cd: str):  # type: ignore[no-untyped-def]
+    """更新客户。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_customer(cust_cd, body)
+    return success_response(data=r) if r else error_response("不存在", 404)
+
+
+@system_bp.delete("/customers/<cust_cd>")
+@login_required
+def delete_customer(cust_cd: str):  # type: ignore[no-untyped-def]
+    """删除客户。"""
+    return success_response() if _service.delete_customer(cust_cd) else error_response("不存在", 404)
 
 
 @system_bp.get("/eid")
 @login_required
 def list_eid():  # type: ignore[no-untyped-def]
-    """EID 设备列表。"""
+    """EID 设备列表（分页）。"""
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
-    eids = _service.list_eid(page=page, per_page=per_page)
-    return success_response(data=eids)
+    result = _service.list_eid(page=page, per_page=per_page)
+    return success_response(data={"items": result["items"], "total": result["total"]})
+
+
+@system_bp.post("/eid")
+@login_required
+def create_eid():  # type: ignore[no-untyped-def]
+    """新增 EID。"""
+    body = request.get_json(silent=True) or {}
+    return success_response(data=_service.create_eid(body), code=201)
+
+
+@system_bp.put("/eid/<eid_val>")
+@login_required
+def update_eid(eid_val: str):  # type: ignore[no-untyped-def]
+    """更新 EID。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_eid(eid_val, body)
+    return success_response(data=r) if r else error_response("不存在", 404)
+
+
+@system_bp.delete("/eid/<eid_val>")
+@login_required
+def delete_eid(eid_val: str):  # type: ignore[no-untyped-def]
+    """删除 EID。"""
+    return success_response() if _service.delete_eid(eid_val) else error_response("不存在", 404)
 
 
 @system_bp.get("/assets")
 @login_required
 def list_assets():  # type: ignore[no-untyped-def]
-    """资产台账列表（tmm35_cust_pos_rl）。"""
+    """资产台账列表（分页）。"""
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
-    assets = _service.list_assets(page=page, per_page=per_page)
-    return success_response(data=assets)
+    result = _service.list_assets(page=page, per_page=per_page)
+    return success_response(data={"items": result["items"], "total": result["total"]})

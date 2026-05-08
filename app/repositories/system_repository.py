@@ -61,21 +61,94 @@ class SystemRepository:
     # ——— 基础数据查询 ———
 
     @staticmethod
-    def get_items(page: int = 1, per_page: int = 20) -> list[Item]:
+    def get_items(page: int = 1, per_page: int = 20) -> tuple[list[Item], int]:
         q = db.session.query(Item).order_by(Item.item_cd)
-        return q.offset((page - 1) * per_page).limit(per_page).all()
+        total = q.count()
+        return q.offset((page - 1) * per_page).limit(per_page).all(), total
 
     @staticmethod
-    def get_customers(page: int = 1, per_page: int = 20) -> list[Customer]:
+    def get_item(item_cd: str) -> Item | None:
+        return db.session.get(Item, item_cd)
+
+    @staticmethod
+    def create_item(data: dict[str, Any]) -> Item:
+        item = Item(**data)
+        db.session.add(item)
+        db.session.commit()
+        return item
+
+    @staticmethod
+    def update_item(record: Item, data: dict[str, Any]) -> Item:
+        for k, v in data.items():
+            setattr(record, k, v)
+        db.session.commit()
+        return record
+
+    @staticmethod
+    def delete_item(record: Item) -> None:
+        db.session.delete(record)
+        db.session.commit()
+
+    @staticmethod
+    def get_customers(page: int = 1, per_page: int = 20) -> tuple[list[Customer], int]:
         q = db.session.query(Customer).order_by(Customer.cust_cd)
-        return q.offset((page - 1) * per_page).limit(per_page).all()
+        total = q.count()
+        return q.offset((page - 1) * per_page).limit(per_page).all(), total
 
     @staticmethod
-    def get_eid_list(page: int = 1, per_page: int = 20) -> list[Eid]:
+    def get_customer(cust_cd: str) -> Customer | None:
+        return db.session.get(Customer, cust_cd)
+
+    @staticmethod
+    def create_customer(data: dict[str, Any]) -> Customer:
+        c = Customer(**data)
+        db.session.add(c)
+        db.session.commit()
+        return c
+
+    @staticmethod
+    def update_customer(record: Customer, data: dict[str, Any]) -> Customer:
+        for k, v in data.items():
+            setattr(record, k, v)
+        db.session.commit()
+        return record
+
+    @staticmethod
+    def delete_customer(record: Customer) -> None:
+        db.session.delete(record)
+        db.session.commit()
+
+    @staticmethod
+    def get_eid_list(page: int = 1, per_page: int = 20) -> tuple[list[Eid], int]:
         q = db.session.query(Eid).order_by(Eid.eid)
-        return q.offset((page - 1) * per_page).limit(per_page).all()
+        total = q.count()
+        return q.offset((page - 1) * per_page).limit(per_page).all(), total
 
     @staticmethod
-    def get_cust_pos_rl(page: int = 1, per_page: int = 20) -> list[CustPosRl]:
+    def get_eid(eid_val: str) -> Eid | None:
+        return db.session.get(Eid, eid_val)
+
+    @staticmethod
+    def create_eid(data: dict[str, Any]) -> Eid:
+        e = Eid(**data)
+        db.session.add(e)
+        db.session.commit()
+        return e
+
+    @staticmethod
+    def update_eid(record: Eid, data: dict[str, Any]) -> Eid:
+        for k, v in data.items():
+            setattr(record, k, v)
+        db.session.commit()
+        return record
+
+    @staticmethod
+    def delete_eid(record: Eid) -> None:
+        db.session.delete(record)
+        db.session.commit()
+
+    @staticmethod
+    def get_cust_pos_rl(page: int = 1, per_page: int = 20) -> tuple[list[CustPosRl], int]:
         q = db.session.query(CustPosRl).order_by(CustPosRl.eid)
-        return q.offset((page - 1) * per_page).limit(per_page).all()
+        total = q.count()
+        return q.offset((page - 1) * per_page).limit(per_page).all(), total

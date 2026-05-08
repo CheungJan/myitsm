@@ -54,14 +54,56 @@ class SystemService:
 
     # ——— 基础数据 ———
 
-    def list_items(self, page: int = 1, per_page: int = 20) -> list[dict[str, Any]]:
-        return [i.to_dict() for i in self._repo.get_items(page, per_page)]
+    def list_items(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = self._repo.get_items(page, per_page)
+        return {"items": [i.to_dict() for i in items], "total": total}
 
-    def list_customers(self, page: int = 1, per_page: int = 20) -> list[dict[str, Any]]:
-        return [c.to_dict() for c in self._repo.get_customers(page, per_page)]
+    def list_customers(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = self._repo.get_customers(page, per_page)
+        return {"items": [c.to_dict() for c in items], "total": total}
 
-    def list_eid(self, page: int = 1, per_page: int = 20) -> list[dict[str, Any]]:
-        return [e.to_dict() for e in self._repo.get_eid_list(page, per_page)]
+    def list_eid(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = self._repo.get_eid_list(page, per_page)
+        return {"items": [e.to_dict() for e in items], "total": total}
 
-    def list_assets(self, page: int = 1, per_page: int = 20) -> list[dict[str, Any]]:
-        return [a.to_dict() for a in self._repo.get_cust_pos_rl(page, per_page)]
+    def list_assets(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = self._repo.get_cust_pos_rl(page, per_page)
+        return {"items": [a.to_dict() for a in items], "total": total}
+
+    # ——— CRUD ———
+
+    def create_item(self, data: dict[str, Any]) -> dict[str, Any]:
+        return self._repo.create_item(data).to_dict()
+
+    def update_item(self, item_cd: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        r = self._repo.get_item(item_cd)
+        return self._repo.update_item(r, data).to_dict() if r else None
+
+    def delete_item(self, item_cd: str) -> bool:
+        r = self._repo.get_item(item_cd)
+        if r: self._repo.delete_item(r); return True
+        return False
+
+    def create_customer(self, data: dict[str, Any]) -> dict[str, Any]:
+        return self._repo.create_customer(data).to_dict()
+
+    def update_customer(self, cust_cd: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        r = self._repo.get_customer(cust_cd)
+        return self._repo.update_customer(r, data).to_dict() if r else None
+
+    def delete_customer(self, cust_cd: str) -> bool:
+        r = self._repo.get_customer(cust_cd)
+        if r: self._repo.delete_customer(r); return True
+        return False
+
+    def create_eid(self, data: dict[str, Any]) -> dict[str, Any]:
+        return self._repo.create_eid(data).to_dict()
+
+    def update_eid(self, eid_val: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        r = self._repo.get_eid(eid_val)
+        return self._repo.update_eid(r, data).to_dict() if r else None
+
+    def delete_eid(self, eid_val: str) -> bool:
+        r = self._repo.get_eid(eid_val)
+        if r: self._repo.delete_eid(r); return True
+        return False
