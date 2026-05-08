@@ -32,19 +32,42 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { fetchMenus, type MenuItem } from '@/api/system'
+import { fetchMenus } from '@/api/system'
 
 defineProps<{ isCollapse: boolean }>()
 
 const route = useRoute()
 const activeMenu = computed(() => route.path)
 
-const menuTree = ref<MenuItem[]>([])
+interface FlatMenu {
+    menu_cd: string; menu_nm: string; exe_path: string
+    parent_cd: string | null; ordno?: number
+}
+interface TreeMenu extends FlatMenu { children?: TreeMenu[] }
+
+const menuTree = ref<TreeMenu[]>([])
+
+function buildTree(flat: FlatMenu[]): TreeMenu[] {
+    const map = new Map<string, TreeMenu>()
+    const roots: TreeMenu[] = []
+    for (const item of flat) {
+        map.set(item.menu_cd, { ...item, children: [] })
+    }
+    for (const item of map.values()) {
+        if (item.parent_cd && map.has(item.parent_cd)) {
+            map.get(item.parent_cd)!.children!.push(item)
+        } else {
+            roots.push(item)
+        }
+    }
+    return roots.filter(r => r.children!.length > 0 || r.exe_path)
+}
 
 onMounted(async () => {
     try {
         const res = await fetchMenus()
-        menuTree.value = res.data || []
+        const flat = (res.data || []) as FlatMenu[]
+        menuTree.value = buildTree(flat)
     } catch {
         menuTree.value = []
     }
