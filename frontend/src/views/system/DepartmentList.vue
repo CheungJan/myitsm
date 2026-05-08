@@ -8,7 +8,7 @@
                 <el-table-column prop="parent_cd" label="上级部门" width="120" />
                 <el-table-column prop="useflg" label="状态" width="80" />
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total"
+            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
         </el-card>
     </div>
 </template>

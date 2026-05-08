@@ -19,7 +19,7 @@
                 <el-table-column prop="status" label="状态" width="80" />
                 <el-table-column prop="created_at" label="创建时间" min-width="150" />
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total"
+            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
         </el-card>
     </div>
 </template>

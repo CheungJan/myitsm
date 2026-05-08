@@ -24,7 +24,7 @@
                     </template>
                 </el-table-column>
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total"
+            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
         </el-card>
 
         <el-dialog :title="editing ? '编辑物料' : '新增物料'" v-model="dialogVisible" width="500px">

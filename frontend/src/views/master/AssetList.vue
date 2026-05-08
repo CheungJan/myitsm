@@ -17,7 +17,7 @@
                 <el-table-column prop="asset_status" label="资产状态" width="100" />
                 <el-table-column prop="install_date" label="安装日期" width="120" />
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total"
+            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
         </el-card>
     </div>
 </template>

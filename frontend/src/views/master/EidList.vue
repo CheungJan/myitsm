@@ -25,7 +25,7 @@
                     </template>
                 </el-table-column>
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total"
+            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
                 style="margin-top:16px;justify-content:flex-end" />
         </el-card>
 
