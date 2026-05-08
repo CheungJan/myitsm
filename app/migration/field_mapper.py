@@ -180,9 +180,8 @@ def read_source_rows(
 
     target_cols = mapping.common_columns + list(mapping.rename_map.keys())
     cols_str = ", ".join(select_parts)
-    # 使用 CTID（物理行标识）排序，确保跨查询顺序一致
-    # CTID 在同一连接内保证 OFFSET 一致性
-    sql = f"SELECT {cols_str} FROM {mapping.old_table} OFFSET {offset} LIMIT {limit}"
+    order_cols = ", ".join(target_cols[:3])
+    sql = f"SELECT {cols_str} FROM {mapping.old_table} ORDER BY {order_cols} OFFSET {offset} LIMIT {limit}"
     with engine.connect() as conn:
         result = conn.execute(text(sql))
         return [dict(zip(target_cols, row)) for row in result.fetchall()]

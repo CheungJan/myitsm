@@ -170,6 +170,8 @@ def _read_batch_from_conn(
 
     target_cols = mapping.common_columns + list(mapping.rename_map.keys())
     cols_str = ", ".join(select_parts)
-    sql = f"SELECT {cols_str} FROM {mapping.old_table} OFFSET {offset} LIMIT {limit}"
+    # ORDER BY 所有列确保跨查询 OFFSET 一致性
+    order_cols = ", ".join(target_cols[:3])  # 前3列足够区分
+    sql = f"SELECT {cols_str} FROM {mapping.old_table} ORDER BY {order_cols} OFFSET {offset} LIMIT {limit}"
     result = conn.execute(text(sql))
     return [dict(zip(target_cols, row)) for row in result.fetchall()]
