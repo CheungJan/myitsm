@@ -55,7 +55,7 @@ frontend/
 │   │   ├── system/                 # F1: 用户/部门/角色/菜单
 │   │   ├── master/                 # F1: 客户/资产/EID/物料BOM
 │   │   ├── itsm/                   # F2: 10类工单
-│   │   ├── warehouse/              # F2: 仓库/出入库/盘点/POS
+│   │   ├── warehouse/              # F2: 仓库/出入库/盘点/设备回收
 │   │   ├── procurement/            # F2: 采购
 │   │   ├── sales/                  # F2: 预计划/销售/话务台
 │   │   ├── qc/                     # F2: 质检
@@ -155,7 +155,7 @@ npm install -D sass @types/node
 | 出库单 | `/warehouse/stock-out` | 8种出库类型 |
 | 库存查询 | `/warehouse/stock` | 实时库存+筛选 |
 | 盘盈盘亏 | `/warehouse/overlost` | 差异处理 |
-| POS设备变更 | `/warehouse/pos-change` | 门店端设备变更 ✅ |
+| 设备回收确认 | `/warehouse/pos-change` | 仓库接收 ITSM 回收单返回的设备，确认入库/调换/报废 (twh21/22) ✅ |
 | 资产盘点 | `/warehouse/asset-check` | 设备级盘点 ✅ |
 
 ### F2.3 采购管理 + 质检（1.5 周）
