@@ -32,11 +32,11 @@ export function fetchEidList(params?: Record<string, string>) {
 export function createEid(data: Record<string, unknown>) {
     return request.post('/eid', data)
 }
-export function updateEid(eidVal: string, data: Record<string, unknown>) {
-    return request.put(`/eid/${eidVal}`, data)
+export function updateEid(itemcd: string, eidVal: string, data: Record<string, unknown>) {
+    return request.put(`/eid/${itemcd}/${eidVal}`, data)
 }
-export function deleteEid(eidVal: string) {
-    return request.delete(`/eid/${eidVal}`)
+export function deleteEid(itemcd: string, eidVal: string) {
+    return request.delete(`/eid/${itemcd}/${eidVal}`)
 }
 
 export function fetchAssets(params?: Record<string, string>) {

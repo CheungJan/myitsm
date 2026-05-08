@@ -17,7 +17,7 @@ request.interceptors.request.use(config => {
 request.interceptors.response.use(
     res => {
         const body = res.data
-        if (body.code && body.code !== 200) {
+        if (body.code && body.code !== 200 && body.code !== 201) {
             ElMessage.error(body.message || '操作失败')
             return Promise.reject(body)
         }

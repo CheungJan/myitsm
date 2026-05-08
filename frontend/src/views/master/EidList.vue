@@ -4,12 +4,15 @@
             <template #header>
                 <div class="page-header">
                     <span>EID 设备管理（共 {{ total }} 条）</span>
-                    <el-button type="primary" size="small" @click="openDialog()">新增设备</el-button>
+                    <div>
+                        <el-input v-model="search" placeholder="搜索 SN 或物料编码" clearable style="width:240px" @change="loadData" />
+                        <el-button type="primary" size="small" style="margin-left:8px" @click="openDialog()">新增设备</el-button>
+                    </div>
                 </div>
             </template>
             <el-table :data="eids" v-loading="loading" stripe>
                 <el-table-column prop="eid" label="设备 SN" min-width="150" />
-                <el-table-column prop="item_cd" label="物料编码" width="120" />
+                <el-table-column prop="itemcd" label="物料编码" width="120" />
                 <el-table-column prop="etyp" label="类型" width="80" />
                 <el-table-column prop="whcd" label="仓库" width="80" />
                 <el-table-column prop="sflg" label="状态" width="80" />
@@ -29,8 +32,12 @@
 
         <el-dialog :title="editing ? '编辑 EID' : '新增 EID'" v-model="dialogVisible" width="500px">
             <el-form :model="form" label-width="80px">
-                <el-form-item label="SN" required><el-input v-model="form.eid" :disabled="!!editing" /></el-form-item>
-                <el-form-item label="物料编码" required><el-input v-model="form.item_cd" /></el-form-item>
+                <el-form-item label="物料编码" required>
+                    <el-input v-model="form.itemcd" :disabled="!!editing" />
+                </el-form-item>
+                <el-form-item label="设备 SN" required>
+                    <el-input v-model="form.eid" :disabled="!!editing" />
+                </el-form-item>
                 <el-form-item label="类型"><el-input v-model="form.etyp" /></el-form-item>
                 <el-form-item label="仓库"><el-input v-model="form.whcd" /></el-form-item>
                 <el-form-item label="状态"><el-input v-model="form.sflg" /></el-form-item>
@@ -51,13 +58,14 @@ import { fetchEidList, createEid, updateEid, deleteEid } from '@/api/master'
 
 const eids = ref<Record<string,unknown>[]>([])
 const loading = ref(false)
+const search = ref('')
 const page = ref(1)
 const total = ref(0)
 
 const dialogVisible = ref(false)
 const editing = ref<Record<string,string>|null>(null)
 const saving = ref(false)
-const form = reactive({ eid: '', item_cd: '', etyp: '0', whcd: '', sflg: '8', new_old: '1' })
+const form = reactive({ itemcd: '', eid: '', etyp: '0', whcd: '', sflg: '8', new_old: '1' })
 
 onMounted(() => loadData())
 
@@ -74,12 +82,12 @@ async function loadData() {
 function openDialog(row?: Record<string,string>) {
     if (row) {
         editing.value = row
-        form.eid = row.eid; form.item_cd = row.item_cd || ''
+        form.itemcd = row.itemcd || ''; form.eid = row.eid || ''
         form.etyp = row.etyp || '0'; form.whcd = row.whcd || ''
         form.sflg = row.sflg || '8'; form.new_old = row.new_old || '1'
     } else {
         editing.value = null
-        form.eid = ''; form.item_cd = ''; form.etyp = '0'
+        form.itemcd = ''; form.eid = ''; form.etyp = '0'
         form.whcd = ''; form.sflg = '8'; form.new_old = '1'
     }
     dialogVisible.value = true
@@ -89,7 +97,7 @@ async function handleSave() {
     saving.value = true
     try {
         if (editing.value) {
-            await updateEid(editing.value.eid, { ...form })
+            await updateEid(editing.value.itemcd, editing.value.eid, { ...form })
             ElMessage.success('更新成功')
         } else {
             await createEid({ ...form, useflg: '1' })
@@ -104,7 +112,7 @@ async function handleSave() {
 async function handleDelete(row: Record<string,string>) {
     await ElMessageBox.confirm(`确定删除 EID ${row.eid}？`, '确认')
     try {
-        await deleteEid(row.eid)
+        await deleteEid(row.itemcd, row.eid)
         ElMessage.success('已删除')
         loadData()
     } catch { /* */ }

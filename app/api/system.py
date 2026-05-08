@@ -183,20 +183,20 @@ def create_eid():  # type: ignore[no-untyped-def]
     return success_response(data=_service.create_eid(body), code=201)
 
 
-@system_bp.put("/eid/<eid_val>")
+@system_bp.put("/eid/<itemcd>/<eid_val>")
 @login_required
-def update_eid(eid_val: str):  # type: ignore[no-untyped-def]
-    """更新 EID。"""
+def update_eid(itemcd: str, eid_val: str):  # type: ignore[no-untyped-def]
+    """更新 EID（复合主键 itemcd+eid）。"""
     body = request.get_json(silent=True) or {}
-    r = _service.update_eid(eid_val, body)
+    r = _service.update_eid(itemcd, eid_val, body)
     return success_response(data=r) if r else error_response("不存在", 404)
 
 
-@system_bp.delete("/eid/<eid_val>")
+@system_bp.delete("/eid/<itemcd>/<eid_val>")
 @login_required
-def delete_eid(eid_val: str):  # type: ignore[no-untyped-def]
-    """删除 EID。"""
-    return success_response() if _service.delete_eid(eid_val) else error_response("不存在", 404)
+def delete_eid(itemcd: str, eid_val: str):  # type: ignore[no-untyped-def]
+    """删除 EID（复合主键 itemcd+eid）。"""
+    return success_response() if _service.delete_eid(itemcd, eid_val) else error_response("不存在", 404)
 
 
 @system_bp.get("/assets")

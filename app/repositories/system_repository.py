@@ -125,8 +125,8 @@ class SystemRepository:
         return q.offset((page - 1) * per_page).limit(per_page).all(), total
 
     @staticmethod
-    def get_eid(eid_val: str) -> Eid | None:
-        return db.session.get(Eid, eid_val)
+    def get_eid(itemcd: str, eid_val: str) -> Eid | None:
+        return db.session.get(Eid, (itemcd, eid_val))
 
     @staticmethod
     def create_eid(data: dict[str, Any]) -> Eid:
@@ -136,16 +136,22 @@ class SystemRepository:
         return e
 
     @staticmethod
-    def update_eid(record: Eid, data: dict[str, Any]) -> Eid:
-        for k, v in data.items():
-            setattr(record, k, v)
-        db.session.commit()
-        return record
+    def update_eid(itemcd: str, eid_val: str, data: dict[str, Any]) -> Eid | None:
+        r = db.session.get(Eid, (itemcd, eid_val))
+        if r:
+            for k, v in data.items():
+                setattr(r, k, v)
+            db.session.commit()
+        return r
 
     @staticmethod
-    def delete_eid(record: Eid) -> None:
-        db.session.delete(record)
-        db.session.commit()
+    def delete_eid(itemcd: str, eid_val: str) -> bool:
+        r = db.session.get(Eid, (itemcd, eid_val))
+        if r:
+            db.session.delete(r)
+            db.session.commit()
+            return True
+        return False
 
     @staticmethod
     def get_cust_pos_rl(page: int = 1, per_page: int = 20) -> tuple[list[CustPosRl], int]:

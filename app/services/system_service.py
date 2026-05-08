@@ -99,11 +99,9 @@ class SystemService:
     def create_eid(self, data: dict[str, Any]) -> dict[str, Any]:
         return self._repo.create_eid(data).to_dict()
 
-    def update_eid(self, eid_val: str, data: dict[str, Any]) -> dict[str, Any] | None:
-        r = self._repo.get_eid(eid_val)
-        return self._repo.update_eid(r, data).to_dict() if r else None
+    def update_eid(self, itemcd: str, eid_val: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        r = self._repo.update_eid(itemcd, eid_val, data)
+        return r.to_dict() if r else None
 
-    def delete_eid(self, eid_val: str) -> bool:
-        r = self._repo.get_eid(eid_val)
-        if r: self._repo.delete_eid(r); return True
-        return False
+    def delete_eid(self, itemcd: str, eid_val: str) -> bool:
+        return self._repo.delete_eid(itemcd, eid_val)
