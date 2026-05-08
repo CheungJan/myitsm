@@ -4,6 +4,26 @@
 
 ---
 
+## [v0.7.0] — 2026-05-08 — 数据迁移完成 + 模块补全
+
+**PR**: [#7](https://github.com/CheungJan/myitsm/pull/7) / [#8](https://github.com/CheungJan/myitsm/pull/8)
+
+### 新增
+- **数据迁移工具**：双PG连接器 + 动态字段映射 + 5批执行引擎 + CLI入口（`app/migration/`）
+- **逐表校验测试**：14 个参数化行数对比测试
+- **资产盘点模块**：AssetCheckAccept Repository + Service + API（6端点）
+- **POS设备变更模块**：PosChange Repository + Service + API（4端点）
+
+### 数据迁移结果
+- 86 表完全匹配，总体完整率 **99.6%**（3,339,020/3,353,080 行）
+- 7 大问题全部修复（OFFSET不一致、CHAR空格、NOT NULL默认值、id FK断裂等）
+
+### 文档
+- 新增 数据迁移执行方案 v2、数据迁移问题解决报告、Oracle核查导出指南
+- 更新 项目整体实施计划 v1.3、API接口文档 v1.2、系统功能分析 v1.3、文档体系审查报告、数据库ER关系文档 v2.1
+
+---
+
 ## [v0.6.0] — 2026-05-07 — 阶段6 事务查询与报表模块
 
 ### 新增
