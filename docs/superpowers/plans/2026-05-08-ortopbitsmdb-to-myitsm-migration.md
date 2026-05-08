@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** ✅ 已执行完成（2026-05-08），最终完整率 99.6%，详见文末"实际执行差异记录"
+
 **Goal:** 将 ortopbitsmdb（PostgreSQL，137张旧表，含真实业务数据）完整迁移至 myitsm（PostgreSQL，139张新表，优化后结构），迁移后数据完整、外键一致、业务语义不变。
 
 **Architecture:** 使用 Python + SQLAlchemy 双 PG 连接器模式。两个 PostgreSQL 库通过独立的 Engine 连接，从 ortopbitsmdb 读取原始数据，经字段映射后写入 myitsm 新库。迁移脚本独立于 Flask 应用，可直接命令行执行。分 5 批按外键依赖顺序导入，每批支持断点续传。
@@ -2463,3 +2465,54 @@ uv run python migrate_data.py
 | BLOB 字段 | to_dict() 已处理为 None |
 | 密码字段明文 | 迁移后统一重置 |
 | 旧库序列值冲突 | `_sync_sequence()` 自动对齐 |
+
+---
+
+## 实际执行差异记录（2026-05-08）
+
+### 与计划的偏离
+
+本计划制定时假设源库为 Oracle（需要 `cx_Oracle`），实际两个库都是 PostgreSQL。执行过程中根据实际数据结构做了大量简化。
+
+### 核心变更
+
+| 计划 | 实际 |
+|------|------|
+| cx_Oracle + psycopg2 双类型 | 双 psycopg2（源库已是 PG） |
+| `ORACLE_URL` 环境变量 | `SOURCE_DATABASE_URL` |
+| `oracle_url` / `pg_url` | `source_url` / `target_url` |
+| 硬编码 900+ FieldMapping | `information_schema` 动态交集 + 模糊匹配 `_try_fuzzy_match` |
+| `FieldMapping` / `map_oracle_row` | `build_mapping()` 自动构建 + `read_source_rows`/`write_target_rows` |
+| Task 按计划结构拆分 | 实际：动态映射 → 简化 batch_runner → 集中调试修复 |
+| 先写测试再写实现 | 执行中发现列名不一致，改为直接探查 `information_schema` |
+| 逐 Task 子代理执行 | 单会话逐步执行（接口一致性需要共享上下文） |
+| 估算 ~2.5h | 实际 ~4h（含 7 个问题排查修复） |
+
+### 新增的修复
+
+1. **OFFSET 不一致**（影响最大）：单连接 + `ORDER BY` 前三列，tmm43_eid_track 63.9%→99.998%
+2. **`id` 被 SKIP 导致 FK 断裂**：从 SKIP_TARGET_COLUMNS 移除 `id`
+3. **批量 executemany 失败降级**：逐行 INSERT 跳过冲突
+4. **CHAR 空格 + VARCHAR 超长**：rstrip() + character_maximum_length 截断
+5. **NOT NULL 默认值**：created_at/updated_at/password/status 自动填充
+6. **MANUAL_RENAME**：10 张表的跨单词列名重映射
+7. **TRUNCATE CASCADE 误清**：tsl02_extenddt 被清，单独重导
+
+### Task 执行状态
+
+| Task | 状态 | 备注 |
+|------|------|------|
+| Task 1 配置与连接器 | ✅ 完成 | 改用双 PG |
+| Task 2 字段映射引擎 | ✅ 完成 | 改为动态映射 |
+| Task 3 分批执行引擎 | ✅ 完成 | 加单连接+ORDER BY+降级 |
+| Task 4 特殊表处理 | ✅ 完成 | 加 SYS_USER 合并+密码迁移 |
+| Task 5-6 校验测试 | ✅ 完成 | 逐表行数对比 99.6% |
+| Task 7 主执行脚本 | ✅ 完成 | migrate_data.py |
+| Task 8 文档更新 | ✅ 完成 | 解决报告+本差异记录 |
+
+### 最终数据完整性
+
+- 完全匹配：**86 张表**
+- 总体完整率：**99.6%**（3,339,020/3,353,080）
+- 13 张差异表均已查明根因（源库 FK孤儿/NULL PK/PK重复）
+- 详见 `docs/core/数据迁移问题解决报告.md`

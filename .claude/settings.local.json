@@ -11,7 +11,8 @@
       "Bash(export SOURCE_DATABASE_URL=postgresql://cheungjan@localhost:5432/ortopbitsmdb)",
       "Bash(export DATABASE_URL=postgresql://cheungjan@localhost:5432/myitsm)",
       "Bash(export MIGRATION_BATCH_SIZE=2000)",
-      "Bash(bc)"
+      "Bash(bc)",
+      "Bash(git rm *)"
     ]
   }
 }
