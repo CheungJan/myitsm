@@ -26,7 +26,6 @@
                 </el-table-column>
             </el-table>
             <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:16px;justify-content:flex-end" />
-                style="margin-top:16px;justify-content:flex-end" />
         </el-card>
 
         <el-dialog :title="editing ? '编辑 EID' : '新增 EID'" v-model="dialogVisible" width="500px">
