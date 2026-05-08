@@ -4,7 +4,13 @@
       "Bash(uv run *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(psql -U cheungjan -d myitsm -c \"SELECT count\\(*\\) FROM tmm01_company;\")",
+      "Bash(psql -U cheungjan -l)",
+      "Bash(psql *)",
+      "Bash(export SOURCE_DATABASE_URL=postgresql://cheungjan@localhost:5432/ortopbitsmdb)",
+      "Bash(export DATABASE_URL=postgresql://cheungjan@localhost:5432/myitsm)",
+      "Bash(export MIGRATION_BATCH_SIZE=2000)"
     ]
   }
 }
