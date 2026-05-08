@@ -11,7 +11,7 @@
                 <el-table-column prop="whcd" label="编码" width="100" />
                 <el-table-column prop="whnm" label="名称" width="200" />
                 <el-table-column prop="address" label="地址" min-width="200" />
-                <el-table-column prop="phone" label="电话" width="140" />
+                <el-table-column prop="phoneno" label="电话" width="140" />
                 <el-table-column prop="leader" label="负责人" width="100" />
                 <el-table-column prop="useflg" label="状态" width="80" />
                 <el-table-column label="操作" width="160" fixed="right">
