@@ -66,7 +66,7 @@ function buildTree(flat: FlatMenu[]): TreeMenu[] {
 onMounted(async () => {
     try {
         const res = await fetchMenus()
-        const flat = (res.data || []) as FlatMenu[]
+        const flat = (res.data || []) as unknown as FlatMenu[]
         menuTree.value = buildTree(flat)
     } catch {
         menuTree.value = []
