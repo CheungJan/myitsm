@@ -9,10 +9,11 @@ from sqlalchemy import Engine, text
 
 # 目标库专属列（源库不存在，有 server default 或无数据来源）
 SKIP_TARGET_COLUMNS = {
-    "created_at", "updated_at", "id", "status", "password",
+    "created_at", "updated_at", "status", "password",
     "phone", "email", "source_type", "customer_status",
     "asset_type", "recycle_status", "verified_at", "preplan_id",
     "valid_until",
+    # 注意：id 不跳过！保留源库 ID 值以维护 FK 引用完整性
 }
 
 # 手动重命名映射（模糊匹配无法处理的跨单词重命名）
