@@ -1,8 +1,8 @@
 # API 接口文档
 
-**版本**: v1.1  
+**版本**: v1.2  
 **基础路径**: `/api/v1`  
-**更新日期**: 2026-05-07
+**更新日期**: 2026-05-08（新增资产盘点+POS变更端点）
 
 ---
 
@@ -243,6 +243,25 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | 方法 | 路径 | 说明 | 查询参数 |
 |------|------|------|---------|
 | GET | `/stock` | 库存明细列表/指定物品余额 | `whcd`, `itemcd`, `page`, `per_page` |
+
+#### 资产盘点 ✅ 新增（2026-05-08）
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/asset-check` | 盘点单列表 | `page`, `per_page` |
+| GET | `/asset-check/<opbillid>` | 盘点单详情（含明细） | - |
+| POST | `/asset-check` | 创建盘点单（含明细） | Body + `details[]` |
+| PUT | `/asset-check/<opbillid>` | 更新盘点单 | Body |
+| POST | `/asset-check/<opbillid>/audit` | 审核盘点单 | - |
+
+#### POS设备变更 ✅ 新增（2026-05-08）
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/pos-change` | 变更记录列表 | `page`, `per_page` |
+| GET | `/pos-change/<pk>` | 变更记录详情（含明细） | - |
+| POST | `/pos-change` | 创建设备变更（含明细） | Body + `details[]` |
+| PUT | `/pos-change/<pk>` | 更新设备变更 | Body |
 
 ---
 
@@ -663,7 +682,7 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | auth | /api/v1 | 2 | 阶段1 |
 | system | /api/v1 | 8 | 阶段1 |
 | itsm | /api/v1/itsm | 36 | 阶段2 |
-| warehouse | /api/v1/warehouse | 13 | 阶段3 |
+| warehouse | /api/v1/warehouse | 23 | 阶段3+7（资产盘点6+POS变更4） |
 | procurement | /api/v1/procurement | 13 | 阶段3 |
 | sales | /api/v1/sales | 11 | 阶段3 |
 | sla | /api/v1/sla | 8 | 阶段3 |
@@ -679,7 +698,7 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | iot | /api/v1/iot | 10 | 阶段5 |
 | transactions | /api/v1/transactions | 4 | 阶段6 |
 | reports | /api/v1/reports | 8 | 阶段6 |
-| **合计** | | **195** | |
+| **合计** | | **205** | |
 
 ---
 
