@@ -45,7 +45,7 @@ defineEmits<{
 
 const searchModel = computed({
     get: () => props.searchValue || '',
-    set: (v: string) => { /* handled by v-model on parent via update:searchValue */ }
+    set: (_v: string) => { /* handled via emit */ }
 })
 </script>
 
