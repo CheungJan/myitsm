@@ -19,7 +19,7 @@
                 <el-table-column prop="status" label="状态" width="80" />
                 <el-table-column prop="created_at" label="创建时间" min-width="150" />
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:16px;justify-content:flex-end" />
         </el-card>
     </div>
 </template>
@@ -30,7 +30,7 @@ import AppPagination from '@/components/common/AppPagination.vue'
 import { fetchUsers } from '@/api/system'
 
 const users = ref<Record<string,unknown>[]>([])
-const loading = ref(false); const search = ref(''); const page = ref(1); const total = ref(0)
+const loading = ref(false); const search = ref(''); const page = ref(1); const perPage = ref(20); const total = ref(0)
 
 onMounted(() => loadData())
 

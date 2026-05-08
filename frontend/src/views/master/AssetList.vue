@@ -17,7 +17,7 @@
                 <el-table-column prop="asset_status" label="资产状态" width="100" />
                 <el-table-column prop="install_date" label="安装日期" width="120" />
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:16px;justify-content:flex-end" />
         </el-card>
     </div>
 </template>
@@ -28,14 +28,14 @@ import AppPagination from '@/components/common/AppPagination.vue'
 import { fetchAssets } from '@/api/master'
 
 const assets = ref<Record<string,unknown>[]>([])
-const loading = ref(false); const search = ref(''); const page = ref(1); const total = ref(0)
+const loading = ref(false); const search = ref(''); const page = ref(1); const perPage = ref(20); const total = ref(0)
 
 onMounted(() => loadData())
 
 async function loadData() {
     loading.value = true
     try {
-        const res = await fetchAssets({ page: String(page.value), per_page: '20' })
+        const res = await fetchAssets({ page: String(page.value), per_page: String(perPage.value) })
         const data = res.data as { items: Record<string,unknown>[], total: number }
         assets.value = data.items || []
         total.value = data.total || 0

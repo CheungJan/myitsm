@@ -1,19 +1,18 @@
 <template>
     <el-pagination
-        :current-page="currentPage"
-        :page-size="pageSize"
+        v-model:current-page="currentPageModel"
+        v-model:page-size="pageSizeModel"
         :page-sizes="pageSizes"
         :total="total"
         :layout="layout"
         :disabled="disabled"
-        @update:current-page="$emit('update:currentPage', $event)"
-        @update:page-size="$emit('update:pageSize', $event)"
-        @size-change="$emit('sizeChange', $event)"
     />
 </template>
 
 <script lang="ts" setup>
-withDefaults(defineProps<{
+import { computed } from 'vue'
+
+const props = withDefaults(defineProps<{
     currentPage?: number; pageSize?: number
     pageSizes?: number[]; total?: number
     layout?: string; disabled?: boolean
@@ -24,9 +23,17 @@ withDefaults(defineProps<{
     layout: 'total, sizes, prev, pager, next, jumper'
 })
 
-defineEmits<{
-    'update:currentPage': [page: number]
-    'update:pageSize': [size: number]
-    sizeChange: [size: number]
+const emit = defineEmits<{
+    'update:current-page': [page: number]
+    'update:page-size': [size: number]
 }>()
+
+const currentPageModel = computed({
+    get: () => props.currentPage,
+    set: (v: number) => emit('update:current-page', v)
+})
+const pageSizeModel = computed({
+    get: () => props.pageSize,
+    set: (v: number) => emit('update:page-size', v)
+})
 </script>

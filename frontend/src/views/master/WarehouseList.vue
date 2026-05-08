@@ -21,7 +21,7 @@
                     </template>
                 </el-table-column>
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:16px;justify-content:flex-end" />
         </el-card>
     </div>
 </template>
@@ -32,7 +32,7 @@ import AppPagination from '@/components/common/AppPagination.vue'
 import { fetchWarehouses } from '@/api/warehouse'
 
 const warehouses = ref<Record<string,unknown>[]>([])
-const loading = ref(false); const page = ref(1); const total = ref(0)
+const loading = ref(false); const page = ref(1); const perPage = ref(20); const total = ref(0)
 
 onMounted(() => loadData())
 
@@ -42,7 +42,7 @@ async function loadData() {
         const res = await fetchWarehouses()
         const list = (res.data || []) as never[]
         total.value = list.length
-        warehouses.value = list.slice((page.value-1)*20, page.value*20)
+        warehouses.value = list.slice((page.value-1)*perPage.value, page.value*perPage.value)
     } finally { loading.value = false }
 }
 

@@ -29,7 +29,7 @@
                     </template>
                 </el-table-column>
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:16px;justify-content:flex-end" />
         </el-card>
 
         <el-dialog :title="editing ? '编辑客户' : '新增客户'" v-model="dialogVisible" width="500px">
@@ -58,7 +58,7 @@ import AppPagination from '@/components/common/AppPagination.vue'
 
 const customers = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const search = ref(''); const classFilter = ref('')
-const page = ref(1); const total = ref(0)
+const page = ref(1); const perPage = ref(20); const total = ref(0)
 const classOptions = ref<string[]>([])
 const dialogVisible = ref(false); const editing = ref<Record<string,string>|null>(null); const saving = ref(false)
 const form = reactive({ cust_cd: '', cust_nm: '', class_cd: '', busi_typ: '', phone_no: '', contactor: '', address: '' })
@@ -75,8 +75,8 @@ function onFilterChange() { page.value = 1; doLoad(true) }
 async function doLoad(filtered: boolean) {
     loading.value = true
     try {
-        const perPage = filtered ? 100000 : 20
-        const res = await fetchCustomers({ page: '1', per_page: String(perPage) })
+        const limit = filtered ? 100000 : perPage.value
+        const res = await fetchCustomers({ page: '1', per_page: String(limit) })
         let list = ((res.data as { items: Record<string,unknown>[] }).items || []) as never[]
         if (classFilter.value) list = list.filter(r => (r as Record<string,string>).class_cd === classFilter.value)
         if (search.value) {
@@ -84,7 +84,7 @@ async function doLoad(filtered: boolean) {
             list = list.filter(r => { const d=r as Record<string,string>; return (d.cust_cd||'').includes(q)||(d.cust_nm||'').includes(q) })
         }
         total.value = list.length
-        customers.value = filtered ? list.slice((page.value-1)*20, page.value*20) : list
+        customers.value = filtered ? list.slice((page.value-1)*perPage.value, page.value*perPage.value) : list
     } finally { loading.value = false }
 }
 

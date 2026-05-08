@@ -8,7 +8,7 @@
                 <el-table-column prop="parent_cd" label="上级部门" width="120" />
                 <el-table-column prop="useflg" label="状态" width="80" />
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:16px;justify-content:flex-end" />
         </el-card>
     </div>
 </template>
@@ -19,7 +19,7 @@ import AppPagination from '@/components/common/AppPagination.vue'
 import { fetchDepartments } from '@/api/system'
 
 const depts = ref<Record<string,unknown>[]>([])
-const loading = ref(false); const page = ref(1); const total = ref(0)
+const loading = ref(false); const page = ref(1); const perPage = ref(20); const total = ref(0)
 
 onMounted(() => loadData())
 
@@ -29,7 +29,7 @@ async function loadData() {
         const res = await fetchDepartments()
         const list = (res.data || []) as never[]
         total.value = list.length
-        depts.value = list.slice((page.value-1)*20, page.value*20)
+        depts.value = list.slice((page.value-1)*perPage.value, page.value*perPage.value)
     } finally { loading.value = false }
 }
 </script>

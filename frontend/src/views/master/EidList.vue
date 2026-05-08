@@ -25,7 +25,7 @@
                     </template>
                 </el-table-column>
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:16px;justify-content:flex-end" />
                 style="margin-top:16px;justify-content:flex-end" />
         </el-card>
 
@@ -57,7 +57,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchEidList, createEid, updateEid, deleteEid } from '@/api/master'
 
 const eids = ref<Record<string,unknown>[]>([])
-const loading = ref(false)
+const loading = ref(false); const perPage = ref(20)
 const search = ref('')
 const page = ref(1)
 const total = ref(0)
@@ -72,7 +72,7 @@ onMounted(() => loadData())
 async function loadData() {
     loading.value = true
     try {
-        const res = await fetchEidList({ page: String(page.value), per_page: '20' })
+        const res = await fetchEidList({ page: String(page.value), per_page: String(perPage.value) })
         const data = res.data as { items: Record<string,unknown>[], total: number }
         eids.value = data.items || []
         total.value = data.total || 0

@@ -24,7 +24,7 @@
                     </template>
                 </el-table-column>
             </el-table>
-            <AppPagination v-model:current-page="page" :total="total" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:16px;justify-content:flex-end" />
         </el-card>
 
         <el-dialog :title="editing ? '编辑物料' : '新增物料'" v-model="dialogVisible" width="500px">
@@ -50,7 +50,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchItems, createItem, updateItem, deleteItem } from '@/api/master'
 
 const items = ref<Record<string,unknown>[]>([])
-const loading = ref(false); const search = ref(''); const page = ref(1); const total = ref(0)
+const loading = ref(false); const search = ref(''); const page = ref(1); const perPage = ref(20); const total = ref(0)
 const dialogVisible = ref(false); const editing = ref<Record<string,string>|null>(null); const saving = ref(false)
 const form = reactive({ item_cd: '', item_nm: '', class_cd: '', itemanm: '', unit: '' })
 
@@ -59,7 +59,7 @@ onMounted(() => loadData())
 async function loadData() {
     loading.value = true
     try {
-        const res = await fetchItems({ page: String(page.value), per_page: '20' })
+        const res = await fetchItems({ page: String(page.value), per_page: String(perPage.value) })
         const data = res.data as { items: Record<string,unknown>[], total: number }
         items.value = data.items || []
         total.value = data.total || 0
