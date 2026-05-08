@@ -8,14 +8,14 @@
                 <el-table-column prop="parent_cd" label="上级部门" width="120" />
                 <el-table-column prop="useflg" label="状态" width="80" />
             </el-table>
-            <el-pagination v-model:current-page="page" :total="total" :page-size="20"
-                layout="total, prev, pager, next" @current-change="loadData" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" :total="total"
         </el-card>
     </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
+import AppPagination from '@/components/common/AppPagination.vue'
 import { fetchDepartments } from '@/api/system'
 
 const depts = ref<Record<string,unknown>[]>([])

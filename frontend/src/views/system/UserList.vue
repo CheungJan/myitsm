@@ -19,14 +19,14 @@
                 <el-table-column prop="status" label="状态" width="80" />
                 <el-table-column prop="created_at" label="创建时间" min-width="150" />
             </el-table>
-            <el-pagination v-model:current-page="page" :total="total" :page-size="20"
-                layout="total, prev, pager, next" @current-change="loadData" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" :total="total"
         </el-card>
     </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
+import AppPagination from '@/components/common/AppPagination.vue'
 import { fetchUsers } from '@/api/system'
 
 const users = ref<Record<string,unknown>[]>([])

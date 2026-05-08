@@ -24,8 +24,7 @@
                     </template>
                 </el-table-column>
             </el-table>
-            <el-pagination v-model:current-page="page" :total="total" :page-size="20"
-                layout="total, prev, pager, next" @current-change="loadData" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" :total="total"
         </el-card>
 
         <el-dialog :title="editing ? '编辑物料' : '新增物料'" v-model="dialogVisible" width="500px">
@@ -46,6 +45,7 @@
 
 <script lang="ts" setup>
 import { ref, reactive, onMounted } from 'vue'
+import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchItems, createItem, updateItem, deleteItem } from '@/api/master'
 

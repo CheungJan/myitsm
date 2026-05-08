@@ -17,14 +17,14 @@
                 <el-table-column prop="asset_status" label="资产状态" width="100" />
                 <el-table-column prop="install_date" label="安装日期" width="120" />
             </el-table>
-            <el-pagination v-model:current-page="page" :total="total" :page-size="20"
-                layout="total, prev, pager, next" @current-change="loadData" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" :total="total"
         </el-card>
     </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
+import AppPagination from '@/components/common/AppPagination.vue'
 import { fetchAssets } from '@/api/master'
 
 const assets = ref<Record<string,unknown>[]>([])

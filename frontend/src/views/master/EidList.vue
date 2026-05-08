@@ -25,8 +25,7 @@
                     </template>
                 </el-table-column>
             </el-table>
-            <el-pagination v-model:current-page="page" :total="total" :page-size="20"
-                layout="total, prev, pager, next" @current-change="loadData"
+            <AppPagination v-model:current-page="page" :total="total"
                 style="margin-top:16px;justify-content:flex-end" />
         </el-card>
 
@@ -53,6 +52,7 @@
 
 <script lang="ts" setup>
 import { ref, reactive, onMounted } from 'vue'
+import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchEidList, createEid, updateEid, deleteEid } from '@/api/master'
 

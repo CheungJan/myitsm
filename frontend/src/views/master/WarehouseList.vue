@@ -21,14 +21,14 @@
                     </template>
                 </el-table-column>
             </el-table>
-            <el-pagination v-model:current-page="page" :total="total" :page-size="20"
-                layout="total, prev, pager, next" @current-change="loadData" style="margin-top:16px;justify-content:flex-end" />
+            <AppPagination v-model:current-page="page" :total="total"
         </el-card>
     </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
+import AppPagination from '@/components/common/AppPagination.vue'
 import { fetchWarehouses } from '@/api/warehouse'
 
 const warehouses = ref<Record<string,unknown>[]>([])

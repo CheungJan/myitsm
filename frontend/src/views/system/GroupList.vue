@@ -19,6 +19,7 @@
 
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
+import AppPagination from '@/components/common/AppPagination.vue'
 import { fetchGroups } from '@/api/system'
 
 const groups = ref<Record<string,unknown>[]>([])
