@@ -40,8 +40,8 @@ const route = useRoute()
 const activeMenu = computed(() => route.path)
 
 interface FlatMenu {
-    menu_cd: string; menu_nm: string; exe_path: string
-    parent_cd: string | null; ordno?: number
+    menu_cd: string; menu_nm: string
+    parent: string | null; exe_path?: string; ordno?: number
 }
 interface TreeMenu extends FlatMenu { children?: TreeMenu[] }
 
@@ -54,8 +54,8 @@ function buildTree(flat: FlatMenu[]): TreeMenu[] {
         map.set(item.menu_cd, { ...item, children: [] })
     }
     for (const item of map.values()) {
-        if (item.parent_cd && map.has(item.parent_cd)) {
-            map.get(item.parent_cd)!.children!.push(item)
+        if (item.parent && map.has(item.parent)) {
+            map.get(item.parent)!.children!.push(item)
         } else {
             roots.push(item)
         }
