@@ -14,8 +14,9 @@ class TestSkipColumns:
     def test_updated_at_is_skipped(self):
         assert "updated_at" in SKIP_TARGET_COLUMNS
 
-    def test_id_is_skipped(self):
-        assert "id" in SKIP_TARGET_COLUMNS
+    def test_id_not_skipped(self):
+        """id 列不应跳过，以保留源库 ID 维护 FK 引用。"""
+        assert "id" not in SKIP_TARGET_COLUMNS
 
     def test_source_type_is_skipped(self):
         assert "source_type" in SKIP_TARGET_COLUMNS

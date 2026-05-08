@@ -6,6 +6,8 @@ from typing import Any
 
 from app.extensions import db
 from app.repositories.warehouse_repository import (
+    AssetCheckRepository,
+    PosChangeRepository,
     StockDetailRepository,
     StockInRepository,
     StockOutRepository,
@@ -217,3 +219,111 @@ class StockBalanceService:
             "page": page,
             "per_page": per_page,
         }
+
+
+# ---------------------------------------------------------------------------
+# 资产盘点
+# ---------------------------------------------------------------------------
+
+
+class AssetCheckService:
+    """资产盘点（twh19_asset_c_a / twh20_asset_c_a_dtl）业务编排。"""
+
+    @staticmethod
+    def get(opbillid: str) -> dict[str, Any] | None:
+        record = AssetCheckRepository.get_by_id(opbillid)
+        if record is None:
+            return None
+        result = record.to_dict()
+        result["details"] = [
+            d.to_dict() for d in record.details.filter_by(useflg="1").all()
+        ]
+        return result
+
+    @staticmethod
+    def list_records(
+        page: int = 1, per_page: int = 20, useflg: str | None = "1"
+    ) -> dict[str, Any]:
+        items, total = AssetCheckRepository.list_all(
+            page=page, per_page=per_page, useflg=useflg
+        )
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        details_data = data.pop("details", [])
+        record = AssetCheckRepository.create(data, creator)
+        for detail in details_data:
+            AssetCheckRepository.add_detail(record.opbillid, detail)
+        return record.to_dict()
+
+    @staticmethod
+    def update(opbillid: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        record = AssetCheckRepository.get_by_id(opbillid)
+        if record is None:
+            return None
+        record = AssetCheckRepository.update(record, data)
+        return record.to_dict()
+
+    @staticmethod
+    def audit(opbillid: str, auditor: str) -> dict[str, object] | None:
+        record = AssetCheckRepository.get_by_id(opbillid)
+        if record is None:
+            return None
+        record = AssetCheckRepository.audit(record, auditor)
+        return record.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# POS设备变更
+# ---------------------------------------------------------------------------
+
+
+class PosChangeService:
+    """POS设备变更（twh21_pos_change / twh22_pos_change_dt）业务编排。"""
+
+    @staticmethod
+    def get(pk: int) -> dict[str, Any] | None:
+        record = PosChangeRepository.get_by_id(pk)
+        if record is None:
+            return None
+        result = record.to_dict()
+        result["details"] = [
+            d.to_dict() for d in record.details.filter_by(useflg="1").all()
+        ]
+        return result
+
+    @staticmethod
+    def list_records(
+        page: int = 1, per_page: int = 20, useflg: str | None = "1"
+    ) -> dict[str, Any]:
+        items, total = PosChangeRepository.list_all(
+            page=page, per_page=per_page, useflg=useflg
+        )
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        details_data = data.pop("details", [])
+        record = PosChangeRepository.create(data, creator)
+        for detail in details_data:
+            PosChangeRepository.add_detail(record.id, detail)
+        return record.to_dict()
+
+    @staticmethod
+    def update(pk: int, data: dict[str, Any]) -> dict[str, Any] | None:
+        record = PosChangeRepository.get_by_id(pk)
+        if record is None:
+            return None
+        record = PosChangeRepository.update(record, data)
+        return record.to_dict()
