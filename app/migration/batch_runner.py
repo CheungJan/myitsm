@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import logging
+
 from sqlalchemy import text
 
 from app.migration.config import MigrationConfig
 from app.migration.connector import DualConnector
 from app.migration.field_mapper import (
-    MAPPINGS,
     TableMapping,
     get_mappings_by_batch,
     map_source_row,

@@ -72,6 +72,12 @@ app/
 
 ## 可用 Skills
 
-`python-backend` `sqlalchemy-alembic-expert-best-practices-code-review` `rest-api-design`
-`frontend-design` `frontend-vue-development` `code-review` `security-review`
-`legacy-modernizer` `webapp-testing`
+| 分类 | Skills |
+|------|--------|
+| 后端 | `python-backend` `sqlalchemy-alembic-expert-best-practices-code-review` `rest-api-design` |
+| 前端 | `frontend-design` `frontend-vue-development` |
+| 质量 | `code-review` `security-review` `test-driven-development` `systematic-debugging` |
+| 流程 | `writing-plans` `executing-plans` `verification-before-completion` `finishing-a-development-branch` |
+| 迁移 | `legacy-modernizer` |
+| 测试 | `webapp-testing` |
+| Agent | `subagent-driven-development` `using-superpowers` |

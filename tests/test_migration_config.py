@@ -1,4 +1,5 @@
 import pytest
+
 from app.migration.config import MigrationConfig
 
 
@@ -40,8 +41,8 @@ class TestDualConnector:
     def test_engines_created_on_demand(self, monkeypatch):
         monkeypatch.setenv("SOURCE_DATABASE_URL", "sqlite:///:memory:")
         monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
-        from app.migration.connector import DualConnector
         from app.migration.config import MigrationConfig
+        from app.migration.connector import DualConnector
         config = MigrationConfig.from_env()
         connector = DualConnector(config)
         assert connector._source_engine is None
@@ -53,8 +54,8 @@ class TestDualConnector:
         from sqlalchemy import text
         monkeypatch.setenv("SOURCE_DATABASE_URL", "sqlite:///:memory:")
         monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
-        from app.migration.connector import DualConnector
         from app.migration.config import MigrationConfig
+        from app.migration.connector import DualConnector
         config = MigrationConfig.from_env()
         connector = DualConnector(config)
         with connector.source.connect() as conn:

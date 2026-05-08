@@ -1,10 +1,13 @@
 from datetime import datetime
+
+import pytest
+
 from app.migration.field_mapper import (
+    MAPPINGS,
     FieldMapping,
     TableMapping,
     map_source_row,
     normalize_char,
-    MAPPINGS,
 )
 
 
@@ -98,6 +101,3 @@ class TestMappingsRegistry:
     def test_batch_order_is_sequential(self):
         batches = sorted({m.batch for m in MAPPINGS})
         assert batches == [1, 2, 3, 4, 5]
-
-
-import pytest
