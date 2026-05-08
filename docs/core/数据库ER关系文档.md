@@ -1,8 +1,9 @@
 # 数据库 ER 关系文档
 
-**版本**: v2.0  
-**更新日期**: 2026-04-27  
-**模型总数**: 138个业务模型（BaseModel 为公共基类，不计入）
+**版本**: v2.1  
+**更新日期**: 2026-05-08  
+**模型总数**: 138个业务模型（BaseModel 为公共基类，不计入）  
+**本次更新**: 资产盘点/POS变更模型已补全 Repository+Service+API 三层
 
 > **v2.0 变更说明**：修正所有表名为实际 `__tablename__` 值，与 Oracle 数据库字典保持一致；
 > 新增"Oracle 遗留表评估"章节，标注重构后不再需要的表。
@@ -223,10 +224,10 @@ TWH01_WAREHOUSE (Warehouse)
 | OverLost | twh17_overlost | 盘盈盘亏 |
 | OverLostDt | twh18_overlostdt | 盘盈盘亏明细 |
 | OverLostEid | twh18_overlosteid | 盘盈盘亏设备 |
-| AssetCheckAccept | twh19_asset_c_a | 资产盘点 |
-| AssetCheckAcceptDtl | twh20_asset_c_a_dtl | 盘点明细 |
-| PosChange | twh21_pos_change | POS设备变更 |
-| PosChangeDt | twh22_pos_change_dt | POS变更明细 |
+| AssetCheckAccept | twh19_asset_c_a | 资产盘点 ✅ (repo+service+api) |
+| AssetCheckAcceptDtl | twh20_asset_c_a_dtl | 盘点明细 ✅ |
+| PosChange | twh21_pos_change | POS设备变更 ✅ (repo+service+api) |
+| PosChangeDt | twh22_pos_change_dt | POS变更明细 ✅ |
 
 ---
 
