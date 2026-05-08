@@ -68,6 +68,12 @@ const router = createRouter({
                     name: 'Assets',
                     component: () => import('@/views/master/AssetList.vue'),
                     meta: { title: '资产台账' }
+                },
+                {
+                    path: 'master/warehouses',
+                    name: 'Warehouses',
+                    component: () => import('@/views/master/WarehouseList.vue'),
+                    meta: { title: '仓库管理' }
                 }
             ]
         },
