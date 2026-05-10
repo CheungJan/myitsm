@@ -2516,3 +2516,36 @@ uv run python migrate_data.py
 - 总体完整率：**99.6%**（3,339,020/3,353,080）
 - 13 张差异表均已查明根因（源库 FK孤儿/NULL PK/PK重复）
 - 详见 `docs/core/数据迁移问题解决报告.md`
+
+---
+
+## Phase 7 补充：行政区域表迁移（2026-05-10）
+
+### 背景
+
+原迁移遗漏了 4 张地理层级表（TMM02-05），导致客户表缺少国家/省份/城市/区县字段。
+
+### 新增表
+
+| 表名 | 模型 | 记录数 | 层级关系 |
+|------|------|--------|---------|
+| `tmm02_country` | Country | 192 | 根 |
+| `tmm03_province` | Province | 34 | country_cd → tmm02_country |
+| `tmm04_city` | City | 436 | prvn_cd → tmm03_province |
+| `tmm05_town` | Town | 2,778 | city_cd → tmm04_city |
+
+### 客户表扩展
+
+`tmm22_customers` 新增 4 列：
+
+| 列名 | 类型 | 说明 |
+|------|------|------|
+| `country_cd` | VARCHAR(3) | 国家代码 |
+| `prvn_cd` | VARCHAR(2) | 省份代码 |
+| `city_cd` | VARCHAR(4) | 城市代码 |
+| `town_cd` | VARCHAR(4) | 区县代码 |
+
+### 迁移方式
+
+- DDL：Alembic 自动生成（`c08d02f7f9f6`）
+- DML：Python psycopg2 双连接逐行 INSERT，字段名映射（countrycd→country_cd 等），strip() 去空格

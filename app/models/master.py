@@ -13,6 +13,49 @@ from app.extensions import db
 from app.models.base import BaseModel
 
 
+class Country(BaseModel):
+    """国家表（TMM02_COUNTRY）。"""
+
+    __tablename__ = "tmm02_country"
+
+    country_cd = db.Column(db.String(3), primary_key=True, comment="国家代码")
+    country_nm = db.Column(db.String(50), nullable=False, comment="国家名称")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+
+class Province(BaseModel):
+    """省份表（TMM03_PROVINCE）。"""
+
+    __tablename__ = "tmm03_province"
+
+    prvn_cd = db.Column(db.String(2), primary_key=True, comment="省份代码")
+    prvn_nm = db.Column(db.String(50), nullable=False, comment="省份名称")
+    country_cd = db.Column(db.String(3), db.ForeignKey("tmm02_country.country_cd"), comment="国家代码")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+
+class City(BaseModel):
+    """城市表（TMM04_CITY）。"""
+
+    __tablename__ = "tmm04_city"
+
+    city_cd = db.Column(db.String(4), primary_key=True, comment="城市代码")
+    city_nm = db.Column(db.String(50), nullable=False, comment="城市名称")
+    prvn_cd = db.Column(db.String(2), db.ForeignKey("tmm03_province.prvn_cd"), comment="省份代码")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+
+class Town(BaseModel):
+    """区县表（TMM05_TOWN）。"""
+
+    __tablename__ = "tmm05_town"
+
+    town_cd = db.Column(db.String(4), primary_key=True, comment="区县代码")
+    town_nm = db.Column(db.String(50), nullable=False, comment="区县名称")
+    city_cd = db.Column(db.String(4), db.ForeignKey("tmm04_city.city_cd"), comment="城市代码")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+
 class Company(BaseModel):
     """公司表（TMM01_COMPANY）。"""
 
@@ -109,6 +152,11 @@ class Customer(BaseModel):
     zf_type = db.Column(db.String(10), comment="支付方式")
     comm_mode = db.Column(db.String(20), comment="通讯方式")
     store_cd = db.Column(db.String(30), comment="门店编码")
+    # 行政区域（关联 tmm02-05 地理表）
+    country_cd = db.Column(db.String(3), comment="国家代码")
+    prvn_cd = db.Column(db.String(2), comment="省份代码")
+    city_cd = db.Column(db.String(4), comment="城市代码")
+    town_cd = db.Column(db.String(4), comment="区县代码")
     # --- Oracle 原表恢复字段（31个） ---
     cust_anm = db.Column(db.String(40), comment="客户别名")
     cust_brcd = db.Column(db.String(20), comment="客户条码")

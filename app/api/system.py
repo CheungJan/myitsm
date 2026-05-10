@@ -24,9 +24,12 @@ _service = SystemService()
 @system_bp.get("/users")
 @login_required
 def list_users():  # type: ignore[no-untyped-def]
-    """获取用户列表。"""
+    """获取用户列表，支持多条件筛选。"""
     status = request.args.get("status")
-    users = _service.list_users(status=status)
+    user_cd = request.args.get("user_cd")
+    user_nm = request.args.get("user_nm")
+    dept_cd = request.args.get("dept_cd")
+    users = _service.list_users(status=status, user_cd=user_cd, user_nm=user_nm, dept_cd=dept_cd)
     return success_response(data=users)
 
 
@@ -40,6 +43,30 @@ def get_user(user_cd: str):  # type: ignore[no-untyped-def]
     return success_response(data=user)
 
 
+@system_bp.post("/users")
+@login_required
+def create_user():  # type: ignore[no-untyped-def]
+    """新增用户。"""
+    body = request.get_json(silent=True) or {}
+    return success_response(data=_service.create_user(body), code=201)
+
+
+@system_bp.put("/users/<user_cd>")
+@login_required
+def update_user(user_cd: str):  # type: ignore[no-untyped-def]
+    """更新用户。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_user(user_cd, body)
+    return success_response(data=r) if r else error_response("用户不存在", 404)
+
+
+@system_bp.delete("/users/<user_cd>")
+@login_required
+def delete_user(user_cd: str):  # type: ignore[no-untyped-def]
+    """删除用户。"""
+    return success_response() if _service.delete_user(user_cd) else error_response("用户不存在", 404)
+
+
 # ---- 部门管理 ----
 
 
@@ -48,6 +75,30 @@ def get_user(user_cd: str):  # type: ignore[no-untyped-def]
 def list_departments():  # type: ignore[no-untyped-def]
     """获取部门列表。"""
     return success_response(data=_service.list_departments())
+
+
+@system_bp.post("/departments")
+@login_required
+def create_department():  # type: ignore[no-untyped-def]
+    """新增部门。"""
+    body = request.get_json(silent=True) or {}
+    return success_response(data=_service.create_department(body), code=201)
+
+
+@system_bp.put("/departments/<dept_cd>")
+@login_required
+def update_department(dept_cd: str):  # type: ignore[no-untyped-def]
+    """更新部门。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_department(dept_cd, body)
+    return success_response(data=r) if r else error_response("部门不存在", 404)
+
+
+@system_bp.delete("/departments/<dept_cd>")
+@login_required
+def delete_department(dept_cd: str):  # type: ignore[no-untyped-def]
+    """删除部门。"""
+    return success_response() if _service.delete_department(dept_cd) else error_response("部门不存在", 404)
 
 
 # ---- 用户组管理 ----
@@ -60,11 +111,87 @@ def list_groups():  # type: ignore[no-untyped-def]
     return success_response(data=_service.list_groups())
 
 
+@system_bp.post("/groups")
+@login_required
+def create_group():  # type: ignore[no-untyped-def]
+    """新增用户组。"""
+    body = request.get_json(silent=True) or {}
+    return success_response(data=_service.create_group(body), code=201)
+
+
+@system_bp.put("/groups/<group_cd>")
+@login_required
+def update_group(group_cd: str):  # type: ignore[no-untyped-def]
+    """更新用户组。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_group(group_cd, body)
+    return success_response(data=r) if r else error_response("用户组不存在", 404)
+
+
+@system_bp.delete("/groups/<group_cd>")
+@login_required
+def delete_group(group_cd: str):  # type: ignore[no-untyped-def]
+    """删除用户组。"""
+    return success_response() if _service.delete_group(group_cd) else error_response("用户组不存在", 404)
+
+
+@system_bp.get("/groups/<group_cd>/members")
+@login_required
+def get_group_members(group_cd: str):  # type: ignore[no-untyped-def]
+    """获取用户组成员列表。"""
+    return success_response(data=_service.get_group_members(group_cd))
+
+
+@system_bp.post("/groups/<group_cd>/members")
+@login_required
+def add_group_member(group_cd: str):  # type: ignore[no-untyped-def]
+    """添加用户组成员。"""
+    body = request.get_json(silent=True) or {}
+    user_cd = body.get("user_cd", "")
+    if not user_cd:
+        return error_response("缺少 user_cd", 400)
+    return success_response() if _service.add_group_member(user_cd, group_cd) else error_response("添加失败", 400)
+
+
+@system_bp.delete("/groups/<group_cd>/members/<user_cd>")
+@login_required
+def remove_group_member(group_cd: str, user_cd: str):  # type: ignore[no-untyped-def]
+    """移除用户组成员。"""
+    return success_response() if _service.remove_group_member(user_cd, group_cd) else error_response("成员不存在", 404)
+
+
 @system_bp.get("/users/<user_cd>/groups")
 @login_required
 def get_user_groups(user_cd: str):  # type: ignore[no-untyped-def]
     """获取用户所属用户组。"""
     return success_response(data=_service.get_user_groups(user_cd))
+
+
+# ---- 权限管理 ----
+
+
+@system_bp.get("/groups/<group_cd>/rights")
+@login_required
+def get_group_rights(group_cd: str):  # type: ignore[no-untyped-def]
+    """获取用户组权限。"""
+    return success_response(data=_service.get_group_rights(group_cd))
+
+
+@system_bp.put("/groups/<group_cd>/rights")
+@login_required
+def set_group_rights(group_cd: str):  # type: ignore[no-untyped-def]
+    """设置用户组权限（全量替换）。"""
+    body = request.get_json(silent=True) or {}
+    rights = body.get("rights", [])
+    _service.set_group_rights(group_cd, rights)
+    return success_response(message="权限设置成功")
+
+
+@system_bp.get("/users/<user_cd>/permissions")
+@login_required
+def get_user_permissions(user_cd: str):  # type: ignore[no-untyped-def]
+    """获取用户有效权限（通过用户组继承）。"""
+    return success_response(data=_service.get_user_permissions(user_cd))
 
 
 # ---- 菜单管理 ----
@@ -75,6 +202,13 @@ def get_user_groups(user_cd: str):  # type: ignore[no-untyped-def]
 def list_menus():  # type: ignore[no-untyped-def]
     """获取菜单树。"""
     return success_response(data=_service.list_menus())
+
+
+@system_bp.get("/menus/perm-tree")
+@login_required
+def get_perm_tree():  # type: ignore[no-untyped-def]
+    """获取权限树（动态读取数据库菜单+功能定义）。"""
+    return success_response(data=_service.get_perm_tree())
 
 
 # ---- 系统参数 ----
@@ -97,13 +231,120 @@ def get_sysparm(parm_cd: str):  # type: ignore[no-untyped-def]
     return success_response(data=parm)
 
 
+# ---- 码表查询 ----
+
+
+@system_bp.get("/syscodes")
+@login_required
+def list_syscodes():  # type: ignore[no-untyped-def]
+    """按编码类型查询系统编码（如 BT/ZF/YB）。"""
+    code_typ = request.args.get("code_typ", "")
+    if not code_typ:
+        return error_response("缺少 code_typ 参数", 400)
+    return success_response(data=_service.get_syscodes(code_typ))
+
+
+@system_bp.get("/areas")
+@login_required
+def list_areas():  # type: ignore[no-untyped-def]
+    """区域列表。"""
+    return success_response(data=_service.get_areas())
+
+
+@system_bp.get("/commodes")
+@login_required
+def list_commodes():  # type: ignore[no-untyped-def]
+    """通讯方式列表。"""
+    return success_response(data=_service.get_commodes())
+
+
+@system_bp.get("/countries")
+@login_required
+def list_countries():  # type: ignore[no-untyped-def]
+    """国家列表。"""
+    return success_response(data=_service.get_countries())
+
+
+@system_bp.get("/provinces")
+@login_required
+def list_provinces():  # type: ignore[no-untyped-def]
+    """省份/直辖市列表。"""
+    return success_response(data=_service.get_provinces())
+
+
+@system_bp.get("/cities")
+@login_required
+def list_cities():  # type: ignore[no-untyped-def]
+    """城市/区列表，可选按省份筛选。"""
+    prvn_cd = request.args.get("prvn_cd")
+    return success_response(data=_service.get_cities(prvn_cd))
+
+
+@system_bp.get("/towns")
+@login_required
+def list_towns():  # type: ignore[no-untyped-def]
+    """区县/街道列表，可选按城市筛选。"""
+    city_cd = request.args.get("city_cd")
+    return success_response(data=_service.get_towns(city_cd))
+
+
+# ---- 物料分类 ----
+
+
+@system_bp.get("/itemclasses/tree")
+@login_required
+def get_item_class_tree():  # type: ignore[no-untyped-def]
+    """物料分类树（三级）。"""
+    return success_response(data=_service.get_item_class_tree())
+
+
+@system_bp.get("/itemclasses")
+@login_required
+def list_item_classes():  # type: ignore[no-untyped-def]
+    """物料分类列表（扁平）。"""
+    return success_response(data=_service.list_item_classes())
+
+
+@system_bp.post("/itemclasses")
+@login_required
+def create_item_class():  # type: ignore[no-untyped-def]
+    """新增物料分类。"""
+    body = request.get_json(silent=True) or {}
+    return success_response(data=_service.create_item_class(body), code=201)
+
+
+@system_bp.put("/itemclasses/<class_cd>")
+@login_required
+def update_item_class(class_cd: str):  # type: ignore[no-untyped-def]
+    """更新物料分类。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_item_class(class_cd, body)
+    return success_response(data=r) if r else error_response("分类不存在", 404)
+
+
+@system_bp.delete("/itemclasses/<class_cd>")
+@login_required
+def delete_item_class(class_cd: str):  # type: ignore[no-untyped-def]
+    """删除物料分类。"""
+    return success_response() if _service.delete_item_class(class_cd) else error_response("分类不存在", 404)
+
+
+# ---- 物料 ----
+
+
 @system_bp.get("/items")
 @login_required
 def list_items():  # type: ignore[no-untyped-def]
-    """物料列表（分页）。"""
+    """物料列表（分页），支持分类筛选、递归子分类、搜索。"""
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
-    result = _service.list_items(page=page, per_page=per_page)
+    class_cd = request.args.get("class_cd")
+    recursive = request.args.get("recursive", "1") == "1"
+    search = request.args.get("search")
+    result = _service.list_items(
+        page=page, per_page=per_page,
+        class_cd=class_cd, recursive=recursive, search=search,
+    )
     return success_response(data={"items": result["items"], "total": result["total"]})
 
 
@@ -131,13 +372,59 @@ def delete_item(item_cd: str):  # type: ignore[no-untyped-def]
     return success_response() if _service.delete_item(item_cd) else error_response("不存在", 404)
 
 
+# ---- 客户分类 ----
+
+
+@system_bp.get("/custclasses/tree")
+@login_required
+def get_cust_class_tree():  # type: ignore[no-untyped-def]
+    """客户分类树。"""
+    return success_response(data=_service.get_cust_class_tree())
+
+
+@system_bp.get("/custclasses")
+@login_required
+def list_cust_classes():  # type: ignore[no-untyped-def]
+    """客户分类列表（扁平）。"""
+    return success_response(data=_service.list_cust_classes())
+
+
+@system_bp.post("/custclasses")
+@login_required
+def create_cust_class():  # type: ignore[no-untyped-def]
+    """新增客户分类。"""
+    body = request.get_json(silent=True) or {}
+    return success_response(data=_service.create_cust_class(body), code=201)
+
+
+@system_bp.put("/custclasses/<class_cd>")
+@login_required
+def update_cust_class(class_cd: str):  # type: ignore[no-untyped-def]
+    """更新客户分类。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_cust_class(class_cd, body)
+    return success_response(data=r) if r else error_response("分类不存在", 404)
+
+
+@system_bp.delete("/custclasses/<class_cd>")
+@login_required
+def delete_cust_class(class_cd: str):  # type: ignore[no-untyped-def]
+    """删除客户分类。"""
+    return success_response() if _service.delete_cust_class(class_cd) else error_response("分类不存在", 404)
+
+
+# ---- 客户 ----
+
+
 @system_bp.get("/customers")
 @login_required
 def list_customers():  # type: ignore[no-untyped-def]
-    """客户列表（分页）。"""
+    """客户列表（分页），支持分类筛选和搜索。"""
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
-    result = _service.list_customers(page=page, per_page=per_page)
+    class_cd = request.args.get("class_cd")
+    search = request.args.get("search")
+    result = _service.list_customers(page=page, per_page=per_page, class_cd=class_cd, search=search)
     return success_response(data={"items": result["items"], "total": result["total"]})
 
 
