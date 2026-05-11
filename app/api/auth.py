@@ -79,7 +79,9 @@ def login():  # type: ignore[no-untyped-def]
 def logout():  # type: ignore[no-untyped-def]
     """登出，写入日志以清除多点登录标记。"""
     user_cd = getattr(g, "current_user", None) or ""
-    AuthService.logout(user_cd)
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header[7:].strip() if auth_header.startswith("Bearer ") else ""
+    AuthService.logout(user_cd, token)
     return success_response(message="已登出")
 
 

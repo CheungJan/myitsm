@@ -24,12 +24,16 @@ request.interceptors.response.use(
         return body
     },
     err => {
+        const isLoginPage = window.location.pathname.startsWith('/login')
         if (err.response?.status === 401) {
-            localStorage.removeItem('token')
-            window.location.href = '/login'
+            if (!isLoginPage) {
+                localStorage.removeItem('token')
+                window.location.href = '/login'
+            }
+        } else {
+            const msg = err.response?.data?.message || '网络错误'
+            ElMessage.error(msg)
         }
-        const msg = err.response?.data?.message || '网络错误'
-        ElMessage.error(msg)
         return Promise.reject(err)
     }
 )

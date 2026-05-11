@@ -406,7 +406,8 @@ class TestMappingsRegistry:
         a_class_tables = [
             "TAC01_FPSK", "THT01_HTGL", "TIP01_PRICE", "TIP03_ADJPRICE",
             "TIT01_TIMEPOINT_AREA", "TIT02_LIABILITYREG", "TIT02_LIABILITYREGDT",
-            "TIT03_SYSCODES", "TIT04_ARCHIVECODE", "TIT05_REPAIRINFO",
+            "TIT03_SYSCODES",  -- 2026-05-10 已合并至 tmm31_syscodes
+            "TIT04_ARCHIVECODE", "TIT05_REPAIRINFO",
             "TMC01_MENUS", "TMC02_MENUSDT", "TMC03_USERMENUS",
             "TMC11_DEPARTMENTS", "TMC12_GROUPS", "TMC13_USERS",
             "TMM01_COMPANY", "TMM11_ITEMCLASS", "TMM12_ITEMS",
@@ -882,7 +883,7 @@ _m("TIT02_LIABILITYREGDT", "tit02_liabilityregdt", [
     FieldMapping("useflg", "USEFLG", transform="char"),
 ], batch=2, depends_on=["tit02_liabilityreg"])
 
-_m("TIT03_SYSCODES", "tit03_syscodes", [
+_m("TIT03_SYSCODES", "tit03_syscodes", [  # 2026-05-10: tit03已合并至tmm31_syscodes并删除
     FieldMapping("codetyp", "CODETYP", transform="char"),
     FieldMapping("codecd", "CODECD", transform="char"),
     FieldMapping("codenm", "CODENM"),

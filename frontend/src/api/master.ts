@@ -213,10 +213,46 @@ export function deleteCustomer(custCd: string) {
     return request.delete<never, unknown>(`/customers/${custCd}`)
 }
 
+// ---- 仓库 ----
+
+export function fetchWarehouses() {
+    return request.get<never, { data: { whcd: string; whnm: string }[] }>('/warehouses')
+}
+
 // ---- EID ----
 
-export function fetchEidList(params?: Record<string, string>) {
-    return request.get('/eid', { params })
+export interface EidRecord {
+    eid: string
+    itemcd: string
+    item_nm: string
+    etyp: string
+    whcd: string
+    sflg: string
+    new_old: string
+    qcflg: string
+    gendate: string
+    prddate: string
+    [key: string]: unknown
+}
+
+export interface EidPage {
+    items: EidRecord[]
+    total: number
+}
+
+export interface EidQuery {
+    page?: number | string
+    per_page?: number | string
+    class_cd?: string
+    search?: string
+}
+
+export function fetchEidTree() {
+    return request.get<never, { data: ItemClassNode[] }>('/eid/tree')
+}
+
+export function fetchEidList(params?: EidQuery) {
+    return request.get<never, { data: EidPage }>('/eid', { params })
 }
 export function createEid(data: Record<string, unknown>) {
     return request.post('/eid', data)
@@ -226,6 +262,10 @@ export function updateEid(itemcd: string, eidVal: string, data: Record<string, u
 }
 export function deleteEid(itemcd: string, eidVal: string) {
     return request.delete(`/eid/${itemcd}/${eidVal}`)
+}
+
+export function fetchEidTracks(itemcd: string, eid: string) {
+    return request.get<never, { data: Record<string,unknown>[] }>(`/eid/${itemcd}/${eid}/tracks`)
 }
 
 // ---- 资产 ----

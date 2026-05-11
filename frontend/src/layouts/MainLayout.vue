@@ -47,8 +47,8 @@ onMounted(async () => {
     await authStore.fetchSession()
 })
 
-function handleLogout() {
-    authStore.logout()
+async function handleLogout() {
+    await authStore.logout()
     router.push('/login')
 }
 </script>

@@ -48,8 +48,8 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    function logout() {
-        logoutApi()  // 通知后端清除多点登录标记
+    async function logout() {
+        await logoutApi()  // 通知后端清除多点登录标记
         token.value = ''
         userCode.value = ''
         userName.value = ''

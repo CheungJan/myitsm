@@ -12,6 +12,7 @@ import uuid
 from typing import Any
 
 from flask import Flask, g, jsonify
+from sqlalchemy.exc import DataError, IntegrityError
 
 from app.config import config_map
 from app.extensions import cors, db, migrate
@@ -121,10 +122,28 @@ def _register_error_handlers(app: Flask) -> None:
     def not_found(exc: Exception) -> tuple[Any, int]:
         return jsonify(_make_error_body(404, "资源不存在")), 404
 
+    @app.errorhandler(IntegrityError)
+    def handle_integrity_error(exc: IntegrityError) -> tuple[Any, int]:
+        """数据库约束错误（主键冲突、唯一约束、外键约束）。"""
+        request_id = getattr(g, "request_id", "")
+        logger.exception("数据库约束冲突，request_id=%s", request_id)
+        msg = str(exc.orig) if exc.orig else "数据库约束冲突"
+        return jsonify(_make_error_body(409, msg)), 409
+
+    @app.errorhandler(DataError)
+    def handle_data_error(exc: DataError) -> tuple[Any, int]:
+        """数据库数据类型错误。"""
+        request_id = getattr(g, "request_id", "")
+        logger.exception("数据库数据类型错误，request_id=%s", request_id)
+        msg = str(exc.orig) if exc.orig else "数据格式错误"
+        return jsonify(_make_error_body(400, msg)), 400
+
     @app.errorhandler(Exception)
     def handle_exception(exc: Exception) -> tuple[Any, int]:
         request_id = getattr(g, "request_id", "")
         logger.exception("请求处理异常，request_id=%s", request_id)
+        if app.debug:
+            return jsonify(_make_error_body(500, str(exc))), 500
         return jsonify(_make_error_body(500, "服务器内部错误")), 500
 
 

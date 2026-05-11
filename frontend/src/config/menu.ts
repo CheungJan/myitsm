@@ -19,7 +19,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'users', menu_nm: '用户管理', path: '/system/users' },
             { menu_cd: 'depts', menu_nm: '部门管理', path: '/system/departments' },
             { menu_cd: 'groups', menu_nm: '用户组管理', path: '/system/groups' },
-            { menu_cd: 'params', menu_nm: '系统参数', path: '/system/params' }
+            { menu_cd: 'params', menu_nm: '系统参数', path: '/system/params' },
+            { menu_cd: 'codes', menu_nm: '系统字典', path: '/system/codes' }
         ]
     },
     {

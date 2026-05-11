@@ -75,7 +75,7 @@
                     <el-collapse-item title="核心信息" name="core">
                         <el-row :gutter="12">
                             <el-col :span="12"><el-form-item label="名称" required><el-input v-model="custForm.cust_nm" /></el-form-item></el-col>
-                            <el-col :span="12"><el-form-item label="磁卡号"><el-input v-model="custForm.cust_card" /></el-form-item></el-col>
+                            <el-col :span="12"><el-form-item label="磁卡号" required><el-input v-model="custForm.cust_card" /></el-form-item></el-col>
                             <el-col :span="12"><el-form-item label="简称"><el-input v-model="custForm.cust_anm" /></el-form-item></el-col>
                             <el-col :span="12"><el-form-item label="全称"><el-input v-model="custForm.custrnm" /></el-form-item></el-col>
                             <el-col :span="12"><el-form-item label="品牌代码"><el-input v-model="custForm.cust_brcd" /></el-form-item></el-col>
@@ -86,6 +86,10 @@
                             <el-col :span="8"><el-form-item label="客户分类"><el-select v-model="custForm.class_cd" clearable filterable style="width:100%"><el-option v-for="c in classOptions" :key="c.class_cd" :label="`${c.class_cd} - ${c.class_nm}`" :value="c.class_cd" /></el-select></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="区域编码"><el-input v-model="custForm.area_cd" /></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="管理单位"><el-input v-model="custForm.parentcd" /></el-form-item></el-col>
+                            <el-col :span="6"><el-form-item label="负责区域"><el-select v-model="custForm.area" clearable style="width:100%"><el-option v-for="a in areas" :key="a.area_cd" :label="a.name || a.area_nm" :value="String(a.area_id)" /></el-select></el-form-item></el-col>
+                            <el-col :span="6"><el-form-item label="环线位置"><el-select v-model="custForm.location" clearable style="width:100%"><el-option label="内环" value="1" /><el-option label="中环" value="2" /><el-option label="外环" value="3" /></el-select></el-form-item></el-col>
+                        </el-row>
+                        <el-row :gutter="12">
                             <el-col :span="8"><el-form-item label="国家"><el-select v-model="custForm.country_cd" clearable style="width:100%" @change="onCountryChange"><el-option v-for="c in countries" :key="c.country_cd" :label="c.country_nm" :value="c.country_cd" /></el-select></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="省/直辖市"><el-select v-model="custForm.prvn_cd" clearable style="width:100%" @change="onProvinceChange"><el-option v-for="p in provinces" :key="p.prvn_cd" :label="p.prvn_nm" :value="p.prvn_cd" /></el-select></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="城市/区"><el-select v-model="custForm.city_cd" clearable style="width:100%" @change="onCityChange"><el-option v-for="c in cities" :key="c.city_cd" :label="c.city_nm" :value="c.city_cd" /></el-select></el-form-item></el-col>
@@ -111,20 +115,21 @@
                     </el-collapse-item>
                     <el-collapse-item title="POS 配置" name="pos">
                         <el-row :gutter="12">
-                            <el-col :span="6"><el-form-item label="POS数量"><el-input v-model="custForm.pos_n" /></el-form-item></el-col>
+                            <el-col :span="6"><el-form-item label="设备数量"><el-input :model-value="custEditing ? String((custEditing as Record<string,unknown>).pos_count || custEditing.pos_n || '0') : '0'" disabled /></el-form-item></el-col>
                             <el-col :span="6"><el-form-item label="POS状态"><el-select v-model="custForm.posstatus" clearable style="width:100%"><el-option v-for="t in posStatuses" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                             <el-col :span="6"><el-form-item label="POS子状态"><el-input v-model="custForm.posstatus1" /></el-form-item></el-col>
                             <el-col :span="6"><el-form-item label="广告机"><el-input v-model="custForm.ad_video" /></el-form-item></el-col>
-                            <el-col :span="12"><el-form-item label="操作系统"><el-input v-model="custForm.opersystem" /></el-form-item></el-col>
-                            <el-col :span="12"><el-form-item label="数据库"><el-input v-model="custForm.data_base" /></el-form-item></el-col>
-                            <el-col :span="12"><el-form-item label="软件版本"><el-input v-model="custForm.soft_edition" /></el-form-item></el-col>
-                            <el-col :span="12"><el-form-item label="内核版本"><el-input v-model="custForm.systemcode" /></el-form-item></el-col>
+                            <el-col :span="12"><el-form-item label="操作系统"><el-input v-model="custForm.opersystem" disabled /></el-form-item></el-col>
+                            <el-col :span="12"><el-form-item label="数据库"><el-input v-model="custForm.data_base" disabled /></el-form-item></el-col>
+                            <el-col :span="12"><el-form-item label="软件版本"><el-input v-model="custForm.soft_edition" disabled /></el-form-item></el-col>
+                            <el-col :span="12"><el-form-item label="内核版本"><el-input v-model="custForm.systemcode" disabled /></el-form-item></el-col>
                         </el-row>
                     </el-collapse-item>
                     <el-collapse-item title="通信" name="comm">
                         <el-row :gutter="12">
-                            <el-col :span="12"><el-form-item label="3G卡号"><el-input v-model="custForm.card3g" /></el-form-item></el-col>
-                            <el-col :span="12"><el-form-item label="3G地址"><el-input v-model="custForm.adr3g" /></el-form-item></el-col>
+                            <el-col :span="8"><el-form-item label="通讯方式"><el-select v-model="custForm.comm_mode" clearable style="width:100%"><el-option v-for="t in commodes" :key="t.cmm_cd" :label="t.cmm_nm" :value="t.cmm_cd" /></el-select></el-form-item></el-col>
+                            <el-col :span="8"><el-form-item label="3G卡号"><el-input v-model="custForm.card3g" /></el-form-item></el-col>
+                            <el-col :span="8"><el-form-item label="3G地址"><el-input v-model="custForm.adr3g" /></el-form-item></el-col>
                         </el-row>
                     </el-collapse-item>
                     <el-collapse-item title="业务属性" name="biz">
@@ -135,15 +140,19 @@
                             <el-col :span="8"><el-form-item label="要货方式"><el-input v-model="custForm.ordertype" /></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="合同标志"><el-input v-model="custForm.is_contract" /></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="支付方式"><el-select v-model="custForm.zf_type" clearable style="width:100%"><el-option v-for="t in payTypes" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
-                            <el-col :span="8"><el-form-item label="通讯方式"><el-select v-model="custForm.comm_mode" clearable style="width:100%"><el-option v-for="t in commodes" :key="t.cmm_cd" :label="t.cmm_nm" :value="t.cmm_cd" /></el-select></el-form-item></el-col>
+                        </el-row>
+                        <el-row :gutter="12">
+                            <el-col :span="8"><el-form-item label="经理联系人"><el-input v-model="custForm.jl_contactor" /></el-form-item></el-col>
+                            <el-col :span="8"><el-form-item label="经理电话"><el-input v-model="custForm.jl_phoneno" /></el-form-item></el-col>
                         </el-row>
                     </el-collapse-item>
                     <el-collapse-item title="生命周期" name="life">
                         <el-row :gutter="12">
-                            <el-col :span="8"><el-form-item label="客户状态"><el-input v-model="custForm.customer_status" /></el-form-item></el-col>
+                            <el-col :span="8"><el-form-item label="客户状态"><el-select v-model="custForm.customer_status" clearable style="width:100%"><el-option v-for="t in csOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
+                            <el-col :span="8"><el-form-item label="设备状态"><el-select v-model="custForm.s_status" clearable style="width:100%"><el-option v-for="t in deviceStatuses" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="首次开通"><el-input v-model="custForm.opendate" /></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="最近更换"><el-input v-model="custForm.replacedate" /></el-form-item></el-col>
-                            <el-col :span="8"><el-form-item label="来源类型"><el-input v-model="custForm.source_type" /></el-form-item></el-col>
+                            <el-col :span="8"><el-form-item label="来源类型"><el-select v-model="custForm.source_type" clearable style="width:100%"><el-option v-for="t in srcOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="预计划ID"><el-input v-model="custForm.preplan_id" /></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="有效标志">
                                 <el-select v-model="custForm.useflg" style="width:100%"><el-option label="有效" value="1" /><el-option label="无效" value="0" /></el-select>
@@ -152,11 +161,6 @@
                     </el-collapse-item>
                     <el-collapse-item title="其他" name="other">
                         <el-row :gutter="12">
-                            <el-col :span="8"><el-form-item label="经理联系人"><el-input v-model="custForm.jl_contactor" /></el-form-item></el-col>
-                            <el-col :span="8"><el-form-item label="经理电话"><el-input v-model="custForm.jl_phoneno" /></el-form-item></el-col>
-                            <el-col :span="8"><el-form-item label="负责区域"><el-select v-model="custForm.area" clearable style="width:100%"><el-option v-for="a in areas" :key="a.area_cd" :label="a.name || a.area_nm" :value="String(a.area_id)" /></el-select></el-form-item></el-col>
-                            <el-col :span="8"><el-form-item label="环线位置"><el-select v-model="custForm.location" clearable style="width:100%"><el-option label="内环" value="1" /><el-option label="中环" value="2" /><el-option label="外环" value="3" /></el-select></el-form-item></el-col>
-                            <el-col :span="8"><el-form-item label="设备状态"><el-input v-model="custForm.s_status" /></el-form-item></el-col>
                             <el-col :span="24"><el-form-item label="备注"><el-input v-model="custForm.backup" type="textarea" /></el-form-item></el-col>
                         </el-row>
                     </el-collapse-item>
@@ -188,6 +192,8 @@
                     <el-descriptions-item label="客户分类">{{ (detailRow as Record<string,unknown>).class_cd_nm || detailRow.class_cd || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="区域编码">{{ detailRow.area_cd || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="管理单位">{{ (detailRow as Record<string,unknown>).parentcd_nm || detailRow.parentcd || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="负责区域">{{ (detailRow as Record<string,unknown>).area_nm || detailRow.area || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="环线位置">{{ (detailRow as Record<string,unknown>).location_nm || detailRow.location || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="国家">{{ (detailRow as Record<string,unknown>).country_nm || detailRow.country_cd || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="省/直辖市">{{ (detailRow as Record<string,unknown>).prvn_nm || detailRow.prvn_cd || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="城市/区">{{ (detailRow as Record<string,unknown>).city_nm || detailRow.city_cd || '-' }}</el-descriptions-item>
@@ -210,7 +216,7 @@
                 </el-descriptions>
                 <el-divider content-position="left">POS 配置</el-divider>
                 <el-descriptions :column="3" border size="small">
-                    <el-descriptions-item label="POS数量">{{ detailRow.pos_n || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="设备数量">{{ (detailRow as Record<string,unknown>).pos_count || detailRow.pos_n || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="POS状态">{{ (detailRow as Record<string,unknown>).posstatus_nm || detailRow.posstatus || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="POS子状态">{{ detailRow.posstatus1 || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="广告机">{{ detailRow.ad_video === '1' ? '是' : '否' }}</el-descriptions-item>
@@ -220,7 +226,8 @@
                     <el-descriptions-item label="内核版本">{{ detailRow.systemcode || '-' }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">通信</el-divider>
-                <el-descriptions :column="2" border size="small">
+                <el-descriptions :column="3" border size="small">
+                    <el-descriptions-item label="通讯方式">{{ (detailRow as Record<string,unknown>).comm_mode_nm || detailRow.comm_mode || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="3G卡号">{{ detailRow.card3g || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="3G地址">{{ detailRow.adr3g || '-' }}</el-descriptions-item>
                 </el-descriptions>
@@ -232,19 +239,19 @@
                     <el-descriptions-item label="要货方式">{{ detailRow.ordertype || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="合同标志">{{ detailRow.is_contract || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="支付方式">{{ (detailRow as Record<string,unknown>).zf_type_nm || detailRow.zf_type || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="通讯方式">{{ (detailRow as Record<string,unknown>).comm_mode_nm || detailRow.comm_mode || '-' }}</el-descriptions-item>
+                </el-descriptions>
+                <el-descriptions :column="2" border size="small">
+                    <el-descriptions-item label="经理联系人">{{ detailRow.jl_contactor || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="经理电话">{{ detailRow.jl_phoneno || '-' }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">生命周期 & 其他</el-divider>
                 <el-descriptions :column="3" border size="small">
-                    <el-descriptions-item label="客户状态">{{ detailRow.customer_status || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="客户状态">{{ (detailRow as Record<string,unknown>).customer_status_nm || detailRow.customer_status || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="首次开通">{{ detailRow.opendate || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="最近更换">{{ detailRow.replacedate || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="来源类型">{{ detailRow.source_type || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="预计划ID">{{ detailRow.preplan_id || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="经理联系人">{{ detailRow.jl_contactor || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="经理电话">{{ detailRow.jl_phoneno || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="负责区域">{{ (detailRow as Record<string,unknown>).area_nm || detailRow.area || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="环线位置">{{ (detailRow as Record<string,unknown>).location_nm || detailRow.location || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="来源类型">{{ (detailRow as Record<string,unknown>).source_type_nm || detailRow.source_type || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="预计划单号">{{ detailRow.preplan_id || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="设备状态">{{ (detailRow as Record<string,unknown>).s_status_nm || detailRow.s_status || '-' }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">备注</el-divider>
                 <el-descriptions :column="1" border size="small">
@@ -344,6 +351,9 @@ const payTypes = ref<{ code_cd: string; code_nm: string }[]>([])
 const areas = ref<{ area_cd: string; area_nm: string; area_id: number; name: string }[]>([])
 const commodes = ref<{ cmm_cd: string; cmm_nm: string }[]>([])
 const posStatuses = ref<{ code_cd: string; code_nm: string }[]>([])
+const deviceStatuses = ref<{ code_cd: string; code_nm: string }[]>([])
+const csOptions = ref<{ code_cd: string; code_nm: string }[]>([])
+const srcOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const countries = ref<{ country_cd: string; country_nm: string }[]>([])
 const provinces = ref<{ prvn_cd: string; prvn_nm: string }[]>([])
 const cities = ref<{ city_cd: string; city_nm: string }[]>([])
@@ -388,11 +398,11 @@ async function autoMatchCity() {
     // 根据客户分类名称匹配上海区县
     const className = classOptions.value.find(c => c.class_cd === custForm.class_cd)?.class_nm || ''
     const mappings: Record<string, string> = {
-        '长宁': '0123', '徐汇': '0112', '浦东': '0128', '黄浦': '0101',
-        '静安': '0115', '普陀': '0113', '虹口': '0102', '杨浦': '0111',
-        '宝山': '0106', '闵行': '0110', '嘉定': '0104', '金山': '0105',
-        '松江': '0109', '青浦': '0107', '奉贤': '0108', '崇明': '0124',
-        '闸北': '0118', '卢湾': '0103', '南汇': '0114',
+        '长宁': '0110', '徐汇': '0125', '浦东': '0121', '沪东': '0121',
+        '黄浦': '0114', '静安': '0117', '普陀': '0120', '虹口': '0113',
+        '杨浦': '0126', '宝山': '0109', '闵行': '0128', '嘉定': '0115',
+        '金山': '0116', '松江': '0124', '青浦': '0122', '奉贤': '0112',
+        '崇明': '0111', '闸北': '0127', '卢湾': '0118', '南汇': '0119',
     }
     for (const [key, cityCd] of Object.entries(mappings)) {
         if (className.includes(key)) {
@@ -431,6 +441,12 @@ async function loadLookups() {
         storeAttrs.value = yb.data || []
         payTypes.value = zf.data || []
         posStatuses.value = ps.data || []
+        const ss = await fetchSyscodes('SS')
+        deviceStatuses.value = ss.data || []
+        const cs = await fetchSyscodes('CS')
+        csOptions.value = cs.data || []
+        const src = await fetchSyscodes('SRC')
+        srcOptions.value = src.data || []
         areas.value = ar.data || []
         commodes.value = cm.data || []
         countries.value = ct.data || []
@@ -584,6 +600,8 @@ function openCustDialog(row?: CustRecord) {
         custForm.class_cd = selectedClassCd.value || ''
         custForm.parentcd = selectedClassCd.value || ''
         custForm.useflg = '1'
+        custForm.customer_status = 'ACTIVE'
+        custForm.source_type = 'MANUAL'
         custForm.country_cd = '191'   // 默认中国
         custForm.prvn_cd = '09'       // 默认上海
         autoMatchCity()
@@ -593,14 +611,16 @@ function openCustDialog(row?: CustRecord) {
 }
 
 async function handleSaveCust() {
-    if (!custForm.cust_nm) {
-        ElMessage.warning('名称为必填项')
+    if (!custForm.cust_nm || !custForm.cust_card) {
+        ElMessage.warning('名称和磁卡号为必填项')
         return
     }
     custSaving.value = true
     try {
         const payload: Record<string, string> = {}
+        const skipKeys = ['opersystem', 'data_base', 'soft_edition', 'systemcode']  // 软件配置由设备监控更新
         for (const key of Object.keys(custForm)) {
+            if (skipKeys.includes(key)) continue
             const v = (custForm as Record<string,string>)[key]
             if (v !== '' && v !== undefined && v !== null) payload[key] = v
         }

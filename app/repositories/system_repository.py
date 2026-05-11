@@ -627,6 +627,11 @@ class SystemRepository:
         return result, total
 
     @staticmethod
+    @staticmethod
+    def get_cust_pos_rl_by_id(asset_id: int) -> CustPosRl | None:
+        return db.session.get(CustPosRl, asset_id)
+
+    @staticmethod
     def get_cust_pos_count(cust_cd: str) -> int:
         """统计客户有效设备数量。"""
         return db.session.query(CustPosRl).filter(

@@ -84,20 +84,7 @@ class LiabilityRegDt(BaseModel):
     __table_args__ = (db.UniqueConstraint("lbdt_cd", "liab_cd", name="uq_liabilityregdt"),)
 
 
-class ItsmSysCode(BaseModel):
-    """ITSM 字典表（TIT03_SYSCODES）。"""
-
-    __tablename__ = "tit03_syscodes"
-
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    code_typ = db.Column(db.String(2), nullable=False, comment="类型")
-    code_cd = db.Column(db.String(2), nullable=False, comment="编码")
-    code_nm = db.Column(db.String(20), comment="名称")
-    memo = db.Column(db.String(60), comment="备注")
-    sys_flg = db.Column(db.String(1), comment="系统标记")
-    useflg = db.Column(db.String(1), default="1", comment="有效标志")
-
-    __table_args__ = (db.UniqueConstraint("code_typ", "code_cd", name="uq_itsm_syscode"),)
+# ItsmSysCode 已合并至 tmm31_syscodes，使用主 SysCode 模型即可
 
 
 class ArchiveCode(BaseModel):

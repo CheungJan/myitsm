@@ -46,6 +46,12 @@ const router = createRouter({
                     meta: { title: '系统参数' }
                 },
                 {
+                    path: 'system/codes',
+                    name: 'SysCodes',
+                    component: () => import('@/views/system/SystemCodes.vue'),
+                    meta: { title: '系统字典' }
+                },
+                {
                     path: 'master/items',
                     name: 'Items',
                     component: () => import('@/views/master/ItemList.vue'),

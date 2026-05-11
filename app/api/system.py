@@ -560,3 +560,26 @@ def list_assets():  # type: ignore[no-untyped-def]
     asset_type = request.args.get("asset_type")
     result = _service.list_assets(page=page, per_page=per_page, class_cd=class_cd, search=search, asset_type=asset_type)
     return success_response(data={"items": result["items"], "total": result["total"]})
+
+
+@system_bp.put("/assets/<int:asset_id>")
+@login_required
+def update_asset(asset_id: int):  # type: ignore[no-untyped-def]
+    """更新资产属性（操作 tmm43_eid）。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.get_asset(asset_id)
+    if not r:
+        return error_response("不存在", 404)
+    itemcd, eid = r.get("item_cd"), r.get("eid")
+    if not itemcd or not eid:
+        return error_response("无法定位设备", 400)
+    from app.models.master import Eid
+    from app.extensions import db
+    e = db.session.get(Eid, (itemcd, eid))
+    if not e:
+        return error_response("设备不存在", 404)
+    for k, v in body.items():
+        if hasattr(e, k):
+            setattr(e, k, v)
+    db.session.commit()
+    return success_response(data=e.to_dict())

@@ -382,6 +382,11 @@ class SystemService:
             class_cd=class_cd, asset_type=asset_type)
         return {"items": items, "total": total}
 
+    def get_asset(self, asset_id: int) -> dict[str, Any] | None:
+        """获取单个资产记录（CustPosRl）。"""
+        r = self._repo.get_cust_pos_rl_by_id(asset_id)
+        return r.to_dict() if r else None
+
     # ——— CRUD ———
 
     def create_item(self, data: dict[str, Any]) -> dict[str, Any]:
