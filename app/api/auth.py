@@ -74,6 +74,15 @@ def login():  # type: ignore[no-untyped-def]
     return success_response(data=result, message="登录成功")
 
 
+@auth_bp.post("/logout")
+@login_required
+def logout():  # type: ignore[no-untyped-def]
+    """登出，写入日志以清除多点登录标记。"""
+    user_cd = getattr(g, "current_user", None) or ""
+    AuthService.logout(user_cd)
+    return success_response(message="已登出")
+
+
 @auth_bp.get("/session")
 @login_required
 def get_session():  # type: ignore[no-untyped-def]

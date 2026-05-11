@@ -29,10 +29,24 @@ class AuthRepository:
 
     @staticmethod
     def has_recent_login(user_cd: str, hours: int = 8) -> bool:
-        """检查用户是否在指定小时内有无有效登录（多点登录检查）。"""
+        """检查是否有未登出的最近登录（多点登录检查）。"""
         cutoff = datetime.utcnow() - timedelta(hours=hours)
-        return db.session.query(AccLog).filter(
-            AccLog.user_cd == user_cd,
-            AccLog.action == "LOGIN",
-            AccLog.created_at >= cutoff,
-        ).count() > 0
+        last_login = (
+            db.session.query(AccLog)
+            .filter(AccLog.user_cd == user_cd, AccLog.action == "LOGIN", AccLog.created_at >= cutoff)
+            .order_by(AccLog.created_at.desc())
+            .first()
+        )
+        if last_login is None:
+            return False
+        # 检查之后是否有 LOGOUT
+        has_logout = (
+            db.session.query(AccLog)
+            .filter(
+                AccLog.user_cd == user_cd,
+                AccLog.action == "LOGOUT",
+                AccLog.created_at > last_login.created_at,
+            )
+            .count() > 0
+        )
+        return not has_logout

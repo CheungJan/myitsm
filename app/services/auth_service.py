@@ -26,6 +26,13 @@ class AuthService:
         self._repo = repo or AuthRepository()
 
     @staticmethod
+    def logout(user_cd: str, repo: AuthRepository | None = None) -> None:
+        """登出，清除多点登录标记。"""
+        _repo = repo or AuthRepository()
+        _repo.add_access_log(user_cd=user_cd, action="LOGOUT", detail="用户登出")
+        db.session.commit()
+
+    @staticmethod
     def check_user_active(user_id: str, repo: AuthRepository | None = None) -> str | None:
         """
         检查用户是否可登录。返回 None 表示正常，返回字符串为错误原因。
