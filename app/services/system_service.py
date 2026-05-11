@@ -374,9 +374,13 @@ class SystemService:
             result.append(d)
         return {"items": result, "total": total}
 
-    def list_assets(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:
-        items, total = self._repo.get_cust_pos_rl(page, per_page)
-        return {"items": [a.to_dict() for a in items], "total": total}
+    def list_assets(self, page: int = 1, per_page: int = 20,
+                    search: str | None = None, class_cd: str | None = None,
+                    asset_type: str | None = None) -> dict[str, Any]:
+        items, total = self._repo.get_cust_pos_rl(
+            page=page, per_page=per_page, search=search,
+            class_cd=class_cd, asset_type=asset_type)
+        return {"items": items, "total": total}
 
     # ——— CRUD ———
 

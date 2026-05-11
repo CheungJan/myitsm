@@ -552,8 +552,11 @@ def list_warehouses():  # type: ignore[no-untyped-def]
 @system_bp.get("/assets")
 @login_required
 def list_assets():  # type: ignore[no-untyped-def]
-    """资产台账列表（分页）。"""
+    """资产台账列表（分页），支持客户分类/搜索/资产类型筛选。"""
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
-    result = _service.list_assets(page=page, per_page=per_page)
+    class_cd = request.args.get("class_cd")
+    search = request.args.get("search")
+    asset_type = request.args.get("asset_type")
+    result = _service.list_assets(page=page, per_page=per_page, class_cd=class_cd, search=search, asset_type=asset_type)
     return success_response(data={"items": result["items"], "total": result["total"]})
