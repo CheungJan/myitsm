@@ -573,7 +573,8 @@ class SystemRepository:
 
     @staticmethod
     def get_cust_pos_rl(page: int = 1, per_page: int = 20, search: str | None = None,
-                         class_cd: str | None = None, asset_type: str | None = None) -> tuple[list[dict], int]:
+                         class_cd: str | None = None, asset_type: str | None = None,
+                         asset_owner: str | None = None) -> tuple[list[dict], int]:
         """资产台账列表，JOIN 客户/物料/EID，支持筛选。"""
         from app.models.master import Customer, Item, CustClass
 
@@ -594,6 +595,8 @@ class SystemRepository:
             q = q.filter(db.or_(CustPosRl.eid.ilike(f"%{search}%"), Customer.cust_nm.ilike(f"%{search}%")))
         if asset_type:
             q = q.filter(Eid.asset_type == asset_type)
+        if asset_owner:
+            q = q.filter(Eid.asset_owner == asset_owner)
 
         total = q.count()
         rows = q.order_by(CustPosRl.eid.desc()).offset((page - 1) * per_page).limit(per_page).all()

@@ -16,8 +16,11 @@
                         <span>资产台账（共 {{ total }} 条）<template v-if="selectedClass"> — {{ selectedClass }}</template></span>
                         <div class="header-actions">
                             <el-input v-model="searchText" placeholder="搜索 SN/客户" clearable size="small" style="width:200px" @keyup.enter="onSearch" @clear="onSearch" />
-                            <el-select v-model="filterAssetType" placeholder="资产类型" clearable size="small" style="width:110px;margin-left:8px" @change="onFilterChange">
+                            <el-select v-model="filterAssetType" placeholder="资产类型" clearable size="small" style="width:100px;margin-left:8px" @change="onFilterChange">
                                 <el-option v-for="t in assetTypes" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" />
+                            </el-select>
+                            <el-select v-model="filterAssetOwner" placeholder="所属方" clearable size="small" style="width:110px;margin-left:8px" @change="onFilterChange">
+                                <el-option v-for="t in assetOwners" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" />
                             </el-select>
                         </div>
                     </div>
@@ -118,7 +121,7 @@ const selectedClassCd = ref(''); const selectedClass = ref('')
 
 const assets = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const searchText = ref(''); const page = ref(1); const perPage = ref(20); const total = ref(0)
-const filterAssetType = ref('')
+const filterAssetType = ref(''); const filterAssetOwner = ref('')
 
 const assetTypes = ref<{code_cd:string;code_nm:string}[]>([])
 const recycleStatuses = ref<{code_cd:string;code_nm:string}[]>([])
@@ -156,6 +159,7 @@ async function loadData() {
         if (searchText.value) params.search = searchText.value
         else if (selectedClassCd.value) params.class_cd = selectedClassCd.value
         if (filterAssetType.value) params.asset_type = filterAssetType.value
+        if (filterAssetOwner.value) params.asset_owner = filterAssetOwner.value
         const res = await fetchAssets(params)
         const d = res.data as { items: Record<string,unknown>[]; total: number }
         assets.value = d.items || []; total.value = d.total || 0

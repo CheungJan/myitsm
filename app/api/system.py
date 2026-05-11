@@ -558,7 +558,8 @@ def list_assets():  # type: ignore[no-untyped-def]
     class_cd = request.args.get("class_cd")
     search = request.args.get("search")
     asset_type = request.args.get("asset_type")
-    result = _service.list_assets(page=page, per_page=per_page, class_cd=class_cd, search=search, asset_type=asset_type)
+    asset_owner = request.args.get("asset_owner")
+    result = _service.list_assets(page=page, per_page=per_page, class_cd=class_cd, search=search, asset_type=asset_type, asset_owner=asset_owner)
     return success_response(data={"items": result["items"], "total": result["total"]})
 
 

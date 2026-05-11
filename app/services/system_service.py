@@ -376,10 +376,10 @@ class SystemService:
 
     def list_assets(self, page: int = 1, per_page: int = 20,
                     search: str | None = None, class_cd: str | None = None,
-                    asset_type: str | None = None) -> dict[str, Any]:
+                    asset_type: str | None = None, asset_owner: str | None = None) -> dict[str, Any]:
         items, total = self._repo.get_cust_pos_rl(
             page=page, per_page=per_page, search=search,
-            class_cd=class_cd, asset_type=asset_type)
+            class_cd=class_cd, asset_type=asset_type, asset_owner=asset_owner)
         return {"items": items, "total": total}
 
     def get_asset(self, asset_id: int) -> dict[str, Any] | None:
