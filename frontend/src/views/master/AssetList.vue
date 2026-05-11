@@ -46,10 +46,13 @@
                     <el-table-column label="所属方" width="85">
                         <template #default="{ row }">{{ codeMaps.OW?.[row.asset_owner as string] || row.asset_owner || '-' }}</template>
                     </el-table-column>
-                    <el-table-column label="状态" width="60">
+                    <el-table-column label="有效" width="60">
                         <template #default="{ row }">
                             <el-tag :type="row.useflg === '0' ? 'danger' : 'success'" size="small">{{ row.useflg === '0' ? '无效' : '有效' }}</el-tag>
                         </template>
+                    </el-table-column>
+                    <el-table-column label="设备状态" width="80">
+                        <template #default="{ row }">{{ codeMaps.AS?.[(row as Record<string,unknown>).asset_status as string] || (row as Record<string,unknown>).asset_status || '-' }}</template>
                     </el-table-column>
                     <el-table-column prop="prddate" label="生产日期" width="100" />
                     <el-table-column label="操作" width="120" fixed="right">
@@ -79,6 +82,7 @@
                     <el-descriptions-item label="回收状态">{{ codeMaps.RS?.[detailRow.recycle_status as string] || detailRow.recycle_status || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="所属方">{{ codeMaps.OW?.[detailRow.asset_owner as string] || detailRow.asset_owner || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="安装日期">{{ detailRow.install_date || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="设备状态">{{ codeMaps.AS?.[(detailRow as Record<string,unknown>).asset_status as string] || (detailRow as Record<string,unknown>).asset_status || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="仓库">{{ (detailRow as Record<string,unknown>).whcd || '-' }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">序列号信息</el-divider>
@@ -144,10 +148,15 @@ watch(treeFilter, (v) => treeRef.value?.filter(v))
 onMounted(async () => {
     const [tree, at, rs, ow, es, qs, et, no] = await Promise.all([
         fetchCustClassTree(), fetchSyscodes('AT'), fetchSyscodes('RS'), fetchSyscodes('OW'),
-        fetchSyscodes('ES'), fetchSyscodes('QS'), fetchSyscodes('ET'), fetchSyscodes('NO'),
+        fetchSyscodes('ES'), fetchSyscodes('QS'), fetchSyscodes('ET'), fetchSyscodes('NO'), fetchSyscodes('AS'),
     ])
     treeData.value = tree.data || []
     assetTypes.value = at.data || []; recycleStatuses.value = rs.data || []; assetOwners.value = ow.data || []
+    const asData = atData  // placeholder, as is last in array
+    codeMaps.value = {
+        ...codeMaps.value,
+        AS: Object.fromEntries((asData||[]).map((t: {code_cd:string;code_nm:string}) => [t.code_cd, t.code_nm])),
+    }
     codeMaps.value = {
         AT: Object.fromEntries(assetTypes.value.map(t => [t.code_cd, t.code_nm])),
         RS: Object.fromEntries(recycleStatuses.value.map(t => [t.code_cd, t.code_nm])),
@@ -156,6 +165,7 @@ onMounted(async () => {
         QS: Object.fromEntries((qs.data||[]).map(t => [t.code_cd, t.code_nm])),
         ET: Object.fromEntries((et.data||[]).map(t => [t.code_cd, t.code_nm])),
         NO: Object.fromEntries((no.data||[]).map(t => [t.code_cd, t.code_nm])),
+        AS: Object.fromEntries((as.data||[]).map(t => [t.code_cd, t.code_nm])),
     }
     loadData()
 })
