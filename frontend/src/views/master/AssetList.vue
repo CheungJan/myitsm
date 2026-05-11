@@ -79,10 +79,10 @@
                 </el-descriptions>
                 <el-divider content-position="left">序列号信息</el-divider>
                 <el-descriptions :column="3" border size="small">
-                    <el-descriptions-item label="质检">{{ detailRow.qcflg || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="设备状态">{{ detailRow.sflg || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="设备类型">{{ detailRow.etyp || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="新旧">{{ detailRow.new_old || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="质检">{{ codeMaps.QS?.[detailRow.qcflg as string] || detailRow.qcflg || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="设备状态">{{ codeMaps.ES?.[detailRow.sflg as string] || detailRow.sflg || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="设备类型">{{ codeMaps.ET?.[detailRow.etyp as string] || detailRow.etyp || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="新旧">{{ codeMaps.NO?.[detailRow.new_old as string] || detailRow.new_old || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="关联单号">{{ detailRow.refid || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="生产日期">{{ detailRow.prddate || '-' }}</el-descriptions-item>
                 </el-descriptions>
@@ -138,13 +138,20 @@ watch(perPage, () => { page.value = 1; loadData() })
 watch(treeFilter, (v) => treeRef.value?.filter(v))
 
 onMounted(async () => {
-    const [tree, at, rs, ow] = await Promise.all([fetchCustClassTree(), fetchSyscodes('AT'), fetchSyscodes('RS'), fetchSyscodes('OW')])
+    const [tree, at, rs, ow, es, qs, et, no] = await Promise.all([
+        fetchCustClassTree(), fetchSyscodes('AT'), fetchSyscodes('RS'), fetchSyscodes('OW'),
+        fetchSyscodes('ES'), fetchSyscodes('QS'), fetchSyscodes('ET'), fetchSyscodes('NO'),
+    ])
     treeData.value = tree.data || []
     assetTypes.value = at.data || []; recycleStatuses.value = rs.data || []; assetOwners.value = ow.data || []
     codeMaps.value = {
         AT: Object.fromEntries(assetTypes.value.map(t => [t.code_cd, t.code_nm])),
         RS: Object.fromEntries(recycleStatuses.value.map(t => [t.code_cd, t.code_nm])),
         OW: Object.fromEntries(assetOwners.value.map(t => [t.code_cd, t.code_nm])),
+        ES: Object.fromEntries((es.data||[]).map(t => [t.code_cd, t.code_nm])),
+        QS: Object.fromEntries((qs.data||[]).map(t => [t.code_cd, t.code_nm])),
+        ET: Object.fromEntries((et.data||[]).map(t => [t.code_cd, t.code_nm])),
+        NO: Object.fromEntries((no.data||[]).map(t => [t.code_cd, t.code_nm])),
     }
     loadData()
 })
