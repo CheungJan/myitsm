@@ -146,17 +146,12 @@ watch(perPage, () => { page.value = 1; loadData() })
 watch(treeFilter, (v) => treeRef.value?.filter(v))
 
 onMounted(async () => {
-    const [tree, at, rs, ow, es, qs, et, no] = await Promise.all([
+    const [tree, at, rs, ow, es, qs, et, no, asCode] = await Promise.all([
         fetchCustClassTree(), fetchSyscodes('AT'), fetchSyscodes('RS'), fetchSyscodes('OW'),
         fetchSyscodes('ES'), fetchSyscodes('QS'), fetchSyscodes('ET'), fetchSyscodes('NO'), fetchSyscodes('AS'),
     ])
     treeData.value = tree.data || []
     assetTypes.value = at.data || []; recycleStatuses.value = rs.data || []; assetOwners.value = ow.data || []
-    const asData = atData  // placeholder, as is last in array
-    codeMaps.value = {
-        ...codeMaps.value,
-        AS: Object.fromEntries((asData||[]).map((t: {code_cd:string;code_nm:string}) => [t.code_cd, t.code_nm])),
-    }
     codeMaps.value = {
         AT: Object.fromEntries(assetTypes.value.map(t => [t.code_cd, t.code_nm])),
         RS: Object.fromEntries(recycleStatuses.value.map(t => [t.code_cd, t.code_nm])),
@@ -165,7 +160,7 @@ onMounted(async () => {
         QS: Object.fromEntries((qs.data||[]).map(t => [t.code_cd, t.code_nm])),
         ET: Object.fromEntries((et.data||[]).map(t => [t.code_cd, t.code_nm])),
         NO: Object.fromEntries((no.data||[]).map(t => [t.code_cd, t.code_nm])),
-        AS: Object.fromEntries((as.data||[]).map(t => [t.code_cd, t.code_nm])),
+        AS: Object.fromEntries((asCode.data||[]).map(t => [t.code_cd, t.code_nm])),
     }
     loadData()
 })
