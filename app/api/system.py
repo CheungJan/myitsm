@@ -231,7 +231,23 @@ def get_sysparm(parm_cd: str):  # type: ignore[no-untyped-def]
     return success_response(data=parm)
 
 
+@system_bp.put("/sysparms/<parm_cd>")
+@login_required
+def update_sysparm(parm_cd: str):  # type: ignore[no-untyped-def]
+    """更新系统参数（单例表）。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_sysparm(parm_cd, body)
+    return success_response(data=r) if r else error_response("参数不存在", 404)
+
+
 # ---- 码表查询 ----
+
+
+@system_bp.get("/syscodes/all")
+@login_required
+def list_all_syscodes():  # type: ignore[no-untyped-def]
+    """全部系统编码列表（字典管理用）。"""
+    return success_response(data=_service.get_all_syscodes())
 
 
 @system_bp.get("/syscodes")
@@ -242,6 +258,30 @@ def list_syscodes():  # type: ignore[no-untyped-def]
     if not code_typ:
         return error_response("缺少 code_typ 参数", 400)
     return success_response(data=_service.get_syscodes(code_typ))
+
+
+@system_bp.post("/syscodes")
+@login_required
+def create_syscode():  # type: ignore[no-untyped-def]
+    """新增系统编码。"""
+    body = request.get_json(silent=True) or {}
+    return success_response(data=_service.create_syscode(body), code=201)
+
+
+@system_bp.put("/syscodes/<int:code_id>")
+@login_required
+def update_syscode(code_id: int):  # type: ignore[no-untyped-def]
+    """更新系统编码。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_syscode(code_id, body)
+    return success_response(data=r) if r else error_response("编码不存在", 404)
+
+
+@system_bp.delete("/syscodes/<int:code_id>")
+@login_required
+def delete_syscode(code_id: int):  # type: ignore[no-untyped-def]
+    """删除系统编码。"""
+    return success_response() if _service.delete_syscode(code_id) else error_response("编码不存在", 404)
 
 
 @system_bp.get("/areas")
@@ -452,13 +492,22 @@ def delete_customer(cust_cd: str):  # type: ignore[no-untyped-def]
     return success_response() if _service.delete_customer(cust_cd) else error_response("不存在", 404)
 
 
+@system_bp.get("/eid/tree")
+@login_required
+def get_eid_tree():  # type: ignore[no-untyped-def]
+    """EID 物料分类树（含 EID 数量）。"""
+    return success_response(data=_service.get_eid_itemcd_tree())
+
+
 @system_bp.get("/eid")
 @login_required
 def list_eid():  # type: ignore[no-untyped-def]
-    """EID 设备列表（分页）。"""
+    """EID 设备列表（分页），支持分类筛选和搜索。"""
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
-    result = _service.list_eid(page=page, per_page=per_page)
+    class_cd = request.args.get("class_cd")
+    search = request.args.get("search")
+    result = _service.list_eid(page=page, per_page=per_page, class_cd=class_cd, search=search)
     return success_response(data={"items": result["items"], "total": result["total"]})
 
 
@@ -479,11 +528,25 @@ def update_eid(itemcd: str, eid_val: str):  # type: ignore[no-untyped-def]
     return success_response(data=r) if r else error_response("不存在", 404)
 
 
+@system_bp.get("/eid/<itemcd>/<eid_val>/tracks")
+@login_required
+def get_eid_tracks(itemcd: str, eid_val: str):  # type: ignore[no-untyped-def]
+    """查询设备变更历史。"""
+    return success_response(data=_service.get_eid_tracks(itemcd, eid_val))
+
+
 @system_bp.delete("/eid/<itemcd>/<eid_val>")
 @login_required
 def delete_eid(itemcd: str, eid_val: str):  # type: ignore[no-untyped-def]
     """删除 EID（复合主键 itemcd+eid）。"""
     return success_response() if _service.delete_eid(itemcd, eid_val) else error_response("不存在", 404)
+
+
+@system_bp.get("/warehouses")
+@login_required
+def list_warehouses():  # type: ignore[no-untyped-def]
+    """仓库列表。"""
+    return success_response(data=_service.get_warehouses())
 
 
 @system_bp.get("/assets")

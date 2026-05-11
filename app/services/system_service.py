@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.extensions import db
 from app.repositories.system_repository import SystemRepository
 
 
@@ -164,6 +165,11 @@ class SystemService:
         parm = self._repo.get_sysparm_by_cd(parm_cd)
         return parm.to_dict() if parm else None
 
+    def update_sysparm(self, parm_cd: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        """更新系统参数。"""
+        r = self._repo.update_sysparm(parm_cd, data)
+        return r.to_dict() if r else None
+
     # ——— 物料分类 ———
 
     def list_item_classes(self) -> list[dict[str, Any]]:
@@ -273,6 +279,13 @@ class SystemService:
         cust["location_nm"] = loc_map.get(cust.get("location", ""), "")
         # POS 状态（posstatus1 是子码，无独立中文名）
         cust["posstatus_nm"] = cache.get("ps", {}).get(cust.get("posstatus", ""), "")
+        # 设备状态
+        cust["s_status_nm"] = cache.get("ss", {}).get(cust.get("s_status", ""), "")
+        # POS 数量 = 有效设备数
+        cust["pos_count"] = self._repo.get_cust_pos_count(cust["cust_cd"])
+        # 生命周期状态
+        cust["customer_status_nm"] = cache.get("cs", {}).get(cust.get("customer_status", ""), "")
+        cust["source_type_nm"] = cache.get("src", {}).get(cust.get("source_type", ""), "")
         # 行政区域
         cust["country_nm"] = cache.get("country", {}).get(cust.get("country_cd", ""), "")
         cust["prvn_nm"] = cache.get("province", {}).get(cust.get("prvn_cd", ""), "")
@@ -294,6 +307,15 @@ class SystemService:
         for s in repo.get_syscodes("PS"):
             cache["ps"] = cache.get("ps", {})
             cache["ps"][s.code_cd] = s.code_nm or ""
+        for s in repo.get_syscodes("SS"):
+            cache["ss"] = cache.get("ss", {})
+            cache["ss"][s.code_cd] = s.code_nm or ""
+        for s in repo.get_syscodes("CS"):
+            cache["cs"] = cache.get("cs", {})
+            cache["cs"][s.code_cd] = s.code_nm or ""
+        for s in repo.get_syscodes("SRC"):
+            cache["src"] = cache.get("src", {})
+            cache["src"][s.code_cd] = s.code_nm or ""
         for cc in repo.get_cust_classes():
             cache["custclass"] = cache.get("custclass", {})
             cache["custclass"][cc.class_cd] = cc.class_nm or ""
@@ -324,9 +346,33 @@ class SystemService:
         resolved = [self._resolve_customer_refs(c.to_dict()) for c in items]
         return {"items": resolved, "total": total}
 
-    def list_eid(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:
-        items, total = self._repo.get_eid_list(page, per_page)
-        return {"items": [e.to_dict() for e in items], "total": total}
+    # ——— EID ———
+
+    def get_eid_itemcd_tree(self) -> list[dict[str, Any]]:
+        """获取物料分类树（含 EID 数量）。"""
+        return self._repo.get_eid_itemcd_tree()
+
+    def list_eid(self, page: int = 1, per_page: int = 20,
+                 search: str | None = None, class_cd: str | None = None) -> dict[str, Any]:
+        items, total = self._repo.get_eid_list(page=page, per_page=per_page, search=search, class_cd=class_cd)
+        # 解析物料名称 + 仓库名称
+        item_map: dict[str, str] = {}
+        wh_map: dict[str, str] = {}
+        from app.models.warehouse import Warehouse
+        for e in items:
+            if e.itemcd and e.itemcd not in item_map:
+                item = self._repo.get_item(e.itemcd)
+                item_map[e.itemcd] = item.item_nm if item else ""
+            if e.whcd and e.whcd not in wh_map:
+                wh = db.session.get(Warehouse, e.whcd)
+                wh_map[e.whcd] = wh.whnm if wh else ""
+        result = []
+        for e in items:
+            d = e.to_dict()
+            d["item_nm"] = item_map.get(e.itemcd, "")
+            d["wh_nm"] = wh_map.get(e.whcd, "")
+            result.append(d)
+        return {"items": result, "total": total}
 
     def list_assets(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:
         items, total = self._repo.get_cust_pos_rl(page, per_page)
@@ -374,10 +420,45 @@ class SystemService:
     def delete_eid(self, itemcd: str, eid_val: str) -> bool:
         return self._repo.delete_eid(itemcd, eid_val)
 
+    def get_warehouses(self) -> list[dict[str, Any]]:
+        return [w.to_dict() for w in self._repo.get_warehouses()]
+
+    def get_eid_tracks(self, itemcd: str, eid: str) -> list[dict[str, Any]]:
+        tracks = self._repo.get_eid_tracks(itemcd, eid)
+        from app.models.warehouse import Warehouse
+        wh_map: dict[str, str] = {}
+        result = []
+        for t in tracks:
+            d = t.to_dict()
+            for wh_field in ['whcd', 'n_whcd']:
+                whcd = d.get(wh_field)
+                if whcd and whcd not in wh_map:
+                    wh = db.session.get(Warehouse, whcd)
+                    wh_map[whcd] = wh.whnm if wh else ""
+                key = 'wh_nm' if wh_field == 'whcd' else 'n_wh_nm'
+                d[key] = wh_map.get(whcd, "")
+            result.append(d)
+        return result
+
     # ——— 码表查询 ———
 
     def get_syscodes(self, code_typ: str) -> list[dict[str, Any]]:
         return [s.to_dict() for s in self._repo.get_syscodes(code_typ)]
+
+    def get_all_syscodes(self) -> list[dict[str, Any]]:
+        return [s.to_dict() for s in self._repo.get_all_syscodes()]
+
+    def create_syscode(self, data: dict[str, Any]) -> dict[str, Any]:
+        return self._repo.create_syscode(data).to_dict()
+
+    def update_syscode(self, code_id: int, data: dict[str, Any]) -> dict[str, Any] | None:
+        r = self._repo.get_syscode_by_id(code_id)
+        return self._repo.update_syscode(r, data).to_dict() if r else None
+
+    def delete_syscode(self, code_id: int) -> bool:
+        r = self._repo.get_syscode_by_id(code_id)
+        if r: self._repo.delete_syscode(r); return True
+        return False
 
     def get_areas(self) -> list[dict[str, Any]]:
         return [a.to_dict() for a in self._repo.get_areas()]

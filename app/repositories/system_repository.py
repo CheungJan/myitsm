@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.extensions import db
-from app.models.master import Area, City, ComMode, Country, CustClass, CustPosRl, Customer, Eid, Item, ItemClass, Province, SysCode, Town
+from app.models.master import Area, City, ComMode, Country, CustClass, CustPosRl, Customer, Eid, EidTrack, Item, ItemClass, Province, SysCode, Town
 from app.models.system import Department, Group, GroupRight, Menu, MenuDetail, SysParm, User, UserGroup
 
 
@@ -245,6 +245,16 @@ class SystemRepository:
         """按编码获取系统参数。"""
         return db.session.get(SysParm, parm_cd)
 
+    @staticmethod
+    def update_sysparm(parm_cd: str, data: dict[str, Any]) -> SysParm | None:
+        """更新系统参数（单例表）。"""
+        r = db.session.get(SysParm, parm_cd)
+        if r:
+            for k, v in data.items():
+                setattr(r, k, v)
+            db.session.commit()
+        return r
+
     # ——— 物料分类 ———
 
     @staticmethod
@@ -480,8 +490,44 @@ class SystemRepository:
         db.session.commit()
 
     @staticmethod
-    def get_eid_list(page: int = 1, per_page: int = 20) -> tuple[list[Eid], int]:
-        q = db.session.query(Eid).order_by(Eid.eid)
+    def get_eid_itemcd_tree() -> list[dict[str, Any]]:
+        """获取物料分类树，含 EID 数量。"""
+        tree = SystemRepository.get_item_class_tree()
+        # 统计每个 leaf 的 EID 数量
+        class_counts: dict[str, int] = {}
+        rows = db.session.execute(db.text("""
+            SELECT i.class_cd, COUNT(*) AS cnt
+            FROM tmm43_eid e
+            JOIN tmm12_items i ON e.itemcd = i.item_cd
+            WHERE e.useflg = '1' AND i.useflg = '1'
+            GROUP BY i.class_cd
+        """)).fetchall()
+        for r in rows:
+            class_counts[r.class_cd] = r.cnt
+
+        def attach_count(nodes: list[dict[str, Any]]) -> int:
+            total = 0
+            for n in nodes:
+                children_total = attach_count(n.get("children", []))
+                n["eid_count"] = class_counts.get(n["class_cd"], 0) + children_total
+                total += n["eid_count"]
+            return total
+        attach_count(tree)
+        return tree
+
+    @staticmethod
+    def get_eid_list(page: int = 1, per_page: int = 20, search: str | None = None,
+                     class_cd: str | None = None) -> tuple[list[Eid], int]:
+        q = db.session.query(Eid)
+        if class_cd:
+            # 递归获取该分类下的所有物料编码
+            cds = SystemRepository._get_descendant_class_cds(class_cd)
+            if cds:
+                item_cds = db.session.query(Item.item_cd).filter(Item.class_cd.in_(cds)).all()
+                q = q.filter(Eid.itemcd.in_([r[0] for r in item_cds]))
+        if search:
+            q = q.filter(db.or_(Eid.eid.ilike(f"%{search}%"), Eid.itemcd.ilike(f"%{search}%")))
+        q = q.order_by(Eid.eid.desc())
         total = q.count()
         return q.offset((page - 1) * per_page).limit(per_page).all(), total
 
@@ -515,10 +561,28 @@ class SystemRepository:
         return False
 
     @staticmethod
+    def get_warehouses() -> list[Any]:
+        from app.models.warehouse import Warehouse
+        return list(db.session.query(Warehouse).order_by(Warehouse.whcd).all())
+
+    @staticmethod
+    def get_eid_tracks(itemcd: str, eid: str) -> list[EidTrack]:
+        return list(db.session.query(EidTrack).filter(
+            EidTrack.itemcd == itemcd, EidTrack.eid == eid
+        ).order_by(EidTrack.seqno.desc()).all())
+
+    @staticmethod
     def get_cust_pos_rl(page: int = 1, per_page: int = 20) -> tuple[list[CustPosRl], int]:
         q = db.session.query(CustPosRl).order_by(CustPosRl.eid)
         total = q.count()
         return q.offset((page - 1) * per_page).limit(per_page).all(), total
+
+    @staticmethod
+    def get_cust_pos_count(cust_cd: str) -> int:
+        """统计客户有效设备数量。"""
+        return db.session.query(CustPosRl).filter(
+            CustPosRl.cust_cd == cust_cd, CustPosRl.useflg == "1"
+        ).count()
 
     # ——— 码表查询 ———
 
@@ -527,6 +591,35 @@ class SystemRepository:
         return list(db.session.query(SysCode).filter(
             SysCode.code_typ == code_typ, SysCode.useflg == "1"
         ).order_by(SysCode.sort_no, SysCode.code_cd).all())
+
+    @staticmethod
+    def get_all_syscodes() -> list[SysCode]:
+        return list(db.session.query(SysCode).order_by(
+            SysCode.code_typ, db.func.coalesce(SysCode.sort_no, 999), SysCode.code_cd
+        ).all())
+
+    @staticmethod
+    def get_syscode_by_id(code_id: int) -> SysCode | None:
+        return db.session.get(SysCode, code_id)
+
+    @staticmethod
+    def create_syscode(data: dict[str, Any]) -> SysCode:
+        sc = SysCode(**data)
+        db.session.add(sc)
+        db.session.commit()
+        return sc
+
+    @staticmethod
+    def update_syscode(record: SysCode, data: dict[str, Any]) -> SysCode:
+        for k, v in data.items():
+            setattr(record, k, v)
+        db.session.commit()
+        return record
+
+    @staticmethod
+    def delete_syscode(record: SysCode) -> None:
+        db.session.delete(record)
+        db.session.commit()
 
     @staticmethod
     def get_areas() -> list[Area]:
