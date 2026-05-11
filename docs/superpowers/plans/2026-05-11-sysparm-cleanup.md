@@ -91,3 +91,12 @@ curl -X PUT /sysparms/SYSPARM -d '{"jwt_expiration_seconds":3600}' → 200
 | `app/models/system.py` | SysParm 加 3 列 |
 | `migrations/versions/db6aef9f5043_*.py` | DDL 迁移 |
 | `frontend/src/views/system/ParamsList.vue` | 6 字段 3 分组 |
+
+---
+
+### 步骤 4：后续待办（本次不实施）
+
+- [ ] **4.1 JWT 超时接入** — `auth_service.py` `_generate_token()` 读取 `jwt_expiration_seconds` 替代硬编码 28800
+- [ ] **4.2 日志保留接入** — 日志清理脚本/定时任务读取 `log_retention_days`
+- [ ] **4.3 上传限制接入** — 文件上传接口读取 `max_upload_size_mb` 校验文件大小
+- [ ] **4.4 备份路径接入** — 自动备份脚本读取 `autobackpath`
