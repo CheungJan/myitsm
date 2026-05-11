@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from app.extensions import db
 from app.models.system import AccLog, User, UserGroup
 
@@ -24,3 +26,13 @@ class AuthRepository:
         """写入访问日志。"""
         log = AccLog(user_cd=user_cd, action=action, detail=detail)
         db.session.add(log)
+
+    @staticmethod
+    def has_recent_login(user_cd: str, hours: int = 8) -> bool:
+        """检查用户是否在指定小时内有无有效登录（多点登录检查）。"""
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        return db.session.query(AccLog).filter(
+            AccLog.user_cd == user_cd,
+            AccLog.action == "LOGIN",
+            AccLog.created_at >= cutoff,
+        ).count() > 0

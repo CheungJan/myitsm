@@ -63,7 +63,13 @@ def login():  # type: ignore[no-untyped-def]
 
     result = AuthService.login(user_id=req.user_id, password=req.password)
     if result is None:
+        # 区分用户不存在/已禁用和密码错误
+        reason = AuthService.check_user_active(req.user_id)
+        if reason:
+            return error_response(message=reason, code=401)
         return error_response(message="用户名或密码错误", code=401)
+    if isinstance(result, dict) and "error" in result:
+        return error_response(message=result["error"], code=403)
 
     return success_response(data=result, message="登录成功")
 

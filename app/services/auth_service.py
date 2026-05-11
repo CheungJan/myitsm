@@ -11,6 +11,7 @@ from flask import current_app
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
+from app.models.system import SysParm
 from app.repositories.auth_repository import AuthRepository
 
 __all__ = ["AuthService"]
@@ -23,6 +24,19 @@ class AuthService:
 
     def __init__(self, repo: AuthRepository | None = None) -> None:
         self._repo = repo or AuthRepository()
+
+    @staticmethod
+    def check_user_active(user_id: str, repo: AuthRepository | None = None) -> str | None:
+        """
+        检查用户是否可登录。返回 None 表示正常，返回字符串为错误原因。
+        """
+        _repo = repo or AuthRepository()
+        user = _repo.get_user(user_id)
+        if user is None:
+            return "用户不存在"
+        if user.status != "1":
+            return "用户已被禁用，无法登录"
+        return None
 
     @staticmethod
     def login(
@@ -48,6 +62,13 @@ class AuthService:
             logger.info("用户 %s 密码已从明文升级为哈希", user_id)
         else:
             return None
+
+        # 多点登录检查
+        sp = db.session.get(SysParm, "SYSPARM")
+        if sp and sp.allowmultilogon == "0":
+            existed = _repo.has_recent_login(user_id, hours=8)
+            if existed:
+                return {"error": "该账号已在其他设备登录，管理员禁止多点登录"}
 
         groups = _repo.get_user_groups(user_id)
         token = _generate_token(user_id)
