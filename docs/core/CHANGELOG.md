@@ -4,6 +4,45 @@
 
 ---
 
+## [v0.8.1] — 2026-05-11 — 系统参数清理
+
+- 标记 5 个零售遗留字段为废弃（costtype/centralwarehouse/poinvaliddays/soinvaliddays/shopbilltype）
+- 新增 3 个 ITSM 全局参数（jwt_expiration_seconds/log_retention_days/max_upload_size_mb）
+- ParamsList.vue 改为 3 分组表单（认证安全/系统运维/路径配置），6 字段
+- allowmultilogon 接入登录流程，登出 API + token 活跃管理
+- SysCode 模型加 memo 字段，tit03→tmm31 字典合并完成
+
+---
+
+## [v0.8.0] — 2026-05-10 — F1 前端地基完成 + 字典表合并 + 数据修复
+
+### 新增
+- **行政区域表迁移**：新增 tmm02_country(192)/tmm03_province(34)/tmm04_city(436)/tmm05_town(2778)
+- **客户行政区域回填**：11,022条 country_cd=191/prvn_cd=09，按分类名+地址匹配 city_cd
+- **预计划关联**：6927条 source_type=PREPLAN，preplan_id 通过磁卡号关联 plan_cust
+- **物料分类树**：ItemList.vue CTE递归树+表格联动，CRUD+搜索互斥
+- **客户管理重写**：52字段全展示，9分组折叠编辑，6码表下拉，详情/编辑对等
+- **EID设备管理**：复用物料分类树(含EID角标)，7码表下拉，变更历史(type=i/u/d)
+- **前端类型安全**：master.ts 严格interface，分组码表映射(codeMaps)
+
+### 变更
+- **tit03_syscodes→tmm31_syscodes**：75条ITSM字典迁入，ItsmSysCode模型移除
+- **新增31条业务码表**：CS/SRC/ES/ET/NO/IU/OD/SS/PS/QS
+- **itemclass parent_cd修复**：从ortopbitsmdb同步186条
+- **SysCode模型加memo字段**
+
+### 数据修复
+- 客户状态/来源初始化(11020条ACTIVE+MANUAL)
+- 物料分类parent_cd回填(186条)
+- 行政区域回填(按分类名+地址匹配)
+- 预计划来源识别(PREPLAN 6927条)
+
+### 文档
+- 新增 客户主数据字段规范.md
+- 更新 前端vue3-setup.md(实施记录)、迁移计划(Phase7补充)、CORE_DOCS_INDEX
+
+---
+
 ## [v0.7.0] — 2026-05-08 — 数据迁移完成 + 模块补全
 
 **PR**: [#7](https://github.com/CheungJan/myitsm/pull/7) / [#8](https://github.com/CheungJan/myitsm/pull/8)

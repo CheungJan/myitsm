@@ -42,7 +42,7 @@ ITSM运维(维护/保养/翻新/变更/回收)  ──→ F2
 | 3 | 用户管理 | 列表/详情/编辑 | system | 4 | 2页 | app_system.pbl | 完整 |
 | 4 | 部门管理 | 列表/树形 | system | 1 | 1页 | app_system.pbl | 完整 |
 | 5 | 用户组管理 | 列表/分配 | system | 2 | 1页 | app_system.pbl | 完整 |
-| 6 | 系统参数 | 分组表单+登录接入 | system | 3 | 1页 | app_system.pbl | ✅ allowmultilogon已生效 |
+| 6 | 系统参数 | 3分组6字段+登录接入 | system | 3 | 1页 | app_system.pbl | ✅ 已清理零售遗留 |
 | 7 | 系统字典 | 类型树+码值CRUD | system | 5 | 1页 | *(tit03合并新增)* | 完整 |
 | 8 | 物料/BOM | 物料清单+BOM结构树 | reports (BOM) | 1 | 2页 | base_cust.pbl | 完整 |
 | 9 | 客户主数据 | 列表/详情/分类树 | system | 2 | 2页 | base_cust.pbl | 完整 |
