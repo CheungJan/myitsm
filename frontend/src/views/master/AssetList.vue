@@ -36,8 +36,8 @@
                     <el-table-column label="资产类型" width="80">
                         <template #default="{ row }">{{ codeMaps.AT?.[row.asset_type as string] || row.asset_type || '-' }}</template>
                     </el-table-column>
-                    <el-table-column label="所属方" width="70">
-                        <template #default="{ row }">{{ codeMaps.AO?.[row.asset_owner as string] || row.asset_owner || '-' }}</template>
+                    <el-table-column label="所属方" width="85">
+                        <template #default="{ row }">{{ codeMaps.OW?.[row.asset_owner as string] || row.asset_owner || '-' }}</template>
                     </el-table-column>
                     <el-table-column label="状态" width="60">
                         <template #default="{ row }">
@@ -70,7 +70,7 @@
                 <el-descriptions :column="3" border size="small">
                     <el-descriptions-item label="资产类型">{{ codeMaps.AT?.[detailRow.asset_type as string] || detailRow.asset_type || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="回收状态">{{ codeMaps.RS?.[detailRow.recycle_status as string] || detailRow.recycle_status || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="所属方">{{ codeMaps.AO?.[detailRow.asset_owner as string] || detailRow.asset_owner || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="所属方">{{ codeMaps.OW?.[detailRow.asset_owner as string] || detailRow.asset_owner || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="安装日期">{{ detailRow.install_date || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="仓库">{{ (detailRow as Record<string,unknown>).whcd || '-' }}</el-descriptions-item>
                 </el-descriptions>
@@ -135,13 +135,13 @@ watch(perPage, () => { page.value = 1; loadData() })
 watch(treeFilter, (v) => treeRef.value?.filter(v))
 
 onMounted(async () => {
-    const [tree, at, rs, ao] = await Promise.all([fetchCustClassTree(), fetchSyscodes('AT'), fetchSyscodes('RS'), fetchSyscodes('AO')])
+    const [tree, at, rs, ow] = await Promise.all([fetchCustClassTree(), fetchSyscodes('AT'), fetchSyscodes('RS'), fetchSyscodes('OW')])
     treeData.value = tree.data || []
-    assetTypes.value = at.data || []; recycleStatuses.value = rs.data || []; assetOwners.value = ao.data || []
+    assetTypes.value = at.data || []; recycleStatuses.value = rs.data || []; assetOwners.value = ow.data || []
     codeMaps.value = {
         AT: Object.fromEntries(assetTypes.value.map(t => [t.code_cd, t.code_nm])),
         RS: Object.fromEntries(recycleStatuses.value.map(t => [t.code_cd, t.code_nm])),
-        AO: Object.fromEntries(assetOwners.value.map(t => [t.code_cd, t.code_nm])),
+        OW: Object.fromEntries(assetOwners.value.map(t => [t.code_cd, t.code_nm])),
     }
     loadData()
 })
