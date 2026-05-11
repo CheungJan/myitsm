@@ -574,7 +574,7 @@ class SystemRepository:
     @staticmethod
     def get_cust_pos_rl(page: int = 1, per_page: int = 20, search: str | None = None,
                          class_cd: str | None = None, asset_type: str | None = None,
-                         asset_owner: str | None = None) -> tuple[list[dict], int]:
+                         asset_owner: str | None = None, useflg: str | None = None) -> tuple[list[dict], int]:
         """资产台账列表，JOIN 客户/物料/EID，支持筛选。"""
         from app.models.master import Customer, Item, CustClass
 
@@ -597,6 +597,8 @@ class SystemRepository:
             q = q.filter(Eid.asset_type == asset_type)
         if asset_owner:
             q = q.filter(Eid.asset_owner == asset_owner)
+        if useflg:
+            q = q.filter(CustPosRl.useflg == useflg)
 
         total = q.count()
         rows = q.order_by(CustPosRl.eid.desc()).offset((page - 1) * per_page).limit(per_page).all()
@@ -623,6 +625,7 @@ class SystemRepository:
             d["new_old"] = no or ""
             d["isunit"] = iu or ""
             d["useflg"] = r.useflg or "1"
+            d["asset_status"] = getattr(r, 'asset_status', None) or ""
             parentcd_raw = (parentcd or "").strip()
             if parentcd_raw and parentcd_raw not in pd_map:
                 pc = db.session.get(CustClass, parentcd_raw)

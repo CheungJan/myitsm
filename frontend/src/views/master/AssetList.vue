@@ -19,8 +19,12 @@
                             <el-select v-model="filterAssetType" placeholder="资产类型" clearable size="small" style="width:100px;margin-left:8px" @change="onFilterChange">
                                 <el-option v-for="t in assetTypes" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" />
                             </el-select>
-                            <el-select v-model="filterAssetOwner" placeholder="所属方" clearable size="small" style="width:110px;margin-left:8px" @change="onFilterChange">
+                            <el-select v-model="filterAssetOwner" placeholder="所属方" clearable size="small" style="width:100px;margin-left:8px" @change="onFilterChange">
                                 <el-option v-for="t in assetOwners" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" />
+                            </el-select>
+                            <el-select v-model="filterUseflg" placeholder="有效性" clearable size="small" style="width:90px;margin-left:8px" @change="onFilterChange">
+                                <el-option label="有效" value="1" />
+                                <el-option label="无效" value="0" />
                             </el-select>
                         </div>
                     </div>
@@ -121,7 +125,7 @@ const selectedClassCd = ref(''); const selectedClass = ref('')
 
 const assets = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const searchText = ref(''); const page = ref(1); const perPage = ref(20); const total = ref(0)
-const filterAssetType = ref(''); const filterAssetOwner = ref('')
+const filterAssetType = ref(''); const filterAssetOwner = ref(''); const filterUseflg = ref('')
 
 const assetTypes = ref<{code_cd:string;code_nm:string}[]>([])
 const recycleStatuses = ref<{code_cd:string;code_nm:string}[]>([])
@@ -167,6 +171,7 @@ async function loadData() {
         else if (selectedClassCd.value) params.class_cd = selectedClassCd.value
         if (filterAssetType.value) params.asset_type = filterAssetType.value
         if (filterAssetOwner.value) params.asset_owner = filterAssetOwner.value
+        if (filterUseflg.value) params.useflg = filterUseflg.value
         const res = await fetchAssets(params)
         const d = res.data as { items: Record<string,unknown>[]; total: number }
         assets.value = d.items || []; total.value = d.total || 0
