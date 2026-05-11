@@ -584,8 +584,7 @@ class SystemRepository:
         .outerjoin(Customer, CustPosRl.cust_cd == Customer.cust_cd)
         .outerjoin(Item, CustPosRl.item_cd == Item.item_cd)
         .outerjoin(Eid, db.and_(CustPosRl.item_cd == Eid.itemcd, CustPosRl.eid == Eid.eid))
-        .outerjoin(CustClass, Customer.class_cd == CustClass.class_cd)
-        .filter(CustPosRl.useflg == "1"))
+        .outerjoin(CustClass, Customer.class_cd == CustClass.class_cd))
 
         if class_cd:
             cds = SystemRepository._get_descendant_class_cds(class_cd)
@@ -618,6 +617,7 @@ class SystemRepository:
             d["etyp"] = et or ""
             d["new_old"] = no or ""
             d["isunit"] = iu or ""
+            d["useflg"] = r.useflg or "1"
             parentcd_raw = (parentcd or "").strip()
             if parentcd_raw and parentcd_raw not in pd_map:
                 pc = db.session.get(CustClass, parentcd_raw)

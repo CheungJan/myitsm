@@ -39,6 +39,11 @@
                     <el-table-column label="所属方" width="70">
                         <template #default="{ row }">{{ codeMaps.AO?.[row.asset_owner as string] || row.asset_owner || '-' }}</template>
                     </el-table-column>
+                    <el-table-column label="状态" width="60">
+                        <template #default="{ row }">
+                            <el-tag :type="row.useflg === '0' ? 'danger' : 'success'" size="small">{{ row.useflg === '0' ? '无效' : '有效' }}</el-tag>
+                        </template>
+                    </el-table-column>
                     <el-table-column prop="prddate" label="生产日期" width="100" />
                     <el-table-column label="操作" width="120" fixed="right">
                         <template #default="{ row }">
