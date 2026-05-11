@@ -177,6 +177,10 @@ class SysParm(BaseModel):
     allowmultilogon = db.Column(db.String(1), comment="允许多点登录")
     shopbilltype = db.Column(db.String(1), comment="店铺单据类型")
     centralwarehouse = db.Column(db.String(4), comment="中心仓库编码")
+    # ITSM 新增全局参数
+    jwt_expiration_seconds = db.Column(db.Integer, default=28800, comment="JWT超时(秒)")
+    log_retention_days = db.Column(db.Integer, default=30, comment="日志保留天数")
+    max_upload_size_mb = db.Column(db.Integer, default=10, comment="上传大小限制(MB)")
 
 
 class AccLog(BaseModel):
