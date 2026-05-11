@@ -67,11 +67,11 @@ TMC71_SYSPARM (SysParm) — 系统参数
 | UserBusiTyp | tmc22_userbusityp | id | 用户业务类型 |
 | GroupRight | tmc31_groupright | id | 组权限 |
 | AccLog | tmc41_acclog | id | 访问日志 |
-| SysParm | tmc71_sysparm | parmcd | 系统参数 |
+| SysParm | tmc71_sysparm | parmcd | 全局系统参数(6有效+5废弃) |
 
 ---
 
-### 2.2 主数据域（13个模型，master.py）
+### 2.2 主数据域（17个模型，master.py）
 
 ```
 TMM01_COMPANY (Company) — 公司
@@ -96,6 +96,10 @@ TMM47_COMMODE (ComMode) — 通讯方式
 | 模型 | 实际表名 | 主键 | 说明 |
 |------|---------|------|------|
 | Company | tmm01_company | companycd | 公司主数据 |
+| Country | tmm02_country | country_cd | 国家(Phase7补充) |
+| Province | tmm03_province | prvn_cd | 省份/直辖市(Phase7) |
+| City | tmm04_city | city_cd | 城市/区(Phase7) |
+| Town | tmm05_town | town_cd | 区县/街道(Phase7) |
 | ItemClass | tmm11_itemclass | classcd | 物料分类 |
 | Item | tmm12_items | itemcd | 物料/商品 |
 | SupplierClass | tmm18_supplierclass | classcd | 供应商分类 |
@@ -103,7 +107,7 @@ TMM47_COMMODE (ComMode) — 通讯方式
 | CustClass | tmm21_custclass | classcd | 客户分类 |
 | Customer | tmm22_customers | cust_cd | 客户/门店主表 |
 | CustomerHistory | tmm22_customers_history | id | 磁卡号变更历史（P0优化） |
-| SysCode | tmm31_syscodes | codetyp+codecd | 系统编码字典 |
+| SysCode | tmm31_syscodes | codetyp+codecd | 系统编码字典(含原tit03) |
 | IdMaster | tmm34_idmaster | id | ID 流水号生成器 |
 | CustPosRl | tmm35_cust_pos_rl | id | 客户-设备关联（资产台账） |
 | Area | tmm46_area | areacd | 区域 |
@@ -188,7 +192,6 @@ PLAN_CUST (PlanCust) — 预计划
 | TimepointArea | tit01_timepoint_area | 响应时间等级 |
 | LiabilityReg | tit02_liabilityreg | 免责条例 |
 | LiabilityRegDt | tit02_liabilityregdt | 免责条例明细 |
-| ItsmSysCode | tit03_syscodes | ITSM 字典 |
 | ArchiveCode | tit04_archivecode | 归档字典 |
 | RepairInfo | tit05_repairinfo | 返修范围 |
 | UserArea | tit06_userarea | 区域人员 |
