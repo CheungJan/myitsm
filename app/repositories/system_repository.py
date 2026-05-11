@@ -578,6 +578,7 @@ class SystemRepository:
         from app.models.master import Customer, Item, CustClass
 
         q = (db.session.query(CustPosRl, Customer.cust_nm, Customer.parentcd, Customer.class_cd,
+              Customer.cust_card,
               Item.item_nm, CustClass.class_nm.label("cust_class_nm"),
               Eid.asset_type, Eid.recyclable, Eid.recycle_status, Eid.asset_owner, Eid.install_date,
               Eid.prddate, Eid.whcd, Eid.qcflg, Eid.sflg, Eid.etyp, Eid.new_old, Eid.isunit)
@@ -600,9 +601,10 @@ class SystemRepository:
         # 管理单位解析
         pd_map: dict[str, str] = {}
         result = []
-        for r, cust_nm, parentcd, _cd, item_nm, cust_class_nm, at, rec, rs, ao, idate, pd, wh, qc, sf, et, no, iu in rows:
+        for r, cust_nm, parentcd, _cd, cust_card, item_nm, cust_class_nm, at, rec, rs, ao, idate, pd, wh, qc, sf, et, no, iu in rows:
             d = r.to_dict()
             d["cust_nm"] = cust_nm or ""
+            d["cust_card"] = cust_card or ""
             d["item_nm"] = item_nm or ""
             d["cust_class_nm"] = cust_class_nm or ""
             d["asset_type"] = at or ""

@@ -64,6 +64,7 @@
                     <el-descriptions-item label="商品名">{{ detailRow.item_nm || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="客户名">{{ detailRow.cust_nm || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="管理单位">{{ (detailRow as Record<string,unknown>).parentcd_nm || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="磁卡号">{{ (detailRow as Record<string,unknown>).cust_card || '-' }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">资产属性</el-divider>
                 <el-descriptions :column="3" border size="small">
