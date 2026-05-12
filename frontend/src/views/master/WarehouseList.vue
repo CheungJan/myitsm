@@ -62,10 +62,8 @@
 
 <script lang="ts" setup>
 import { ref, reactive, onMounted } from 'vue'
-import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchWarehouses } from '@/api/warehouse'
-import { createSyscode, updateSyscode, deleteSyscode } from '@/api/system'
 
 const warehouses = ref<Record<string,unknown>[]>([])
 const allData = ref<Record<string,unknown>[]>([])
