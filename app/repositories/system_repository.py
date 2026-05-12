@@ -618,7 +618,7 @@ class SystemRepository:
 
         q = (db.session.query(Eid, CustPosRl, Customer.cust_nm, Customer.parentcd, Customer.class_cd,
               Customer.cust_card, Item.item_nm, CustClass.class_nm.label("cust_class_nm"))
-        .outerjoin(CustPosRl, db.and_(Eid.itemcd == CustPosRl.item_cd, Eid.eid == CustPosRl.eid))
+        .outerjoin(CustPosRl, Eid.eid == CustPosRl.eid)
         .outerjoin(Customer, CustPosRl.cust_cd == Customer.cust_cd)
         .outerjoin(Item, Eid.itemcd == Item.item_cd)
         .outerjoin(CustClass, Customer.class_cd == CustClass.class_cd))

@@ -37,7 +37,7 @@ class WarehouseRepository:
         return db.session.get(Warehouse, whcd)
 
     @staticmethod
-    def list_all(useflg: str | None = "1") -> list[Warehouse]:
+    def list_all(useflg: str | None = None) -> list[Warehouse]:
         query = db.session.query(Warehouse)
         if useflg is not None:
             query = query.filter(Warehouse.useflg == useflg)

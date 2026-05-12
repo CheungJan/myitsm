@@ -111,7 +111,7 @@
                     <el-table-column prop="itemcd" label="配件代码" width="100" />
                     <el-table-column prop="item_nm" label="配件名称" min-width="150" />
                     <el-table-column prop="eid" label="配件序列号" width="150" />
-                    <el-table-column label="状态" width="65">
+                    <el-table-column label="配件状态" width="75">
                         <template #default="{ row }">
                             <el-tag :type="row.active ? 'success' : 'danger'" size="small">{{ row.active ? '有效' : '无效' }}</el-tag>
                         </template>

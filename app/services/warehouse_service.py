@@ -26,8 +26,8 @@ class WarehouseService:
         return record.to_dict()
 
     @staticmethod
-    def list_all() -> list[dict[str, Any]]:
-        records = WarehouseRepository.list_all()
+    def list_all(useflg: str | None = None) -> list[dict[str, Any]]:
+        records = WarehouseRepository.list_all(useflg=useflg)
         return [r.to_dict() for r in records]
 
     @staticmethod

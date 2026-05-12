@@ -215,8 +215,12 @@ export function deleteCustomer(custCd: string) {
 
 // ---- 仓库 ----
 
-export function fetchWarehouses() {
-    return request.get<never, { data: { whcd: string; whnm: string }[] }>('/warehouses')
+export function fetchWarehouses(useflg?: string) {
+    const params: Record<string, string> = {}
+    if (useflg !== undefined && useflg !== '') {
+        params.useflg = useflg
+    }
+    return request.get<never, { data: { whcd: string; whnm: string }[] }>('/warehouses', { params })
 }
 
 // ---- EID ----

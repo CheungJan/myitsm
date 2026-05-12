@@ -432,7 +432,7 @@ class SystemService:
         return self._repo.delete_eid(itemcd, eid_val)
 
     def get_warehouses(self) -> list[dict[str, Any]]:
-        return [w.to_dict() for w in self._repo.get_warehouses()]
+        return self._repo.get_warehouses()
 
     def create_warehouse(self, data: dict[str, Any]) -> dict[str, Any]:
         return self._repo.create_warehouse(data).to_dict()

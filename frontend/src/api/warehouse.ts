@@ -10,17 +10,17 @@ export interface WarehouseRecord {
 }
 
 export function fetchWarehouses() {
-    return request.get<never, { data: WarehouseRecord[] }>('/warehouse/warehouses')
+    return request.get<never, { data: WarehouseRecord[] }>('/warehouses')
 }
 
 export function createWarehouse(data: Record<string, unknown>) {
-    return request.post<never, unknown>('/warehouse/warehouses', data)
+    return request.post<never, unknown>('/warehouses', data)
 }
 
 export function updateWarehouse(whcd: string, data: Record<string, unknown>) {
-    return request.put<never, unknown>(`/warehouse/warehouses/${whcd}`, data)
+    return request.put<never, unknown>(`/warehouses/${whcd}`, data)
 }
 
 export function deleteWarehouse(whcd: string) {
-    return request.delete<never, unknown>(`/warehouse/warehouses/${whcd}`)
+    return request.delete<never, unknown>(`/warehouses/${whcd}`)
 }
