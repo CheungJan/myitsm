@@ -4,7 +4,14 @@
             <template #header>
                 <div class="page-header">
                     <span>仓库管理（共 {{ total }} 条）</span>
-                    <el-button type="primary" size="small" @click="openDialog()">新增仓库</el-button>
+                    <div>
+                        <el-select v-model="filterUseflg" placeholder="有效性" size="small" style="width:100px;margin-right:8px" @change="filterData">
+                            <el-option label="全部" value="" />
+                            <el-option label="有效" value="1" />
+                            <el-option label="无效" value="0" />
+                        </el-select>
+                        <el-button type="primary" size="small" @click="openDialog()">新增仓库</el-button>
+                    </div>
                 </div>
             </template>
             <el-table :data="warehouses" v-loading="loading" stripe>
@@ -61,7 +68,8 @@ import { fetchWarehouses } from '@/api/warehouse'
 import { createSyscode, updateSyscode, deleteSyscode } from '@/api/system'
 
 const warehouses = ref<Record<string,unknown>[]>([])
-const loading = ref(false); const total = ref(0)
+const allData = ref<Record<string,unknown>[]>([])
+const loading = ref(false); const total = ref(0); const filterUseflg = ref('')
 const dialogVisible = ref(false); const editing = ref<Record<string,unknown>|null>(null); const saving = ref(false)
 const form = reactive({ whcd: '', whnm: '', address: '', phoneno: '', leader: '', useflg: '1' })
 
@@ -71,10 +79,16 @@ async function loadData() {
     loading.value = true
     try {
         const res = await fetchWarehouses()
-        const list = (res.data || []) as Record<string,unknown>[]
-        total.value = list.length
-        warehouses.value = list
+        allData.value = (res.data || []) as Record<string,unknown>[]
+        filterData()
     } finally { loading.value = false }
+}
+
+function filterData() {
+    let list = allData.value
+    if (filterUseflg.value) list = list.filter(r => r.useflg === filterUseflg.value)
+    total.value = list.length
+    warehouses.value = list
 }
 
 function openDialog(row?: Record<string,unknown>) {
