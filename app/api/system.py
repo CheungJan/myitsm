@@ -593,20 +593,43 @@ def list_assets():  # type: ignore[no-untyped-def]
 @system_bp.get("/assets/bom")
 @login_required
 def get_asset_bom():  # type: ignore[no-untyped-def]
-    """查询设备 BOM 配件明细（通过 tmm44_pos_r_eid）。"""
+    """查询设备 BOM 配件明细（通过 tmm44_pos_r_eid），含质保信息。"""
     eid = request.args.get("eid", "")
     if not eid:
         return error_response("缺少 eid 参数", 400)
-    from app.models.master import PosREid, Item
+    from app.models.master import PosREid, Item, Eid as EidModel
+    from app.models.system import Customer
     from app.extensions import db
+
     rows = db.session.query(PosREid).filter(PosREid.posid == eid).all()
-    if not rows:
-        rows = db.session.query(PosREid).filter(PosREid.eid == eid).all()
+
+    # 主机信息
+    host_item = db.session.query(Item).filter(
+        Item.item_cd == db.session.query(EidModel.itemcd).filter(EidModel.eid == eid).scalar_subquery()
+    ).first()
+    host_nm = host_item.item_nm if host_item else ""
+
+    # 客户质保信息
+    cust = db.session.query(Customer).join(
+        CustPosRl, Customer.cust_cd == CustPosRl.cust_cd
+    ).filter(CustPosRl.eid == eid, CustPosRl.useflg == "1").first()
+
     result = []
     for r in rows:
         d = r.to_dict()
-        item = db.session.get(Item, r.eid) if hasattr(r, 'eid') else None
+        d["host_nm"] = host_nm
+        d["host_eid"] = eid
+        item = db.session.query(Item).filter(Item.item_cd == r.itemcd).first()
         d["item_nm"] = item.item_nm if item else ""
+        # EID 质保信息
+        eid_info = db.session.query(EidModel).filter(EidModel.eid == r.eid, EidModel.itemcd == r.itemcd).first()
+        if eid_info:
+            d["old_degree"] = str(eid_info.old_degree) if eid_info.old_degree else ""
+            d["asset_owner"] = eid_info.asset_owner or ""
+            d["warranty_start"] = str(cust.opendate) if cust and cust.opendate else ""
+            d["warranty_days"] = item.newperiod if eid_info.old_degree and str(eid_info.old_degree) == '12' else (item.oldperiod or 0)
+        else:
+            d["old_degree"] = ""; d["asset_owner"] = ""; d["warranty_start"] = ""; d["warranty_days"] = 0
         result.append(d)
     return success_response(data=result)
 

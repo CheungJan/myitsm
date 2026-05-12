@@ -104,11 +104,19 @@
                     <el-descriptions-item label="仓库">{{ (detailRow as Record<string,unknown>).wh_nm || (detailRow as Record<string,unknown>).whcd || '-' }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">BOM 配件明细</el-divider>
-                <el-table :data="bomItems" size="small" stripe max-height="300" v-if="bomItems.length">
-                    <el-table-column prop="posid" label="主机号" width="150" />
-                    <el-table-column prop="eid" label="配件SN" width="150" />
+                <el-table :data="bomItems" size="small" stripe max-height="350" v-if="bomItems.length" style="width:100%">
+                    <el-table-column prop="host_nm" label="整机名称" width="120" />
+                    <el-table-column prop="host_eid" label="整机序列号" width="150" />
+                    <el-table-column prop="itemcd" label="配件代码" width="100" />
                     <el-table-column prop="item_nm" label="配件名称" min-width="150" />
-                    <el-table-column prop="itemcd" label="物料编码" width="100" />
+                    <el-table-column prop="eid" label="配件序列号" width="150" />
+                    <el-table-column label="质保类型" width="80">
+                        <template #default="{ row }">{{ codeMaps.OD?.[row.old_degree] || '-' }}</template>
+                    </el-table-column>
+                    <el-table-column prop="warranty_start" label="质保开始" width="105" />
+                    <el-table-column label="质保结束" width="105">
+                        <template #default="{ row }">{{ calcWarrantyEnd(row) }}</template>
+                    </el-table-column>
                 </el-table>
                 <div v-else style="color:#909399;padding:12px 0">暂无配件明细，需通过预计划/生产环节关联</div>
                 <el-divider content-position="left">序列号信息</el-divider>
@@ -174,10 +182,10 @@ watch(perPage, () => { page.value = 1; loadData() })
 watch(treeFilter, (v) => treeRef.value?.filter(v))
 
 onMounted(async () => {
-    const [tree, at, rs, ow, es, qs, et, no, asCode, iuCode] = await Promise.all([
+    const [tree, at, rs, ow, es, qs, et, no, asCode, iuCode, odCode] = await Promise.all([
         fetchCustClassTree(), fetchSyscodes('AT'), fetchSyscodes('RS'), fetchSyscodes('OW'),
         fetchSyscodes('ES'), fetchSyscodes('QS'), fetchSyscodes('ET'), fetchSyscodes('NO'), fetchSyscodes('AS'),
-        fetchSyscodes('IU'),
+        fetchSyscodes('IU'), fetchSyscodes('OD'),
     ])
     treeData.value = tree.data || []
     assetTypes.value = at.data || []; recycleStatuses.value = rs.data || []; assetOwners.value = ow.data || []
@@ -191,6 +199,7 @@ onMounted(async () => {
         NO: Object.fromEntries((no.data||[]).map(t => [t.code_cd, t.code_nm])),
         AS: Object.fromEntries((asCode.data||[]).map(t => [t.code_cd, t.code_nm])),
         IU: Object.fromEntries((iuCode.data||[]).map(t => [t.code_cd, t.code_nm])),
+        OD: Object.fromEntries((odCode.data||[]).map(t => [t.code_cd, t.code_nm])),
     }
     const wh = await fetchWarehouses()
     whOptions.value = wh.data || []
@@ -220,6 +229,14 @@ async function loadData() {
 }
 
 function onSearch() { page.value = 1; loadData() }
+function calcWarrantyEnd(row: Record<string,unknown>): string {
+    if ((row as Record<string,unknown>).asset_owner !== '01') return '-'
+    const start = row.warranty_start as string; const days = Number(row.warranty_days) || 0
+    if (!start || !days) return '-'
+    const d = new Date(start); d.setDate(d.getDate() + days)
+    return d.toISOString().slice(0, 10)
+}
+
 function onFilterChange() { page.value = 1; loadData() }
 
 async function openDetail(row: Record<string,unknown>) {
