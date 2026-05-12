@@ -28,6 +28,7 @@
                                 <el-option v-for="w in whOptions.filter((w:Record<string,string>) => w.useflg === '0')" :key="w.whcd" :label="`${w.whcd} ${w.whnm} (无效)`" :value="w.whcd" />
                             </el-option-group>
                         </el-select>
+                        <el-tree-select v-model="filterItemClass" :data="itemClassTree" :props="{label:'class_nm',children:'children'}" placeholder="物料分类" clearable filterable check-strictly size="small" style="width:140px;margin-left:8px" @change="onFilterChange" />
                         <el-select v-model="filterLocation" placeholder="设备位置" clearable size="small" style="width:95px;margin-left:8px" @change="onFilterChange">
                             <el-option label="客户设备" value="customer" />
                             <el-option label="仓库库存" value="warehouse" />
@@ -168,7 +169,7 @@ import type { ElTree } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import { fetchAssets, fetchCustClassTree, fetchSyscodes, fetchWarehouses } from '@/api/master'
+import { fetchAssets, fetchCustClassTree, fetchSyscodes, fetchWarehouses, fetchItemClassTree } from '@/api/master'
 import type { ItemClassNode } from '@/api/master'
 
 const authStore = useAuthStore()
@@ -182,6 +183,8 @@ const assets = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const searchText = ref(''); const page = ref(1); const perPage = ref(20); const total = ref(0)
 const filterAssetType = ref(''); const filterAssetOwner = ref(''); const filterUseflg = ref(''); const filterLocation = ref('')
 const filterWhcd = ref<string[]>([]); const filterSflg = ref('')
+const filterItemClass = ref('')
+const itemClassTree = ref<ItemClassNode[]>([])
 const esOptions = ref<{code_cd:string;code_nm:string}[]>([])
 
 const assetTypes = ref<{code_cd:string;code_nm:string}[]>([])
@@ -206,6 +209,8 @@ onMounted(async () => {
         fetchSyscodes('IU'), fetchSyscodes('OD'),
     ])
     treeData.value = tree.data || []
+    const icTree = await fetchItemClassTree()
+    itemClassTree.value = icTree.data || []
     assetTypes.value = at.data || []; recycleStatuses.value = rs.data || []; assetOwners.value = ow.data || []
     esOptions.value = es.data || []
     codeMaps.value = {
@@ -241,6 +246,7 @@ async function loadData() {
         if (filterLocation.value) params.location = filterLocation.value
         if (filterWhcd.value.length > 0) params.whcd = filterWhcd.value.join(',')
         if (filterSflg.value) params.sflg = filterSflg.value
+        if (filterItemClass.value) params.item_class = filterItemClass.value
         const res = await fetchAssets(params)
         const d = res.data as { items: Record<string,unknown>[]; total: number }
         assets.value = d.items || []; total.value = d.total || 0

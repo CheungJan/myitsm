@@ -588,7 +588,9 @@ def list_assets():  # type: ignore[no-untyped-def]
     whcd = request.args.get("whcd")
     sflg = request.args.get("sflg")
     cust_cd = request.args.get("cust_cd")
-    result = _service.list_assets(page=page, per_page=per_page, class_cd=class_cd, search=search, asset_type=asset_type, asset_owner=asset_owner, useflg=useflg, location=location, whcd=whcd, sflg=sflg, cust_cd=cust_cd)
+    class_cd = request.args.get("class_cd")
+    item_class = request.args.get("item_class")
+    result = _service.list_assets(page=page, per_page=per_page, class_cd=class_cd, search=search, asset_type=asset_type, asset_owner=asset_owner, useflg=useflg, location=location, whcd=whcd, sflg=sflg, cust_cd=cust_cd, item_class=class_cd)
     return success_response(data={"items": result["items"], "total": result["total"]})
 
 
