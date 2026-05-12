@@ -613,7 +613,7 @@ class SystemRepository:
                          class_cd: str | None = None, asset_type: str | None = None,
                          asset_owner: str | None = None, useflg: str | None = None,
                          location: str | None = None, whcd: str | None = None,
-                         sflg: str | None = None) -> tuple[list[dict], int]:
+                         sflg: str | None = None, cust_cd: str | None = None) -> tuple[list[dict], int]:
         """资产台账列表（以 Eid 为主表，含库存设备）。"""
         from app.models.master import Customer, Item, CustClass
 
@@ -634,6 +634,8 @@ class SystemRepository:
             q = q.filter(Eid.asset_owner == asset_owner)
         if sflg:
             q = q.filter(Eid.sflg == sflg)
+        if cust_cd:
+            q = q.filter(CustPosRl.cust_cd == cust_cd)
         if useflg:
             if location == "warehouse":
                 q = q.filter(Eid.useflg == useflg)

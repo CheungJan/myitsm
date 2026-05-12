@@ -391,10 +391,11 @@ class SystemService:
                     search: str | None = None, class_cd: str | None = None,
                     asset_type: str | None = None, asset_owner: str | None = None,
                     useflg: str | None = None, location: str | None = None,
-                    whcd: str | None = None, sflg: str | None = None) -> dict[str, Any]:
+                    whcd: str | None = None, sflg: str | None = None,
+                    cust_cd: str | None = None) -> dict[str, Any]:
         items, total = self._repo.get_cust_pos_rl(
             page=page, per_page=per_page, search=search,
-            class_cd=class_cd, asset_type=asset_type, asset_owner=asset_owner, useflg=useflg, location=location, whcd=whcd, sflg=sflg)
+            class_cd=class_cd, asset_type=asset_type, asset_owner=asset_owner, useflg=useflg, location=location, whcd=whcd, sflg=sflg, cust_cd=cust_cd)
         return {"items": items, "total": total}
 
     def get_asset(self, asset_id: int) -> dict[str, Any] | None:

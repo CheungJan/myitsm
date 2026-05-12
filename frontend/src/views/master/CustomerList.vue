@@ -215,6 +215,17 @@
                     <el-descriptions-item label="预缴金额">{{ detailRow.yj_money || '-' }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">POS 配置</el-divider>
+                <el-table :data="custDevices" size="small" max-height="250" stripe v-if="custDevices.length" style="margin-bottom:8px">
+                    <el-table-column prop="eid" label="设备 SN" width="150" />
+                    <el-table-column prop="item_nm" label="商品名" min-width="140" />
+                    <el-table-column prop="item_cd" label="物料编码" width="100" />
+                    <el-table-column label="状态" width="60">
+                        <template #default="{ row }">
+                            <el-tag :type="row.useflg === '0' ? 'danger' : 'success'" size="small">{{ row.useflg === '0' ? '无效' : '有效' }}</el-tag>
+                        </template>
+                    </el-table-column>
+                </el-table>
+                <div v-else style="color:#909399;padding:4px 0">该客户暂无设备关联</div>
                 <el-descriptions :column="3" border size="small">
                     <el-descriptions-item label="设备数量">{{ (detailRow as Record<string,unknown>).pos_count || detailRow.pos_n || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="POS状态">{{ (detailRow as Record<string,unknown>).posstatus_nm || detailRow.posstatus || '-' }}</el-descriptions-item>
@@ -325,6 +336,7 @@ const total = ref(0)
 // ---- 客户详情 ----
 const detailVisible = ref(false)
 const detailRow = ref<CustRecord | null>(null)
+const custDevices = ref<Record<string,unknown>[]>([])
 
 // ---- 客户弹窗 ----
 const custDialogVisible = ref(false)
@@ -579,9 +591,13 @@ function onSearch() {
 
 // ---- 客户详情 ----
 
-function openDetail(row: CustRecord) {
-    detailRow.value = row
-    detailVisible.value = true
+async function openDetail(row: CustRecord) {
+    detailRow.value = row; detailVisible.value = true; custDevices.value = []
+    try {
+        const token = localStorage.getItem('token')
+        const resp = await fetch(`/api/v1/assets?cust_cd=${row.cust_cd}&per_page=100`, { headers: { Authorization: `Bearer ${token}` } })
+        if (resp.ok) { const d = await resp.json(); custDevices.value = d.data?.items || [] }
+    } catch { /* */ }
 }
 
 // ---- 客户 CRUD ----
