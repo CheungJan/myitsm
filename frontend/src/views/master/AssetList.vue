@@ -19,7 +19,7 @@
                         <span>资产台账（共 {{ total }} 条）<template v-if="selectedClass"> — {{ selectedClass }}</template></span>
                         <div class="header-actions">
                             <el-input v-model="searchText" placeholder="SN/客户/磁卡号" clearable size="small" style="width:170px" @keyup.enter="onSearch" @clear="onSearch" />
-                            <el-select v-model="filterWhcd" placeholder="仓库" clearable filterable size="small" style="width:130px;margin-left:8px" @change="onFilterChange">
+                            <el-select v-model="filterWhcd" placeholder="仓库" clearable filterable multiple collapse-tags collapse-tags-tooltip size="small" style="width:160px;margin-left:8px" @change="onFilterChange">
                                 <el-option v-for="w in whOptions" :key="w.whcd" :label="`${w.whcd} ${w.whnm}`" :value="w.whcd" />
                             </el-select>
                             <el-select v-model="filterLocation" placeholder="设备位置" clearable size="small" style="width:95px;margin-left:8px" @change="onFilterChange">
@@ -140,7 +140,7 @@ const selectedClassCd = ref(''); const selectedClass = ref('')
 const assets = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const searchText = ref(''); const page = ref(1); const perPage = ref(20); const total = ref(0)
 const filterAssetType = ref(''); const filterAssetOwner = ref(''); const filterUseflg = ref(''); const filterLocation = ref('')
-const filterWhcd = ref('')
+const filterWhcd = ref<string[]>([])
 
 const assetTypes = ref<{code_cd:string;code_nm:string}[]>([])
 const whOptions = ref<{whcd:string;whnm:string}[]>([])
@@ -195,7 +195,7 @@ async function loadData() {
         if (filterAssetOwner.value) params.asset_owner = filterAssetOwner.value
         if (filterUseflg.value) params.useflg = filterUseflg.value
         if (filterLocation.value) params.location = filterLocation.value
-        if (filterWhcd.value) params.whcd = filterWhcd.value
+        if (filterWhcd.value.length > 0) params.whcd = filterWhcd.value.join(',')
         const res = await fetchAssets(params)
         const d = res.data as { items: Record<string,unknown>[]; total: number }
         assets.value = d.items || []; total.value = d.total || 0

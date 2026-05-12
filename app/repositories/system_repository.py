@@ -601,7 +601,9 @@ class SystemRepository:
         elif location == "warehouse":
             q = q.filter(CustPosRl.id.is_(None))
         if whcd:
-            q = q.filter(Eid.whcd == whcd)
+            whcds = [w.strip() for w in whcd.split(",") if w.strip()]
+            if whcds:
+                q = q.filter(Eid.whcd.in_(whcds))
 
         total = q.count()
         rows = q.order_by(Eid.eid.desc()).offset((page - 1) * per_page).limit(per_page).all()
