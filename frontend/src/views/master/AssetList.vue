@@ -52,6 +52,9 @@
                     <el-table-column label="客户名" min-width="130">
                         <template #default="{ row }">{{ row.cust_nm || row.cust_cd }}</template>
                     </el-table-column>
+                    <el-table-column label="磁卡号" width="110">
+                        <template #default="{ row }">{{ (row as Record<string,unknown>).cust_card || '-' }}</template>
+                    </el-table-column>
                     <el-table-column label="管理单位" width="130">
                         <template #default="{ row }">{{ (row as Record<string,unknown>).parentcd_nm || '-' }}</template>
                     </el-table-column>
