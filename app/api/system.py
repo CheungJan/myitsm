@@ -590,6 +590,27 @@ def list_assets():  # type: ignore[no-untyped-def]
     return success_response(data={"items": result["items"], "total": result["total"]})
 
 
+@system_bp.get("/assets/bom")
+@login_required
+def get_asset_bom():  # type: ignore[no-untyped-def]
+    """查询设备 BOM 配件明细（通过 tmm44_pos_r_eid）。"""
+    eid = request.args.get("eid", "")
+    if not eid:
+        return error_response("缺少 eid 参数", 400)
+    from app.models.master import PosREid, Item
+    from app.extensions import db
+    rows = db.session.query(PosREid).filter(PosREid.posid == eid).all()
+    if not rows:
+        rows = db.session.query(PosREid).filter(PosREid.eid == eid).all()
+    result = []
+    for r in rows:
+        d = r.to_dict()
+        item = db.session.get(Item, r.eid) if hasattr(r, 'eid') else None
+        d["item_nm"] = item.item_nm if item else ""
+        result.append(d)
+    return success_response(data=result)
+
+
 @system_bp.put("/assets/<int:asset_id>")
 @login_required
 def update_asset(asset_id: int):  # type: ignore[no-untyped-def]

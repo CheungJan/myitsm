@@ -103,6 +103,14 @@
                     <el-descriptions-item label="设备状态">{{ codeMaps.AS?.[(detailRow as Record<string,unknown>).asset_status as string] || (detailRow as Record<string,unknown>).asset_status || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="仓库">{{ (detailRow as Record<string,unknown>).wh_nm || (detailRow as Record<string,unknown>).whcd || '-' }}</el-descriptions-item>
                 </el-descriptions>
+                <el-divider content-position="left">BOM 配件明细</el-divider>
+                <el-table :data="bomItems" size="small" stripe max-height="300" v-if="bomItems.length">
+                    <el-table-column prop="posid" label="主机号" width="150" />
+                    <el-table-column prop="eid" label="配件SN" width="150" />
+                    <el-table-column prop="item_nm" label="配件名称" min-width="150" />
+                    <el-table-column prop="itemcd" label="物料编码" width="100" />
+                </el-table>
+                <div v-else style="color:#909399;padding:12px 0">暂无配件明细，需通过预计划/生产环节关联</div>
                 <el-divider content-position="left">序列号信息</el-divider>
                 <el-descriptions :column="3" border size="small">
                     <el-descriptions-item label="质检">{{ codeMaps.QS?.[detailRow.qcflg as string] || detailRow.qcflg || '-' }}</el-descriptions-item>
@@ -156,7 +164,7 @@ const recycleStatuses = ref<{code_cd:string;code_nm:string}[]>([])
 const assetOwners = ref<{code_cd:string;code_nm:string}[]>([])
 const codeMaps = ref<Record<string,Record<string,string>>>({})
 
-const detailVisible = ref(false); const detailRow = ref<Record<string,unknown>|null>(null)
+const detailVisible = ref(false); const detailRow = ref<Record<string,unknown>|null>(null); const bomItems = ref<Record<string,unknown>[]>([])
 const editVisible = ref(false); const editRow = ref<Record<string,unknown>|null>(null)
 const saving = ref(false)
 const editForm = reactive({ asset_type:'', recycle_status:'', asset_owner:'', install_date:'', recyclable:false })
@@ -214,7 +222,17 @@ async function loadData() {
 function onSearch() { page.value = 1; loadData() }
 function onFilterChange() { page.value = 1; loadData() }
 
-function openDetail(row: Record<string,unknown>) { detailRow.value = row; detailVisible.value = true }
+async function openDetail(row: Record<string,unknown>) {
+    detailRow.value = row; detailVisible.value = true; bomItems.value = []
+    const eid = row.eid as string
+    if (eid) {
+        try {
+            const token = localStorage.getItem('token')
+            const resp = await fetch(`/api/v1/assets/bom?eid=${eid}`, { headers: { Authorization: `Bearer ${token}` } })
+            if (resp.ok) { const d = await resp.json(); bomItems.value = d.data || [] }
+        } catch { /* BOM数据暂缺 */ }
+    }
+}
 function openEdit(row: Record<string,unknown>) {
     editRow.value = row
     editForm.asset_type = (row.asset_type as string) || ''
