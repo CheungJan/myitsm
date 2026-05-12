@@ -562,4 +562,8 @@ class PosREid(BaseModel):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     posid = db.Column(db.String(50), comment="整机POS编码")
     eid = db.Column(db.String(50), comment="配件EID")
+    itemcd = db.Column(db.String(10), comment="物料编码")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
     useflg = db.Column(db.String(1), default="1")
