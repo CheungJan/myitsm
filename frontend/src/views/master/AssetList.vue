@@ -3,6 +3,9 @@
         <div class="tree-panel">
             <el-card shadow="never">
                 <template #header><span>客户分类</span></template>
+                <div style="margin-bottom:4px">
+                    <el-button link size="small" @click="clearTreeFilter">全部设备</el-button>
+                </div>
                 <el-input v-model="treeFilter" placeholder="过滤" clearable size="small" style="margin-bottom:4px" />
                 <el-tree ref="treeRef" :data="treeData" :props="{label:'class_nm',children:'children'}"
                     node-key="class_cd" highlight-current :filter-node-method="filterTree"
@@ -167,6 +170,7 @@ onMounted(async () => {
 
 function filterTree(v: string, d: ItemClassNode) { return !v || d.class_nm.includes(v) }
 function onTreeClick(n: ItemClassNode) { selectedClassCd.value = n.class_cd; selectedClass.value = `(${n.class_cd})`; searchText.value = ''; page.value = 1; loadData() }
+function clearTreeFilter() { selectedClassCd.value = ''; selectedClass.value = ''; treeRef.value?.setCurrentKey(null); page.value = 1; loadData() }
 
 async function loadData() {
     loading.value = true
