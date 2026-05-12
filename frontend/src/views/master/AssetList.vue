@@ -38,9 +38,12 @@
                         <el-select v-model="filterAssetOwner" placeholder="所属方" clearable size="small" style="width:100px;margin-left:8px" @change="onFilterChange">
                             <el-option v-for="t in assetOwners" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" />
                         </el-select>
-                        <el-select v-model="filterUseflg" placeholder="有效性" clearable size="small" style="width:90px;margin-left:8px" @change="onFilterChange">
+                        <el-select v-model="filterUseflg" placeholder="门店有效性" clearable size="small" style="width:105px;margin-left:8px" @change="onFilterChange">
                             <el-option label="有效" value="1" />
                             <el-option label="无效" value="0" />
+                        </el-select>
+                        <el-select v-model="filterSflg" placeholder="设备状态" clearable size="small" style="width:105px;margin-left:8px" @change="onFilterChange">
+                            <el-option v-for="t in esOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" />
                         </el-select>
                     </div>
                 </template>
@@ -70,6 +73,9 @@
                         </template>
                     </el-table-column>
                     <el-table-column label="设备状态" width="80">
+                        <template #default="{ row }">{{ codeMaps.ES?.[row.sflg as string] || row.sflg || '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="门店状态" width="80">
                         <template #default="{ row }">{{ codeMaps.AS?.[(row as Record<string,unknown>).asset_status as string] || (row as Record<string,unknown>).asset_status || '-' }}</template>
                     </el-table-column>
                     <el-table-column prop="prddate" label="生产日期" width="100" />
@@ -100,7 +106,7 @@
                     <el-descriptions-item label="回收状态">{{ codeMaps.RS?.[detailRow.recycle_status as string] || detailRow.recycle_status || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="所属方">{{ codeMaps.OW?.[detailRow.asset_owner as string] || detailRow.asset_owner || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="安装日期">{{ detailRow.install_date || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="设备状态">{{ codeMaps.AS?.[(detailRow as Record<string,unknown>).asset_status as string] || (detailRow as Record<string,unknown>).asset_status || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="设备状态">{{ codeMaps.AS?.[(detailRow as Record<string,unknown>).asset_status as string] || codeMaps.ES?.[detailRow.sflg as string] || detailRow.sflg || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="仓库">{{ (detailRow as Record<string,unknown>).wh_nm || (detailRow as Record<string,unknown>).whcd || '-' }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">BOM 配件明细</el-divider>
@@ -175,7 +181,8 @@ const selectedClassCd = ref(''); const selectedClass = ref('')
 const assets = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const searchText = ref(''); const page = ref(1); const perPage = ref(20); const total = ref(0)
 const filterAssetType = ref(''); const filterAssetOwner = ref(''); const filterUseflg = ref(''); const filterLocation = ref('')
-const filterWhcd = ref<string[]>([])
+const filterWhcd = ref<string[]>([]); const filterSflg = ref('')
+const esOptions = ref<{code_cd:string;code_nm:string}[]>([])
 
 const assetTypes = ref<{code_cd:string;code_nm:string}[]>([])
 const whOptions = ref<{whcd:string;whnm:string}[]>([])
@@ -200,6 +207,7 @@ onMounted(async () => {
     ])
     treeData.value = tree.data || []
     assetTypes.value = at.data || []; recycleStatuses.value = rs.data || []; assetOwners.value = ow.data || []
+    esOptions.value = es.data || []
     codeMaps.value = {
         AT: Object.fromEntries(assetTypes.value.map(t => [t.code_cd, t.code_nm])),
         RS: Object.fromEntries(recycleStatuses.value.map(t => [t.code_cd, t.code_nm])),
@@ -232,6 +240,7 @@ async function loadData() {
         if (filterUseflg.value) params.useflg = filterUseflg.value
         if (filterLocation.value) params.location = filterLocation.value
         if (filterWhcd.value.length > 0) params.whcd = filterWhcd.value.join(',')
+        if (filterSflg.value) params.sflg = filterSflg.value
         const res = await fetchAssets(params)
         const d = res.data as { items: Record<string,unknown>[]; total: number }
         assets.value = d.items || []; total.value = d.total || 0

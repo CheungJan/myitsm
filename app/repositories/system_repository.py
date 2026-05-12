@@ -612,7 +612,8 @@ class SystemRepository:
     def get_cust_pos_rl(page: int = 1, per_page: int = 20, search: str | None = None,
                          class_cd: str | None = None, asset_type: str | None = None,
                          asset_owner: str | None = None, useflg: str | None = None,
-                         location: str | None = None, whcd: str | None = None) -> tuple[list[dict], int]:
+                         location: str | None = None, whcd: str | None = None,
+                         sflg: str | None = None) -> tuple[list[dict], int]:
         """资产台账列表（以 Eid 为主表，含库存设备）。"""
         from app.models.master import Customer, Item, CustClass
 
@@ -631,8 +632,13 @@ class SystemRepository:
             q = q.filter(Eid.asset_type == asset_type)
         if asset_owner:
             q = q.filter(Eid.asset_owner == asset_owner)
+        if sflg:
+            q = q.filter(Eid.sflg == sflg)
         if useflg:
-            q = q.filter(CustPosRl.useflg == useflg)
+            if location == "warehouse":
+                q = q.filter(Eid.useflg == useflg)
+            else:
+                q = q.filter(CustPosRl.useflg == useflg)
         if location == "customer":
             q = q.filter(CustPosRl.id.isnot(None))
         elif location == "warehouse":
@@ -655,7 +661,7 @@ class SystemRepository:
             d["cust_card"] = cust_card or ""
             d["item_nm"] = item_nm or ""
             d["cust_class_nm"] = cust_class_nm or ""
-            d["useflg"] = r.useflg if r else "1"
+            d["useflg"] = r.useflg if r else (e.useflg or "1")
             d["asset_status"] = getattr(r, 'asset_status', None) or "" if r else ""
             # 仓库名解析
             whcd = e.whcd or ""
