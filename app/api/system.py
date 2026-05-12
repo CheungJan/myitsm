@@ -597,16 +597,14 @@ def get_asset_bom():  # type: ignore[no-untyped-def]
     eid = request.args.get("eid", "")
     if not eid:
         return error_response("缺少 eid 参数", 400)
-    from app.models.master import PosREid, Item, Eid as EidModel
-    from app.models.system import Customer
+    from app.models.master import CustPosRl, Customer, PosREid, Item, Eid as EidModel
     from app.extensions import db
 
     rows = db.session.query(PosREid).filter(PosREid.posid == eid).all()
 
     # 主机信息
-    host_item = db.session.query(Item).filter(
-        Item.item_cd == db.session.query(EidModel.itemcd).filter(EidModel.eid == eid).scalar_subquery()
-    ).first()
+    eid_row = db.session.query(EidModel).filter(EidModel.eid == eid).first()
+    host_item = db.session.get(Item, eid_row.itemcd) if eid_row else None
     host_nm = host_item.item_nm if host_item else ""
 
     # 客户质保信息
