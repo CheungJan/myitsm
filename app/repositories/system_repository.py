@@ -563,7 +563,19 @@ class SystemRepository:
     @staticmethod
     def get_warehouses() -> list[Any]:
         from app.models.warehouse import Warehouse
-        return list(db.session.query(Warehouse).order_by(Warehouse.whcd).all())
+        from app.models.system import User
+        whs = list(db.session.query(Warehouse).order_by(Warehouse.whcd).all())
+        user_map: dict[str, str] = {}
+        result = []
+        for w in whs:
+            d = w.to_dict()
+            leader = w.leader or ""
+            if leader and leader not in user_map:
+                u = db.session.get(User, leader)
+                user_map[leader] = u.user_nm if u else ""
+            d["leader_nm"] = user_map.get(leader, "")
+            result.append(d)
+        return result
 
     @staticmethod
     def get_warehouse(whcd: str) -> Any:

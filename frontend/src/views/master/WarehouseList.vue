@@ -19,7 +19,9 @@
                 <el-table-column prop="whnm" label="名称" width="160" />
                 <el-table-column prop="address" label="地址" min-width="160" />
                 <el-table-column prop="phoneno" label="电话" width="120" />
-                <el-table-column prop="leader" label="负责人" width="90" />
+                <el-table-column label="负责人" width="100">
+                    <template #default="{ row }">{{ (row as Record<string,unknown>).leader_nm || row.leader || '-' }}</template>
+                </el-table-column>
                 <el-table-column label="状态" width="70">
                     <template #default="{ row }">
                         <el-tag :type="row.useflg === '0' ? 'danger' : 'success'" size="small">{{ row.useflg === '0' ? '无效' : '有效' }}</el-tag>
