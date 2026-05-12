@@ -104,9 +104,10 @@
                     <el-descriptions-item label="仓库">{{ (detailRow as Record<string,unknown>).wh_nm || (detailRow as Record<string,unknown>).whcd || '-' }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">BOM 配件明细</el-divider>
+                <div v-if="bomItems.length" style="margin-bottom:8px;color:#409eff;font-size:13px">
+                    整机：{{ bomItems[0].host_nm || '-' }}　序列号：{{ bomItems[0].host_eid || '-' }}
+                </div>
                 <el-table :data="bomItems" size="small" stripe max-height="350" v-if="bomItems.length" style="width:100%">
-                    <el-table-column prop="host_nm" label="整机名称" width="120" />
-                    <el-table-column prop="host_eid" label="整机序列号" width="150" />
                     <el-table-column prop="itemcd" label="配件代码" width="100" />
                     <el-table-column prop="item_nm" label="配件名称" min-width="150" />
                     <el-table-column prop="eid" label="配件序列号" width="150" />
