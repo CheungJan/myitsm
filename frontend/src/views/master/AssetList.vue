@@ -118,6 +118,11 @@
                     <el-table-column label="质保结束" width="105">
                         <template #default="{ row }">{{ calcWarrantyEnd(row) }}</template>
                     </el-table-column>
+                    <el-table-column label="质保状态" width="80">
+                        <template #default="{ row }">
+                            <el-tag :type="isWarrantyExpired(row) ? 'danger' : 'success'" size="small">{{ isWarrantyExpired(row) ? '过保' : '在保' }}</el-tag>
+                        </template>
+                    </el-table-column>
                 </el-table>
                 <div v-else style="color:#909399;padding:12px 0">暂无配件明细，需通过预计划/生产环节关联</div>
                 <el-divider content-position="left">序列号信息</el-divider>
@@ -236,6 +241,12 @@ function calcWarrantyEnd(row: Record<string,unknown>): string {
     if (!start || !days) return '-'
     const d = new Date(start); d.setDate(d.getDate() + days)
     return d.toISOString().slice(0, 10)
+}
+
+function isWarrantyExpired(row: Record<string,unknown>): boolean {
+    const end = calcWarrantyEnd(row)
+    if (end === '-') return false
+    return new Date(end) < new Date()
 }
 
 function onFilterChange() { page.value = 1; loadData() }
