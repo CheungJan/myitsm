@@ -566,6 +566,31 @@ class SystemRepository:
         return list(db.session.query(Warehouse).order_by(Warehouse.whcd).all())
 
     @staticmethod
+    def get_warehouse(whcd: str) -> Any:
+        from app.models.warehouse import Warehouse
+        return db.session.get(Warehouse, whcd)
+
+    @staticmethod
+    def create_warehouse(data: dict[str, Any]) -> Any:
+        from app.models.warehouse import Warehouse
+        w = Warehouse(**data)
+        db.session.add(w)
+        db.session.commit()
+        return w
+
+    @staticmethod
+    def update_warehouse(record: Any, data: dict[str, Any]) -> Any:
+        for k, v in data.items():
+            setattr(record, k, v)
+        db.session.commit()
+        return record
+
+    @staticmethod
+    def delete_warehouse(record: Any) -> None:
+        db.session.delete(record)
+        db.session.commit()
+
+    @staticmethod
     def get_eid_tracks(itemcd: str, eid: str) -> list[EidTrack]:
         return list(db.session.query(EidTrack).filter(
             EidTrack.itemcd == itemcd, EidTrack.eid == eid

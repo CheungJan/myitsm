@@ -549,6 +549,30 @@ def list_warehouses():  # type: ignore[no-untyped-def]
     return success_response(data=_service.get_warehouses())
 
 
+@system_bp.post("/warehouses")
+@login_required
+def create_warehouse():  # type: ignore[no-untyped-def]
+    """新增仓库。"""
+    body = request.get_json(silent=True) or {}
+    return success_response(data=_service.create_warehouse(body), code=201)
+
+
+@system_bp.put("/warehouses/<whcd>")
+@login_required
+def update_warehouse(whcd: str):  # type: ignore[no-untyped-def]
+    """更新仓库。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_warehouse(whcd, body)
+    return success_response(data=r) if r else error_response("仓库不存在", 404)
+
+
+@system_bp.delete("/warehouses/<whcd>")
+@login_required
+def delete_warehouse(whcd: str):  # type: ignore[no-untyped-def]
+    """删除仓库。"""
+    return success_response() if _service.delete_warehouse(whcd) else error_response("仓库不存在", 404)
+
+
 @system_bp.get("/assets")
 @login_required
 def list_assets():  # type: ignore[no-untyped-def]

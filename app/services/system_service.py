@@ -434,6 +434,18 @@ class SystemService:
     def get_warehouses(self) -> list[dict[str, Any]]:
         return [w.to_dict() for w in self._repo.get_warehouses()]
 
+    def create_warehouse(self, data: dict[str, Any]) -> dict[str, Any]:
+        return self._repo.create_warehouse(data).to_dict()
+
+    def update_warehouse(self, whcd: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        r = self._repo.get_warehouse(whcd)
+        return self._repo.update_warehouse(r, data).to_dict() if r else None
+
+    def delete_warehouse(self, whcd: str) -> bool:
+        r = self._repo.get_warehouse(whcd)
+        if r: self._repo.delete_warehouse(r); return True
+        return False
+
     def get_eid_tracks(self, itemcd: str, eid: str) -> list[dict[str, Any]]:
         tracks = self._repo.get_eid_tracks(itemcd, eid)
         from app.models.warehouse import Warehouse
