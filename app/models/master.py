@@ -456,6 +456,19 @@ class EidTrack(BaseModel):
     n_manf_seq = db.Column(db.String(100), comment="新制造序列号")
     old_degree = db.Column(db.Numeric, comment="旧化程度")
     n_old_degree = db.Column(db.Numeric, comment="新旧化程度")
+    # 资产追踪扩展（2026-05-12）
+    install_date = db.Column(db.DateTime, comment="安装日期")
+    n_install_date = db.Column(db.DateTime, comment="新安装日期")
+    cust_cd = db.Column(db.String(20), comment="变更前客户")
+    n_cust_cd = db.Column(db.String(20), comment="变更后客户")
+    asset_type_trk = db.Column("asset_type", db.String(10), comment="资产类型")
+    n_asset_type = db.Column(db.String(10), comment="新资产类型")
+    recyclable = db.Column(db.String(1), comment="可回收标志")
+    n_recyclable = db.Column(db.String(1), comment="新可回收标志")
+    recycle_status = db.Column(db.String(10), comment="回收状态")
+    n_recycle_status = db.Column(db.String(10), comment="新回收状态")
+    asset_owner = db.Column(db.String(20), comment="资产所属方")
+    n_asset_owner = db.Column(db.String(20), comment="新资产所属方")
 
 
 class Bom(BaseModel):
