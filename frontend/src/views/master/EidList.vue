@@ -117,10 +117,10 @@
                         <span v-else>{{ row.type }}</span>
                     </template>
                 </el-table-column>
-                <el-table-column label="客户" width="120">
+                <el-table-column label="客户" width="130">
                     <template #default="{ row }">
                         <template v-if="!row.cust_cd && !row.n_cust_cd">-</template>
-                        <template v-else>{{ row.cust_cd || '-' }}→{{ row.n_cust_cd || '-' }}</template>
+                        <template v-else>{{ (row as Record<string,unknown>).cust_cd_card || row.cust_cd || '-' }}→{{ (row as Record<string,unknown>).n_cust_cd_card || row.n_cust_cd || '-' }}</template>
                     </template>
                 </el-table-column>
                 <el-table-column label="状态" width="120">

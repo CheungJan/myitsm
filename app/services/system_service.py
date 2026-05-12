@@ -449,7 +449,9 @@ class SystemService:
     def get_eid_tracks(self, itemcd: str, eid: str) -> list[dict[str, Any]]:
         tracks = self._repo.get_eid_tracks(itemcd, eid)
         from app.models.warehouse import Warehouse
+        from app.models.master import Customer
         wh_map: dict[str, str] = {}
+        cust_map: dict[str, str] = {}
         result = []
         for t in tracks:
             d = t.to_dict()
@@ -460,6 +462,13 @@ class SystemService:
                     wh_map[whcd] = wh.whnm if wh else ""
                 key = 'wh_nm' if wh_field == 'whcd' else 'n_wh_nm'
                 d[key] = wh_map.get(whcd, "")
+            # 客户编码→磁卡号
+            for cust_field in ['cust_cd', 'n_cust_cd']:
+                cd = d.get(cust_field)
+                if cd and cd not in cust_map:
+                    c = db.session.get(Customer, cd)
+                    cust_map[cd] = c.cust_card if c else ""
+                d[cust_field + '_card'] = cust_map.get(cd, "")
             result.append(d)
         return result
 
