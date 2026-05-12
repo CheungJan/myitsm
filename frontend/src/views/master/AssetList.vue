@@ -15,28 +15,33 @@
         <div class="table-panel">
             <el-card>
                 <template #header>
-                    <div class="page-header">
+                    <div class="page-header-title">
                         <span>资产台账（共 {{ total }} 条）<template v-if="selectedClass"> — {{ selectedClass }}</template></span>
-                        <div class="header-actions">
-                            <el-input v-model="searchText" placeholder="SN/客户/磁卡号" clearable size="small" style="width:170px" @keyup.enter="onSearch" @clear="onSearch" />
-                            <el-select v-model="filterWhcd" placeholder="仓库" clearable filterable multiple collapse-tags collapse-tags-tooltip size="small" style="width:160px;margin-left:8px" @change="onFilterChange">
-                                <el-option v-for="w in whOptions" :key="w.whcd" :label="`${w.whcd} ${w.whnm}`" :value="w.whcd" />
-                            </el-select>
-                            <el-select v-model="filterLocation" placeholder="设备位置" clearable size="small" style="width:95px;margin-left:8px" @change="onFilterChange">
-                                <el-option label="客户设备" value="customer" />
-                                <el-option label="仓库库存" value="warehouse" />
-                            </el-select>
-                            <el-select v-model="filterAssetType" placeholder="资产类型" clearable size="small" style="width:100px;margin-left:8px" @change="onFilterChange">
-                                <el-option v-for="t in assetTypes" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" />
-                            </el-select>
-                            <el-select v-model="filterAssetOwner" placeholder="所属方" clearable size="small" style="width:100px;margin-left:8px" @change="onFilterChange">
-                                <el-option v-for="t in assetOwners" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" />
-                            </el-select>
-                            <el-select v-model="filterUseflg" placeholder="有效性" clearable size="small" style="width:90px;margin-left:8px" @change="onFilterChange">
-                                <el-option label="有效" value="1" />
-                                <el-option label="无效" value="0" />
-                            </el-select>
-                        </div>
+                    </div>
+                    <div class="header-actions">
+                        <el-input v-model="searchText" placeholder="SN/客户/磁卡号" clearable size="small" style="width:170px" @keyup.enter="onSearch" @clear="onSearch" />
+                        <el-select v-model="filterWhcd" placeholder="仓库" clearable filterable multiple collapse-tags collapse-tags-tooltip size="small" style="width:160px;margin-left:8px" @change="onFilterChange">
+                            <el-option-group label="有效仓库">
+                                <el-option v-for="w in whOptions.filter((w:Record<string,string>) => w.useflg !== '0')" :key="w.whcd" :label="`${w.whcd} ${w.whnm}`" :value="w.whcd" />
+                            </el-option-group>
+                            <el-option-group label="无效仓库">
+                                <el-option v-for="w in whOptions.filter((w:Record<string,string>) => w.useflg === '0')" :key="w.whcd" :label="`${w.whcd} ${w.whnm} (无效)`" :value="w.whcd" />
+                            </el-option-group>
+                        </el-select>
+                        <el-select v-model="filterLocation" placeholder="设备位置" clearable size="small" style="width:95px;margin-left:8px" @change="onFilterChange">
+                            <el-option label="客户设备" value="customer" />
+                            <el-option label="仓库库存" value="warehouse" />
+                        </el-select>
+                        <el-select v-model="filterAssetType" placeholder="资产类型" clearable size="small" style="width:100px;margin-left:8px" @change="onFilterChange">
+                            <el-option v-for="t in assetTypes" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" />
+                        </el-select>
+                        <el-select v-model="filterAssetOwner" placeholder="所属方" clearable size="small" style="width:100px;margin-left:8px" @change="onFilterChange">
+                            <el-option v-for="t in assetOwners" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" />
+                        </el-select>
+                        <el-select v-model="filterUseflg" placeholder="有效性" clearable size="small" style="width:90px;margin-left:8px" @change="onFilterChange">
+                            <el-option label="有效" value="1" />
+                            <el-option label="无效" value="0" />
+                        </el-select>
                     </div>
                 </template>
                 <el-table :data="assets" v-loading="loading" stripe>
@@ -238,6 +243,6 @@ async function handleSave() {
 .asset-page { display: flex; gap: 12px; padding: 16px; height: calc(100vh - 80px); }
 .tree-panel { width: 220px; flex-shrink: 0; overflow-y: auto; :deep(.el-card__body) { padding: 8px; } }
 .table-panel { flex: 1; overflow-y: auto; min-width: 0; }
-.page-header { display: flex; justify-content: space-between; align-items: center; }
-.header-actions { display: flex; align-items: center; }
+.page-header-title { font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+.header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 </style>
