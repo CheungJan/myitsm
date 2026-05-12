@@ -90,7 +90,7 @@
                     <el-descriptions-item label="所属方">{{ codeMaps.OW?.[detailRow.asset_owner as string] || detailRow.asset_owner || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="安装日期">{{ detailRow.install_date || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="设备状态">{{ codeMaps.AS?.[(detailRow as Record<string,unknown>).asset_status as string] || (detailRow as Record<string,unknown>).asset_status || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="仓库">{{ (detailRow as Record<string,unknown>).whcd || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="仓库">{{ (detailRow as Record<string,unknown>).wh_nm || (detailRow as Record<string,unknown>).whcd || '-' }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">序列号信息</el-divider>
                 <el-descriptions :column="3" border size="small">
@@ -153,9 +153,10 @@ watch(perPage, () => { page.value = 1; loadData() })
 watch(treeFilter, (v) => treeRef.value?.filter(v))
 
 onMounted(async () => {
-    const [tree, at, rs, ow, es, qs, et, no, asCode] = await Promise.all([
+    const [tree, at, rs, ow, es, qs, et, no, asCode, iuCode] = await Promise.all([
         fetchCustClassTree(), fetchSyscodes('AT'), fetchSyscodes('RS'), fetchSyscodes('OW'),
         fetchSyscodes('ES'), fetchSyscodes('QS'), fetchSyscodes('ET'), fetchSyscodes('NO'), fetchSyscodes('AS'),
+        fetchSyscodes('IU'),
     ])
     treeData.value = tree.data || []
     assetTypes.value = at.data || []; recycleStatuses.value = rs.data || []; assetOwners.value = ow.data || []
@@ -168,6 +169,7 @@ onMounted(async () => {
         ET: Object.fromEntries((et.data||[]).map(t => [t.code_cd, t.code_nm])),
         NO: Object.fromEntries((no.data||[]).map(t => [t.code_cd, t.code_nm])),
         AS: Object.fromEntries((asCode.data||[]).map(t => [t.code_cd, t.code_nm])),
+        IU: Object.fromEntries((iuCode.data||[]).map(t => [t.code_cd, t.code_nm])),
     }
     loadData()
 })

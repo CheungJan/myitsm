@@ -605,6 +605,7 @@ class SystemRepository:
         rows = q.order_by(Eid.eid.desc()).offset((page - 1) * per_page).limit(per_page).all()
 
         pd_map: dict[str, str] = {}
+        wh_map: dict[str, str] = {}
         result = []
         for e, r, cust_nm, parentcd, _cd, cust_card, item_nm, cust_class_nm in rows:
             d = e.to_dict()
@@ -615,6 +616,14 @@ class SystemRepository:
             d["cust_class_nm"] = cust_class_nm or ""
             d["useflg"] = r.useflg if r else "1"
             d["asset_status"] = getattr(r, 'asset_status', None) or "" if r else ""
+            # 仓库名解析
+            whcd = e.whcd or ""
+            if whcd and whcd not in wh_map:
+                from app.models.warehouse import Warehouse
+                wh = db.session.get(Warehouse, whcd)
+                wh_map[whcd] = wh.whnm if wh else ""
+            d["wh_nm"] = wh_map.get(whcd, "")
+            # 管理单位解析
             parentcd_raw = (parentcd or "").strip()
             if parentcd_raw and parentcd_raw not in pd_map:
                 pc = db.session.get(CustClass, parentcd_raw)
