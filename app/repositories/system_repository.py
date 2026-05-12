@@ -606,7 +606,7 @@ class SystemRepository:
     def get_eid_tracks(itemcd: str, eid: str) -> list[EidTrack]:
         return list(db.session.query(EidTrack).filter(
             EidTrack.itemcd == itemcd, EidTrack.eid == eid
-        ).order_by(EidTrack.seqno.desc()).all())
+        ).order_by(EidTrack.change_date.asc(), EidTrack.seqno.asc()).all())
 
     @staticmethod
     def get_cust_pos_rl(page: int = 1, per_page: int = 20, search: str | None = None,
