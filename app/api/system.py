@@ -617,6 +617,7 @@ def get_asset_bom():  # type: ignore[no-untyped-def]
         d = r.to_dict()
         d["host_nm"] = host_nm
         d["host_eid"] = eid
+        d["active"] = (r.useflg or "1") == "1"
         item = db.session.query(Item).filter(Item.item_cd == r.itemcd).first()
         d["item_nm"] = item.item_nm if item else ""
         # EID 质保信息

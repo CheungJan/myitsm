@@ -111,6 +111,11 @@
                     <el-table-column prop="itemcd" label="配件代码" width="100" />
                     <el-table-column prop="item_nm" label="配件名称" min-width="150" />
                     <el-table-column prop="eid" label="配件序列号" width="150" />
+                    <el-table-column label="状态" width="65">
+                        <template #default="{ row }">
+                            <el-tag :type="row.active ? 'success' : 'danger'" size="small">{{ row.active ? '有效' : '无效' }}</el-tag>
+                        </template>
+                    </el-table-column>
                     <el-table-column label="质保类型" width="80">
                         <template #default="{ row }">{{ codeMaps.OD?.[row.old_degree] || '-' }}</template>
                     </el-table-column>
