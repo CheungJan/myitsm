@@ -63,7 +63,7 @@
 <script lang="ts" setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { fetchWarehouses } from '@/api/warehouse'
+import { fetchWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from '@/api/warehouse'
 
 const warehouses = ref<Record<string,unknown>[]>([])
 const allData = ref<Record<string,unknown>[]>([])
@@ -99,26 +99,22 @@ async function handleSave() {
     if (!form.whcd || !form.whnm) { ElMessage.warning('编码和名称为必填项'); return }
     saving.value = true
     try {
-        const token = localStorage.getItem('token')
-        const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
         if (editing.value) {
-            await fetch(`/api/v1/warehouses/${editing.value.whcd}`, { method: 'PUT', headers, body: JSON.stringify(form) })
+            await updateWarehouse(editing.value.whcd as string, { ...form })
             ElMessage.success('更新成功')
         } else {
-            await fetch('/api/v1/warehouses', { method: 'POST', headers, body: JSON.stringify(form) })
+            await createWarehouse({ ...form })
             ElMessage.success('创建成功')
         }
         dialogVisible.value = false
         loadData()
-    } catch { ElMessage.error('保存失败') }
-    finally { saving.value = false }
+    } finally { saving.value = false }
 }
 
 async function handleDelete(row: Record<string,unknown>) {
     try {
         await ElMessageBox.confirm(`确定删除仓库 ${row.whcd}(${row.whnm})？`, '确认删除')
-        const token = localStorage.getItem('token')
-        await fetch(`/api/v1/warehouses/${row.whcd}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+        await deleteWarehouse(row.whcd as string)
         ElMessage.success('已删除')
         loadData()
     } catch (e: unknown) { if (e !== 'cancel') ElMessage.error('删除失败') }
