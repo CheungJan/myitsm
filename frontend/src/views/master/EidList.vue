@@ -106,12 +106,21 @@
             <el-table :data="tracks" v-loading="trackLoading" stripe max-height="500">
                 <el-table-column type="index" label="序号" width="50" />
                 <el-table-column prop="change_date" label="变更日期" width="155" />
-                <el-table-column label="操作" width="80">
+                <el-table-column label="类型" width="85">
                     <template #default="{ row }">
                         <el-tag v-if="row.type === 'i'" type="success" size="small">首次录入</el-tag>
                         <el-tag v-else-if="row.type === 'u'" type="warning" size="small">状态变更</el-tag>
                         <el-tag v-else-if="row.type === 'd'" type="danger" size="small">删除</el-tag>
+                        <el-tag v-else-if="row.type === 'C'" size="small">客户分配</el-tag>
+                        <el-tag v-else-if="row.type === 'R'" type="danger" size="small">回收</el-tag>
+                        <el-tag v-else-if="row.type === 'T'" size="small">客户转移</el-tag>
                         <span v-else>{{ row.type }}</span>
+                    </template>
+                </el-table-column>
+                <el-table-column label="客户" width="120">
+                    <template #default="{ row }">
+                        <template v-if="!row.cust_cd && !row.n_cust_cd">-</template>
+                        <template v-else>{{ row.cust_cd || '-' }}→{{ row.n_cust_cd || '-' }}</template>
                     </template>
                 </el-table-column>
                 <el-table-column label="状态" width="120">
@@ -131,6 +140,9 @@
                         <template v-if="row.type === 'i'">{{ (row as Record<string,unknown>).wh_nm || row.whcd }}</template>
                         <template v-else>{{ (row as Record<string,unknown>).wh_nm || row.whcd }}→{{ (row as Record<string,unknown>).n_wh_nm || row.n_whcd }}</template>
                     </template>
+                </el-table-column>
+                <el-table-column label="安装日期" width="105">
+                    <template #default="{ row }">{{ row.n_install_date || row.install_date || '-' }}</template>
                 </el-table-column>
                 <el-table-column label="关联单号" width="100">
                     <template #default="{ row }">{{ row.n_refid || row.refid }}</template>
