@@ -575,7 +575,7 @@ class SystemRepository:
     def get_cust_pos_rl(page: int = 1, per_page: int = 20, search: str | None = None,
                          class_cd: str | None = None, asset_type: str | None = None,
                          asset_owner: str | None = None, useflg: str | None = None,
-                         location: str | None = None) -> tuple[list[dict], int]:
+                         location: str | None = None, whcd: str | None = None) -> tuple[list[dict], int]:
         """资产台账列表（以 Eid 为主表，含库存设备）。"""
         from app.models.master import Customer, Item, CustClass
 
@@ -589,7 +589,7 @@ class SystemRepository:
         if class_cd:
             q = q.filter(Customer.class_cd == class_cd)
         if search:
-            q = q.filter(db.or_(Eid.eid.ilike(f"%{search}%"), Customer.cust_nm.ilike(f"%{search}%")))
+            q = q.filter(db.or_(Eid.eid.ilike(f"%{search}%"), Customer.cust_nm.ilike(f"%{search}%"), Customer.cust_card.ilike(f"%{search}%")))
         if asset_type:
             q = q.filter(Eid.asset_type == asset_type)
         if asset_owner:
@@ -600,6 +600,8 @@ class SystemRepository:
             q = q.filter(CustPosRl.id.isnot(None))
         elif location == "warehouse":
             q = q.filter(CustPosRl.id.is_(None))
+        if whcd:
+            q = q.filter(Eid.whcd == whcd)
 
         total = q.count()
         rows = q.order_by(Eid.eid.desc()).offset((page - 1) * per_page).limit(per_page).all()
