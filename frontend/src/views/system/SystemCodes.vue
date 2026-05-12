@@ -108,7 +108,7 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchSyscodes } from '@/api/master'
-import { createSyscode, updateSyscode, deleteSyscode } from '@/api/system'
+import { createSyscode, updateSyscode, deleteSyscode, fetchAllSyscodes } from '@/api/system'
 
 interface TreeNode {
     code_cd: string
@@ -141,15 +141,27 @@ watch(treeFilter, (v) => treeRef.value?.filter(v))
 
 async function loadTree() {
     try {
-        const res = await fetchSyscodes('SY')
-        const list = (res.data || []) as Record<string,unknown>[]
-        treeData.value = list
-            .sort((a, b) => ((a.sort_no != null ? Number(a.sort_no) : 999) - (b.sort_no != null ? Number(b.sort_no) : 999)) || String(a.code_cd).localeCompare(String(b.code_cd)))
-            .map(r => ({
-                code_cd: r.code_cd as string,
-                label: `${r.code_nm}（${r.code_cd}）`,
-                sort_no: r.sort_no != null ? Number(r.sort_no) : 999,
-                _id: r.id as number,
+        const allRes = await fetchAllSyscodes()
+        const all = (allRes.data || []) as Record<string,unknown>[]
+        // 动态提取所有类型
+        const typeSet = new Map<string, string>()
+        for (const r of all) {
+            const typ = r.code_typ as string
+            if (typ && typ !== 'SY' && !typeSet.has(typ)) typeSet.set(typ, r.code_nm as string || '')
+        }
+        // 补充 SY 中的中文名
+        const syList = all.filter(r => r.code_typ === 'SY')
+        for (const sy of syList) {
+            const cd = sy.code_cd as string
+            if (typeSet.has(cd)) typeSet.set(cd, (sy.code_nm as string) || typeSet.get(cd) || '')
+            else typeSet.set(cd, sy.code_nm as string || '')
+        }
+        treeData.value = Array.from(typeSet.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([cd, nm]) => ({
+                code_cd: cd,
+                label: nm ? `${nm}（${cd}）` : cd,
+                sort_no: 0,
             }))
     } catch { /* */ }
 }
