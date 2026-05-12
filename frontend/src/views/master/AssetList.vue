@@ -19,7 +19,9 @@
                         <span>资产台账（共 {{ total }} 条）<template v-if="selectedClass"> — {{ selectedClass }}</template></span>
                         <div class="header-actions">
                             <el-input v-model="searchText" placeholder="SN/客户/磁卡号" clearable size="small" style="width:170px" @keyup.enter="onSearch" @clear="onSearch" />
-                            <el-input v-model="filterWhcd" placeholder="仓库号" clearable size="small" style="width:80px;margin-left:8px" @keyup.enter="onFilterChange" @clear="onFilterChange" />
+                            <el-select v-model="filterWhcd" placeholder="仓库" clearable filterable size="small" style="width:130px;margin-left:8px" @change="onFilterChange">
+                                <el-option v-for="w in whOptions" :key="w.whcd" :label="`${w.whcd} ${w.whnm}`" :value="w.whcd" />
+                            </el-select>
                             <el-select v-model="filterLocation" placeholder="设备位置" clearable size="small" style="width:95px;margin-left:8px" @change="onFilterChange">
                                 <el-option label="客户设备" value="customer" />
                                 <el-option label="仓库库存" value="warehouse" />
@@ -125,7 +127,7 @@ import type { ElTree } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import { fetchAssets, fetchCustClassTree, fetchSyscodes } from '@/api/master'
+import { fetchAssets, fetchCustClassTree, fetchSyscodes, fetchWarehouses } from '@/api/master'
 import type { ItemClassNode } from '@/api/master'
 
 const authStore = useAuthStore()
@@ -141,6 +143,7 @@ const filterAssetType = ref(''); const filterAssetOwner = ref(''); const filterU
 const filterWhcd = ref('')
 
 const assetTypes = ref<{code_cd:string;code_nm:string}[]>([])
+const whOptions = ref<{whcd:string;whnm:string}[]>([])
 const recycleStatuses = ref<{code_cd:string;code_nm:string}[]>([])
 const assetOwners = ref<{code_cd:string;code_nm:string}[]>([])
 const codeMaps = ref<Record<string,Record<string,string>>>({})
@@ -173,6 +176,8 @@ onMounted(async () => {
         AS: Object.fromEntries((asCode.data||[]).map(t => [t.code_cd, t.code_nm])),
         IU: Object.fromEntries((iuCode.data||[]).map(t => [t.code_cd, t.code_nm])),
     }
+    const wh = await fetchWarehouses()
+    whOptions.value = wh.data || []
     loadData()
 })
 
