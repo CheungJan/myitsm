@@ -574,58 +574,47 @@ class SystemRepository:
     @staticmethod
     def get_cust_pos_rl(page: int = 1, per_page: int = 20, search: str | None = None,
                          class_cd: str | None = None, asset_type: str | None = None,
-                         asset_owner: str | None = None, useflg: str | None = None) -> tuple[list[dict], int]:
-        """资产台账列表，JOIN 客户/物料/EID，支持筛选。"""
+                         asset_owner: str | None = None, useflg: str | None = None,
+                         location: str | None = None) -> tuple[list[dict], int]:
+        """资产台账列表（以 Eid 为主表，含库存设备）。"""
         from app.models.master import Customer, Item, CustClass
 
-        q = (db.session.query(CustPosRl, Customer.cust_nm, Customer.parentcd, Customer.class_cd,
-              Customer.cust_card,
-              Item.item_nm, CustClass.class_nm.label("cust_class_nm"),
-              Eid.asset_type, Eid.recyclable, Eid.recycle_status, Eid.asset_owner, Eid.install_date,
-              Eid.prddate, Eid.whcd, Eid.qcflg, Eid.sflg, Eid.etyp, Eid.new_old, Eid.isunit)
+        q = (db.session.query(Eid, CustPosRl, Customer.cust_nm, Customer.parentcd, Customer.class_cd,
+              Customer.cust_card, Item.item_nm, CustClass.class_nm.label("cust_class_nm"))
+        .outerjoin(CustPosRl, db.and_(Eid.itemcd == CustPosRl.item_cd, Eid.eid == CustPosRl.eid))
         .outerjoin(Customer, CustPosRl.cust_cd == Customer.cust_cd)
-        .outerjoin(Item, CustPosRl.item_cd == Item.item_cd)
-        .outerjoin(Eid, db.and_(CustPosRl.item_cd == Eid.itemcd, CustPosRl.eid == Eid.eid))
+        .outerjoin(Item, Eid.itemcd == Item.item_cd)
         .outerjoin(CustClass, Customer.class_cd == CustClass.class_cd))
 
         if class_cd:
-            cds = SystemRepository._get_descendant_class_cds(class_cd)
-            q = q.filter(Customer.class_cd.in_(cds))
+            q = q.filter(Customer.class_cd == class_cd)
         if search:
-            q = q.filter(db.or_(CustPosRl.eid.ilike(f"%{search}%"), Customer.cust_nm.ilike(f"%{search}%")))
+            q = q.filter(db.or_(Eid.eid.ilike(f"%{search}%"), Customer.cust_nm.ilike(f"%{search}%")))
         if asset_type:
             q = q.filter(Eid.asset_type == asset_type)
         if asset_owner:
             q = q.filter(Eid.asset_owner == asset_owner)
         if useflg:
             q = q.filter(CustPosRl.useflg == useflg)
+        if location == "customer":
+            q = q.filter(CustPosRl.id.isnot(None))
+        elif location == "warehouse":
+            q = q.filter(CustPosRl.id.is_(None))
 
         total = q.count()
-        rows = q.order_by(CustPosRl.eid.desc()).offset((page - 1) * per_page).limit(per_page).all()
+        rows = q.order_by(Eid.eid.desc()).offset((page - 1) * per_page).limit(per_page).all()
 
-        # 管理单位解析
         pd_map: dict[str, str] = {}
         result = []
-        for r, cust_nm, parentcd, _cd, cust_card, item_nm, cust_class_nm, at, rec, rs, ao, idate, pd, wh, qc, sf, et, no, iu in rows:
-            d = r.to_dict()
-            d["cust_nm"] = cust_nm or ""
+        for e, r, cust_nm, parentcd, _cd, cust_card, item_nm, cust_class_nm in rows:
+            d = e.to_dict()
+            d["id"] = r.id if r else None
+            d["cust_nm"] = cust_nm or "库存"
             d["cust_card"] = cust_card or ""
             d["item_nm"] = item_nm or ""
             d["cust_class_nm"] = cust_class_nm or ""
-            d["asset_type"] = at or ""
-            d["recyclable"] = rec
-            d["recycle_status"] = rs or ""
-            d["asset_owner"] = ao or ""
-            d["install_date"] = str(idate) if idate else ""
-            d["prddate"] = str(pd) if pd else ""
-            d["whcd"] = wh or ""
-            d["qcflg"] = qc or ""
-            d["sflg"] = sf or ""
-            d["etyp"] = et or ""
-            d["new_old"] = no or ""
-            d["isunit"] = iu or ""
-            d["useflg"] = r.useflg or "1"
-            d["asset_status"] = getattr(r, 'asset_status', None) or ""
+            d["useflg"] = r.useflg if r else "1"
+            d["asset_status"] = getattr(r, 'asset_status', None) or "" if r else ""
             parentcd_raw = (parentcd or "").strip()
             if parentcd_raw and parentcd_raw not in pd_map:
                 pc = db.session.get(CustClass, parentcd_raw)
