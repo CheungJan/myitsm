@@ -366,11 +366,24 @@ class SystemService:
             if e.whcd and e.whcd not in wh_map:
                 wh = db.session.get(Warehouse, e.whcd)
                 wh_map[e.whcd] = wh.whnm if wh else ""
+        # 预计划号
+        plan_map: dict[str, str] = {}
+        if items:
+            eids = [e.eid for e in items]
+            from app.models.master import EidTrack
+            tracks = db.session.query(EidTrack.eid, EidTrack.refid).filter(
+                EidTrack.eid.in_(eids), EidTrack.type == 'C', EidTrack.refid != ''
+            ).order_by(EidTrack.change_date.desc()).all()
+            for t in tracks:
+                if t.eid not in plan_map:
+                    plan_map[t.eid] = t.refid
+
         result = []
         for e in items:
             d = e.to_dict()
             d["item_nm"] = item_map.get(e.itemcd, "")
             d["wh_nm"] = wh_map.get(e.whcd, "")
+            d["plan_refid"] = plan_map.get(e.eid, "")
             result.append(d)
         return {"items": result, "total": total}
 

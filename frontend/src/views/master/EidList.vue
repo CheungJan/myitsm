@@ -60,7 +60,9 @@
                         <template #default="{ row }">{{ (row as Record<string,unknown>).wh_nm || row.whcd || '-' }}</template>
                     </el-table-column>
                     <el-table-column prop="manuf_seq" label="制造序列号" width="130" />
-                    <el-table-column prop="refid" label="关联单号" width="100" />
+                    <el-table-column label="关联单号" width="120">
+                        <template #default="{ row }">{{ (row as Record<string,unknown>).plan_refid || row.refid }}</template>
+                    </el-table-column>
                     <el-table-column label="新旧" width="70">
                         <template #default="{ row }">{{ codeMaps.NO?.[row.new_old] || row.new_old }}</template>
                     </el-table-column>
