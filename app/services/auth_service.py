@@ -1,160 +1,168 @@
-"""
-认证与会话服务。
-作者：Cascade
-创建时间：2026-04-08
-变更时间：2026-04-08
-注意事项：登录会话管理，对应 PB nvo_appmanager 登录事件。
-"""
+"""认证与会话服务。"""
 
 from __future__ import annotations
 
-import secrets
-import time
+import logging
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import jwt
+from flask import current_app
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from app.extensions import db
+from app.models.system import SysParm
 from app.repositories.auth_repository import AuthRepository
 
 __all__ = ["AuthService"]
 
+logger = logging.getLogger(__name__)
+
 
 class AuthService:
-    """
-    认证与会话业务服务。
+    """认证业务服务，对应 PB nvo_appmanager 登录事件链。"""
 
-    功能概述：
-        处理用户登录、登出、会话管理；
-        对应原 PB nvo_appmanager 的 oe_logon / oe_prelogon / oe_postlogon 事件链。
-    """
+    def __init__(self, repo: AuthRepository | None = None) -> None:
+        self._repo = repo or AuthRepository()
 
-    def __init__(
-        self,
-        auth_repository: AuthRepository | None = None,
-    ) -> None:
+    @staticmethod
+    def logout(user_cd: str, token: str = "", repo: AuthRepository | None = None) -> None:
+        """登出，撤销当前 token 并写登出日志。"""
+        _repo = repo or AuthRepository()
+        if token:
+            _repo.revoke_token(token)
+        else:
+            _repo.revoke_user_tokens(user_cd)
+        _repo.add_access_log(user_cd=user_cd, action="LOGOUT", detail="用户登出")
+        db.session.commit()
+
+    @staticmethod
+    def check_user_active(user_id: str, repo: AuthRepository | None = None) -> str | None:
         """
-        初始化认证服务。
-
-        参数：
-            auth_repository: 认证仓储实例，默认自动创建。
+        检查用户是否可登录。返回 None 表示正常，返回字符串为错误原因。
         """
-        self._auth_repository = auth_repository or AuthRepository()
-        # 内存会话存储：token -> session_info
-        # 后续应替换为 Redis / DB
-        self._sessions: dict[str, dict[str, Any]] = {}
+        _repo = repo or AuthRepository()
+        user = _repo.get_user(user_id)
+        if user is None:
+            return "用户不存在"
+        if user.status != "1":
+            return "用户已被禁用，无法登录"
+        return None
 
+    @staticmethod
     def login(
-        self,
         user_id: str,
         password: str,
-        server: str | None = None,
+        repo: AuthRepository | None = None,
     ) -> dict[str, Any] | None:
-        """
-        用户登录。
+        """用户登录，返回 JWT token 和用户信息。"""
+        _repo = repo or AuthRepository()
 
-        参数：
-            user_id: 用户编码（对应 PB Logon.UserID）。
-            password: 密码（对应 PB Logon.Password）。
-            server: 服务器名（可选，对应 PB Logon.Server）。
+        user = _repo.get_user(user_id)
+        if user is None or user.status != "1":
+            return None
 
-        返回值：
-            dict[str, Any] | None: 登录成功返回会话信息，失败返回空。
-            成功字段：token, user_code, user_name, groups, server, login_time
-        """
-        # 验证用户凭据（对应 PB oe_logon 事件）
-        user = self._auth_repository.verify_user(user_id, password)
+        # 1. 哈希比对（已升级的密码）
+        if check_password_hash(user.password or "", password):
+            pass
+        # 2. 明文比对（从旧系统迁移未升级）+ 自动升级为哈希
+        elif user.password and user.password == password:
+            user.password = generate_password_hash(password, method="pbkdf2:sha256")
+            user.passwd = None  # 清除明文备份
+            db.session.flush()
+            logger.info("用户 %s 密码已从明文升级为哈希", user_id)
+        else:
+            return None
+
+        _repo.clean_expired_tokens()
+        # 多点登录检查：禁止多点登录时，若已有活跃 token 则拒绝
+        sp = db.session.get(SysParm, "SYSPARM")
+        allow_multi = (sp is None) or (sp.allowmultilogon != "0")
+        if not allow_multi:
+            if _repo.has_active_token(user_id):
+                return {"error": "该账号已在其他设备登录，管理员禁止多点登录"}
+
+        groups = _repo.get_user_groups(user_id)
+        token = _generate_token(user_id)
+
+        # 禁止多点登录：撤销旧 token，保持单一活跃 token
+        # 允许多点登录：保留旧 token，各设备独立持有
+        exp_seconds = int(current_app.config.get("JWT_EXPIRATION_SECONDS", 28800))
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=exp_seconds)
+        if not allow_multi:
+            _repo.revoke_user_tokens(user_id)
+        _repo.register_token(user_id, token, expires_at)
+
+        _repo.add_access_log(user_cd=user_id, action="LOGIN", detail="用户登录")
+        db.session.commit()
+
+        return {
+            "token": token,
+            "user_code": user.user_cd,
+            "user_name": user.user_nm,
+            "groups": [{"group_code": ug.group_cd} for ug in groups],
+        }
+
+    @staticmethod
+    def validate_token(token: str) -> dict[str, Any] | None:
+        """验证 JWT token，返回用户信息。"""
+        try:
+            payload = jwt.decode(
+                token,
+                current_app.config["SECRET_KEY"],
+                algorithms=[current_app.config.get("JWT_ALGORITHM", "HS256")],
+            )
+            user_cd = payload.get("sub")
+            if user_cd is None:
+                return None
+            return {"user_code": user_cd, "exp": payload.get("exp")}
+        except jwt.ExpiredSignatureError:
+            return None
+        except jwt.InvalidTokenError:
+            return None
+
+    @staticmethod
+    def get_session(
+        token: str,
+        repo: AuthRepository | None = None,
+    ) -> dict[str, Any] | None:
+        """获取会话信息。"""
+        _repo = repo or AuthRepository()
+
+        payload = AuthService.validate_token(token)
+        if payload is None:
+            return None
+        if not _repo.is_token_active(token):
+            return None
+
+        user = _repo.get_user(payload["user_code"])
         if user is None:
             return None
 
-        # 获取用户组
-        groups = self._auth_repository.get_user_groups(user_id)
-
-        # 生成会话令牌
-        token = secrets.token_urlsafe(32)
-        session = {
-            "token": token,
-            "user_code": user["user_code"],
-            "user_name": user["user_name"],
-            "groups": groups,
-            "server": server or "",
-            "login_time": time.time(),
-            "last_active": time.time(),
-        }
-
-        # 存储会话
-        self._sessions[token] = session
+        groups = _repo.get_user_groups(user.user_cd)
 
         return {
-            "token": token,
-            "user_code": session["user_code"],
-            "user_name": session["user_name"],
-            "groups": session["groups"],
-            "server": session["server"],
-            "login_time": session["login_time"],
+            "user_code": user.user_cd,
+            "user_name": user.user_nm,
+            "groups": [{"group_code": ug.group_cd} for ug in groups],
         }
 
-    def logout(self, token: str) -> bool:
-        """
-        用户登出。
+    @staticmethod
+    def hash_password(plain: str) -> str:
+        """生成密码哈希（pbkdf2:sha256，适配 VARCHAR(128) 列）。"""
+        return generate_password_hash(plain, method="pbkdf2:sha256")
 
-        参数：
-            token: 会话令牌。
 
-        返回值：
-            bool: 是否成功登出。
-        """
-        if token in self._sessions:
-            del self._sessions[token]
-            return True
-        return False
-
-    def get_session(self, token: str) -> dict[str, Any] | None:
-        """
-        获取会话信息。
-
-        参数：
-            token: 会话令牌。
-
-        返回值：
-            dict[str, Any] | None: 会话信息或空（无效/过期）。
-        """
-        session = self._sessions.get(token)
-        if session is None:
-            return None
-
-        # 更新最后活跃时间
-        session["last_active"] = time.time()
-
-        return {
-            "token": session["token"],
-            "user_code": session["user_code"],
-            "user_name": session["user_name"],
-            "groups": session["groups"],
-            "server": session["server"],
-            "login_time": session["login_time"],
-        }
-
-    def get_user_id(self, token: str) -> str | None:
-        """
-        从会话令牌获取用户编码。
-
-        参数：
-            token: 会话令牌。
-
-        返回值：
-            str | None: 用户编码或空（对应 PB of_GetUserID）。
-        """
-        session = self._sessions.get(token)
-        if session is None:
-            return None
-        return session["user_code"]
-
-    def validate_token(self, token: str) -> bool:
-        """
-        验证令牌是否有效。
-
-        参数：
-            token: 会话令牌。
-
-        返回值：
-            bool: 是否有效。
-        """
-        return token in self._sessions
+def _generate_token(user_id: str) -> str:
+    """生成 JWT token。"""
+    exp_seconds = current_app.config.get("JWT_EXPIRATION_SECONDS", 28800)
+    payload = {
+        "sub": user_id,
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(seconds=int(exp_seconds)),
+    }
+    return jwt.encode(
+        payload,
+        current_app.config["SECRET_KEY"],
+        algorithm=current_app.config.get("JWT_ALGORITHM", "HS256"),
+    )

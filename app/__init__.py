@@ -1,128 +1,155 @@
 """
-应用工厂与全局中间件。
-作者：Cascade
-创建时间：2026-03-24
-变更时间：2026-04-08（注册客户/资产/回收任务/预计划/维修单/设备变更单/新机开通/旧机翻新/日常保养蓝图）
-注意事项：统一注入 request_id，并提供统一 JSON 错误响应结构。
+应用工厂。
+
+Flask 应用创建入口，注册扩展、蓝图、错误处理和中间件。
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from typing import Any
 
 from flask import Flask, g, jsonify
+from sqlalchemy.exc import DataError, IntegrityError
 
-from app.api.asset import asset_bp
-from app.api.accessories_update_report import accessories_update_report_bp
-from app.api.asset_audit import asset_audit_bp
-from app.api.auth import auth_bp
-from app.api.codetable import codetable_bp
-from app.api.customer import customer_bp
-from app.api.device_change import device_change_bp
-from app.api.dispatch_report import dispatch_report_bp
-from app.api.ex_gh import ex_gh_bp
-from app.api.free_replace import free_replace_bp
-from app.api.liability import liability_bp
-from app.api.liability_group import liability_group_bp
-from app.api.liability_sum import liability_sum_bp
-from app.api.maintenance import maintenance_bp
-from app.api.maintenance_daily import maintenance_daily_bp
-from app.api.maintenance_open import maintenance_open_bp
-from app.api.maintenance_plan import maintenance_plan_bp
-from app.api.maintenance_renovate import maintenance_renovate_bp
-from app.api.paper_average_report import paper_average_report_bp
-from app.api.pos_r_eid_update import pos_r_eid_update_bp
-from app.api.preplan import preplan_bp
-from app.api.recycle_task import recycle_task_bp
-from app.api.rep_cust_info import rep_cust_info_bp
-from app.api.rep_liability_report import rep_liability_report_bp
-from app.api.rep_maintenance_daily import rep_maintenance_daily_bp
-from app.api.rep_maintenance_daily_m import rep_maintenance_daily_m_bp
-from app.api.rep_maintenance_daily_ym import rep_maintenance_daily_ym_bp
-from app.api.shell import shell_bp
-from app.api.store_close import store_close_bp
-from app.api.timepoint_levels import timepoint_levels_bp
-from app.api.user_group import user_group_bp
+from app.config import config_map
+from app.extensions import cors, db, migrate
 
 __all__ = ["create_app"]
 
 logger = logging.getLogger(__name__)
 
 
-def create_app() -> Flask:
-    """
-    创建 Flask 应用实例并注册基础组件。
+def create_app(config_name: str | None = None) -> Flask:
+    """创建 Flask 应用实例。"""
+    if config_name is None:
+        config_name = os.getenv("FLASK_ENV", "development")
 
-    返回值：
-        Flask: 应用实例。
-
-    异常：
-        RuntimeError: 初始化关键组件失败时抛出。
-    """
     app = Flask(__name__)
+    app.config.from_object(config_map.get(config_name, config_map["development"]))
 
-    @app.before_request
-    def _bind_request_id() -> None:
-        """
-        为当前请求注入 request_id。
+    _init_extensions(app)
+    _register_blueprints(app)
+    _register_error_handlers(app)
+    _register_before_request(app)
 
-        返回值：
-            None
-        """
-        g.request_id = str(uuid.uuid4())
+    return app
+
+
+def _init_extensions(app: Flask) -> None:
+    """初始化扩展。"""
+    db.init_app(app)
+    migrate.init_app(app, db)
+    cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
+
+
+def _register_blueprints(app: Flask) -> None:
+    """注册蓝图。"""
+    from app.api.attendance import attendance_bp
+    from app.api.auth import auth_bp
+    from app.api.billing import billing_bp
+    from app.api.contract import contract_bp
+    from app.api.deposit import deposit_bp
+    from app.api.finance import finance_bp
+    from app.api.health import health_bp
+    from app.api.inventory import inventory_bp
+    from app.api.iot import iot_bp
+    from app.api.itsm import itsm_bp
+    from app.api.mes import mes_bp
+    from app.api.notification import notification_bp
+    from app.api.portal import portal_bp
+    from app.api.procurement import procurement_bp
+    from app.api.reports import report_bp
+    from app.api.sales import sales_bp
+    from app.api.sla import sla_bp
+    from app.api.system import system_bp
+    from app.api.transactions import transaction_bp
+    from app.api.warehouse import warehouse_bp
+
+    app.register_blueprint(health_bp, url_prefix="/api/v1")
+    app.register_blueprint(auth_bp, url_prefix="/api/v1")
+    app.register_blueprint(system_bp, url_prefix="/api/v1")
+    app.register_blueprint(itsm_bp, url_prefix="/api/v1/itsm")
+    app.register_blueprint(warehouse_bp, url_prefix="/api/v1/warehouse")
+    app.register_blueprint(procurement_bp, url_prefix="/api/v1/procurement")
+    app.register_blueprint(sales_bp, url_prefix="/api/v1/sales")
+    app.register_blueprint(sla_bp, url_prefix="/api/v1/sla")
+    app.register_blueprint(attendance_bp, url_prefix="/api/v1/attendance")
+    app.register_blueprint(inventory_bp, url_prefix="/api/v1/inventory")
+    app.register_blueprint(deposit_bp, url_prefix="/api/v1/deposit")
+    app.register_blueprint(contract_bp, url_prefix="/api/v1/contract")
+    app.register_blueprint(notification_bp, url_prefix="/api/v1/notification")
+    # Tier-2 扩展
+    app.register_blueprint(billing_bp, url_prefix="/api/v1/billing")
+    app.register_blueprint(finance_bp, url_prefix="/api/v1/finance")
+    app.register_blueprint(portal_bp, url_prefix="/api/v1/portal")
+    # Tier-3 扩展
+    app.register_blueprint(mes_bp, url_prefix="/api/v1/mes")
+    app.register_blueprint(iot_bp, url_prefix="/api/v1/iot")
+    # 事务查询与报表
+    app.register_blueprint(transaction_bp, url_prefix="/api/v1/transactions")
+    app.register_blueprint(report_bp, url_prefix="/api/v1/reports")
+
+
+def _make_error_body(code: int, message: str) -> dict[str, Any]:
+    """构造统一错误响应体：{ code, message, data, request_id }。"""
+    return {
+        "code": code,
+        "message": message,
+        "data": None,
+        "request_id": getattr(g, "request_id", ""),
+    }
+
+
+def _register_error_handlers(app: Flask) -> None:
+    """注册全局错误处理。"""
+
+    @app.errorhandler(400)
+    def bad_request(exc: Exception) -> tuple[Any, int]:
+        return jsonify(_make_error_body(400, str(exc))), 400
+
+    @app.errorhandler(401)
+    def unauthorized(exc: Exception) -> tuple[Any, int]:
+        return jsonify(_make_error_body(401, "未授权")), 401
+
+    @app.errorhandler(403)
+    def forbidden(exc: Exception) -> tuple[Any, int]:
+        return jsonify(_make_error_body(403, "无权限")), 403
+
+    @app.errorhandler(404)
+    def not_found(exc: Exception) -> tuple[Any, int]:
+        return jsonify(_make_error_body(404, "资源不存在")), 404
+
+    @app.errorhandler(IntegrityError)
+    def handle_integrity_error(exc: IntegrityError) -> tuple[Any, int]:
+        """数据库约束错误（主键冲突、唯一约束、外键约束）。"""
+        request_id = getattr(g, "request_id", "")
+        logger.exception("数据库约束冲突，request_id=%s", request_id)
+        msg = str(exc.orig) if exc.orig else "数据库约束冲突"
+        return jsonify(_make_error_body(409, msg)), 409
+
+    @app.errorhandler(DataError)
+    def handle_data_error(exc: DataError) -> tuple[Any, int]:
+        """数据库数据类型错误。"""
+        request_id = getattr(g, "request_id", "")
+        logger.exception("数据库数据类型错误，request_id=%s", request_id)
+        msg = str(exc.orig) if exc.orig else "数据格式错误"
+        return jsonify(_make_error_body(400, msg)), 400
 
     @app.errorhandler(Exception)
-    def _handle_exception(exc: Exception) -> tuple[Any, int]:
-        """
-        处理未捕获异常并返回统一错误结构。
-
-        参数：
-            exc: 未捕获异常对象。
-
-        返回值：
-            tuple[Any, int]: JSON 响应与 HTTP 状态码。
-        """
+    def handle_exception(exc: Exception) -> tuple[Any, int]:
         request_id = getattr(g, "request_id", "")
         logger.exception("请求处理异常，request_id=%s", request_id)
-        payload = {
-            "code": 500,
-            "message": "服务器内部错误",
-            "data": {"request_id": request_id},
-        }
-        return jsonify(payload), 500
+        if app.debug:
+            return jsonify(_make_error_body(500, str(exc))), 500
+        return jsonify(_make_error_body(500, "服务器内部错误")), 500
 
-    app.register_blueprint(asset_bp, url_prefix="/api/v1")
-    app.register_blueprint(accessories_update_report_bp, url_prefix="/api/v1")
-    app.register_blueprint(asset_audit_bp, url_prefix="/api/v1")
-    app.register_blueprint(auth_bp, url_prefix="/api/v1")
-    app.register_blueprint(codetable_bp, url_prefix="/api/v1")
-    app.register_blueprint(customer_bp, url_prefix="/api/v1")
-    app.register_blueprint(device_change_bp, url_prefix="/api/v1")
-    app.register_blueprint(dispatch_report_bp, url_prefix="/api/v1")
-    app.register_blueprint(ex_gh_bp, url_prefix="/api/v1")
-    app.register_blueprint(free_replace_bp, url_prefix="/api/v1")
-    app.register_blueprint(liability_bp, url_prefix="/api/v1")
-    app.register_blueprint(liability_group_bp, url_prefix="/api/v1")
-    app.register_blueprint(liability_sum_bp, url_prefix="/api/v1")
-    app.register_blueprint(maintenance_bp, url_prefix="/api/v1")
-    app.register_blueprint(maintenance_daily_bp, url_prefix="/api/v1")
-    app.register_blueprint(maintenance_open_bp, url_prefix="/api/v1")
-    app.register_blueprint(maintenance_plan_bp, url_prefix="/api/v1")
-    app.register_blueprint(maintenance_renovate_bp, url_prefix="/api/v1")
-    app.register_blueprint(paper_average_report_bp, url_prefix="/api/v1")
-    app.register_blueprint(pc_plan_bp, url_prefix="/api/v1")
-    app.register_blueprint(pos_r_eid_update_bp, url_prefix="/api/v1")
-    app.register_blueprint(preplan_bp, url_prefix="/api/v1")
-    app.register_blueprint(recycle_task_bp, url_prefix="/api/v1")
-    app.register_blueprint(rep_cust_info_bp, url_prefix="/api/v1")
-    app.register_blueprint(rep_liability_report_bp, url_prefix="/api/v1")
-    app.register_blueprint(rep_maintenance_daily_bp, url_prefix="/api/v1")
-    app.register_blueprint(rep_maintenance_daily_m_bp, url_prefix="/api/v1")
-    app.register_blueprint(rep_maintenance_daily_ym_bp, url_prefix="/api/v1")
-    app.register_blueprint(shell_bp, url_prefix="/api/v1")
-    app.register_blueprint(store_close_bp, url_prefix="/api/v1")
-    app.register_blueprint(timepoint_levels_bp, url_prefix="/api/v1")
-    app.register_blueprint(user_group_bp, url_prefix="/api/v1")
-    return app
+
+def _register_before_request(app: Flask) -> None:
+    """注册请求前钩子。"""
+
+    @app.before_request
+    def bind_request_id() -> None:
+        g.request_id = str(uuid.uuid4())
