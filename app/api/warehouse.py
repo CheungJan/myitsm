@@ -42,7 +42,8 @@ warehouse_bp = Blueprint("warehouse", __name__)
 @login_required
 def list_warehouses():  # type: ignore[no-untyped-def]
     """仓库列表。"""
-    data = WarehouseService.list_all()
+    useflg = request.args.get("useflg", default=None)
+    data = WarehouseService.list_all(useflg=useflg)
     return success_response(data=data)
 
 

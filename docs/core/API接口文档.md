@@ -1,8 +1,8 @@
 # API 接口文档
 
-**版本**: v1.1  
+**版本**: v1.2  
 **基础路径**: `/api/v1`  
-**更新日期**: 2026-05-07
+**更新日期**: 2026-05-08（新增资产盘点+POS变更端点）
 
 ---
 
@@ -95,16 +95,83 @@ Authorization: Bearer <token>
 
 路由前缀：`/api/v1`
 
+#### 用户/部门/组/权限
+
 | 方法 | 路径 | 说明 | 查询参数 |
 |------|------|------|---------|
-| GET | `/users` | 用户列表 | `status` |
-| GET | `/users/<user_cd>` | 用户详情 | - |
+| GET | `/users` | 用户列表 | `status`,`user_cd`,`user_nm`,`dept_cd` |
+| GET/POST | `/users` / `/users/<cd>` | 用户CRUD | - |
 | GET | `/departments` | 部门列表 | - |
-| GET | `/groups` | 用户组列表 | - |
-| GET | `/users/<user_cd>/groups` | 用户所属用户组 | - |
+| GET/POST/PUT/DELETE | `/departments` / `/departments/<cd>` | 部门CRUD | - |
+| GET/POST/PUT/DELETE | `/groups` / `/groups/<cd>` | 用户组CRUD | - |
+| GET/POST | `/groups/<cd>/members` | 组成员管理 | - |
+| GET/PUT | `/groups/<cd>/rights` | 组权限管理 | - |
+| GET | `/users/<cd>/permissions` | 用户有效权限 | - |
 | GET | `/menus` | 菜单树 | - |
-| GET | `/sysparms` | 系统参数列表 | - |
-| GET | `/sysparms/<parm_cd>` | 指定系统参数 | - |
+| GET | `/menus/perm-tree` | 权限树(动态) | - |
+
+#### 物料分类 & 物料
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/itemclasses/tree` | 分类树(CTE递归) | - |
+| GET/POST | `/itemclasses` | 分类列表/新增 | - |
+| PUT/DELETE | `/itemclasses/<cd>` | 分类编辑/删除 | - |
+| GET | `/items` | 物料列表(分页) | `page`,`per_page`,`class_cd`,`recursive`,`search` |
+| POST/PUT/DELETE | `/items` / `/items/<cd>` | 物料CRUD | - |
+
+#### 客户分类 & 客户
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/custclasses/tree` | 分类树 | - |
+| GET/POST | `/custclasses` | 分类列表/新增 | - |
+| PUT/DELETE | `/custclasses/<cd>` | 分类编辑/删除 | - |
+| GET | `/customers` | 客户列表(分页) | `page`,`per_page`,`class_cd`,`search` |
+| POST/PUT/DELETE | `/customers` / `/customers/<cd>` | 客户CRUD | - |
+
+#### EID 设备管理
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/eid/tree` | 物料分类树(含EID数量) | - |
+| GET | `/eid` | EID列表(分页) | `page`,`per_page`,`class_cd`,`search` |
+| POST | `/eid` | 新增EID | - |
+| PUT/DELETE | `/eid/<itemcd>/<eid>` | 编辑/删除EID | - |
+| GET | `/eid/<itemcd>/<eid>/tracks` | 变更历史(含自动纠正) | - |
+
+#### 资产台账
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/assets` | 资产台账列表(分页) | `page`,`per_page`,`class_cd`,`search`,`asset_type`,`asset_owner`,`useflg`,`location`,`whcd`,`sflg`,`cust_cd`,`item_class` |
+| GET | `/assets/bom` | BOM配件明细(含门店退回状态) | `eid` |
+| PUT | `/assets/<id>` | 更新资产属性 | - |
+
+> **`plan_refid` 取值逻辑**（EID列表）：优先查 `tit15_maintenance_renovate.new_device_id` → 其次查 C 记录（`change_date >= gendate`）。详见表 `tit15_maintenance_renovate`。  
+> **BOM 配件归属**：通过 `tmm44_pos_r_eid` → 父设备 `CustPosRl` 链路解析客户，按页批量后解析。  
+> **`location` 筛选**：`customer` 含直接分配+BOM配件(父设备有客户)；`warehouse` 仅无客户且非BOM配件。
+
+#### 码表查询
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/syscodes` | 按类型查编码 | `code_typ`(BT/YB/ZF/ES/QS/PS/SS/CS/SRC等) |
+| GET | `/areas` | 区域列表 | - |
+| GET | `/commodes` | 通讯方式列表 | - |
+| GET | `/countries` | 国家列表 | - |
+| GET | `/provinces` | 省份列表 | - |
+| GET | `/cities` | 城市列表 | `prvn_cd` |
+| GET | `/towns` | 区县列表 | `city_cd` |
+| GET | `/warehouses` | 仓库列表 | - |
+
+#### 系统参数
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/sysparms` | 系统参数列表 |
+| GET | `/sysparms/<parm_cd>` | 指定系统参数 |
+| PUT | `/sysparms/<parm_cd>` | 更新系统参数 |
 
 ---
 
@@ -243,6 +310,25 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | 方法 | 路径 | 说明 | 查询参数 |
 |------|------|------|---------|
 | GET | `/stock` | 库存明细列表/指定物品余额 | `whcd`, `itemcd`, `page`, `per_page` |
+
+#### 资产盘点 ✅ 新增（2026-05-08）
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/asset-check` | 盘点单列表 | `page`, `per_page` |
+| GET | `/asset-check/<opbillid>` | 盘点单详情（含明细） | - |
+| POST | `/asset-check` | 创建盘点单（含明细） | Body + `details[]` |
+| PUT | `/asset-check/<opbillid>` | 更新盘点单 | Body |
+| POST | `/asset-check/<opbillid>/audit` | 审核盘点单 | - |
+
+#### POS设备变更 ✅ 新增（2026-05-08）
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/pos-change` | 变更记录列表 | `page`, `per_page` |
+| GET | `/pos-change/<pk>` | 变更记录详情（含明细） | - |
+| POST | `/pos-change` | 创建设备变更（含明细） | Body + `details[]` |
+| PUT | `/pos-change/<pk>` | 更新设备变更 | Body |
 
 ---
 
@@ -661,9 +747,9 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 |------|------|--------|------|
 | health | /api/v1 | 1 | 阶段1 |
 | auth | /api/v1 | 2 | 阶段1 |
-| system | /api/v1 | 8 | 阶段1 |
+| system | /api/v1 | 57 | 阶段1 |
 | itsm | /api/v1/itsm | 36 | 阶段2 |
-| warehouse | /api/v1/warehouse | 13 | 阶段3 |
+| warehouse | /api/v1/warehouse | 23 | 阶段3+7（资产盘点6+POS变更4） |
 | procurement | /api/v1/procurement | 13 | 阶段3 |
 | sales | /api/v1/sales | 11 | 阶段3 |
 | sla | /api/v1/sla | 8 | 阶段3 |
@@ -679,7 +765,7 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | iot | /api/v1/iot | 10 | 阶段5 |
 | transactions | /api/v1/transactions | 4 | 阶段6 |
 | reports | /api/v1/reports | 8 | 阶段6 |
-| **合计** | | **195** | |
+| **合计** | | **205** | |
 
 ---
 

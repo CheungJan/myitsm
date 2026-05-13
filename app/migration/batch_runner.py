@@ -35,7 +35,7 @@ BATCH_TABLES: dict[int, list[str]] = {
     2: [
         "tmc01_menus", "tmc02_menusdt",
         "tit01_timepoint_area", "tit02_liabilityreg", "tit02_liabilityregdt",
-        "tit03_syscodes", "tit04_archivecode", "tit05_repairinfo", "tit06_userarea",
+        "tit04_archivecode", "tit05_repairinfo", "tit06_userarea",
         "tmc03_usermenus", "tmc21_usergroup", "tmc22_userbusityp", "tmc31_groupright",
         "tmm35_cust_pos_rl", "tmm36_cust_ve_rl",
     ],

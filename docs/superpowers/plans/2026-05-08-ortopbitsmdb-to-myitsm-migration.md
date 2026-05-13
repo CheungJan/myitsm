@@ -406,7 +406,8 @@ class TestMappingsRegistry:
         a_class_tables = [
             "TAC01_FPSK", "THT01_HTGL", "TIP01_PRICE", "TIP03_ADJPRICE",
             "TIT01_TIMEPOINT_AREA", "TIT02_LIABILITYREG", "TIT02_LIABILITYREGDT",
-            "TIT03_SYSCODES", "TIT04_ARCHIVECODE", "TIT05_REPAIRINFO",
+            "TIT03_SYSCODES",  -- 2026-05-10 已合并至 tmm31_syscodes
+            "TIT04_ARCHIVECODE", "TIT05_REPAIRINFO",
             "TMC01_MENUS", "TMC02_MENUSDT", "TMC03_USERMENUS",
             "TMC11_DEPARTMENTS", "TMC12_GROUPS", "TMC13_USERS",
             "TMM01_COMPANY", "TMM11_ITEMCLASS", "TMM12_ITEMS",
@@ -882,7 +883,7 @@ _m("TIT02_LIABILITYREGDT", "tit02_liabilityregdt", [
     FieldMapping("useflg", "USEFLG", transform="char"),
 ], batch=2, depends_on=["tit02_liabilityreg"])
 
-_m("TIT03_SYSCODES", "tit03_syscodes", [
+_m("TIT03_SYSCODES", "tit03_syscodes", [  # 2026-05-10: tit03已合并至tmm31_syscodes并删除
     FieldMapping("codetyp", "CODETYP", transform="char"),
     FieldMapping("codecd", "CODECD", transform="char"),
     FieldMapping("codenm", "CODENM"),
@@ -2423,10 +2424,10 @@ uv run python migrate_data.py
 | TMC43_LOGS | 丢弃（操作日志，量太大） |
 | TMC44_SYSLOCK | 丢弃（锁表） |
 | TMC51_VERCTRL | 丢弃（版本控制） |
-| TMM02_COUNTRY | 归档（地理层级，暂不用） |
-| TMM03_PROVINCE | 归档 |
-| TMM04_CITY | 归档 |
-| TMM05_TOWN | 归档 |
+| TMM02_COUNTRY | ✅ 已迁移（192条，客户管理四级联动） |
+| TMM03_PROVINCE | ✅ 已迁移（34条，同上） |
+| TMM04_CITY | ✅ 已迁移（436条，同上） |
+| TMM05_TOWN | ✅ 已迁移（2778条，同上） |
 | TMM33_MESSAGE | 丢弃（已替换为 tntf01/02） |
 | TMM50_MFLOG | 丢弃（操作日志） |
 | TIT22_FETION_SEND | 丢弃（飞信已停运） |
@@ -2516,3 +2517,36 @@ uv run python migrate_data.py
 - 总体完整率：**99.6%**（3,339,020/3,353,080）
 - 13 张差异表均已查明根因（源库 FK孤儿/NULL PK/PK重复）
 - 详见 `docs/core/数据迁移问题解决报告.md`
+
+---
+
+## Phase 7 补充：行政区域表迁移（2026-05-10）
+
+### 背景
+
+原迁移遗漏了 4 张地理层级表（TMM02-05），导致客户表缺少国家/省份/城市/区县字段。
+
+### 新增表
+
+| 表名 | 模型 | 记录数 | 层级关系 |
+|------|------|--------|---------|
+| `tmm02_country` | Country | 192 | 根 |
+| `tmm03_province` | Province | 34 | country_cd → tmm02_country |
+| `tmm04_city` | City | 436 | prvn_cd → tmm03_province |
+| `tmm05_town` | Town | 2,778 | city_cd → tmm04_city |
+
+### 客户表扩展
+
+`tmm22_customers` 新增 4 列：
+
+| 列名 | 类型 | 说明 |
+|------|------|------|
+| `country_cd` | VARCHAR(3) | 国家代码 |
+| `prvn_cd` | VARCHAR(2) | 省份代码 |
+| `city_cd` | VARCHAR(4) | 城市代码 |
+| `town_cd` | VARCHAR(4) | 区县代码 |
+
+### 迁移方式
+
+- DDL：Alembic 自动生成（`c08d02f7f9f6`）
+- DML：Python psycopg2 双连接逐行 INSERT，字段名映射（countrycd→country_cd 等），strip() 去空格

@@ -1,8 +1,9 @@
 # 数据库 ER 关系文档
 
-**版本**: v2.0  
-**更新日期**: 2026-04-27  
-**模型总数**: 138个业务模型（BaseModel 为公共基类，不计入）
+**版本**: v2.1  
+**更新日期**: 2026-05-08  
+**模型总数**: 142个业务模型（BaseModel 为公共基类，不计入）  
+**本次更新**: 2026-05-13 P0 完成，全面核对域模型数与实际代码一致
 
 > **v2.0 变更说明**：修正所有表名为实际 `__tablename__` 值，与 Oracle 数据库字典保持一致；
 > 新增"Oracle 遗留表评估"章节，标注重构后不再需要的表。
@@ -34,7 +35,7 @@
 
 ## 二、业务域 ER 关系（按实际表名）
 
-### 2.1 系统管理域（9个模型，system.py）
+### 2.1 系统管理域（11个模型，system.py）
 
 ```
 TMC01_MENUS (Menu)
@@ -66,11 +67,11 @@ TMC71_SYSPARM (SysParm) — 系统参数
 | UserBusiTyp | tmc22_userbusityp | id | 用户业务类型 |
 | GroupRight | tmc31_groupright | id | 组权限 |
 | AccLog | tmc41_acclog | id | 访问日志 |
-| SysParm | tmc71_sysparm | parmcd | 系统参数 |
+| SysParm | tmc71_sysparm | parmcd | 全局系统参数(6有效+5废弃) |
 
 ---
 
-### 2.2 主数据域（13个模型，master.py）
+### 2.2 主数据域（25个模型，master.py）
 
 ```
 TMM01_COMPANY (Company) — 公司
@@ -95,6 +96,10 @@ TMM47_COMMODE (ComMode) — 通讯方式
 | 模型 | 实际表名 | 主键 | 说明 |
 |------|---------|------|------|
 | Company | tmm01_company | companycd | 公司主数据 |
+| Country | tmm02_country | country_cd | 国家(Phase7补充) |
+| Province | tmm03_province | prvn_cd | 省份/直辖市(Phase7) |
+| City | tmm04_city | city_cd | 城市/区(Phase7) |
+| Town | tmm05_town | town_cd | 区县/街道(Phase7) |
 | ItemClass | tmm11_itemclass | classcd | 物料分类 |
 | Item | tmm12_items | itemcd | 物料/商品 |
 | SupplierClass | tmm18_supplierclass | classcd | 供应商分类 |
@@ -102,7 +107,7 @@ TMM47_COMMODE (ComMode) — 通讯方式
 | CustClass | tmm21_custclass | classcd | 客户分类 |
 | Customer | tmm22_customers | cust_cd | 客户/门店主表 |
 | CustomerHistory | tmm22_customers_history | id | 磁卡号变更历史（P0优化） |
-| SysCode | tmm31_syscodes | codetyp+codecd | 系统编码字典 |
+| SysCode | tmm31_syscodes | codetyp+codecd | 系统编码字典(含原tit03) |
 | IdMaster | tmm34_idmaster | id | ID 流水号生成器 |
 | CustPosRl | tmm35_cust_pos_rl | id | 客户-设备关联（资产台账） |
 | Area | tmm46_area | areacd | 区域 |
@@ -110,7 +115,7 @@ TMM47_COMMODE (ComMode) — 通讯方式
 
 ---
 
-### 2.3 ITSM 核心域（30个模型，itsm.py + sales.py）
+### 2.3 ITSM 核心域（33个模型，itsm.py）
 
 #### 核心主子表关系
 
@@ -187,7 +192,6 @@ PLAN_CUST (PlanCust) — 预计划
 | TimepointArea | tit01_timepoint_area | 响应时间等级 |
 | LiabilityReg | tit02_liabilityreg | 免责条例 |
 | LiabilityRegDt | tit02_liabilityregdt | 免责条例明细 |
-| ItsmSysCode | tit03_syscodes | ITSM 字典 |
 | ArchiveCode | tit04_archivecode | 归档字典 |
 | RepairInfo | tit05_repairinfo | 返修范围 |
 | UserArea | tit06_userarea | 区域人员 |
@@ -198,7 +202,7 @@ PLAN_CUST (PlanCust) — 预计划
 
 ---
 
-### 2.4 仓储域（14个模型，warehouse.py）
+### 2.4 仓储域（19个模型，warehouse.py）
 
 ```
 TWH01_WAREHOUSE (Warehouse)
@@ -223,14 +227,14 @@ TWH01_WAREHOUSE (Warehouse)
 | OverLost | twh17_overlost | 盘盈盘亏 |
 | OverLostDt | twh18_overlostdt | 盘盈盘亏明细 |
 | OverLostEid | twh18_overlosteid | 盘盈盘亏设备 |
-| AssetCheckAccept | twh19_asset_c_a | 资产盘点 |
-| AssetCheckAcceptDtl | twh20_asset_c_a_dtl | 盘点明细 |
-| PosChange | twh21_pos_change | POS设备变更 |
-| PosChangeDt | twh22_pos_change_dt | POS变更明细 |
+| AssetCheckAccept | twh19_asset_c_a | 资产盘点 ✅ (repo+service+api) |
+| AssetCheckAcceptDtl | twh20_asset_c_a_dtl | 盘点明细 ✅ |
+| PosChange | twh21_pos_change | POS设备变更 ✅ (repo+service+api) |
+| PosChangeDt | twh22_pos_change_dt | POS变更明细 ✅ |
 
 ---
 
-### 2.5 采购域（10个模型，procurement.py）
+### 2.5 采购域（11个模型，procurement.py）
 
 | 模型 | 实际表名 | 说明 |
 |------|---------|------|
@@ -247,7 +251,7 @@ TWH01_WAREHOUSE (Warehouse)
 
 ---
 
-### 2.6 销售域（4个模型，sales.py + itsm.py）
+### 2.6 销售域（4个模型，sales.py）
 
 | 模型 | 实际表名 | 说明 |
 |------|---------|------|
@@ -267,7 +271,7 @@ TWH01_WAREHOUSE (Warehouse)
 | Attendance | tkq01_attendance | 考勤记录 |
 | AttendanceCount | tkq02_attendancecount | 考勤月度汇总 |
 
-#### 库存预警 + 价格（4个，inventory.py）
+#### 库存预警 + 价格（6个，inventory.py）
 
 | 模型 | 实际表名 | 说明 |
 |------|---------|------|
@@ -383,6 +387,20 @@ TWH01_WAREHOUSE (Warehouse)
 
 ---
 
+## 三.1、性能索引清单
+
+> P0 阶段新增索引，用于资产查询和轨迹查询优化。
+
+| 索引名 | 表 | 列 | 用途 |
+|--------|-----|-----|------|
+| `idx_pos_r_eid_eid` | `tmm44_pos_r_eid` | `eid` | BOM 配件归属解析 |
+| `idx_pos_r_eid_useflg` | `tmm44_pos_r_eid` | `useflg, eid` | 资产台账位置筛选 + useflg 过滤 |
+| `idx_cust_pos_rl_eid_useflg` | `tmm35_cust_pos_rl` | `eid, useflg` | BOM 父设备客户关系查询 |
+| `idx_eid_track_eid_itemcd` | `tmm43_eid_track` | `eid, itemcd` | 设备历史详情（47ms→0.4ms） |
+| `idx_eid_track_type_eid` | `tmm43_eid_track` | `type, eid` | plan_refid 解析 + C 记录过滤 |
+
+---
+
 ## 四、Oracle 遗留表评估（33张无模型表）
 
 以下为 `数据库字典_精简后_最终版.md` 中存在但当前无 Python 模型的表。
@@ -400,14 +418,14 @@ TWH01_WAREHOUSE (Warehouse)
 | TMC44_SYSLOCK | PB并发锁 | 数据库行级锁 | PB 专属的表级锁机制，PostgreSQL 自带行锁 |
 | TMC51_VERCTRL | PB版本控制 | Git + Flask-Migrate | PB 客户端版本管理，B/S 架构不需要 |
 
-### 4.2 地理参考数据（可按需导入，暂不建模，共4张）
+### 4.2 地理参考数据（已建模，已迁移，共4张）
 
-| Oracle 表 | 原用途 | 说明 |
-|-----------|--------|------|
-| TMM02_COUNTRY | 国家字典 | 标准地理参考数据，可作为 CSV 导入或在线接口 |
-| TMM03_PROVINCE | 省份字典 | 同上 |
-| TMM04_CITY | 城市字典 | 同上 |
-| TMM05_TOWN | 乡镇字典 | 同上 |
+| Oracle 表 | Python 模型 | 所在文件 | 数据量 | 用途 |
+|-----------|------------|---------|--------|------|
+| TMM02_COUNTRY | Country | master.py | 192 | 客户管理四级联动（国家） |
+| TMM03_PROVINCE | Province | master.py | 34 | 客户管理四级联动（省份） |
+| TMM04_CITY | City | master.py | 436 | 客户管理四级联动（城市） |
+| TMM05_TOWN | Town | master.py | 2,778 | 客户管理四级联动（区县） |
 
 ### 4.3 ~~建议后续建模~~ → 已完成建模（业务必须，共14张）
 
@@ -415,8 +433,9 @@ TWH01_WAREHOUSE (Warehouse)
 
 | Oracle 表 | 字段数 | 用途 | Python 模型 | 所在文件 |
 |-----------|--------|------|-------------|---------|
-| TMM43_EID | 17 | 设备 SN 码主表 | Eid | master.py |
-| TMM43_EID_TRACK | 31 | 设备 SN 变更追踪 | EidTrack | master.py |
+| TMM43_EID | 22 | 设备 SN 码主表（P0新增5资产字段） | Eid | master.py |
+| TMM43_EID_TRACK | 43 | 设备 SN 变更追踪（P0新增12字段） | EidTrack | master.py |
+| TMM44_POS_R_EID | 11 | POS-EID 配件 BOM 关联 | PosREid | master.py |
 | TMM41_BOM | 6 | BOM 清单主表 | Bom | master.py |
 | TMM42_BOMDT | 7 | BOM 明细 | BomDt | master.py |
 | TMM24_CUSTITEMS | 13 | 客户-物品关联 | CustItems | master.py |
@@ -446,13 +465,16 @@ TWH01_WAREHOUSE (Warehouse)
 
 ## 五、统计汇总
 
-| 类别 | 数量 |
-|------|------|
-| 当前已实现的业务模型 | 138（含14张新增业务必须表） |
-| Oracle 等价迁移表（已完全匹配） | 69 |
-| Oracle 等价迁移表（有字段缺失，已补全） | 28（共155+10字段已恢复） |
-| 4.3节业务必须表（已建模） | 14 |
-| 重构新增表（优化方案+Tier扩展） | 27 |
-| Oracle 遗留表（已替代/淘汰，不建模） | 7 |
-| Oracle 遗留表（地理参考，暂不建模） | 4 |
-| Oracle 遗留表（可选/低价值） | 8 |
+| 类别 | 数量 | 说明 |
+|------|------|------|
+| **当前已实现的业务模型** | **142** | 含 14 张业务必须表 |
+| ├ Oracle 等价迁移（已完全匹配） | 76 | 69 张原匹配 + 4 张地理表(已迁) + 3 张库存预警扩展 |
+| ├ Oracle 等价迁移（有字段缺失，已补全） | 28 | 155+10 字段已恢复 |
+| ├ 4.3节业务必须表（已建模） | 14 | TMM41-44/TMM24/TMM36/TMM62 等 |
+| └ 重构新增表（Tier 扩展） | 24 | SLA/通知/结算/财务/门户/MES/IoT |
+| **Oracle 遗留表（不建模）** | **15** | |
+| ├ 已替代/淘汰 | 7 | 被新模块替代或 PB C/S 专属 |
+| └ 可选/低价值 | 8 | 标签/固资/G3/门店状态等 |
+
+> 实际数据库表 143 张 = 142 模型表 + 1 张 Alembic 版本表。  
+> 2.1-2.10 节各域模型数已于 2026-05-13 按实际代码重新核对。
