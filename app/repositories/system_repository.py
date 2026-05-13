@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.extensions import db
-from app.models.master import Area, City, ComMode, Country, CustClass, CustPosRl, Customer, Eid, EidTrack, Item, ItemClass, Province, SysCode, Town
+from app.models.master import Area, City, ComMode, Country, CustClass, CustPosRl, Customer, Eid, EidTrack, Item, ItemClass, PosREid, Province, SysCode, Town
 from app.models.system import Department, Group, GroupRight, Menu, MenuDetail, SysParm, User, UserGroup
 
 
@@ -264,7 +264,7 @@ class SystemRepository:
 
     @staticmethod
     def get_item_class_tree() -> list[dict[str, Any]]:
-        """物料分类树（PostgreSQL WITH RECURSIVE CTE）。"""
+        """物料分类树（PostgreSQL WITH RECURSIVE CTE + 叶子物料）。"""
         sql = db.text("""
             WITH RECURSIVE tree AS (
                 SELECT class_cd, class_nm, childflg, parent_cd, 0 AS depth
@@ -280,18 +280,29 @@ class SystemRepository:
             FROM tree ORDER BY depth, class_cd
         """)
         rows = db.session.execute(sql).fetchall()
+        # 查询所有物料作为叶子节点
+        items = list(db.session.query(Item.item_cd, Item.item_nm, Item.class_cd)
+                     .order_by(Item.item_cd).all())
         node_map: dict[str, dict[str, Any]] = {}
         roots: list[dict[str, Any]] = []
         for r in rows:
             node = {"class_cd": r.class_cd, "class_nm": r.class_nm,
                     "childflg": r.childflg, "parent_cd": r.parent_cd.strip() if r.parent_cd else "",
-                    "children": []}
+                    "children": [], "type": "class"}
             node_map[r.class_cd] = node
             parent = r.parent_cd.strip() if r.parent_cd else None
             if parent and parent in node_map:
                 node_map[parent]["children"].append(node)
             else:
                 roots.append(node)
+        # 将物料挂载到对应分类下
+        for item_cd, item_nm, class_cd in items:
+            label = f"{item_cd} {item_nm}" if item_nm and item_nm != item_cd else item_cd
+            leaf = {"class_cd": item_cd, "class_nm": label,
+                    "childflg": "0", "parent_cd": class_cd,
+                    "children": [], "type": "item"}
+            if class_cd and class_cd in node_map:
+                node_map[class_cd]["children"].append(leaf)
         return roots
 
     @staticmethod
@@ -615,20 +626,38 @@ class SystemRepository:
                          location: str | None = None, whcd: str | None = None,
                          sflg: str | None = None, cust_cd: str | None = None,
                          item_class: str | None = None) -> tuple[list[dict], int]:
-        """资产台账列表（以 Eid 为主表，含库存设备）。"""
-        from app.models.master import Customer, Item, CustClass
+        """资产台账列表（以 Eid 为主表，BOM 归属按页批量后解析）。"""
+        from app.models.master import Customer as CustModel, Item, CustClass
 
-        q = (db.session.query(Eid, CustPosRl, Customer.cust_nm, Customer.parentcd, Customer.class_cd,
-              Customer.cust_card, Item.item_nm, CustClass.class_nm.label("cust_class_nm"))
+        # BOM 配件归属子查询：找出所有"父设备有客户"的 BOM 配件 EID
+        bom_cust_subq = (
+            db.session.query(PosREid.eid.label("bom_eid"))
+            .join(CustPosRl, db.and_(
+                PosREid.posid == CustPosRl.eid,
+                CustPosRl.useflg == "1",
+            ))
+            .filter(PosREid.useflg == "1")
+            .distinct()
+            .subquery()
+        )
+
+        q = (db.session.query(Eid, CustPosRl, bom_cust_subq.c.bom_eid,
+              CustModel.cust_nm, CustModel.parentcd, CustModel.class_cd,
+              CustModel.cust_card, Item.item_nm, CustClass.class_nm.label("cust_class_nm"))
         .outerjoin(CustPosRl, Eid.eid == CustPosRl.eid)
-        .outerjoin(Customer, CustPosRl.cust_cd == Customer.cust_cd)
+        .outerjoin(CustModel, CustPosRl.cust_cd == CustModel.cust_cd)
         .outerjoin(Item, Eid.itemcd == Item.item_cd)
-        .outerjoin(CustClass, Customer.class_cd == CustClass.class_cd))
+        .outerjoin(CustClass, CustModel.class_cd == CustClass.class_cd)
+        .outerjoin(bom_cust_subq, Eid.eid == bom_cust_subq.c.bom_eid))
 
         if class_cd:
-            q = q.filter(Customer.class_cd == class_cd)
+            q = q.filter(CustModel.class_cd == class_cd)
         if search:
-            q = q.filter(db.or_(Eid.eid.ilike(f"%{search}%"), Customer.cust_nm.ilike(f"%{search}%"), Customer.cust_card.ilike(f"%{search}%")))
+            q = q.filter(db.or_(
+                Eid.eid.ilike(f"%{search}%"),
+                CustModel.cust_nm.ilike(f"%{search}%"),
+                CustModel.cust_card.ilike(f"%{search}%"),
+            ))
         if asset_type:
             q = q.filter(Eid.asset_type == asset_type)
         if asset_owner:
@@ -638,18 +667,43 @@ class SystemRepository:
         if cust_cd:
             q = q.filter(CustPosRl.cust_cd == cust_cd)
         if item_class:
-            cds = SystemRepository._get_descendant_class_cds(item_class)
-            item_cds = db.session.query(Item.item_cd).filter(Item.class_cd.in_(cds)).all()
-            q = q.filter(Eid.itemcd.in_([r[0] for r in item_cds]))
+            all_cds: set[str] = set()
+            direct_items: set[str] = set()
+            for ic in item_class.split(","):
+                ic = ic.strip()
+                if not ic:
+                    continue
+                if SystemRepository.get_item_class_by_cd(ic):
+                    all_cds.update(SystemRepository._get_descendant_class_cds(ic))
+                else:
+                    direct_items.add(ic)
+            conditions: list = []
+            if all_cds:
+                item_cds = db.session.query(Item.item_cd).filter(Item.class_cd.in_(list(all_cds))).all()
+                conditions.append(Eid.itemcd.in_([r[0] for r in item_cds]))
+            if direct_items:
+                conditions.append(Eid.itemcd.in_(list(direct_items)))
+            if conditions:
+                q = q.filter(db.or_(*conditions))
+
+        has_rl = CustPosRl.id.isnot(None)
+        has_bom_cust = bom_cust_subq.c.bom_eid.isnot(None)
+        is_customer = db.or_(has_rl, has_bom_cust)
+
+        if location == "customer":
+            q = q.filter(is_customer)
+        elif location == "warehouse":
+            q = q.filter(~is_customer)
+
         if useflg:
             if location == "warehouse":
                 q = q.filter(Eid.useflg == useflg)
             else:
-                q = q.filter(CustPosRl.useflg == useflg)
-        if location == "customer":
-            q = q.filter(CustPosRl.id.isnot(None))
-        elif location == "warehouse":
-            q = q.filter(CustPosRl.id.is_(None))
+                q = q.filter(db.or_(
+                    db.and_(has_rl, CustPosRl.useflg == useflg),
+                    db.and_(~has_rl, has_bom_cust),
+                    db.and_(~has_rl, ~has_bom_cust, Eid.useflg == useflg),
+                ))
         if whcd:
             whcds = [w.strip() for w in whcd.split(",") if w.strip()]
             if whcds:
@@ -658,27 +712,62 @@ class SystemRepository:
         total = q.count()
         rows = q.order_by(Eid.eid.desc()).offset((page - 1) * per_page).limit(per_page).all()
 
+        # —— 按页批量解析 BOM 归属（仅对无直接 CustPosRl 的设备） ——
+        bom_eids = [e.eid for e, r, *_ in rows if not r]
+        bom_map: dict[str, dict[str, str | None]] = {}
+        if bom_eids:
+            bom_rows = (db.session.query(PosREid.eid, PosREid.posid,
+                        CustModel.cust_nm, CustModel.parentcd, CustModel.cust_card,
+                        CustClass.class_nm)
+                .filter(PosREid.eid.in_(bom_eids), PosREid.useflg == "1")
+                .join(CustPosRl, db.and_(PosREid.posid == CustPosRl.eid, CustPosRl.useflg == "1"))
+                .join(CustModel, CustPosRl.cust_cd == CustModel.cust_cd)
+                .outerjoin(CustClass, CustModel.class_cd == CustClass.class_cd)
+                .all())
+            for eid, posid, cn, pcd, card, ccnm in bom_rows:
+                bom_map[eid] = {"host_eid": posid, "cust_nm": cn, "parentcd": pcd,
+                                "cust_card": card, "cust_class_nm": ccnm}
+
         pd_map: dict[str, str] = {}
         wh_map: dict[str, str] = {}
         result = []
-        for e, r, cust_nm, parentcd, _cd, cust_card, item_nm, cust_class_nm in rows:
+        for e, r, bom_eid, cust_nm, parentcd, _cd, cust_card, item_nm, cust_class_nm in rows:
             d = e.to_dict()
-            d["id"] = r.id if r else None
-            d["cust_nm"] = cust_nm or "库存"
-            d["cust_card"] = cust_card or ""
-            d["item_nm"] = item_nm or ""
-            d["cust_class_nm"] = cust_class_nm or ""
-            d["useflg"] = r.useflg if r else (e.useflg or "1")
-            d["asset_status"] = getattr(r, 'asset_status', None) or "" if r else ""
+            if r:
+                d["id"] = r.id
+                d["cust_nm"] = cust_nm or "库存"
+                d["cust_card"] = cust_card or ""
+                d["cust_class_nm"] = cust_class_nm or ""
+                d["useflg"] = r.useflg or (e.useflg or "1")
+                d["asset_status"] = getattr(r, 'asset_status', None) or ""
+                d["parentcd"] = (parentcd or "").strip()
+            elif e.eid in bom_map:
+                bm = bom_map[e.eid]
+                d["id"] = None
+                d["cust_nm"] = bm["cust_nm"] or "库存"
+                d["cust_card"] = bm["cust_card"] or ""
+                d["cust_class_nm"] = bm["cust_class_nm"] or ""
+                d["useflg"] = e.useflg or "1"
+                d["asset_status"] = ""
+                d["parentcd"] = (bm["parentcd"] or "").strip()
+                d["host_eid"] = bm["host_eid"]
+            else:
+                d["id"] = None
+                d["cust_nm"] = "库存"
+                d["cust_card"] = ""
+                d["cust_class_nm"] = ""
+                d["useflg"] = e.useflg or "1"
+                d["asset_status"] = ""
+                d["parentcd"] = ""
             # 仓库名解析
-            whcd = e.whcd or ""
-            if whcd and whcd not in wh_map:
+            whcd_val = e.whcd or ""
+            if whcd_val and whcd_val not in wh_map:
                 from app.models.warehouse import Warehouse
-                wh = db.session.get(Warehouse, whcd)
-                wh_map[whcd] = wh.whnm if wh else ""
-            d["wh_nm"] = wh_map.get(whcd, "")
+                wh = db.session.get(Warehouse, whcd_val)
+                wh_map[whcd_val] = wh.whnm if wh else ""
+            d["wh_nm"] = wh_map.get(whcd_val, "")
             # 管理单位解析
-            parentcd_raw = (parentcd or "").strip()
+            parentcd_raw = d.get("parentcd", "")
             if parentcd_raw and parentcd_raw not in pd_map:
                 pc = db.session.get(CustClass, parentcd_raw)
                 pd_map[parentcd_raw] = pc.class_nm if pc else ""

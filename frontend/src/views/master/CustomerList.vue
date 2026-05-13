@@ -595,7 +595,7 @@ async function openDetail(row: CustRecord) {
     detailRow.value = row; detailVisible.value = true; custDevices.value = []
     try {
         const token = localStorage.getItem('token')
-        const resp = await fetch(`/api/v1/assets?cust_cd=${row.cust_cd}&per_page=100`, { headers: { Authorization: `Bearer ${token}` } })
+        const resp = await fetch(`/api/v1/assets?cust_cd=${row.cust_cd}&useflg=1&per_page=100`, { headers: { Authorization: `Bearer ${token}` } })
         if (resp.ok) { const d = await resp.json(); custDevices.value = d.data?.items || [] }
     } catch { /* */ }
 }

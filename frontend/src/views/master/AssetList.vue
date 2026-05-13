@@ -28,7 +28,7 @@
                                 <el-option v-for="w in whOptions.filter((w:Record<string,string>) => w.useflg === '0')" :key="w.whcd" :label="`${w.whcd} ${w.whnm} (无效)`" :value="w.whcd" />
                             </el-option-group>
                         </el-select>
-                        <el-tree-select v-model="filterItemClass" :data="itemClassTree" :props="{label:'class_nm',children:'children'}" placeholder="物料分类" clearable filterable check-strictly size="small" style="width:140px;margin-left:8px" @change="onFilterChange" />
+                        <el-tree-select v-model="filterItemClass" :data="itemClassTree" :props="{label:'class_nm',children:'children'}" node-key="class_cd" placeholder="物料分类" clearable filterable multiple size="small" style="width:160px;margin-left:8px" @change="onFilterChange" />
                         <el-select v-model="filterLocation" placeholder="设备位置" clearable size="small" style="width:95px;margin-left:8px" @change="onFilterChange">
                             <el-option label="客户设备" value="customer" />
                             <el-option label="仓库库存" value="warehouse" />
@@ -79,6 +79,9 @@
                     <el-table-column label="门店状态" width="80">
                         <template #default="{ row }">{{ codeMaps.AS?.[(row as Record<string,unknown>).asset_status as string] || (row as Record<string,unknown>).asset_status || '-' }}</template>
                     </el-table-column>
+                    <el-table-column label="所属整机" width="140">
+                        <template #default="{ row }">{{ (row as Record<string,unknown>).host_eid || '-' }}</template>
+                    </el-table-column>
                     <el-table-column prop="prddate" label="生产日期" width="100" />
                     <el-table-column label="操作" width="120" fixed="right">
                         <template #default="{ row }">
@@ -106,6 +109,7 @@
                     <el-descriptions-item label="资产类型">{{ codeMaps.AT?.[detailRow.asset_type as string] || detailRow.asset_type || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="回收状态">{{ codeMaps.RS?.[detailRow.recycle_status as string] || detailRow.recycle_status || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="所属方">{{ codeMaps.OW?.[detailRow.asset_owner as string] || detailRow.asset_owner || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="所属整机">{{ (detailRow as Record<string,unknown>).host_eid || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="安装日期">{{ detailRow.install_date || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="设备状态">{{ codeMaps.AS?.[(detailRow as Record<string,unknown>).asset_status as string] || codeMaps.ES?.[detailRow.sflg as string] || detailRow.sflg || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="仓库">{{ (detailRow as Record<string,unknown>).wh_nm || (detailRow as Record<string,unknown>).whcd || '-' }}</el-descriptions-item>
@@ -118,9 +122,10 @@
                     <el-table-column prop="itemcd" label="配件代码" width="100" />
                     <el-table-column prop="item_nm" label="配件名称" min-width="150" />
                     <el-table-column prop="eid" label="配件序列号" width="150" />
-                    <el-table-column label="配件状态" width="75">
+                    <el-table-column label="配件状态" width="100">
                         <template #default="{ row }">
-                            <el-tag :type="row.active ? 'success' : 'danger'" size="small">{{ row.active ? '有效' : '无效' }}</el-tag>
+                            <template v-if="row.store_returned"><el-tag type="warning" size="small">门店已退回</el-tag></template>
+                            <template v-else><el-tag :type="row.active ? 'success' : 'danger'" size="small">{{ row.active ? '有效' : '无效' }}</el-tag></template>
                         </template>
                     </el-table-column>
                     <el-table-column label="质保类型" width="80">
@@ -183,7 +188,7 @@ const assets = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const searchText = ref(''); const page = ref(1); const perPage = ref(20); const total = ref(0)
 const filterAssetType = ref(''); const filterAssetOwner = ref(''); const filterUseflg = ref(''); const filterLocation = ref('')
 const filterWhcd = ref<string[]>([]); const filterSflg = ref('')
-const filterItemClass = ref('')
+const filterItemClass = ref<string[]>([])
 const itemClassTree = ref<ItemClassNode[]>([])
 const esOptions = ref<{code_cd:string;code_nm:string}[]>([])
 
@@ -246,7 +251,7 @@ async function loadData() {
         if (filterLocation.value) params.location = filterLocation.value
         if (filterWhcd.value.length > 0) params.whcd = filterWhcd.value.join(',')
         if (filterSflg.value) params.sflg = filterSflg.value
-        if (filterItemClass.value) params.item_class = filterItemClass.value
+        if (filterItemClass.value.length > 0) params.item_class = filterItemClass.value.join(',')
         const res = await fetchAssets(params)
         const d = res.data as { items: Record<string,unknown>[]; total: number }
         assets.value = d.items || []; total.value = d.total || 0

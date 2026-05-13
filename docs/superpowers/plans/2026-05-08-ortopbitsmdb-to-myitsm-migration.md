@@ -2424,10 +2424,10 @@ uv run python migrate_data.py
 | TMC43_LOGS | 丢弃（操作日志，量太大） |
 | TMC44_SYSLOCK | 丢弃（锁表） |
 | TMC51_VERCTRL | 丢弃（版本控制） |
-| TMM02_COUNTRY | 归档（地理层级，暂不用） |
-| TMM03_PROVINCE | 归档 |
-| TMM04_CITY | 归档 |
-| TMM05_TOWN | 归档 |
+| TMM02_COUNTRY | ✅ 已迁移（192条，客户管理四级联动） |
+| TMM03_PROVINCE | ✅ 已迁移（34条，同上） |
+| TMM04_CITY | ✅ 已迁移（436条，同上） |
+| TMM05_TOWN | ✅ 已迁移（2778条，同上） |
 | TMM33_MESSAGE | 丢弃（已替换为 tntf01/02） |
 | TMM50_MFLOG | 丢弃（操作日志） |
 | TIT22_FETION_SEND | 丢弃（飞信已停运） |

@@ -366,17 +366,36 @@ class SystemService:
             if e.whcd and e.whcd not in wh_map:
                 wh = db.session.get(Warehouse, e.whcd)
                 wh_map[e.whcd] = wh.whnm if wh else ""
-        # 预计划号
+        # 关联单号（3级优先级：翻新单 → C记录(时间校验) → 空）
         plan_map: dict[str, str] = {}
         if items:
             eids = [e.eid for e in items]
+
+            # 1. 优先：翻新单 tit15_maintenance_renovate（按 new_device_id 匹配）
+            renovate_rows = db.session.execute(
+                db.text("""
+                    SELECT new_device_id, renew_id FROM tit15_maintenance_renovate
+                    WHERE new_device_id = ANY(:eids)
+                """), {"eids": eids}
+            ).fetchall()
+            for new_device_id, renew_id in renovate_rows:
+                plan_map[new_device_id] = renew_id
+
+            # 2. 其次：C 记录（refid 非空 且 change_date >= 设备生产日期）
+            gendate_map = {e.eid: e.gendate for e in items if e.gendate}
             from app.models.master import EidTrack
-            tracks = db.session.query(EidTrack.eid, EidTrack.refid).filter(
-                EidTrack.eid.in_(eids), EidTrack.type == 'C', EidTrack.refid != ''
+            tracks = db.session.query(
+                EidTrack.eid, EidTrack.refid, EidTrack.change_date
+            ).filter(
+                EidTrack.eid.in_(eids),
+                EidTrack.type == 'C',
+                EidTrack.refid != '',
             ).order_by(EidTrack.change_date.desc()).all()
             for t in tracks:
-                if t.eid not in plan_map:
-                    plan_map[t.eid] = t.refid
+                if t.eid not in plan_map:  # 翻新单已匹配则跳过
+                    gd = gendate_map.get(t.eid)
+                    if gd and t.change_date and t.change_date >= gd:
+                        plan_map[t.eid] = t.refid
 
         result = []
         for e in items:
@@ -462,6 +481,19 @@ class SystemService:
 
     def get_eid_tracks(self, itemcd: str, eid: str) -> list[dict[str, Any]]:
         tracks = self._repo.get_eid_tracks(itemcd, eid)
+        eid_record = self._repo.get_eid(itemcd, eid)
+        gendate = eid_record.gendate if eid_record else None
+
+        # 翻新单（用于校验 C 记录 refid）
+        reno_refid: str | None = None
+        if eid_record:
+            row = db.session.execute(
+                db.text("SELECT renew_id FROM tit15_maintenance_renovate WHERE new_device_id = :eid"),
+                {"eid": eid},
+            ).fetchone()
+            if row:
+                reno_refid = row[0]
+
         from app.models.warehouse import Warehouse
         from app.models.master import Customer
         wh_map: dict[str, str] = {}
@@ -476,14 +508,29 @@ class SystemService:
                     wh_map[whcd] = wh.whnm if wh else ""
                 key = 'wh_nm' if wh_field == 'whcd' else 'n_wh_nm'
                 d[key] = wh_map.get(whcd, "")
-            # 客户编码→磁卡号
             for cust_field in ['cust_cd', 'n_cust_cd']:
                 cd = d.get(cust_field)
                 if cd and cd not in cust_map:
                     c = db.session.get(Customer, cd)
                     cust_map[cd] = c.cust_card if c else ""
                 d[cust_field + '_card'] = cust_map.get(cd, "")
+
+            # C 记录校验：change_date 不得早于设备生产日期，refid 优先用翻新单
+            if t.type == 'C' and gendate and t.change_date:
+                if t.change_date < gendate:
+                    # 从 CustPosRl 取正确的安装日期
+                    pos_row = db.session.execute(
+                        db.text("SELECT posupddate FROM tmm35_cust_pos_rl WHERE eid = :eid"),
+                        {"eid": eid},
+                    ).fetchone()
+                    if pos_row and pos_row[0]:
+                        d['change_date'] = pos_row[0].isoformat()
+                if reno_refid and t.refid != reno_refid:
+                    d['refid'] = reno_refid
+                    d['_refid_corrected'] = True
             result.append(d)
+        # 纠正后重新按时间排序（change_date 可能在上面被修正过）
+        result.sort(key=lambda d: (d.get("change_date") or "", d.get("seqno") or 0))
         return result
 
     # ——— 码表查询 ———

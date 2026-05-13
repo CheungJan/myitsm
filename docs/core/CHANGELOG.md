@@ -4,6 +4,36 @@
 
 ---
 
+## [v0.9.0] — 2026-05-13 — P0 资产台账重构 + 数据质量治理
+
+### 新增
+- **物料分类树三级结构**：tmm11_itemclass + tmm12_items 叶子节点，大类→中类→物料编码
+- **BOM 配件归属解析**：tmm44_pos_r_eid → 父设备 CustPosRl 链路，按页批量后解析（非全表 JOIN）
+- **所属整机列**：资产列表+详情显示 host_eid，区分 BOM 配件与独立设备
+- **C 记录自动纠正**：历史详情实时校验 change_date≥gendate，自动修正日期(posupddate)和单号(翻新单)
+- **plan_refid 三级取值**：翻新单(tit15_maintenance_renovate) → C记录(时间校验) → 空
+- **性能索引**：idx_pos_r_eid_eid / idx_pos_r_eid_useflg / idx_cust_pos_rl_eid_useflg
+
+### 变更
+- **资产查询重构**：Eid 主表，BOM 归属子查询(LEFT JOIN)，位置筛选含 BOM 配件
+- **item_class 多选**：前端 el-tree-select 多选+父子级联，后端逗号分隔递归查询
+- **BOM 门店退回**：`/assets/bom` 新增 store_returned，配件状态联动整机门店分配
+- **树选择修复**：node-key="class_cd" 解决"点一个全选"Bug
+
+### 数据修复
+- **1,230 台孤儿报废**：sflg='1' 无客户无 BOM → sflg='2' + 1,189 条报废轨迹
+- **1,650 台退回同步**：门店已退回但 sflg 未联动 → sflg='0' + 1,402 条退回轨迹
+- **C 记录脏数据纠正**：2,700 条 change_date<gendate 自动过滤+纠正
+- **EID 空格清理**：tmm43_eid(1)+tmm43_eid_track(2)+tmm44_pos_r_eid(80)
+
+### 文档
+- 更新 API接口文档.md（新增 /assets、/assets/bom 端点）
+- 更新 数据库ER关系文档.md（Eid 17→22 字段，EidTrack 31→43 字段，新增 TMM44_POS_R_EID）
+- 更新 数据库字典_精简后_最终版.md（补充 P0 字段）
+- 新增 scripts/scrap_orphan_devices.py
+
+---
+
 ## [v0.8.1] — 2026-05-11 — 系统参数清理
 
 - 标记 5 个零售遗留字段为废弃（costtype/centralwarehouse/poinvaliddays/soinvaliddays/shopbilltype）

@@ -138,7 +138,19 @@ Authorization: Bearer <token>
 | GET | `/eid` | EID列表(分页) | `page`,`per_page`,`class_cd`,`search` |
 | POST | `/eid` | 新增EID | - |
 | PUT/DELETE | `/eid/<itemcd>/<eid>` | 编辑/删除EID | - |
-| GET | `/eid/<itemcd>/<eid>/tracks` | 变更历史 | - |
+| GET | `/eid/<itemcd>/<eid>/tracks` | 变更历史(含自动纠正) | - |
+
+#### 资产台账
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/assets` | 资产台账列表(分页) | `page`,`per_page`,`class_cd`,`search`,`asset_type`,`asset_owner`,`useflg`,`location`,`whcd`,`sflg`,`cust_cd`,`item_class` |
+| GET | `/assets/bom` | BOM配件明细(含门店退回状态) | `eid` |
+| PUT | `/assets/<id>` | 更新资产属性 | - |
+
+> **`plan_refid` 取值逻辑**（EID列表）：优先查 `tit15_maintenance_renovate.new_device_id` → 其次查 C 记录（`change_date >= gendate`）。详见表 `tit15_maintenance_renovate`。  
+> **BOM 配件归属**：通过 `tmm44_pos_r_eid` → 父设备 `CustPosRl` 链路解析客户，按页批量后解析。  
+> **`location` 筛选**：`customer` 含直接分配+BOM配件(父设备有客户)；`warehouse` 仅无客户且非BOM配件。
 
 #### 码表查询
 

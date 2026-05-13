@@ -1,6 +1,6 @@
 # myitsm 前端开发方案（Vue 3 + Element Plus）
 
-> **Status**: 待确认 | **融合**: frontend-vue-development skill + 项目整体实施计划 §5 + 愿景全覆盖
+> **Status**: F1 完成，P0 增强已实施（2026-05-13） | **融合**: frontend-vue-development skill + 项目整体实施计划 §5 + 愿景全覆盖
 
 **Goal**: 从零搭建 Vue 3 + Element Plus 管理后台，覆盖全部 35 个子模块，205 个 API 端点。按"地基→业务主链→配套增强→打磨上线"四阶段推进，F2 结束即可端到端跑通核心业务流。
 
@@ -253,6 +253,18 @@ npm install -D sass @types/node
 | EID 管理 | `/master/eid` | TMM43 + TMM43_TRACK | 设备SN码+变更追踪 |
 | 资产台账 | `/master/assets` | TMM35 + TMM62 | 设备-客户关联+asset_type |
 | 仓库主数据 | `/master/warehouses` | TWH01 | 仓库基础信息 |
+
+### P0 增强（2026-05-13 已完成）
+
+| 页面 | 增强 | 影响 |
+|------|------|------|
+| 资产台账 | 物料分类树三级（大类→中类→物料），el-tree-select 多选+父子级联 | 筛选体验 |
+| 资产台账 | BOM 配件归属解析 + 所属整机列 + 门店退回状态 | 配件可见性 |
+| 资产台账 | 位置筛选修正（客户设备含BOM配件） | 筛选准确性 |
+| 资产台账 | 设备状态/资产类型 筛选区分（sflg vs asset_type） | 避免混淆 |
+| EID 管理 | plan_refid 三级取值（翻新单→C记录→空） | 关联单号准确 |
+| EID 管理 | 历史轨迹 C 记录自动纠正（日期+单号） | 数据可信度 |
+| 客户管理 | POS 设备查询加 useflg=1 过滤 | 仅显示有效设备 |
 
 ---
 

@@ -590,7 +590,7 @@ def list_assets():  # type: ignore[no-untyped-def]
     cust_cd = request.args.get("cust_cd")
     class_cd = request.args.get("class_cd")
     item_class = request.args.get("item_class")
-    result = _service.list_assets(page=page, per_page=per_page, class_cd=class_cd, search=search, asset_type=asset_type, asset_owner=asset_owner, useflg=useflg, location=location, whcd=whcd, sflg=sflg, cust_cd=cust_cd, item_class=class_cd)
+    result = _service.list_assets(page=page, per_page=per_page, class_cd=class_cd, search=search, asset_type=asset_type, asset_owner=asset_owner, useflg=useflg, location=location, whcd=whcd, sflg=sflg, cust_cd=cust_cd, item_class=item_class)
     return success_response(data={"items": result["items"], "total": result["total"]})
 
 
@@ -611,17 +611,23 @@ def get_asset_bom():  # type: ignore[no-untyped-def]
     host_item = db.session.get(Item, eid_row.itemcd) if eid_row else None
     host_nm = host_item.item_nm if host_item else ""
 
-    # 客户质保信息
-    cust = db.session.query(Customer).join(
-        CustPosRl, Customer.cust_cd == CustPosRl.cust_cd
-    ).filter(CustPosRl.eid == eid, CustPosRl.useflg == "1").first()
+    # 客户质保信息 + 门店分配状态
+    parent_rl = db.session.query(CustPosRl).filter(
+        CustPosRl.eid == eid, CustPosRl.useflg == "1"
+    ).first()
+    cust = db.session.query(Customer).filter(
+        Customer.cust_cd == parent_rl.cust_cd
+    ).first() if parent_rl else None
 
     result = []
     for r in rows:
         d = r.to_dict()
         d["host_nm"] = host_nm
         d["host_eid"] = eid
-        d["active"] = (r.useflg or "1") == "1"
+        # 配件有效 = 自身有效 且 整机门店分配有效（未退回）
+        acc_active = (r.useflg or "1") == "1"
+        d["active"] = acc_active and parent_rl is not None
+        d["store_returned"] = parent_rl is None  # 门店已退回
         item = db.session.query(Item).filter(Item.item_cd == r.itemcd).first()
         d["item_nm"] = item.item_nm if item else ""
         # EID 质保信息
