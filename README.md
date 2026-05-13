@@ -13,7 +13,8 @@
 | 数据库 | PostgreSQL 16+（CCGLPDB + LGREPORTPDB 双库合并） |
 | 请求校验 | Pydantic v2 |
 | 认证 | JWT（PyJWT） |
-| 包管理 | [uv](https://docs.astral.sh/uv/)（快速依赖管理 + 虚拟环境 + lockfile） |
+| 前端框架 | Vue 3.4 + Element Plus + TypeScript + Vite |
+| 包管理 | [uv](https://docs.astral.sh/uv/)（Python 后端）+ npm（前端） |
 | 质量门禁 | black / isort / ruff / mypy --strict / pytest / bandit |
 
 ## 项目结构
@@ -24,22 +25,25 @@ myitsm/
 ├── README.md                 # 本文件
 ├── app/                      # 后端代码
 │   ├── __init__.py           # Flask 应用工厂
-│   ├── api/                  # API 蓝图层（18个模块）
-│   ├── models/               # SQLAlchemy 数据模型（124个业务模型）
+│   ├── api/                  # API 蓝图层（20个模块，205个端点）
+│   ├── models/               # SQLAlchemy 数据模型（142个业务模型）
 │   ├── services/             # 业务逻辑层
 │   ├── repositories/         # 数据访问层
 │   ├── schemas/              # Pydantic 请求/响应 Schema
 │   ├── extensions/           # Flask 扩展初始化
 │   └── utils/                # 工具函数（统一响应等）
-├── tests/                    # 测试用例（128个）
-├── migrations/               # Flask-Migrate 数据库迁移
+├── frontend/                 # Vue 3 + Element Plus 前端（F1 已完成）
+├── tests/                    # 测试用例（148个）
+├── scripts/                  # 运维脚本
+├── migrations/               # Flask-Migrate 数据库迁移（版本链）
 ├── docs/
-│   ├── core/                 # 核心文档（索引见 CORE_DOCS_INDEX.md）
+│   ├── core/                 # 核心文档（22个，索引见 CORE_DOCS_INDEX.md）
+│   ├── superpowers/          # 头脑风暴设计文档+实施计划
 │   └── archive/              # 归档文档（旧重构资料）
 ├── PBsrc/                    # PB 原始源码（25个 .pbl 模块）
 ├── _backup/                  # 备份（旧重构代码）
 ├── pyproject.toml            # Python 项目配置
-├── uv.lock                   # uv 依赖锁文件（确保团队版本一致）
+├── uv.lock                   # uv 依赖锁文件
 ├── wsgi.py                   # WSGI 入口
 └── .env.example              # 环境变量模板
 ```
@@ -108,7 +112,7 @@ TEST_DATABASE_URL=postgresql://cheungjan@localhost:5432/myitsm_test
 createdb -U cheungjan myitsm
 createdb -U cheungjan myitsm_test
 
-# 运行迁移（自动创建全部 124 张业务表）
+# 运行迁移（自动创建全部 142 张业务表）
 uv run flask db upgrade
 ```
 
@@ -148,7 +152,7 @@ uv run bandit -r app/ -c pyproject.toml
 - **统一前缀**：`/api/v1`
 - **统一响应**：`{ code, message, data, request_id }`
 - **认证方式**：JWT Bearer Token（`POST /api/v1/login` 获取）
-- **端点总数**：183个，覆盖18个业务模块
+- **端点总数**：205个，覆盖20个蓝图
 
 完整接口文档见 [`docs/core/API接口文档.md`](docs/core/API接口文档.md)。
 
@@ -156,25 +160,26 @@ uv run bandit -r app/ -c pyproject.toml
 
 | 模块 | 说明 | 模型数 |
 |------|------|--------|
-| 系统管理 | 用户/部门/菜单/权限/系统参数 | 11 |
-| 主数据 | 客户/门店/设备/产品/数据字典 | 13 |
-| ITSM核心 | 日常维护/新机开通/旧机翻新/设备变更/门店关闭/保养/回收 | 34 |
-| 仓储管理 | 仓库/入库/出库/库存余额/流水 | 15 |
-| 采购管理 | 采购计划/登记/单据/供应商评价 | 10 |
-| 销售管理 | 预计划/销售单据/延期 | 4 |
-| SLA管理 | SLA定义/工单监控/达标率统计 | 2 |
-| 考勤管理 | 考勤记录/月度汇总 | 2 |
-| 库存价格 | 库存预警/价格规则/调价 | 4 |
-| 押金管理 | 押金主表/变更明细/型号标准 | 5 |
-| 合同发票 | 合同/发票 | 2 |
-| 通知系统 | 通知模板/发送记录 | 2 |
-| 结算管理 | 结算规则/账单/结算批次 | 4 |
-| 财务管理 | 会计科目/应收/应付/收付款/折旧 | 5 |
-| 客户门户 | 门户用户/自助报修/服务评价 | 3 |
-| MES制造 | 生产工单/工序定义/工单工序/物料消耗 | 4 |
-| IoT监控 | 设备接入/数据采集/报警规则/报警记录 | 4 |
+| 系统管理 | 用户/部门/菜单/权限/参数/字典 | 11 |
+| 主数据 | 客户/物料/设备SN/供应商/区域/分类 | 25 |
+| ITSM核心 | 维护/开通/翻新/变更/保养/关店/回收 | 33 |
+| 仓储管理 | 仓库/入库/出库/库存/盘点/调拨 | 15 |
+| 采购管理 | 计划/登记/单据/评价/验收 | 11 |
+| 销售管理 | 预计划/销售单/延期 | 3 |
+| 财务 | 科目/应收/应付/收付款/折旧/合同/发票 | 7 |
+| 考勤 | 考勤记录/月度汇总 | 2 |
+| 库存预警 | 预警/库存明细/价格规则 | 4 |
+| 押金 | 押金主表/明细/出入/型号标准 | 5 |
+| 结算 | 规则/账单/批次 | 4 |
+| 通知 | 模板/发送记录 | 2 |
+| SLA | 服务级别定义/工单监控 | 2 |
+| 门户 | 门户用户/自助报修/评价 | 3 |
+| MES | 工单/工序/物料消耗 | 4 |
+| IoT | 设备接入/数据/报警 | 4 |
+| 质检 | 质检结果/明细 | 3 |
+| 其他 | 调拨科目/资产属性 | 4 |
 
-**总计**：124个业务模型 / 128个测试 / 6项质量门禁
+**总计**：142个业务模型 / 148个测试 / 143张数据表 / 6项质量门禁
 
 ## 文档
 
@@ -183,10 +188,13 @@ uv run bandit -r app/ -c pyproject.toml
 | 文档 | 说明 |
 |------|------|
 | [项目整体实施计划](docs/core/项目整体实施计划.md) | 里程碑、数据库迁移、前端规划、部署方案 |
-| [系统功能对比分析](docs/core/系统功能对比分析与扩展规划.md) | 已有功能映射 + Tier-1/2/3 扩展规划 |
-| [API接口文档](docs/core/API接口文档.md) | 183个端点完整说明 |
-| [全阶段模型字段核对报告](docs/core/全阶段模型字段核对报告.md) | 124个模型逐表核对 |
-| [数据库字典](docs/core/数据库字典_精简后_最终版.md) | 表结构与字段语义 |
+| [前端开发方案](docs/superpowers/plans/2026-05-08-frontend-vue3-setup.md) | Vue 3 + Element Plus，F1 已完成 |
+| [系统功能对比分析](docs/core/系统功能对比分析与扩展规划.md) | 已有功能映射 + Tier-1/2/3 |
+| [API接口文档](docs/core/API接口文档.md) | 205个端点完整说明 |
+| [数据库ER关系文档](docs/core/数据库ER关系文档.md) | 142模型跨域关联+统计汇总（**权威**） |
+| [数据库字典（PG版）](docs/core/数据库字典_PostgreSQL当前版.md) | 142表字段/类型/索引（**权威**） |
+| [数据库变更追踪](docs/core/数据库变更追踪_迁移后.md) | 迁移后→P0 变更记录 |
+| [P0数据治理记录](docs/core/P0数据治理记录.md) | 批量修复+自动纠正+回滚方案 |
 
 ## 贡献
 
