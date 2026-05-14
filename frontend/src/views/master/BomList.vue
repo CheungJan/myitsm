@@ -261,7 +261,7 @@ function onSearch() { page.value = 1; loadItems() }
 async function onSelectItem(row: ItemRecord) {
     selectedItem.value = row; detailLoading.value = true
     try {
-        const res = await fetchBom(row.item_cd)
+        const res = await fetchBom(row.item_cd.toUpperCase())
         selectedBom.value = (res.data && res.data.bomcd) ? res.data : null
         details.value = selectedBom.value?.details || []
     } catch {
@@ -273,9 +273,10 @@ async function onSelectItem(row: ItemRecord) {
 async function openCreateBomForItem() {
     if (!selectedItem.value) return
     try {
-        const existing = await fetchBom(selectedItem.value.item_cd)
+        const bomcd = selectedItem.value.item_cd.toUpperCase()
+        const existing = await fetchBom(bomcd)
         if (!existing.data || !existing.data.bomcd) {
-            await createBom({ bomcd: selectedItem.value.item_cd, bomnm: selectedItem.value.item_nm })
+            await createBom({ bomcd, bomnm: selectedItem.value.item_nm })
         }
     } catch { /* */ }
     await onSelectItem(selectedItem.value)

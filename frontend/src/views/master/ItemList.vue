@@ -499,7 +499,7 @@ async function openItemDialog(row?: ItemRecord) {
             if (row.typflg === '0') {
                 m.fetchRelatedBoms(row!.item_cd).then(r => itemBoms.value = r.data || []).catch(() => itemBoms.value = [])
             } else {
-                m.fetchBom(row!.item_cd).then(r => itemBoms.value = (r.data && r.data.bomcd) ? [r.data] : []).catch(() => itemBoms.value = [])
+                m.fetchBom(row!.item_cd.toUpperCase()).then(r => itemBoms.value = (r.data && r.data.bomcd) ? [r.data] : []).catch(() => itemBoms.value = [])
             }
             m.fetchItemPrices(row!.item_cd).then(r => { itemPrices.value = (r.data || []).map(p => ({ ...p, _orig_busityp: p.busityp })) }).catch(() => itemPrices.value = [])
         })
