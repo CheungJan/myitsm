@@ -2,8 +2,8 @@
 
 **版本**: v2.1  
 **更新日期**: 2026-05-08  
-**模型总数**: 142个业务模型（BaseModel 为公共基类，不计入）  
-**本次更新**: 2026-05-13 P0 完成，全面核对域模型数与实际代码一致
+**模型总数**: 143个业务模型（BaseModel 为公共基类，不计入）  
+**本次更新**: 2026-05-14 P0 物料增强完成，新增 SupplierPrice 模型
 
 > **v2.0 变更说明**：修正所有表名为实际 `__tablename__` 值，与 Oracle 数据库字典保持一致；
 > 新增"Oracle 遗留表评估"章节，标注重构后不再需要的表。
@@ -271,11 +271,12 @@ TWH01_WAREHOUSE (Warehouse)
 | Attendance | tkq01_attendance | 考勤记录 |
 | AttendanceCount | tkq02_attendancecount | 考勤月度汇总 |
 
-#### 库存预警 + 价格（6个，inventory.py）
+#### 库存预警 + 价格（7个，inventory.py）
 
 | 模型 | 实际表名 | 说明 |
 |------|---------|------|
-| Price | tip01_price | 价格规则 |
+| Price | tip01_price | 价格规则（P0加 effective_date/expire_date/is_current） |
+| SupplierPrice | tip02_supplier_price | 供应商报价表（P0新增） |
 | AdjustPrice | tip03_adjprice | 调价记录 |
 | InventoryLimit | tiv01_invlimit | 库存预警规则 |
 | InventoryLimitHistory | tiv02_invlimit_hi | 库存预警历史 |
@@ -467,7 +468,7 @@ TWH01_WAREHOUSE (Warehouse)
 
 | 类别 | 数量 | 说明 |
 |------|------|------|
-| **当前已实现的业务模型** | **142** | 含 14 张业务必须表 |
+| **当前已实现的业务模型** | **143** | 含 14 张业务必须表 + P0 新增 SupplierPrice |
 | ├ Oracle 等价迁移（已完全匹配） | 76 | 69 张原匹配 + 4 张地理表(已迁) + 3 张库存预警扩展 |
 | ├ Oracle 等价迁移（有字段缺失，已补全） | 28 | 155+10 字段已恢复 |
 | ├ 4.3节业务必须表（已建模） | 14 | TMM41-44/TMM24/TMM36/TMM62 等 |
@@ -476,5 +477,5 @@ TWH01_WAREHOUSE (Warehouse)
 | ├ 已替代/淘汰 | 7 | 被新模块替代或 PB C/S 专属 |
 | └ 可选/低价值 | 8 | 标签/固资/G3/门店状态等 |
 
-> 实际数据库表 143 张 = 142 模型表 + 1 张 Alembic 版本表。  
+> 实际数据库表 144 张 = 143 模型表 + 1 张 Alembic 版本表。  
 > 2.1-2.10 节各域模型数已于 2026-05-13 按实际代码重新核对。
