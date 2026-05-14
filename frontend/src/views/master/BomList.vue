@@ -274,8 +274,8 @@ async function openCreateBomForItem() {
     if (!selectedItem.value) return
     try {
         await createBom({ bomcd: selectedItem.value.item_cd, bomnm: selectedItem.value.item_nm })
-        if (selectedItem.value) await onSelectItem(selectedItem.value)
-    } catch { /* already exists */ }
+    } catch { /* already exists, just load it */ }
+    await onSelectItem(selectedItem.value)
 }
 
 function openEditBom() {
