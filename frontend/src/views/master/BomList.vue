@@ -278,7 +278,10 @@ async function openCreateBomForItem() {
         if (!existing.data || !existing.data.bomcd) {
             await createBom({ bomcd, bomnm: selectedItem.value.item_nm })
         }
-    } catch { /* */ }
+    } catch (e: unknown) {
+        const status = (e as any)?.response?.status
+        if (status && status !== 404) ElMessage.error('创建BOM失败')
+    }
     await onSelectItem(selectedItem.value)
 }
 
@@ -310,7 +313,7 @@ async function openAddDetail() {
     try {
         const r = await fetchBomClassTree('0')
         addTreeData.value = r.data || []
-    } catch { /* */ }
+    } catch { ElMessage.error('操作失败') }
 }
 
 async function handleDeleteDetail(row: BomDetailRecord) {
@@ -319,7 +322,7 @@ async function handleDeleteDetail(row: BomDetailRecord) {
         await ElMessageBox.confirm(`确定移除 ${row.itemcd}？`, '确认', { type: 'warning' })
         await deleteBomDetail(selectedBom.value.bomcd, row.itemcd)
         if (selectedItem.value) await onSelectItem(selectedItem.value)
-    } catch { /* */ }
+    } catch { ElMessage.error('操作失败') }
 }
 </script>
 
