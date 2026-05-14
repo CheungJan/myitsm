@@ -59,6 +59,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.api.itsm import itsm_bp
     from app.api.mes import mes_bp
     from app.api.notification import notification_bp
+    from app.api.bom import bom_bp
     from app.api.portal import portal_bp
     from app.api.qc import qc_bp
     from app.api.procurement import procurement_bp
@@ -78,6 +79,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(sales_bp, url_prefix="/api/v1/sales")
     app.register_blueprint(sla_bp, url_prefix="/api/v1/sla")
     app.register_blueprint(attendance_bp, url_prefix="/api/v1/attendance")
+    app.register_blueprint(bom_bp, url_prefix="/api/v1/bom")
     app.register_blueprint(inventory_bp, url_prefix="/api/v1/inventory")
     app.register_blueprint(deposit_bp, url_prefix="/api/v1/deposit")
     app.register_blueprint(contract_bp, url_prefix="/api/v1/contract")
