@@ -420,6 +420,13 @@ def delete_item(item_cd: str):  # type: ignore[no-untyped-def]
     return success_response() if _service.delete_item(item_cd) else error_response("不存在", 404)
 
 
+@system_bp.get("/items/<item_cd>/suppliers")
+@login_required
+def get_item_suppliers(item_cd: str):  # type: ignore[no-untyped-def]
+    """查询物料关联的供应商列表（含供应商名称+周期参数）。"""
+    return success_response(data=_service.get_item_suppliers(item_cd))
+
+
 # ---- 客户分类 ----
 
 

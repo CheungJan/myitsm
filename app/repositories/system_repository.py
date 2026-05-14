@@ -397,6 +397,20 @@ class SystemRepository:
         return db.session.get(ItemClass, class_cd)
 
     @staticmethod
+    def get_item_suppliers(item_cd: str) -> list[dict[str, Any]]:
+        """查询物料关联的供应商列表（含供应商名称）。"""
+        from app.models.master import CustItems
+        rows = db.session.query(CustItems).filter(CustItems.itemcd == item_cd).all()
+        result = []
+        for r in rows:
+            d = r.to_dict()
+            from app.models.master import Supplier
+            s = db.session.get(Supplier, r.custcd)
+            d["supp_nm"] = s.supp_nm if s else ""
+            result.append(d)
+        return result
+
+    @staticmethod
     def create_item_class(data: dict[str, Any]) -> ItemClass:
         ic = ItemClass(**data)
         db.session.add(ic)

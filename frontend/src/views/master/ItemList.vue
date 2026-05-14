@@ -85,46 +85,48 @@
         </div>
 
         <!-- 物料新增/编辑弹窗 -->
-        <el-dialog :title="itemEditing ? '编辑物料' : '新增物料'" v-model="itemDialogVisible" width="500px">
-            <el-form :model="itemForm" label-width="80px">
-                <el-form-item label="编码" required>
-                    <el-input v-model="itemForm.item_cd" :disabled="!!itemEditing" />
-                </el-form-item>
-                <el-form-item label="名称" required>
-                    <el-input v-model="itemForm.item_nm" />
-                </el-form-item>
-                <el-form-item label="分类">
-                    <el-select v-model="itemForm.class_cd" clearable filterable style="width:100%" placeholder="选择分类">
-                        <el-option v-for="c in classOptions" :key="c.class_cd" :label="`${c.class_cd} - ${c.class_nm}`" :value="c.class_cd" />
-                    </el-select>
-                </el-form-item>
-                <el-form-item label="别名">
-                    <el-input v-model="itemForm.itemanm" />
-                </el-form-item>
-                <el-form-item label="单位">
-                    <el-input v-model="itemForm.unit" />
-                </el-form-item>
-                <el-divider content-position="left">库存管理</el-divider>
-                <el-form-item label="库存上限">
-                    <el-input-number v-model="itemForm.upperlimit" :min="0" style="width:100%" />
-                </el-form-item>
-                <el-form-item label="库存下限">
-                    <el-input-number v-model="itemForm.lowerlimit" :min="0" style="width:100%" />
-                </el-form-item>
-                <el-form-item label="最小订购量">
-                    <el-input-number v-model="itemForm.minorder" :min="0" style="width:100%" />
-                </el-form-item>
-                <el-divider content-position="left">周期与采购</el-divider>
-                <el-form-item label="新品周期(天)">
-                    <el-input-number v-model="itemForm.newperiod" :min="0" style="width:100%" />
-                </el-form-item>
-                <el-form-item label="旧品周期(天)">
-                    <el-input-number v-model="itemForm.oldperiod" :min="0" style="width:100%" />
-                </el-form-item>
-                <el-form-item label="采购负责人">
-                    <el-input v-model="itemForm.pcrep" />
-                </el-form-item>
-            </el-form>
+        <el-dialog :title="itemEditing ? '编辑物料' : '新增物料'" v-model="itemDialogVisible" width="650px">
+            <el-tabs v-model="itemActiveTab" type="border-card">
+                <el-tab-pane label="基本信息" name="base">
+                    <el-form :model="itemForm" label-width="80px">
+                        <el-form-item label="编码" required><el-input v-model="itemForm.item_cd" :disabled="!!itemEditing" /></el-form-item>
+                        <el-form-item label="名称" required><el-input v-model="itemForm.item_nm" /></el-form-item>
+                        <el-form-item label="分类"><el-select v-model="itemForm.class_cd" clearable filterable style="width:100%"><el-option v-for="c in classOptions" :key="c.class_cd" :label="`${c.class_cd} - ${c.class_nm}`" :value="c.class_cd" /></el-select></el-form-item>
+                        <el-form-item label="别名"><el-input v-model="itemForm.itemanm" /></el-form-item>
+                        <el-form-item label="单位"><el-input v-model="itemForm.unit" /></el-form-item>
+                        <el-form-item label="规格"><el-input v-model="itemForm.spec" /></el-form-item>
+                        <el-form-item label="类型"><el-select v-model="itemForm.typflg" style="width:100%"><el-option label="成品/整机" value="1" /><el-option label="配件" value="0" /></el-select></el-form-item>
+                    </el-form>
+                </el-tab-pane>
+                <el-tab-pane label="库存周期" name="stock">
+                    <el-form :model="itemForm" label-width="100px">
+                        <el-form-item label="库存上限"><el-input-number v-model="itemForm.upperlimit" :min="0" style="width:100%" /></el-form-item>
+                        <el-form-item label="库存下限"><el-input-number v-model="itemForm.lowerlimit" :min="0" style="width:100%" /></el-form-item>
+                        <el-form-item label="最小订购量"><el-input-number v-model="itemForm.minorder" :min="0" style="width:100%" /></el-form-item>
+                        <el-form-item label="新品周期(天)"><el-input-number v-model="itemForm.newperiod" :min="0" style="width:100%" /></el-form-item>
+                        <el-form-item label="旧品周期(天)"><el-input-number v-model="itemForm.oldperiod" :min="0" style="width:100%" /></el-form-item>
+                        <el-form-item label="采购负责人"><el-input v-model="itemForm.pcrep" /></el-form-item>
+                    </el-form>
+                </el-tab-pane>
+                <el-tab-pane label="供应商" name="supplier" v-if="itemEditing">
+                    <el-table :data="itemSuppliers" size="small" stripe>
+                        <el-table-column prop="custcd" label="供应商编码" width="100" />
+                        <el-table-column prop="supp_nm" label="供应商名称" min-width="150" show-overflow-tooltip />
+                        <el-table-column label="默认" width="60"><template #default="{row}"><el-tag :type="row.dfltflg==='Y'?'success':''" size="small">{{ row.dfltflg==='Y'?'默认':'' }}</el-tag></template></el-table-column>
+                        <el-table-column prop="guaranteeperiod" label="保修期(天)" width="100" />
+                        <el-table-column prop="delivercycle" label="配送周期" width="80" />
+                        <el-table-column prop="servicecycle" label="服务周期" width="80" />
+                    </el-table>
+                </el-tab-pane>
+                <el-tab-pane label="相关BOM" name="bom" v-if="itemEditing">
+                    <el-table :data="itemBoms" size="small" stripe>
+                        <el-table-column prop="bomcd" label="BOM编码" width="90" />
+                        <el-table-column prop="bomnm" label="BOM名称" min-width="150" show-overflow-tooltip />
+                        <el-table-column label="类型" width="80"><template #default="{row}">{{ row.details?.some((d:any)=>d.itemtyp==='1')?'全配件':'主机+配件' }}</template></el-table-column>
+                        <el-table-column label="有效" width="60"><template #default="{row}"><el-tag :type="row.useflg==='0'?'danger':'success'" size="small">{{ row.useflg==='0'?'无效':'有效' }}</el-tag></template></el-table-column>
+                    </el-table>
+                </el-tab-pane>
+            </el-tabs>
             <template #footer>
                 <el-button @click="itemDialogVisible = false">取消</el-button>
                 <el-button type="primary" @click="handleSaveItem" :loading="itemSaving">保存</el-button>
@@ -183,10 +185,11 @@ const perPage = ref(20)
 const total = ref(0)
 
 // ---- 物料弹窗 ----
-const itemDialogVisible = ref(false)
+const itemDialogVisible = ref(false); const itemActiveTab = ref('base')
+const itemSuppliers = ref<Record<string,unknown>[]>([]); const itemBoms = ref<Record<string,unknown>[]>([])
 const itemEditing = ref<ItemRecord | null>(null)
 const itemSaving = ref(false)
-const itemForm = reactive<Record<string, unknown>>({ item_cd: '', item_nm: '', class_cd: '', itemanm: '', unit: '', upperlimit: undefined, lowerlimit: undefined, minorder: undefined, newperiod: undefined, oldperiod: undefined, pcrep: '' })
+const itemForm = reactive<Record<string, unknown>>({ item_cd: '', item_nm: '', class_cd: '', itemanm: '', unit: '', spec: '', typflg: '0', upperlimit: undefined, lowerlimit: undefined, minorder: undefined, newperiod: undefined, oldperiod: undefined, pcrep: '' })
 
 // ---- 分类弹窗 ----
 const classDialogVisible = ref(false)
@@ -344,9 +347,20 @@ function openItemDialog(row?: ItemRecord) {
         itemForm.minorder = (row as Record<string,unknown>).minorder
         itemForm.newperiod = (row as Record<string,unknown>).newperiod
         itemForm.oldperiod = (row as Record<string,unknown>).oldperiod
+        itemForm.spec = (row as Record<string,unknown>).spec || ''
+        itemForm.typflg = (row as Record<string,unknown>).typflg || '0'
         itemForm.pcrep = (row as Record<string,unknown>).pcrep || ''
+        // 加载供应商和BOM
+        itemActiveTab.value = 'base'
+        import('@/api/master').then(m => {
+            m.fetchItemSuppliers(row.item_cd).then(r => itemSuppliers.value = r.data || []).catch(() => itemSuppliers.value = [])
+            m.fetchBom(row.item_cd).then(r => itemBoms.value = r.data ? [r.data] : []).catch(() => itemBoms.value = [])
+        })
     } else {
         itemEditing.value = null
+        itemActiveTab.value = 'base'
+        itemSuppliers.value = []
+        itemBoms.value = []
         // 新增时自动继承左侧选中分类
         itemForm.item_cd = selectedClassCd.value || ''
         itemForm.item_nm = ''
