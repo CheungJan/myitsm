@@ -398,20 +398,22 @@ async function handleDeletePrice(row: Record<string,unknown>) {
         itemPrices.value = r.data || []
     } catch { ElMessage.error('删除失败') }
 }
-const _priceOrigBusityp = ref<Record<number, string>>({})
+const _priceKeys = ref<Record<string,string>>({})
 async function handleUpdatePrice(row: Record<string,unknown>, field: string, val: unknown) {
     if (!itemEditing.value) return
     try {
         const { updateItemPrice, deleteItemPrice, addItemPrice } = await import('@/api/master')
         if (field === 'busityp') {
-            // 复合主键变更：删旧建新
-            const oldTyp = _priceOrigBusityp.value[row.itemcd as any + '_' + row.busityp as any] || row.busityp
+            // 用原始 busityp 删旧，新 busityp 建新
+            const idx = itemPrices.value.indexOf(row)
+            const oldTyp = _priceKeys.value[`${row.itemcd}_${idx}`] || row.busityp
             await deleteItemPrice(itemEditing.value.item_cd, oldTyp as string)
             await addItemPrice(itemEditing.value.item_cd, { ...row, busityp: val, itemcd: itemEditing.value.item_cd })
+            _priceKeys.value[`${row.itemcd}_${idx}`] = val as string
         } else {
             await updateItemPrice(itemEditing.value.item_cd, row.busityp as string, { [field]: val })
         }
-    } catch { ElMessage.error('更新失败') }
+    } catch { ElMessage.error('更新失败（可能该业务类型已存在）') }
 }
 async function openAddSupplier() {
     supplierDialogVisible.value = true; selectedSuppCd.value = ''
@@ -485,7 +487,7 @@ async function openItemDialog(row?: ItemRecord) {
             } else {
                 m.fetchBom(row!.item_cd).then(r => itemBoms.value = (r.data && r.data.bomcd) ? [r.data] : []).catch(() => itemBoms.value = [])
             }
-            m.fetchItemPrices(row!.item_cd).then(r => itemPrices.value = r.data || []).catch(() => itemPrices.value = [])
+            m.fetchItemPrices(row!.item_cd).then(r => { itemPrices.value = r.data || []; itemPrices.value.forEach((p,i) => _priceKeys.value[`${p.itemcd}_${i}`] = p.busityp as string) }).catch(() => itemPrices.value = [])
         })
     } else {
         itemEditing.value = null
