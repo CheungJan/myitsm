@@ -62,10 +62,11 @@
                         <div class="panel-header">
                             <span>{{ selectedItem.item_cd }} — {{ selectedItem.item_nm }} BOM 明细</span>
                             <template v-if="selectedBom">
-                                <div style="display:flex;gap:8px">
+                                <div style="display:flex;gap:8px;align-items:center">
                                     <el-tag :type="bomType.type" size="small">{{ bomType.label }}</el-tag>
+                                    <el-tag :type="selectedBom.useflg==='0'?'danger':'success'" size="small">{{ selectedBom.useflg==='0'?'无效':'有效' }}</el-tag>
                                     <el-button type="primary" size="small" @click="openAddDetail">添加物料</el-button>
-                                    <el-button size="small" @click="openEditBom">编辑</el-button>
+                                    <el-button size="small" @click="openEditBom">重命名</el-button>
                                 </div>
                             </template>
                             <el-button v-else type="primary" size="small" @click="openCreateBomForItem">新建 BOM</el-button>
@@ -316,6 +317,10 @@ async function openAddDetail() {
     } catch { ElMessage.error('操作失败') }
 }
 
+async function handleUpdateDetail(row: BomDetailRecord, field: string, val: unknown) {
+    if (!selectedBom.value) return
+    try { await updateBomDetail(selectedBom.value.bomcd, row.itemcd, { [field]: val }) } catch { /* */ }
+}
 async function handleDeleteDetail(row: BomDetailRecord) {
     if (!selectedBom.value) return
     try {

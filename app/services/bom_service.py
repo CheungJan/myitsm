@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.extensions import db
 from app.repositories.bom_repository import BomRepository
 
 
@@ -22,7 +23,14 @@ class BomService:
         if not bom:
             return None
         data = bom.to_dict()
-        data["details"] = [d.to_dict() for d in BomRepository.list_details(bomcd)]
+        details = []
+        for d in BomRepository.list_details(bomcd):
+            dd = d.to_dict()
+            from app.models.master import Item
+            item = db.session.get(Item, d.itemcd)
+            dd["item_nm"] = item.item_nm if item else ""
+            details.append(dd)
+        data["details"] = details
         return data
 
     @staticmethod
