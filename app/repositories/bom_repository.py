@@ -16,7 +16,7 @@ class BomRepository:
                   class_cd: str | None = None) -> tuple[list[Bom], int]:
         from app.models.master import Item
         from app.repositories.system_repository import SystemRepository
-        q = db.session.query(Bom)
+        q = db.session.query(Bom).join(Item, Bom.bomcd == Item.item_cd).filter(Item.typflg == "1")
         if search:
             q = q.filter(db.or_(Bom.bomcd.ilike(f"%{search}%"), Bom.bomnm.ilike(f"%{search}%")))
         if class_cd:

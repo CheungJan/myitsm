@@ -346,8 +346,9 @@ class SystemRepository:
 
     @staticmethod
     def get_items(page: int = 1, per_page: int = 20, search: str | None = None,
-                  class_cd: str | None = None, recursive: bool = True) -> tuple[list[Item], int]:
-        """获取物料列表，支持分类筛选、递归子分类、搜索。"""
+                  class_cd: str | None = None, recursive: bool = True,
+                  typflg: str | None = None) -> tuple[list[Item], int]:
+        """获取物料列表，支持分类筛选、递归子分类、搜索、成品/配件过滤。"""
         q = db.session.query(Item)
         if class_cd:
             if recursive:
@@ -360,6 +361,8 @@ class SystemRepository:
                 Item.item_cd.ilike(f"%{search}%"),
                 Item.item_nm.ilike(f"%{search}%"),
             ))
+        if typflg:
+            q = q.filter(Item.typflg == typflg)
         q = q.order_by(Item.item_cd)
         total = q.count()
         return q.offset((page - 1) * per_page).limit(per_page).all(), total

@@ -375,15 +375,16 @@ def delete_item_class(class_cd: str):  # type: ignore[no-untyped-def]
 @system_bp.get("/items")
 @login_required
 def list_items():  # type: ignore[no-untyped-def]
-    """物料列表（分页），支持分类筛选、递归子分类、搜索。"""
+    """物料列表（分页），支持分类筛选、递归子分类、搜索、成品/配件过滤。"""
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
     class_cd = request.args.get("class_cd")
     recursive = request.args.get("recursive", "1") == "1"
     search = request.args.get("search")
+    typflg = request.args.get("typflg")
     result = _service.list_items(
         page=page, per_page=per_page,
-        class_cd=class_cd, recursive=recursive, search=search,
+        class_cd=class_cd, recursive=recursive, search=search, typflg=typflg,
     )
     return success_response(data={"items": result["items"], "total": result["total"]})
 

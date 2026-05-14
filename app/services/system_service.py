@@ -207,12 +207,12 @@ class SystemService:
     def list_items(
         self, page: int = 1, per_page: int = 20,
         class_cd: str | None = None, recursive: bool = True,
-        search: str | None = None,
+        search: str | None = None, typflg: str | None = None,
     ) -> dict[str, Any]:
-        """获取物料列表，支持分类筛选、递归子分类、搜索。"""
+        """获取物料列表，支持分类筛选、递归子分类、搜索、成品/配件过滤。"""
         items, total = self._repo.get_items(
             page=page, per_page=per_page,
-            class_cd=class_cd, recursive=recursive, search=search,
+            class_cd=class_cd, recursive=recursive, search=search, typflg=typflg,
         )
         return {"items": [i.to_dict() for i in items], "total": total}
 
