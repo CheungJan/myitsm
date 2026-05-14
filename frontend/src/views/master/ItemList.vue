@@ -378,20 +378,9 @@ function onSearch() {
 
 async function openAddPrice() {
     if (!itemEditing.value) return
-    try {
-        const { addItemPrice, fetchItemPrices } = await import('@/api/master')
-        // 逐个尝试 busityp，直到成功
-        let added = false
-        for (const pt of priceTypes.value) {
-            try {
-                await addItemPrice(itemEditing.value!.item_cd, { busityp: pt.code_cd, itemprice: 0, unitcd: '', is_current: true })
-                added = true; break
-            } catch { continue }
-        }
-        if (!added) { ElMessage.error('所有价格类型已存在'); return }
-        const r = await fetchItemPrices(itemEditing.value!.item_cd)
-        itemPrices.value = r.data || []
-    } catch { ElMessage.error('添加失败') }
+    // 创建本地编辑行，暂不提交
+    const newRow: Record<string,unknown> = { busityp: '', itemprice: 0, unitcd: '', is_current: true, effective_date: null, expire_date: null, _editing: true, _busityp: '', _itemprice: 0, _is_current: true, _effective_date: null, _expire_date: null, _orig_busityp: '' }
+    itemPrices.value.push(newRow)
 }
 async function handleDeletePrice(row: Record<string,unknown>) {
     if (!itemEditing.value) return
@@ -407,21 +396,39 @@ function handleEditPrice(row: Record<string,unknown>) {
     row._is_current = row.is_current; row._effective_date = row.effective_date; row._expire_date = row.expire_date
 }
 async function handleSavePrice(row: Record<string,unknown>) {
-    if (!itemEditing.value) return
+    if (!itemEditing.value || !row._busityp) { ElMessage.warning('请选择业务类型'); return }
     try {
-        const { updateItemPrice, fetchItemPrices } = await import('@/api/master')
-        const oldBusityp = row._orig_busityp as string || row.busityp as string
-        await updateItemPrice(itemEditing.value.item_cd, oldBusityp, { busityp: row._busityp, itemprice: row._itemprice, is_current: row._is_current, effective_date: row._effective_date, expire_date: row._expire_date })
+        const { updateItemPrice, addItemPrice, fetchItemPrices } = await import('@/api/master')
+        const oldBusityp = row._orig_busityp as string
+        if (!oldBusityp) {
+            // 新建：调用 add
+            await addItemPrice(itemEditing.value!.item_cd, { busityp: row._busityp, itemprice: row._itemprice, unitcd: '', is_current: row._is_current, effective_date: row._effective_date, expire_date: row._expire_date })
+        } else {
+            // 编辑：调用 update（后端处理 busityp 变更）
+            await updateItemPrice(itemEditing.value.item_cd, oldBusityp, { busityp: row._busityp, itemprice: row._itemprice, is_current: row._is_current, effective_date: row._effective_date, expire_date: row._expire_date })
+        }
         row._editing = false; row.busityp = row._busityp; row.itemprice = row._itemprice
         row.is_current = row._is_current; row.effective_date = row._effective_date; row.expire_date = row._expire_date
         row._orig_busityp = row._busityp
-        if (row.busityp !== oldBusityp) {
-            const r = await fetchItemPrices(itemEditing.value.item_cd)
-            itemPrices.value = (r.data || []).map((p: Record<string,unknown>) => ({ ...p, _orig_busityp: p.busityp }))
+        const r = await fetchItemPrices(itemEditing.value!.item_cd)
+        itemPrices.value = (r.data || []).map((p: Record<string,unknown>) => ({ ...p, _orig_busityp: p.busityp }))
+    } catch (e: unknown) {
+        const msg = (e as any)?.response?.data?.message || ''
+        if (msg.includes('duplicate') || msg.includes('already exists')) {
+            ElMessage.error('该价格类型已存在，请重新选择')
+        } else {
+            ElMessage.error('保存失败')
         }
-    } catch { ElMessage.error('保存失败') }
+    }
 }
-function handleCancelEditPrice(row: Record<string,unknown>) { row._editing = false }
+function handleCancelEditPrice(row: Record<string,unknown>) {
+    if (!row._orig_busityp) {
+        // 新建未保存的行 → 直接删除
+        itemPrices.value = itemPrices.value.filter(p => p !== row)
+    } else {
+        row._editing = false
+    }
+}
 async function openAddSupplier() {
     supplierDialogVisible.value = true; selectedSuppCd.value = ''
     if (!allSuppliers.value.length) {
