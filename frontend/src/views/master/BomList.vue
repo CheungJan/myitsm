@@ -76,16 +76,14 @@
                         <el-table :data="details" v-loading="detailLoading" stripe size="small">
                             <el-table-column prop="itemcd" label="物料代码" width="100" />
                             <el-table-column prop="item_nm" label="物料名称" min-width="160" show-overflow-tooltip />
-                            <el-table-column prop="bomqty" label="数量" width="60" align="center" />
-                            <el-table-column label="类型" width="90" align="center">
-                                <template #default="{ row }">
-                                    <el-tag :type="row.itemtyp === '1' ? 'warning' : 'info'" size="small">{{ row.itemtyp === '1' ? '核心配件' : '外设配件' }}</el-tag>
-                                </template>
+                            <el-table-column label="数量" width="80" align="center">
+                                <template #default="{ row }"><el-input-number v-model="row.bomqty" :min="1" size="small" controls-position="right" style="width:70px" @change="(v: number|undefined) => handleUpdateDetail(row, 'bomqty', v)" /></template>
+                            </el-table-column>
+                            <el-table-column label="类型" width="110" align="center">
+                                <template #default="{ row }"><el-select v-model="row.itemtyp" size="small" style="width:100px" @change="(v: unknown) => handleUpdateDetail(row, 'itemtyp', v)"><el-option label="外设配件" value="0" /><el-option label="核心配件" value="1" /></el-select></template>
                             </el-table-column>
                             <el-table-column label="操作" width="70" align="center">
-                                <template #default="{ row }">
-                                    <el-button type="danger" link size="small" @click="handleDeleteDetail(row)">删除</el-button>
-                                </template>
+                                <template #default="{ row }"><el-button type="danger" link size="small" @click="handleDeleteDetail(row)">删除</el-button></template>
                             </el-table-column>
                         </el-table>
                     </template>
@@ -151,7 +149,7 @@ import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
     fetchBom, createBom, updateBom, deleteBom,
-    addBomDetail, deleteBomDetail,
+    addBomDetail, updateBomDetail, deleteBomDetail,
     fetchItems, fetchBomClassTree,
 } from '@/api/master'
 import type { BomRecord, BomDetailRecord, ItemRecord, ItemClassNode } from '@/api/master'
