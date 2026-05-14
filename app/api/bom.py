@@ -18,7 +18,8 @@ def list_boms():  # type: ignore[no-untyped-def]
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
     search = request.args.get("search")
-    return success_response(data=BomService.list_boms(page=page, per_page=per_page, search=search))
+    class_cd = request.args.get("class_cd")
+    return success_response(data=BomService.list_boms(page=page, per_page=per_page, search=search, class_cd=class_cd))
 
 
 @bom_bp.post("")

@@ -78,7 +78,9 @@
         <el-dialog :title="bomDialogTitle" v-model="bomDialogVisible" width="420px">
             <el-form :model="bomForm" label-width="80px">
                 <el-form-item label="BOM 代码">
-                    <el-input v-model="bomForm.bomcd" maxlength="6" placeholder="6位整机物料编码" :disabled="isEditingBom" style="text-transform: uppercase" />
+                    <el-select v-model="bomForm.bomcd" filterable placeholder="选择成品物料" :disabled="isEditingBom" style="width: 100%" :filter-method="filterFinishedProducts">
+                        <el-option v-for="it in filteredFinishedProducts" :key="it.item_cd" :label="`${it.item_cd} ${it.item_nm}`" :value="it.item_cd" />
+                    </el-select>
                 </el-form-item>
                 <el-form-item label="BOM 名称">
                     <el-input v-model="bomForm.bomnm" placeholder="如 TFP4000 4LR4" />

@@ -12,10 +12,21 @@ class BomRepository:
     """BOM 数据访问。"""
 
     @staticmethod
-    def list_boms(page: int = 1, per_page: int = 20, search: str | None = None) -> tuple[list[Bom], int]:
+    def list_boms(page: int = 1, per_page: int = 20, search: str | None = None,
+                  class_cd: str | None = None) -> tuple[list[Bom], int]:
+        from app.models.master import Item
+        from app.repositories.system_repository import SystemRepository
         q = db.session.query(Bom)
         if search:
             q = q.filter(db.or_(Bom.bomcd.ilike(f"%{search}%"), Bom.bomnm.ilike(f"%{search}%")))
+        if class_cd:
+            cds = SystemRepository._get_descendant_class_cds(class_cd)
+            item_cds = [r[0] for r in db.session.query(Item.item_cd).filter(
+                Item.class_cd.in_(cds)).all()]
+            if item_cds:
+                q = q.filter(Bom.bomcd.in_(item_cds))
+            else:
+                return [], 0
         q = q.order_by(Bom.bomcd)
         total = q.count()
         return q.offset((page - 1) * per_page).limit(per_page).all(), total

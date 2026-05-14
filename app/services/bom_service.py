@@ -11,8 +11,9 @@ class BomService:
     """BOM 业务逻辑。"""
 
     @staticmethod
-    def list_boms(page: int = 1, per_page: int = 20, search: str | None = None) -> dict[str, Any]:
-        items, total = BomRepository.list_boms(page=page, per_page=per_page, search=search)
+    def list_boms(page: int = 1, per_page: int = 20, search: str | None = None,
+                  class_cd: str | None = None) -> dict[str, Any]:
+        items, total = BomRepository.list_boms(page=page, per_page=per_page, search=search, class_cd=class_cd)
         return {"items": [i.to_dict() for i in items], "total": total}
 
     @staticmethod
