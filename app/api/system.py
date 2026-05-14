@@ -460,6 +460,13 @@ def update_item_price(item_cd: str, busityp: str):  # type: ignore[no-untyped-de
     return success_response(data=r) if r else error_response("不存在", 404)
 
 
+@system_bp.delete("/items/<item_cd>/prices/<busityp>")
+@login_required
+def delete_item_price(item_cd: str, busityp: str):  # type: ignore[no-untyped-def]
+    """删除物料价格记录。"""
+    return success_response() if _service.delete_item_price(item_cd, busityp) else error_response("不存在", 404)
+
+
 @system_bp.get("/items/<item_cd>/suppliers")
 @login_required
 def get_item_suppliers(item_cd: str):  # type: ignore[no-untyped-def]

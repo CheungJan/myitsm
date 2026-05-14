@@ -449,6 +449,12 @@ class SystemRepository:
         return r
 
     @staticmethod
+    def delete_item_price(r: Any) -> bool:
+        db.session.delete(r)
+        db.session.commit()
+        return True
+
+    @staticmethod
     def get_item_supplier(item_cd: str, cust_cd: str):
         from app.models.master import CustItems
         return db.session.get(CustItems, (item_cd, cust_cd))

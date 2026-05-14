@@ -200,6 +200,10 @@ class SystemService:
         r = self._repo.get_item_price(item_cd, busityp)
         return self._repo.update_item_price(r, data).to_dict() if r else None
 
+    def delete_item_price(self, item_cd: str, busityp: str) -> bool:
+        r = self._repo.get_item_price(item_cd, busityp)
+        return self._repo.delete_item_price(r) if r else False
+
     def get_related_boms(self, item_cd: str) -> list[dict[str, Any]]:
         """反查包含该物料的 BOM 列表。"""
         return self._repo.get_related_boms(item_cd)

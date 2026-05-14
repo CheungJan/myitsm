@@ -240,7 +240,7 @@ watch(treeFilterText, (v) => treeRef.value?.filter(v))
 onMounted(async () => {
     await Promise.all([loadTree(), loadClassOptions()])
     loadItems()
-    import('@/api/master').then(m => m.fetchSyscodes('PT').then(r => priceTypes.value = r.data || []))
+    import('@/api/master').then(m => m.fetchSyscodes('PT').then(r => priceTypes.value = (r.data || []).sort((a,b) => a.code_cd.localeCompare(b.code_cd))))
 })
 
 // ---- 分类树 ----
@@ -386,11 +386,19 @@ async function openAddPrice() {
         itemPrices.value = r.data || []
     } catch { ElMessage.error('添加失败') }
 }
+const _priceOrigBusityp = ref<Record<number, string>>({})
 async function handleUpdatePrice(row: Record<string,unknown>, field: string, val: unknown) {
     if (!itemEditing.value) return
     try {
-        const { updateItemPrice } = await import('@/api/master')
-        await updateItemPrice(itemEditing.value.item_cd, row.busityp as string, { [field]: val })
+        const { updateItemPrice, deleteItemPrice, addItemPrice } = await import('@/api/master')
+        if (field === 'busityp') {
+            // 复合主键变更：删旧建新
+            const oldTyp = _priceOrigBusityp.value[row.itemcd as any + '_' + row.busityp as any] || row.busityp
+            await deleteItemPrice(itemEditing.value.item_cd, oldTyp as string)
+            await addItemPrice(itemEditing.value.item_cd, { ...row, busityp: val, itemcd: itemEditing.value.item_cd })
+        } else {
+            await updateItemPrice(itemEditing.value.item_cd, row.busityp as string, { [field]: val })
+        }
     } catch { ElMessage.error('更新失败') }
 }
 async function openAddSupplier() {

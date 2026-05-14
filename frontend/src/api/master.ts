@@ -100,6 +100,10 @@ export function updateItemPrice(itemCd: string, busityp: string, data: Record<st
     return request.put<never, { data: Record<string, unknown> }>(`/items/${itemCd}/prices/${busityp}`, data)
 }
 
+export function deleteItemPrice(itemCd: string, busityp: string) {
+    return request.delete<never, unknown>(`/items/${itemCd}/prices/${busityp}`)
+}
+
 export function fetchRelatedBoms(itemCd: string) {
     return request.get<never, { data: Record<string, unknown>[] }>(`/items/${itemCd}/related-boms`)
 }
