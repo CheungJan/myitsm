@@ -10,14 +10,14 @@ from pydantic import BaseModel, Field, field_validator
 class BomCreateRequest(BaseModel):
     """创建 BOM。"""
 
-    bomcd: str = Field(..., max_length=6, description="BOM编码（整机物料编码）")
+    bomcd: str = Field(..., max_length=20, description="BOM编码（整机物料编码）")
     bomnm: str = Field(..., max_length=50, description="BOM名称")
 
     @field_validator("bomcd")
     @classmethod
-    def bomcd_must_be_6_chars(cls, v: str) -> str:
-        if len(v.strip()) != 6:
-            raise ValueError("BOM编码必须为6位")
+    def bomcd_uppercase(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("BOM编码不能为空")
         return v.strip().upper()
 
 
