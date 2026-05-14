@@ -358,7 +358,10 @@ def get_bom_class_tree():  # type: ignore[no-untyped-def]
 def create_item_class():  # type: ignore[no-untyped-def]
     """新增物料分类。"""
     body = request.get_json(silent=True) or {}
-    return success_response(data=_service.create_item_class(body), code=201)
+    try:
+        return success_response(data=_service.create_item_class(body), code=201)
+    except ValueError as e:
+        return error_response(str(e), 400)
 
 
 @system_bp.put("/itemclasses/<class_cd>")
@@ -366,8 +369,11 @@ def create_item_class():  # type: ignore[no-untyped-def]
 def update_item_class(class_cd: str):  # type: ignore[no-untyped-def]
     """更新物料分类。"""
     body = request.get_json(silent=True) or {}
-    r = _service.update_item_class(class_cd, body)
-    return success_response(data=r) if r else error_response("分类不存在", 404)
+    try:
+        r = _service.update_item_class(class_cd, body)
+        return success_response(data=r) if r else error_response("分类不存在", 404)
+    except ValueError as e:
+        return error_response(str(e), 400)
 
 
 @system_bp.delete("/itemclasses/<class_cd>")

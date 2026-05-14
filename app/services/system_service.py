@@ -236,10 +236,16 @@ class SystemService:
 
     def create_item_class(self, data: dict[str, Any]) -> dict[str, Any]:
         """新增物料分类。"""
+        parent = (data.get("parent_cd") or "").strip()
+        if parent and parent == data["class_cd"]:
+            raise ValueError("父分类不能指向自己")
         return self._repo.create_item_class(data).to_dict()
 
     def update_item_class(self, class_cd: str, data: dict[str, Any]) -> dict[str, Any] | None:
         """更新物料分类。"""
+        parent = (data.get("parent_cd") or "").strip()
+        if parent and parent == class_cd:
+            raise ValueError("父分类不能指向自己")
         r = self._repo.get_item_class_by_cd(class_cd)
         return self._repo.update_item_class(r, data).to_dict() if r else None
 
