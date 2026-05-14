@@ -80,6 +80,12 @@ const router = createRouter({
                     name: 'Warehouses',
                     component: () => import('@/views/master/WarehouseList.vue'),
                     meta: { title: '仓库管理' }
+                },
+                {
+                    path: 'master/bom',
+                    name: 'BomList',
+                    component: () => import('@/views/master/BomList.vue'),
+                    meta: { title: 'BOM管理' }
                 }
             ]
         },

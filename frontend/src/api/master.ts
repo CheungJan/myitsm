@@ -19,6 +19,19 @@ export interface ItemRecord {
     unit: string
     spec: string
     useflg: string
+    upperlimit?: number
+    lowerlimit?: number
+    minorder?: number
+    newperiod?: number
+    oldperiod?: number
+    itembrcd?: string
+    itemsize?: string
+    pcrep?: string
+    purchasetyp?: string
+    keeper?: string
+    backup?: string
+    typflg?: string
+    consume?: string
     [key: string]: unknown
 }
 
@@ -33,6 +46,29 @@ export interface ItemQuery {
     class_cd?: string
     recursive?: boolean
     search?: string
+}
+
+// ---- BOM 类型 ----
+
+export interface BomRecord {
+    bomcd: string
+    bomnm: string
+    useflg: string
+    gendate: string
+    details?: BomDetailRecord[]
+}
+
+export interface BomDetailRecord {
+    bomcd: string
+    itemcd: string
+    bomqty: number
+    itemtyp: string
+    item_nm?: string
+}
+
+export interface BomListPage {
+    items: BomRecord[]
+    total: number
 }
 
 // ---- 物料分类 ----
@@ -272,6 +308,40 @@ export function deleteEid(itemcd: string, eidVal: string) {
 
 export function fetchEidTracks(itemcd: string, eid: string) {
     return request.get<never, { data: Record<string,unknown>[] }>(`/eid/${itemcd}/${eid}/tracks`)
+}
+
+// ---- BOM API ----
+
+export function fetchBoms(params?: { page?: number | string; per_page?: number | string; search?: string }) {
+    return request.get<never, { data: BomListPage }>('/bom', { params })
+}
+
+export function fetchBom(bomcd: string) {
+    return request.get<never, { data: BomRecord }>(`/bom/${bomcd}`)
+}
+
+export function createBom(data: { bomcd: string; bomnm: string }) {
+    return request.post<never, { data: BomRecord }>('/bom', data)
+}
+
+export function updateBom(bomcd: string, data: { bomnm?: string; useflg?: string }) {
+    return request.put<never, { data: BomRecord }>(`/bom/${bomcd}`, data)
+}
+
+export function deleteBom(bomcd: string) {
+    return request.delete<never, unknown>(`/bom/${bomcd}`)
+}
+
+export function addBomDetail(bomcd: string, data: { itemcd: string; bomqty: number; itemtyp: string }) {
+    return request.post<never, { data: BomDetailRecord }>(`/bom/${bomcd}/details`, data)
+}
+
+export function updateBomDetail(bomcd: string, itemcd: string, data: { bomqty?: number; itemtyp?: string }) {
+    return request.put<never, { data: BomDetailRecord }>(`/bom/${bomcd}/details/${itemcd}`, data)
+}
+
+export function deleteBomDetail(bomcd: string, itemcd: string) {
+    return request.delete<never, unknown>(`/bom/${bomcd}/details/${itemcd}`)
 }
 
 // ---- 资产 ----
