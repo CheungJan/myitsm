@@ -114,26 +114,31 @@
             </template>
         </el-dialog>
 
-        <!-- 添加物料弹窗 -->
-        <el-dialog title="添加物料" v-model="addDetailVisible" width="420px">
-            <el-form :model="detailForm" label-width="80px">
-                <el-form-item label="选择物料">
-                    <el-select v-model="detailForm.itemcd" filterable placeholder="搜索配件物料" style="width: 100%" :filter-method="filterAccessories" @visible-change="onDetailSelectOpen">
-                        <el-option v-for="it in filteredAccessories" :key="it.item_cd" :label="`${it.item_cd} ${it.item_nm}`" :value="it.item_cd" />
-                    </el-select>
-                </el-form-item>
-                <el-form-item label="数量">
-                    <el-input-number v-model="detailForm.bomqty" :min="1" style="width: 100%" />
-                </el-form-item>
-                <el-form-item label="物料类型">
-                    <el-select v-model="detailForm.itemtyp" style="width: 100%">
-                        <el-option label="外设配件" value="0" /><el-option label="核心配件" value="1" />
-                    </el-select>
-                </el-form-item>
-            </el-form>
+        <!-- 添加物料弹窗（树形多选） -->
+        <el-dialog title="添加物料" v-model="addDetailVisible" width="600px">
+            <div style="display:flex;gap:12px">
+                <div style="flex:1;max-height:400px;overflow:auto;border:1px solid #eee;border-radius:4px;padding:8px">
+                    <el-input v-model="addTreeFilter" placeholder="过滤物料" size="small" clearable style="margin-bottom:8px" />
+                    <el-tree :data="addTreeData" :props="{ label: 'class_nm', children: 'children' }"
+                        node-key="class_cd" show-checkbox :filter-node-method="filterAddTree"
+                        ref="addTreeRef" @check="onAddTreeCheck" />
+                </div>
+                <div style="width:180px;flex-shrink:0">
+                    <div style="font-size:13px;margin-bottom:4px">已选 {{ checkedItems.length }} 个</div>
+                    <div style="max-height:340px;overflow:auto;font-size:12px">
+                        <div v-for="it in checkedItems" :key="it.class_cd" style="display:flex;align-items:center;margin-bottom:4px">
+                            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="it.class_nm">{{ it.class_nm }}</span>
+                            <el-input-number v-model="checkQtys[it.class_cd]" :min="1" size="small" style="width:60px" controls-position="right" />
+                            <el-select v-model="checkTyps[it.class_cd]" size="small" style="width:80px;margin-left:4px">
+                                <el-option label="外设" value="0" /><el-option label="核心" value="1" />
+                            </el-select>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <template #footer>
                 <el-button @click="addDetailVisible = false">取消</el-button>
-                <el-button type="primary" @click="handleAddDetail" :loading="addingDetail">确定</el-button>
+                <el-button type="primary" @click="handleBatchAddDetail" :loading="addingDetail" :disabled="!checkedItems.length">批量添加</el-button>
             </template>
         </el-dialog>
     </div>
@@ -146,7 +151,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
     fetchBom, createBom, updateBom, deleteBom,
     addBomDetail, deleteBomDetail,
-    fetchItems, fetchBomClassTree,
+    fetchItems, fetchBomClassTree, fetchItemClassTree,
 } from '@/api/master'
 import type { BomRecord, BomDetailRecord, ItemRecord, ItemClassNode } from '@/api/master'
 
@@ -193,8 +198,37 @@ const bomForm = reactive({ bomcd: '', bomnm: '', useflg: '1' })
 const bomDialogTitle = computed(() => isEditingBom.value ? '编辑 BOM' : '新建 BOM')
 
 const addDetailVisible = ref(false); const addingDetail = ref(false)
-const detailForm = reactive({ itemcd: '', bomqty: 1, itemtyp: '0' })
-const allAccessories = ref<ItemRecord[]>([]); const filteredAccessories = ref<ItemRecord[]>([])
+const addTreeData = ref<ItemClassNode[]>([]); const addTreeFilter = ref(''); const addTreeRef = ref()
+const checkedItems = ref<ItemClassNode[]>([])
+const checkQtys = reactive<Record<string,number>>({}); const checkTyps = reactive<Record<string,string>>({})
+
+function filterAddTree(value: string, data: { class_nm: string }): boolean {
+    return !value || data.class_nm.toLowerCase().includes(value.toLowerCase())
+}
+watch(addTreeFilter, (v) => { (addTreeRef.value as any)?.filter(v) })
+
+function onAddTreeCheck(_node: ItemClassNode, checked: { checkedNodes: ItemClassNode[] }) {
+    checkedItems.value = checked.checkedNodes.filter(n => n.type === 'item')
+}
+
+async function handleBatchAddDetail() {
+    if (!selectedBom.value || !checkedItems.value.length) return
+    addingDetail.value = true
+    const total = checkedItems.value.length
+    let done = 0
+    try {
+        for (const it of checkedItems.value) {
+            const qty = checkQtys[it.class_cd] || 1
+            const typ = checkTyps[it.class_cd] || '0'
+            await addBomDetail(selectedBom.value.bomcd, { itemcd: it.class_cd, bomqty: qty, itemtyp: typ })
+            done++
+        }
+        ElMessage.success(`已添加 ${done} 个配件`)
+        addDetailVisible.value = false
+        if (selectedItem.value) await onSelectItem(selectedItem.value)
+    } catch { ElMessage.error(`已添加 ${done}/${total}，部分失败`) }
+    finally { addingDetail.value = false }
+}
 
 const bomType = computed(() => {
     if (!selectedBom.value?.details || selectedBom.value.details.length === 0) return { type: 'info', label: '主机+配件' }
@@ -262,34 +296,10 @@ async function handleSaveBom() {
 
 async function openAddDetail() {
     addDetailVisible.value = true
-    detailForm.itemcd = ''; detailForm.bomqty = 1; detailForm.itemtyp = '0'
-    if (!allAccessories.value.length) {
-        try {
-            const r = await fetchItems({ per_page: 999, typflg: '0' } as any)
-            allAccessories.value = (r.data as any).items || []
-        } catch { /* */ }
+    checkedItems.value = []
+    if (!addTreeData.value.length) {
+        try { const r = await fetchItemClassTree(); addTreeData.value = r.data || [] } catch { /* */ }
     }
-    filteredAccessories.value = [...allAccessories.value]
-}
-
-function filterAccessories(v: string) {
-    filteredAccessories.value = allAccessories.value.filter(i => i.item_cd.includes(v.toUpperCase()) || i.item_nm.includes(v))
-}
-function onDetailSelectOpen(_v: boolean) {
-    if (_v && !allAccessories.value.length) {
-        fetchItems({ per_page: 999, typflg: '0' } as any).then(r => { allAccessories.value = (r.data as any).items || [] }).catch(() => {})
-    }
-}
-
-async function handleAddDetail() {
-    if (!detailForm.itemcd || !selectedBom.value) return
-    addingDetail.value = true
-    try {
-        await addBomDetail(selectedBom.value.bomcd, { itemcd: detailForm.itemcd, bomqty: detailForm.bomqty, itemtyp: detailForm.itemtyp })
-        addDetailVisible.value = false
-        if (selectedItem.value) await onSelectItem(selectedItem.value)
-    } catch { ElMessage.error('添加失败') }
-    finally { addingDetail.value = false }
 }
 
 async function handleDeleteDetail(row: BomDetailRecord) {
