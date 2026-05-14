@@ -442,6 +442,24 @@ def get_item_prices(item_cd: str):  # type: ignore[no-untyped-def]
     return success_response(data=_service.get_item_prices(item_cd))
 
 
+@system_bp.post("/items/<item_cd>/prices")
+@login_required
+def add_item_price(item_cd: str):  # type: ignore[no-untyped-def]
+    """添加物料价格记录。"""
+    body = request.get_json(silent=True) or {}
+    body["itemcd"] = item_cd
+    return success_response(data=_service.add_item_price(body), code=201)
+
+
+@system_bp.put("/items/<item_cd>/prices/<busityp>")
+@login_required
+def update_item_price(item_cd: str, busityp: str):  # type: ignore[no-untyped-def]
+    """更新物料价格记录。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_item_price(item_cd, busityp, body)
+    return success_response(data=r) if r else error_response("不存在", 404)
+
+
 @system_bp.get("/items/<item_cd>/suppliers")
 @login_required
 def get_item_suppliers(item_cd: str):  # type: ignore[no-untyped-def]

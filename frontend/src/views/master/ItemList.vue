@@ -129,13 +129,14 @@
                     </el-table>
                 </el-tab-pane>
                 <el-tab-pane label="商品价格" name="price" v-if="itemEditing">
+                    <div style="margin-bottom:8px"><el-button type="primary" size="small" @click="openAddPrice">添加价格</el-button></div>
                     <el-table :data="itemPrices" size="small" stripe>
-                        <el-table-column prop="busityp" label="业务类型" width="90" />
-                        <el-table-column prop="itemprice" label="单价" width="100" />
+                        <el-table-column prop="busityp" label="业务类型" width="80"><template #default="{row}"><el-input v-model="row.busityp" size="small" @change="(v:unknown) => handleUpdatePrice(row, 'busityp', v)" /></template></el-table-column>
+                        <el-table-column label="单价" width="100"><template #default="{row}"><el-input-number v-model="row.itemprice" size="small" :min="0" controls-position="right" style="width:90px" @change="(v:number|undefined) => handleUpdatePrice(row, 'itemprice', v)" /></template></el-table-column>
                         <el-table-column prop="unitcd" label="单位" width="70" />
-                        <el-table-column label="当前有效" width="80"><template #default="{row}"><el-tag :type="row.is_current?'success':'info'" size="small">{{ row.is_current?'有效':'失效' }}</el-tag></template></el-table-column>
-                        <el-table-column prop="effective_date" label="生效日期" width="110" />
-                        <el-table-column prop="expire_date" label="失效日期" width="110" />
+                        <el-table-column label="有效" width="70"><template #default="{row}"><el-switch :model-value="row.is_current" size="small" @change="(v:boolean) => handleUpdatePrice(row, 'is_current', v)" /></template></el-table-column>
+                        <el-table-column label="生效" width="110"><template #default="{row}"><el-date-picker v-model="row.effective_date" type="date" size="small" style="width:100px" @change="(v:unknown) => handleUpdatePrice(row, 'effective_date', v)" /></template></el-table-column>
+                        <el-table-column label="失效" width="110"><template #default="{row}"><el-date-picker v-model="row.expire_date" type="date" size="small" style="width:100px" @change="(v:unknown) => handleUpdatePrice(row, 'expire_date', v)" /></template></el-table-column>
                     </el-table>
                 </el-tab-pane>
                 <el-tab-pane :label="itemEditing?.typflg==='0' ? '所属BOM' : '相关BOM'" name="bom" v-if="itemEditing">
@@ -373,6 +374,23 @@ function onSearch() {
 
 // ---- 物料 CRUD ----
 
+async function openAddPrice() {
+    if (!itemEditing.value) return
+    try {
+        const { addItemPrice } = await import('@/api/master')
+        await addItemPrice(itemEditing.value.item_cd, { busityp: '01', itemprice: 0, unitcd: '', is_current: true })
+        const { fetchItemPrices } = await import('@/api/master')
+        const r = await fetchItemPrices(itemEditing.value.item_cd)
+        itemPrices.value = r.data || []
+    } catch { ElMessage.error('添加失败') }
+}
+async function handleUpdatePrice(row: Record<string,unknown>, field: string, val: unknown) {
+    if (!itemEditing.value) return
+    try {
+        const { updateItemPrice } = await import('@/api/master')
+        await updateItemPrice(itemEditing.value.item_cd, row.busityp as string, { [field]: val })
+    } catch { ElMessage.error('更新失败') }
+}
 async function openAddSupplier() {
     supplierDialogVisible.value = true; selectedSuppCd.value = ''
     if (!allSuppliers.value.length) {

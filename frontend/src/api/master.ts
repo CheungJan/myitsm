@@ -92,6 +92,14 @@ export function fetchItemPrices(itemCd: string) {
     return request.get<never, { data: Record<string, unknown>[] }>(`/items/${itemCd}/prices`)
 }
 
+export function addItemPrice(itemCd: string, data: Record<string, unknown>) {
+    return request.post<never, { data: Record<string, unknown> }>(`/items/${itemCd}/prices`, data)
+}
+
+export function updateItemPrice(itemCd: string, busityp: string, data: Record<string, unknown>) {
+    return request.put<never, { data: Record<string, unknown> }>(`/items/${itemCd}/prices/${busityp}`, data)
+}
+
 export function fetchRelatedBoms(itemCd: string) {
     return request.get<never, { data: Record<string, unknown>[] }>(`/items/${itemCd}/related-boms`)
 }

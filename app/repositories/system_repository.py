@@ -429,6 +429,26 @@ class SystemRepository:
         return [r.to_dict() for r in rows]
 
     @staticmethod
+    def get_item_price(item_cd: str, busityp: str):
+        from app.models.inventory import Price
+        return db.session.get(Price, (item_cd, busityp))
+
+    @staticmethod
+    def add_item_price(data: dict[str, Any]):
+        from app.models.inventory import Price
+        r = Price(**data)
+        db.session.add(r)
+        db.session.commit()
+        return r
+
+    @staticmethod
+    def update_item_price(r: Any, data: dict[str, Any]) -> Any:
+        for k, v in data.items():
+            setattr(r, k, v)
+        db.session.commit()
+        return r
+
+    @staticmethod
     def get_item_supplier(item_cd: str, cust_cd: str):
         from app.models.master import CustItems
         return db.session.get(CustItems, (item_cd, cust_cd))
