@@ -46,9 +46,11 @@
                         <el-table-column prop="item_cd" label="成品编码" width="100" />
                         <el-table-column prop="item_nm" label="成品名称" min-width="160" show-overflow-tooltip />
                         <el-table-column prop="spec" label="规格" min-width="120" show-overflow-tooltip />
-                        <el-table-column label="BOM" width="70" align="center">
+                        <el-table-column label="BOM状态" width="80" align="center">
                             <template #default="{ row }">
-                                <span style="font-size:12px;color:#999">点击查看</span>
+                                <template v-if="bomStatusMap[row.item_cd] === undefined"><span style="font-size:12px;color:#ccc">-</span></template>
+                                <template v-else-if="bomStatusMap[row.item_cd] === null"><el-tag type="info" size="small">无BOM</el-tag></template>
+                                <template v-else><el-tag :type="bomStatusMap[row.item_cd]==='0'?'danger':'success'" size="small">{{ bomStatusMap[row.item_cd]==='0'?'无效':'有效' }}</el-tag></template>
                             </template>
                         </el-table-column>
                     </el-table>
@@ -143,6 +145,7 @@
 import { ref, reactive, watch, onMounted, computed } from 'vue'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import request from '@/api/request'
 import {
     fetchBom, createBom, updateBom, deleteBom,
     addBomDetail, updateBomDetail, deleteBomDetail,
@@ -187,7 +190,7 @@ const total = ref(0); const page = ref(1); const perPage = ref(20); const search
 const selectedItem = ref<ItemRecord | null>(null)
 const selectedBom = ref<BomRecord | null>(null)
 const details = ref<BomDetailRecord[]>([]); const detailLoading = ref(false)
-const bomDetailVisible = ref(false)
+const bomDetailVisible = ref(false); const bomStatusMap = ref<Record<string,string|null>>({})
 
 const bomDialogVisible = ref(false); const isEditingBom = ref(false); const saving = ref(false)
 const bomForm = reactive({ bomcd: '', bomnm: '', useflg: '1' })
@@ -248,6 +251,11 @@ async function loadItems() {
         const res = await fetchItems(params as any)
         items.value = (res.data as any).items || []
         total.value = (res.data as any).total || 0
+        // 批量查 BOM 状态
+        const itemcds = items.value.map(i => i.item_cd).join(',')
+        if (itemcds) {
+            try { const r = await request.get('/bom/check', { params: { items: itemcds } }); bomStatusMap.value = r.data || {} } catch { /* */ }
+        }
     } catch { ElMessage.error('加载失败') }
     finally { loading.value = false }
 }

@@ -12,6 +12,24 @@ from app.utils.response import error_response, success_response
 bom_bp = Blueprint("bom", __name__)
 
 
+@bom_bp.get("/check")
+@login_required
+def check_bom_status():  # type: ignore[no-untyped-def]
+    """批量查询 BOM 状态（items=xxx,yyy → {itemcd: useflg|null}）。"""
+    items = request.args.get("items", "")
+    if not items:
+        return success_response(data={})
+    itemcds = [i.strip().upper() for i in items.split(",") if i.strip()]
+    from app.extensions import db
+    from app.models.master import Bom
+    rows = db.session.query(Bom.bomcd, Bom.useflg).filter(Bom.bomcd.in_(itemcds)).all()
+    result = {r[0]: r[1] for r in rows}
+    for cd in itemcds:
+        if cd not in result:
+            result[cd] = None
+    return success_response(data=result)
+
+
 @bom_bp.get("")
 @login_required
 def list_boms():  # type: ignore[no-untyped-def]
