@@ -7,8 +7,10 @@ export interface ItemClassNode {
     class_nm: string
     childflg: string
     children: ItemClassNode[]
-    type?: string         // 'class' | 'item'
+    type?: string
     parent_cd?: string
+    opercd?: string
+    gendate?: string
 }
 
 export interface ItemRecord {

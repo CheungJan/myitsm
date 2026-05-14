@@ -329,13 +329,13 @@ class SystemRepository:
         # CTE 生成完整树（含所有分类）
         sql = db.text("""
             WITH RECURSIVE tree AS (
-                SELECT class_cd, class_nm, childflg, parent_cd, 0 AS depth
+                SELECT class_cd, class_nm, childflg, parent_cd, opercd, gendate, 0 AS depth
                 FROM tmm11_itemclass WHERE parent_cd IS NULL
                 UNION ALL
-                SELECT c.class_cd, c.class_nm, c.childflg, c.parent_cd, t.depth + 1
+                SELECT c.class_cd, c.class_nm, c.childflg, c.parent_cd, c.opercd, c.gendate, t.depth + 1
                 FROM tmm11_itemclass c JOIN tree t ON c.parent_cd = t.class_cd
             )
-            SELECT class_cd, class_nm, childflg, parent_cd, depth
+            SELECT class_cd, class_nm, childflg, parent_cd, opercd, gendate, depth
             FROM tree ORDER BY depth, class_cd
         """)
         rows = db.session.execute(sql).fetchall()
@@ -351,6 +351,7 @@ class SystemRepository:
                 continue  # 没有成品的分类不显示
             node = {"class_cd": r.class_cd, "class_nm": r.class_nm,
                     "childflg": r.childflg, "parent_cd": r.parent_cd.strip() if r.parent_cd else "",
+                    "opercd": r.opercd or "", "gendate": str(r.gendate)[:10] if r.gendate else "",
                     "children": [], "type": "class"}
             node_map[r.class_cd] = node
             parent = r.parent_cd.strip() if r.parent_cd else None

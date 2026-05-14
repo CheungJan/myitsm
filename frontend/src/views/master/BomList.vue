@@ -13,14 +13,17 @@
 
         <!-- 右侧 -->
         <div class="content-panel">
-            <!-- 子类按钮区 -->
+            <!-- 子类表格 -->
             <div class="list-panel" v-if="showClasses && childClasses.length">
                 <el-card shadow="never">
-                    <template #header><span>{{ selectedClassNm }} — 子分类</span></template>
-                    <div class="class-grid">
-                        <el-button v-for="c in childClasses" :key="c.class_cd" size="small"
-                            @click="onSelectChildClass(c)">{{ c.class_cd }} {{ c.class_nm }}</el-button>
-                    </div>
+                    <template #header><span>{{ selectedClassNm }} — 子分类（共 {{ childClasses.length }} 个）</span></template>
+                    <el-table :data="childClasses" stripe size="small" highlight-current-row @row-click="(row: ItemClassNode) => onSelectChildClass(row)">
+                        <el-table-column prop="class_cd" label="类别代码" width="100" />
+                        <el-table-column prop="class_nm" label="类别名称" min-width="150" show-overflow-tooltip />
+                        <el-table-column prop="parent_cd" label="所属大类" width="80" />
+                        <el-table-column prop="opercd" label="操作员" width="80" />
+                        <el-table-column prop="gendate" label="最后更新" width="110" />
+                    </el-table>
                 </el-card>
             </div>
 
