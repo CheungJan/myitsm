@@ -84,8 +84,8 @@ export function fetchSuppliers() {
     return request.get<never, { data: { supp_cd: string; supp_nm: string }[] }>('/suppliers')
 }
 
-export function fetchBomClassTree() {
-    return request.get<never, { data: ItemClassNode[] }>('/itemclasses/bom-tree')
+export function fetchBomClassTree(typflg?: string) {
+    return request.get<never, { data: ItemClassNode[] }>('/itemclasses/bom-tree', { params: typflg ? { typflg } : {} })
 }
 
 export function fetchItemPrices(itemCd: string) {

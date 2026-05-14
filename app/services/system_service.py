@@ -181,9 +181,9 @@ class SystemService:
         """获取物料分类树。"""
         return self._repo.get_item_class_tree()
 
-    def get_bom_class_tree(self) -> list[dict[str, Any]]:
-        """获取 BOM 分类树（只含 typflg=1 成品的分类）。"""
-        return self._repo.get_bom_class_tree()
+    def get_bom_class_tree(self, typflg: str = "1") -> list[dict[str, Any]]:
+        """获取分类树（按 typflg 过滤，默认只含成品）。"""
+        return self._repo.get_bom_class_tree(typflg)
 
     def get_item_suppliers(self, item_cd: str) -> list[dict[str, Any]]:
         """查询物料关联的供应商列表。"""

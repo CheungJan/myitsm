@@ -306,13 +306,14 @@ class SystemRepository:
         return roots
 
     @staticmethod
-    def get_bom_class_tree() -> list[dict[str, Any]]:
-        """BOM 分类树：只含 typflg=1 成品的分类 + 成品作为叶子节点。"""
-        # 找到有成品（typflg=1）的分类集合
-        finished_classes = set(r[0] for r in db.session.query(Item.class_cd)
-                               .filter(Item.typflg == "1").distinct().all())
+    def get_bom_class_tree(typflg: str = "1") -> list[dict[str, Any]]:
+        """分类树（按 typflg 过滤：1=只含成品，0=只含配件）。"""
+        item_classes = set(r[0] for r in db.session.query(Item.class_cd)
+                          .filter(Item.typflg == typflg).distinct().all())
+        finished_items = list(db.session.query(Item.item_cd, Item.item_nm, Item.class_cd)
+                              .filter(Item.typflg == typflg).order_by(Item.item_cd).all())
         # 递归收集所有父分类（保证层级完整）
-        all_relevant: set[str] = set(finished_classes)
+        all_relevant: set[str] = set(item_classes)
         while True:
             parents = set(r[0] for r in db.session.query(ItemClass.parent_cd)
                          .filter(ItemClass.class_cd.in_(list(all_relevant)),

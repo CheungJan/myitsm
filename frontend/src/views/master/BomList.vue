@@ -151,7 +151,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
     fetchBom, createBom, updateBom, deleteBom,
     addBomDetail, deleteBomDetail,
-    fetchItems, fetchBomClassTree, fetchItemClassTree,
+    fetchItems, fetchBomClassTree,
 } from '@/api/master'
 import type { BomRecord, BomDetailRecord, ItemRecord, ItemClassNode } from '@/api/master'
 
@@ -301,9 +301,10 @@ async function handleSaveBom() {
 async function openAddDetail() {
     addDetailVisible.value = true
     checkedItems.value = []
-    if (!addTreeData.value.length) {
-        try { const r = await fetchItemClassTree(); addTreeData.value = r.data || [] } catch { /* */ }
-    }
+    try {
+        const r = await fetchBomClassTree('0')
+        addTreeData.value = r.data || []
+    } catch { /* */ }
 }
 
 async function handleDeleteDetail(row: BomDetailRecord) {

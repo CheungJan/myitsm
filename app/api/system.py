@@ -348,8 +348,9 @@ def list_item_classes():  # type: ignore[no-untyped-def]
 @system_bp.get("/itemclasses/bom-tree")
 @login_required
 def get_bom_class_tree():  # type: ignore[no-untyped-def]
-    """BOM 分类树（只含 typflg=1 成品的分类）。"""
-    return success_response(data=_service.get_bom_class_tree())
+    """分类树（typflg=1 成品，typflg=0 配件）。"""
+    typflg = request.args.get("typflg", "1")
+    return success_response(data=_service.get_bom_class_tree(typflg))
 
 
 @system_bp.post("/itemclasses")
