@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from flask import Blueprint, request
 
 from app.api.auth import login_required
@@ -15,17 +17,24 @@ bom_bp = Blueprint("bom", __name__)
 @bom_bp.get("/check")
 @login_required
 def check_bom_status():  # type: ignore[no-untyped-def]
-    """批量查询 BOM 状态（items=xxx,yyy → {itemcd: useflg|null}）。"""
+    """批量查询 BOM 状态（items=xxx,yyy → {itemcd: {useflg,bomnm,opercd,updated}}）。"""
     items = request.args.get("items", "")
     if not items:
         return success_response(data={})
     itemcds = [i.strip().upper() for i in items.split(",") if i.strip()]
     from app.extensions import db
     from app.models.master import Bom
-    rows = db.session.query(Bom.bomcd, Bom.useflg, Bom.bomnm).filter(Bom.bomcd.in_(itemcds)).all()
-    result = {}
+    rows = db.session.query(Bom.bomcd, Bom.useflg, Bom.bomnm, Bom.opercd, Bom.upddate).filter(Bom.bomcd.in_(itemcds)).all()
+    # 批量查操作员名称
+    opercds = list({r[3].strip() for r in rows if r[3]})
+    user_map: dict[str, str] = {}
+    if opercds:
+        users = db.session.execute(db.text("SELECT user_cd, user_nm FROM tmc13_users WHERE user_cd = ANY(:cds)"), {"cds": opercds}).fetchall()
+        user_map = {u[0]: u[1] for u in users}
+    result: dict[str, Any] = {}
     for r in rows:
-        result[r[0]] = {"useflg": r[1], "bomnm": r[2]}
+        oper_raw = (r[3] or "").strip()
+        result[r[0]] = {"useflg": r[1], "bomnm": r[2], "opercd": user_map.get(oper_raw, oper_raw), "upddate": str(r[4])[:10] if r[4] else ""}
     for cd in itemcds:
         if cd not in result:
             result[cd] = None

@@ -56,6 +56,12 @@
                                 <template v-else><el-tag :type="bomStatusMap[row.item_cd.toUpperCase()]==='0'?'danger':'success'" size="small">{{ bomStatusMap[row.item_cd.toUpperCase()]==='0'?'无效':'有效' }}</el-tag></template>
                             </template>
                         </el-table-column>
+                        <el-table-column label="操作员" width="80">
+                            <template #default="{ row }">{{ bomOperMap[row.item_cd.toUpperCase()] || '-' }}</template>
+                        </el-table-column>
+                        <el-table-column label="更新日期" width="110">
+                            <template #default="{ row }">{{ bomDateMap[row.item_cd.toUpperCase()] || '-' }}</template>
+                        </el-table-column>
                     </el-table>
                     <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top: 12px; justify-content: flex-end" />
                 </el-card>
@@ -193,7 +199,8 @@ const total = ref(0); const page = ref(1); const perPage = ref(20); const search
 const selectedItem = ref<ItemRecord | null>(null)
 const selectedBom = ref<BomRecord | null>(null)
 const details = ref<BomDetailRecord[]>([]); const detailLoading = ref(false)
-const bomDetailVisible = ref(false); const bomStatusMap = ref<Record<string,string|null>>({}); const bomNameMap = ref<Record<string,string>>({})
+const bomDetailVisible = ref(false); const bomStatusMap = ref<Record<string,string|null>>({})
+const bomNameMap = ref<Record<string,string>>({}); const bomOperMap = ref<Record<string,string>>({}); const bomDateMap = ref<Record<string,string>>({})
 
 const bomDialogVisible = ref(false); const isEditingBom = ref(false); const saving = ref(false)
 const bomForm = reactive({ bomcd: '', bomnm: '', useflg: '1' })
@@ -264,6 +271,8 @@ async function loadItems() {
                     if (v && typeof v === 'object') {
                         bomStatusMap.value[k] = (v as any).useflg
                         bomNameMap.value[k] = (v as any).bomnm || ''
+                        bomOperMap.value[k] = (v as any).opercd || ''
+                        bomDateMap.value[k] = (v as any).upddate || ''
                     }
                 }
             } catch { /* */ }
