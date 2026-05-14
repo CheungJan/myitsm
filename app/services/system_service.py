@@ -198,7 +198,19 @@ class SystemService:
 
     def update_item_price(self, item_cd: str, busityp: str, data: dict[str, Any]) -> dict[str, Any] | None:
         r = self._repo.get_item_price(item_cd, busityp)
-        return self._repo.update_item_price(r, data).to_dict() if r else None
+        if not r:
+            return None
+        # busityp 是复合主键，如果请求改了 busityp → 删旧建新
+        if "busityp" in data and data["busityp"] != busityp:
+            new_busityp = data.pop("busityp")
+            existing = self._repo.get_item_price(item_cd, new_busityp)
+            if existing:
+                return None  # 目标busityp已存在
+            self._repo.delete_item_price(r)
+            data["itemcd"] = item_cd
+            data["busityp"] = new_busityp
+            return self._repo.add_item_price(data).to_dict()
+        return self._repo.update_item_price(r, data).to_dict()
 
     def delete_item_price(self, item_cd: str, busityp: str) -> bool:
         r = self._repo.get_item_price(item_cd, busityp)

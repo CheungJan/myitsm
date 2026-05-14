@@ -403,30 +403,22 @@ async function handleDeletePrice(row: Record<string,unknown>) {
         itemPrices.value = r.data || []
     } catch { ElMessage.error('删除失败') }
 }
-const _priceKeys = ref<Record<string,string>>({})
 async function handleUpdatePrice(row: Record<string,unknown>, field: string, val: unknown) {
     if (!itemEditing.value) return
     try {
-        const { updateItemPrice, deleteItemPrice, addItemPrice } = await import('@/api/master')
+        const { updateItemPrice, fetchItemPrices } = await import('@/api/master')
+        const oldBusityp = row._orig_busityp as string || row.busityp as string
+        const payload: Record<string,unknown> = { [field]: val }
         if (field === 'busityp') {
-            const idx = itemPrices.value.indexOf(row)
-            const oldTyp = _priceKeys.value[`${row.itemcd}_${idx}`] || row.busityp
-            await deleteItemPrice(itemEditing.value.item_cd, oldTyp as string)
-            const payload: Record<string,unknown> = { itemcd: itemEditing.value.item_cd, busityp: val, itemprice: row.itemprice ?? 0, unitcd: row.unitcd ?? '', is_current: row.is_current ?? true }
-            if (row.effective_date) payload.effective_date = row.effective_date
-            if (row.expire_date) payload.expire_date = row.expire_date
-            await addItemPrice(itemEditing.value.item_cd, payload)
-            _priceKeys.value[`${row.itemcd}_${idx}`] = val as string
-            // 同步刷新
-            const { fetchItemPrices } = await import('@/api/master')
+            payload.busityp = val  // 告诉后端新 busityp，后端内部处理删旧建新
+            await updateItemPrice(itemEditing.value.item_cd, oldBusityp, payload)
+            // 刷新列表
             const r = await fetchItemPrices(itemEditing.value.item_cd)
-            itemPrices.value = r.data || []
-            itemPrices.value.forEach((p,i) => _priceKeys.value[`${p.itemcd}_${i}`] = p.busityp as string)
-            return
+            itemPrices.value = (r.data || []).map((p: Record<string,unknown>) => ({ ...p, _orig_busityp: p.busityp }))
         } else {
-            await updateItemPrice(itemEditing.value.item_cd, row.busityp as string, { [field]: val })
+            await updateItemPrice(itemEditing.value.item_cd, oldBusityp, payload)
         }
-    } catch { ElMessage.error('更新失败（可能该业务类型已存在）') }
+    } catch { ElMessage.error('更新失败') }
 }
 async function openAddSupplier() {
     supplierDialogVisible.value = true; selectedSuppCd.value = ''
@@ -500,7 +492,7 @@ async function openItemDialog(row?: ItemRecord) {
             } else {
                 m.fetchBom(row!.item_cd).then(r => itemBoms.value = (r.data && r.data.bomcd) ? [r.data] : []).catch(() => itemBoms.value = [])
             }
-            m.fetchItemPrices(row!.item_cd).then(r => { itemPrices.value = r.data || []; itemPrices.value.forEach((p,i) => _priceKeys.value[`${p.itemcd}_${i}`] = p.busityp as string) }).catch(() => itemPrices.value = [])
+            m.fetchItemPrices(row!.item_cd).then(r => { itemPrices.value = (r.data || []).map(p => ({ ...p, _orig_busityp: p.busityp })) }).catch(() => itemPrices.value = [])
         })
     } else {
         itemEditing.value = null
