@@ -163,6 +163,13 @@ async function loadTree() { try { const r = await fetchBomClassTree(); treeData.
 function onTreeNodeClick(node: ItemClassNode) {
     selectedItem.value = null; selectedBom.value = null
     selectedClassNm.value = node.class_nm
+    // 点击具体物料（成品）→ 直接显示 BOM 详情
+    if (node.type === 'item') {
+        showClasses.value = false; showItems.value = false
+        const fakeItem = { item_cd: node.class_cd, item_nm: node.class_nm } as ItemRecord
+        onSelectItem(fakeItem)
+        return
+    }
     const subClasses = (node.children || []).filter((c: ItemClassNode) => c.type === 'class')
     if (subClasses.length > 0) {
         childClasses.value = subClasses; showClasses.value = true; showItems.value = false
