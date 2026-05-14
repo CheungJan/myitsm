@@ -270,11 +270,12 @@ async function onSelectItem(row: ItemRecord) {
     finally { detailLoading.value = false }
 }
 
-function openCreateBomForItem() {
+async function openCreateBomForItem() {
     if (!selectedItem.value) return
-    bomForm.bomcd = selectedItem.value.item_cd
-    bomForm.bomnm = selectedItem.value.item_nm
-    bomForm.useflg = '1'; isEditingBom.value = false; bomDialogVisible.value = true
+    try {
+        await createBom({ bomcd: selectedItem.value.item_cd, bomnm: selectedItem.value.item_nm })
+        if (selectedItem.value) await onSelectItem(selectedItem.value)
+    } catch { /* already exists */ }
 }
 
 function openEditBom() {
