@@ -55,6 +55,24 @@
                     <el-table-column prop="class_cd" label="分类编码" width="100" />
                     <el-table-column prop="itemanm" label="别名" width="120" />
                     <el-table-column prop="unit" label="单位" width="80" />
+                    <el-table-column label="库存上限" width="85">
+                        <template #default="{ row }">{{ row.upperlimit ?? '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="库存下限" width="85">
+                        <template #default="{ row }">{{ row.lowerlimit ?? '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="最小订购" width="85">
+                        <template #default="{ row }">{{ row.minorder ?? '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="新品周期" width="85">
+                        <template #default="{ row }">{{ row.newperiod ?? '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="旧品周期" width="85">
+                        <template #default="{ row }">{{ row.oldperiod ?? '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="采购负责人" width="100">
+                        <template #default="{ row }">{{ row.pcrep ?? '-' }}</template>
+                    </el-table-column>
                     <el-table-column label="操作" width="120" fixed="right">
                         <template #default="{ row }">
                             <el-button type="primary" link size="small" @click="openItemDialog(row)">编辑</el-button>
@@ -85,6 +103,26 @@
                 </el-form-item>
                 <el-form-item label="单位">
                     <el-input v-model="itemForm.unit" />
+                </el-form-item>
+                <el-divider content-position="left">库存管理</el-divider>
+                <el-form-item label="库存上限">
+                    <el-input-number v-model="itemForm.upperlimit" :min="0" style="width:100%" />
+                </el-form-item>
+                <el-form-item label="库存下限">
+                    <el-input-number v-model="itemForm.lowerlimit" :min="0" style="width:100%" />
+                </el-form-item>
+                <el-form-item label="最小订购量">
+                    <el-input-number v-model="itemForm.minorder" :min="0" style="width:100%" />
+                </el-form-item>
+                <el-divider content-position="left">周期与采购</el-divider>
+                <el-form-item label="新品周期">
+                    <el-input-number v-model="itemForm.newperiod" :min="0" style="width:100%" />
+                </el-form-item>
+                <el-form-item label="旧品周期">
+                    <el-input-number v-model="itemForm.oldperiod" :min="0" style="width:100%" />
+                </el-form-item>
+                <el-form-item label="采购负责人">
+                    <el-input v-model="itemForm.pcrep" />
                 </el-form-item>
             </el-form>
             <template #footer>
@@ -148,7 +186,7 @@ const total = ref(0)
 const itemDialogVisible = ref(false)
 const itemEditing = ref<ItemRecord | null>(null)
 const itemSaving = ref(false)
-const itemForm = reactive({ item_cd: '', item_nm: '', class_cd: '', itemanm: '', unit: '' })
+const itemForm = reactive<Record<string, unknown>>({ item_cd: '', item_nm: '', class_cd: '', itemanm: '', unit: '', upperlimit: undefined, lowerlimit: undefined, minorder: undefined, newperiod: undefined, oldperiod: undefined, pcrep: '' })
 
 // ---- 分类弹窗 ----
 const classDialogVisible = ref(false)
@@ -301,6 +339,12 @@ function openItemDialog(row?: ItemRecord) {
         itemForm.class_cd = row.class_cd || ''
         itemForm.itemanm = row.itemanm || ''
         itemForm.unit = row.unit || ''
+        itemForm.upperlimit = (row as Record<string,unknown>).upperlimit
+        itemForm.lowerlimit = (row as Record<string,unknown>).lowerlimit
+        itemForm.minorder = (row as Record<string,unknown>).minorder
+        itemForm.newperiod = (row as Record<string,unknown>).newperiod
+        itemForm.oldperiod = (row as Record<string,unknown>).oldperiod
+        itemForm.pcrep = (row as Record<string,unknown>).pcrep || ''
     } else {
         itemEditing.value = null
         // 新增时自动继承左侧选中分类
@@ -308,6 +352,13 @@ function openItemDialog(row?: ItemRecord) {
         itemForm.item_nm = ''
         itemForm.class_cd = selectedClassCd.value || ''
         itemForm.itemanm = ''
+        itemForm.unit = ''
+        itemForm.upperlimit = undefined
+        itemForm.lowerlimit = undefined
+        itemForm.minorder = undefined
+        itemForm.newperiod = undefined
+        itemForm.oldperiod = undefined
+        itemForm.pcrep = ''
         itemForm.unit = ''
     }
     itemDialogVisible.value = true

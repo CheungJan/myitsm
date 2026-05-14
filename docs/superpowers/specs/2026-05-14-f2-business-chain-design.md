@@ -2,6 +2,8 @@
 
 > **Status**: 待实施 | **创建**: 2026-05-14 | **分支**: `feature/f2-business-chain`
 
+> **说明**: 本文档已被 `docs/superpowers/specs/2026-05-14-F2业务主链前端权威设计文档.md` 合并替代，后续F2前端开发以新权威设计文档为准。
+
 **Goal**: 在 F1 地基上完成预计划→仓储→采购→ITSM 四个模块的前端页面，打通核心业务流。
 
 **Tech Stack**: Vue 3 + Element Plus + TypeScript + Vite（同 F1）

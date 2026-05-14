@@ -773,9 +773,10 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | mes | /api/v1/mes | 10 | 阶段5 |
 | iot | /api/v1/iot | 10 | 阶段5 |
 | qc | /api/v1/qc | 2 | P0 补 |
+| bom | /api/v1/bom | 9 | F1 补（BOM CRUD） |
 | transactions | /api/v1/transactions | 4 | 阶段6 |
 | reports | /api/v1/reports | 8 | 阶段6 |
-| **合计** | | **207** | |
+| **合计** | | **216** | |
 
 ---
 

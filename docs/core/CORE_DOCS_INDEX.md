@@ -21,6 +21,7 @@
 
 4. **前端开发方案**（Vue 3 + Element Plus，F1/F2/F3 阶段计划 + P0 增强清单）
    - `docs/superpowers/plans/2026-05-08-frontend-vue3-setup.md`
+   - `docs/superpowers/specs/2026-05-14-F2业务主链前端权威设计文档.md`
    - 状态：F1 完成，P0 增强已实施（2026-05-13）
 
 4. **全阶段模型字段核对报告**（阶段1-5全部138个模型逐表核对，已包含阶段1内容）
