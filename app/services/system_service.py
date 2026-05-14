@@ -492,8 +492,17 @@ class SystemService:
 
     def delete_item(self, item_cd: str) -> bool:
         r = self._repo.get_item(item_cd)
-        if r: self._repo.delete_item(r); return True
-        return False
+        if not r:
+            return False
+        # 级联删除关联数据
+        from app.repositories.bom_repository import BomRepository
+        bom = BomRepository.get_bom(item_cd.upper())
+        if bom:
+            for dt in BomRepository.list_details(item_cd.upper()):
+                BomRepository.delete_detail(dt)
+            BomRepository.delete_bom(bom)
+        self._repo.delete_item(r)
+        return True
 
     def create_customer(self, data: dict[str, Any]) -> dict[str, Any]:
         """新增客户 — 检查所属分类是否有效。"""
