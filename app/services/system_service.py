@@ -201,7 +201,7 @@ class SystemService:
         return self._repo.delete_item_supplier(r) if r else False
 
     def list_all_suppliers(self) -> list[dict[str, Any]]:
-        return [s.to_dict() for s in self._repo.list_all_suppliers()]
+        return self._repo.list_all_suppliers()
 
     def create_item_class(self, data: dict[str, Any]) -> dict[str, Any]:
         """新增物料分类。"""
