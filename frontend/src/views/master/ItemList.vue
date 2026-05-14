@@ -131,7 +131,7 @@
                 <el-tab-pane label="商品价格" name="price" v-if="itemEditing">
                     <div style="margin-bottom:8px"><el-button type="primary" size="small" @click="openAddPrice">添加价格</el-button></div>
                     <el-table :data="itemPrices" size="small" stripe>
-                        <el-table-column prop="busityp" label="业务类型" width="80"><template #default="{row}"><el-input v-model="row.busityp" size="small" @change="(v:unknown) => handleUpdatePrice(row, 'busityp', v)" /></template></el-table-column>
+                        <el-table-column label="业务类型" width="90"><template #default="{row}"><el-select v-model="row.busityp" size="small" style="width:80px" @change="(v:unknown) => handleUpdatePrice(row, 'busityp', v)"><el-option label="销售(10)" value="10" /><el-option label="采购(20)" value="20" /></el-select></template></el-table-column>
                         <el-table-column label="单价" width="100"><template #default="{row}"><el-input-number v-model="row.itemprice" size="small" :min="0" controls-position="right" style="width:90px" @change="(v:number|undefined) => handleUpdatePrice(row, 'itemprice', v)" /></template></el-table-column>
                         <el-table-column prop="unitcd" label="单位" width="70" />
                         <el-table-column label="有效" width="70"><template #default="{row}"><el-switch :model-value="row.is_current" size="small" @change="(v:boolean) => handleUpdatePrice(row, 'is_current', v)" /></template></el-table-column>
@@ -378,7 +378,7 @@ async function openAddPrice() {
     if (!itemEditing.value) return
     try {
         const { addItemPrice } = await import('@/api/master')
-        await addItemPrice(itemEditing.value.item_cd, { busityp: '01', itemprice: 0, unitcd: '', is_current: true })
+        await addItemPrice(itemEditing.value.item_cd, { busityp: '10', itemprice: 0, unitcd: '', is_current: true })
         const { fetchItemPrices } = await import('@/api/master')
         const r = await fetchItemPrices(itemEditing.value.item_cd)
         itemPrices.value = r.data || []
