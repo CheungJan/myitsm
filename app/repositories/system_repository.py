@@ -411,6 +411,37 @@ class SystemRepository:
         return result
 
     @staticmethod
+    def get_item_supplier(item_cd: str, cust_cd: str):
+        from app.models.master import CustItems
+        return db.session.get(CustItems, (item_cd, cust_cd))
+
+    @staticmethod
+    def add_item_supplier(data: dict[str, Any]):
+        from app.models.master import CustItems
+        r = CustItems(**data)
+        db.session.add(r)
+        db.session.commit()
+        return r
+
+    @staticmethod
+    def update_item_supplier(r: Any, data: dict[str, Any]) -> Any:
+        for k, v in data.items():
+            setattr(r, k, v)
+        db.session.commit()
+        return r
+
+    @staticmethod
+    def delete_item_supplier(r: Any) -> bool:
+        db.session.delete(r)
+        db.session.commit()
+        return True
+
+    @staticmethod
+    def list_all_suppliers():
+        from app.models.master import Supplier
+        return list(db.session.query(Supplier.supp_cd, Supplier.supp_nm).order_by(Supplier.supp_cd).all())
+
+    @staticmethod
     def create_item_class(data: dict[str, Any]) -> ItemClass:
         ic = ItemClass(**data)
         db.session.add(ic)

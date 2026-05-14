@@ -420,11 +420,44 @@ def delete_item(item_cd: str):  # type: ignore[no-untyped-def]
     return success_response() if _service.delete_item(item_cd) else error_response("不存在", 404)
 
 
+@system_bp.get("/suppliers")
+@login_required
+def list_all_suppliers():  # type: ignore[no-untyped-def]
+    """全部供应商列表（用于下拉选择）。"""
+    return success_response(data=_service.list_all_suppliers())
+
+
 @system_bp.get("/items/<item_cd>/suppliers")
 @login_required
 def get_item_suppliers(item_cd: str):  # type: ignore[no-untyped-def]
     """查询物料关联的供应商列表（含供应商名称+周期参数）。"""
     return success_response(data=_service.get_item_suppliers(item_cd))
+
+
+@system_bp.post("/items/<item_cd>/suppliers")
+@login_required
+def add_item_supplier(item_cd: str):  # type: ignore[no-untyped-def]
+    """添加物料供应商关联。"""
+    body = request.get_json(silent=True) or {}
+    body["itemcd"] = item_cd
+    data = _service.add_item_supplier(body)
+    return success_response(data=data, code=201)
+
+
+@system_bp.put("/items/<item_cd>/suppliers/<cust_cd>")
+@login_required
+def update_item_supplier(item_cd: str, cust_cd: str):  # type: ignore[no-untyped-def]
+    """更新物料供应商关联（dfltflg/周期参数）。"""
+    body = request.get_json(silent=True) or {}
+    result = _service.update_item_supplier(item_cd, cust_cd, body)
+    return success_response(data=result) if result else error_response("不存在", 404)
+
+
+@system_bp.delete("/items/<item_cd>/suppliers/<cust_cd>")
+@login_required
+def delete_item_supplier(item_cd: str, cust_cd: str):  # type: ignore[no-untyped-def]
+    """删除物料供应商关联。"""
+    return success_response() if _service.delete_item_supplier(item_cd, cust_cd) else error_response("不存在", 404)
 
 
 # ---- 客户分类 ----

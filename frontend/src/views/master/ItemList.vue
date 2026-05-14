@@ -109,13 +109,15 @@
                     </el-form>
                 </el-tab-pane>
                 <el-tab-pane label="供应商" name="supplier" v-if="itemEditing">
+                    <div style="margin-bottom:8px"><el-button type="primary" size="small" @click="openAddSupplier">添加供应商</el-button></div>
                     <el-table :data="itemSuppliers" size="small" stripe>
                         <el-table-column prop="custcd" label="供应商编码" width="100" />
                         <el-table-column prop="supp_nm" label="供应商名称" min-width="150" show-overflow-tooltip />
-                        <el-table-column label="默认" width="60"><template #default="{row}"><el-tag :type="row.dfltflg==='Y'?'success':''" size="small">{{ row.dfltflg==='Y'?'默认':'' }}</el-tag></template></el-table-column>
+                        <el-table-column label="默认" width="70"><template #default="{row}"><el-tag :type="row.dfltflg==='Y'?'success':''" size="small">{{ row.dfltflg==='Y'?'默认':'' }}</el-tag></template></el-table-column>
                         <el-table-column prop="guaranteeperiod" label="保修期(天)" width="100" />
                         <el-table-column prop="delivercycle" label="配送周期" width="80" />
                         <el-table-column prop="servicecycle" label="服务周期" width="80" />
+                        <el-table-column label="操作" width="80"><template #default="{row}"><el-button link type="danger" size="small" @click="handleRemoveSupplier(row)">移除</el-button></template></el-table-column>
                     </el-table>
                 </el-tab-pane>
                 <el-tab-pane label="相关BOM" name="bom" v-if="itemEditing">
@@ -153,6 +155,17 @@
                 <el-button type="primary" @click="handleSaveClass" :loading="classSaving">保存</el-button>
             </template>
         </el-dialog>
+
+        <!-- 添加供应商弹窗 -->
+        <el-dialog title="选择供应商" v-model="supplierDialogVisible" width="480px">
+            <el-select v-model="selectedSuppCd" filterable placeholder="搜索供应商" style="width:100%">
+                <el-option v-for="s in allSuppliers" :key="s.supp_cd" :label="`${s.supp_cd} ${s.supp_nm}`" :value="s.supp_cd" />
+            </el-select>
+            <template #footer>
+                <el-button @click="supplierDialogVisible = false">取消</el-button>
+                <el-button type="primary" :disabled="!selectedSuppCd" @click="handleAddSupplier">添加</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -187,6 +200,8 @@ const total = ref(0)
 // ---- 物料弹窗 ----
 const itemDialogVisible = ref(false); const itemActiveTab = ref('base')
 const itemSuppliers = ref<Record<string,unknown>[]>([]); const itemBoms = ref<Record<string,unknown>[]>([])
+const supplierDialogVisible = ref(false); const selectedSuppCd = ref('')
+const allSuppliers = ref<{supp_cd:string;supp_nm:string}[]>([])
 const itemEditing = ref<ItemRecord | null>(null)
 const itemSaving = ref(false)
 const itemForm = reactive<Record<string, unknown>>({ item_cd: '', item_nm: '', class_cd: '', itemanm: '', unit: '', spec: '', typflg: '0', upperlimit: undefined, lowerlimit: undefined, minorder: undefined, newperiod: undefined, oldperiod: undefined, pcrep: '' })
@@ -333,6 +348,35 @@ function onSearch() {
 }
 
 // ---- 物料 CRUD ----
+
+async function openAddSupplier() {
+    supplierDialogVisible.value = true; selectedSuppCd.value = ''
+    if (!allSuppliers.value.length) {
+        try { const { fetchSuppliers } = await import('@/api/master'); const r = await fetchSuppliers(); allSuppliers.value = r.data || [] } catch { /**/ }
+    }
+}
+async function handleAddSupplier() {
+    if (!selectedSuppCd.value || !itemEditing.value) return
+    try {
+        const { addItemSupplier } = await import('@/api/master')
+        await addItemSupplier(itemEditing.value.item_cd, { custcd: selectedSuppCd.value, dfltflg: itemSuppliers.value.length === 0 ? 'Y' : 'N' })
+        supplierDialogVisible.value = false
+        const { fetchItemSuppliers } = await import('@/api/master')
+        const r = await fetchItemSuppliers(itemEditing.value.item_cd)
+        itemSuppliers.value = r.data || []
+    } catch { ElMessage.error('添加失败') }
+}
+async function handleRemoveSupplier(row: Record<string,unknown>) {
+    if (!itemEditing.value) return
+    try { await ElMessageBox.confirm(`确定移除供应商 ${row.supp_nm}？`, '确认', { type: 'warning' }) } catch { return }
+    try {
+        const { deleteItemSupplier } = await import('@/api/master')
+        await deleteItemSupplier(itemEditing.value.item_cd, row.custcd as string)
+        const { fetchItemSuppliers } = await import('@/api/master')
+        const r = await fetchItemSuppliers(itemEditing.value.item_cd)
+        itemSuppliers.value = r.data || []
+    } catch { ElMessage.error('移除失败') }
+}
 
 function openItemDialog(row?: ItemRecord) {
     if (row) {

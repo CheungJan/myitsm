@@ -189,6 +189,20 @@ class SystemService:
         """查询物料关联的供应商列表。"""
         return self._repo.get_item_suppliers(item_cd)
 
+    def add_item_supplier(self, data: dict[str, Any]) -> dict[str, Any]:
+        return self._repo.add_item_supplier(data).to_dict()
+
+    def update_item_supplier(self, item_cd: str, cust_cd: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        r = self._repo.get_item_supplier(item_cd, cust_cd)
+        return self._repo.update_item_supplier(r, data).to_dict() if r else None
+
+    def delete_item_supplier(self, item_cd: str, cust_cd: str) -> bool:
+        r = self._repo.get_item_supplier(item_cd, cust_cd)
+        return self._repo.delete_item_supplier(r) if r else False
+
+    def list_all_suppliers(self) -> list[dict[str, Any]]:
+        return [s.to_dict() for s in self._repo.list_all_suppliers()]
+
     def create_item_class(self, data: dict[str, Any]) -> dict[str, Any]:
         """新增物料分类。"""
         return self._repo.create_item_class(data).to_dict()

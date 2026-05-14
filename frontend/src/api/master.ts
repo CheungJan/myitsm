@@ -80,12 +80,24 @@ export function fetchItemClassTree() {
     return request.get<never, { data: ItemClassNode[] }>('/itemclasses/tree')
 }
 
+export function fetchSuppliers() {
+    return request.get<never, { data: { supp_cd: string; supp_nm: string }[] }>('/system/suppliers')
+}
+
 export function fetchBomClassTree() {
     return request.get<never, { data: ItemClassNode[] }>('/itemclasses/bom-tree')
 }
 
 export function fetchItemSuppliers(itemCd: string) {
     return request.get<never, { data: { custcd: string; supp_nm: string; dfltflg: string; delivercycle: number; servicecycle: number; guaranteeperiod: number }[] }>(`/items/${itemCd}/suppliers`)
+}
+
+export function addItemSupplier(itemCd: string, data: Record<string, unknown>) {
+    return request.post<never, { data: Record<string, unknown> }>(`/items/${itemCd}/suppliers`, data)
+}
+
+export function deleteItemSupplier(itemCd: string, custCd: string) {
+    return request.delete<never, unknown>(`/items/${itemCd}/suppliers/${custCd}`)
 }
 
 export function fetchItemClasses() {
