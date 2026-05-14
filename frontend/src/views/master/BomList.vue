@@ -11,14 +11,25 @@
             </el-card>
         </div>
 
-        <!-- 右侧：成品列表 + BOM 明细 -->
+        <!-- 右侧 -->
         <div class="content-panel">
-            <div class="list-panel">
+            <!-- 子类按钮区 -->
+            <div class="list-panel" v-if="showClasses && childClasses.length">
+                <el-card shadow="never">
+                    <template #header><span>{{ selectedClassNm }} — 子分类</span></template>
+                    <div class="class-grid">
+                        <el-button v-for="c in childClasses" :key="c.class_cd" size="small"
+                            @click="onSelectChildClass(c)">{{ c.class_cd }} {{ c.class_nm }}</el-button>
+                    </div>
+                </el-card>
+            </div>
+
+            <!-- 成品列表 -->
+            <div class="list-panel" v-if="showItems && items.length >= 0">
                 <el-card shadow="never">
                     <template #header>
                         <div class="panel-header">
-                            <span>成品列表（共 {{ total }} 个）</span>
-                            <span style="font-size:12px;color:#999">仅显示 typflg=1 的整机物料</span>
+                            <span>成品列表 — {{ selectedClassNm || '请选择分类' }}（共 {{ total }} 个）</span>
                         </div>
                     </template>
                     <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -128,23 +139,33 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
     fetchBom, createBom, updateBom, deleteBom,
     addBomDetail, deleteBomDetail,
-    fetchItems, fetchItemClassTree,
+    fetchItems, fetchBomClassTree,
 } from '@/api/master'
 import type { BomRecord, BomDetailRecord, ItemRecord, ItemClassNode } from '@/api/master'
 
 const treeData = ref<ItemClassNode[]>([]); const treeFilter = ref(''); const treeRef = ref()
-const selectedClassCd = ref('')
+const selectedClassCd = ref(''); const selectedClassNm = ref('')
+const childClasses = ref<ItemClassNode[]>([]); const showClasses = ref(false); const showItems = ref(false)
 
 function filterNode(value: string, data: { class_nm: string }): boolean {
     return !value || data.class_nm.toLowerCase().includes(value.toLowerCase())
 }
 watch(treeFilter, (v) => { (treeRef.value as any)?.filter(v) })
-async function loadTree() { try { const r = await fetchItemClassTree(); treeData.value = r.data || [] } catch { /* */ } }
+async function loadTree() { try { const r = await fetchBomClassTree(); treeData.value = r.data || [] } catch { /* */ } }
 
 function onTreeNodeClick(node: ItemClassNode) {
-    selectedClassCd.value = node.type === 'item' ? '' : node.class_cd
+    selectedItem.value = null; selectedBom.value = null
+    selectedClassNm.value = node.class_nm
+    const subClasses = (node.children || []).filter((c: ItemClassNode) => c.type === 'class')
+    if (subClasses.length > 0) {
+        childClasses.value = subClasses; showClasses.value = true; showItems.value = false
+        return
+    }
+    selectedClassCd.value = node.class_cd; showClasses.value = false; showItems.value = true
     page.value = 1; loadItems()
 }
+
+function onSelectChildClass(c: ItemClassNode) { onTreeNodeClick(c) }
 
 // 成品列表（仅 typflg=1）
 const items = ref<ItemRecord[]>([]); const loading = ref(false)

@@ -306,6 +306,69 @@ class SystemRepository:
         return roots
 
     @staticmethod
+    def get_bom_class_tree() -> list[dict[str, Any]]:
+        """BOM 分类树：只含 typflg=1 成品的分类 + 成品作为叶子节点。"""
+        # 找到有成品（typflg=1）的分类集合
+        finished_classes = set(r[0] for r in db.session.query(Item.class_cd)
+                               .filter(Item.typflg == "1").distinct().all())
+        # 递归收集所有父分类（保证层级完整）
+        all_relevant: set[str] = set(finished_classes)
+        while True:
+            parents = set(r[0] for r in db.session.query(ItemClass.parent_cd)
+                         .filter(ItemClass.class_cd.in_(list(all_relevant)),
+                                 ItemClass.parent_cd.isnot(None),
+                                 ItemClass.parent_cd != "").all())
+            new_parents = parents - all_relevant
+            if not new_parents:
+                break
+            all_relevant.update(new_parents)
+            # 防止死循环
+            if len(all_relevant) > 500:
+                break
+
+        # CTE 生成完整树（含所有分类）
+        sql = db.text("""
+            WITH RECURSIVE tree AS (
+                SELECT class_cd, class_nm, childflg, parent_cd, 0 AS depth
+                FROM tmm11_itemclass WHERE parent_cd IS NULL
+                UNION ALL
+                SELECT c.class_cd, c.class_nm, c.childflg, c.parent_cd, t.depth + 1
+                FROM tmm11_itemclass c JOIN tree t ON c.parent_cd = t.class_cd
+            )
+            SELECT class_cd, class_nm, childflg, parent_cd, depth
+            FROM tree ORDER BY depth, class_cd
+        """)
+        rows = db.session.execute(sql).fetchall()
+
+        # 成品叶子节点
+        finished_items = list(db.session.query(Item.item_cd, Item.item_nm, Item.class_cd)
+                              .filter(Item.typflg == "1").order_by(Item.item_cd).all())
+
+        node_map: dict[str, dict[str, Any]] = {}
+        roots: list[dict[str, Any]] = []
+        for r in rows:
+            if r.class_cd not in all_relevant:
+                continue  # 没有成品的分类不显示
+            node = {"class_cd": r.class_cd, "class_nm": r.class_nm,
+                    "childflg": r.childflg, "parent_cd": r.parent_cd.strip() if r.parent_cd else "",
+                    "children": [], "type": "class"}
+            node_map[r.class_cd] = node
+            parent = r.parent_cd.strip() if r.parent_cd else None
+            if parent and parent in node_map:
+                node_map[parent]["children"].append(node)
+            else:
+                roots.append(node)
+
+        for item_cd, item_nm, class_cd in finished_items:
+            label = f"{item_cd} {item_nm}" if item_nm and item_nm != item_cd else item_cd
+            leaf = {"class_cd": item_cd, "class_nm": label,
+                    "childflg": "0", "parent_cd": class_cd,
+                    "children": [], "type": "item"}
+            if class_cd and class_cd in node_map:
+                node_map[class_cd]["children"].append(leaf)
+        return roots
+
+    @staticmethod
     def _get_descendant_class_cds(class_cd: str) -> list[str]:
         """CTE 递归查询指定分类的所有子分类编码。"""
         sql = db.text("""

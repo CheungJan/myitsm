@@ -181,6 +181,10 @@ class SystemService:
         """获取物料分类树。"""
         return self._repo.get_item_class_tree()
 
+    def get_bom_class_tree(self) -> list[dict[str, Any]]:
+        """获取 BOM 分类树（只含 typflg=1 成品的分类）。"""
+        return self._repo.get_bom_class_tree()
+
     def create_item_class(self, data: dict[str, Any]) -> dict[str, Any]:
         """新增物料分类。"""
         return self._repo.create_item_class(data).to_dict()
