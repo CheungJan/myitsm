@@ -262,7 +262,8 @@ async function onSelectItem(row: ItemRecord) {
     selectedItem.value = row; detailLoading.value = true
     try {
         const res = await fetchBom(row.item_cd)
-        selectedBom.value = res.data; details.value = res.data.details || []
+        selectedBom.value = (res.data && res.data.bomcd) ? res.data : null
+        details.value = selectedBom.value?.details || []
     } catch {
         selectedBom.value = null; details.value = []
     }

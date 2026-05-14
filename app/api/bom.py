@@ -38,7 +38,7 @@ def create_bom():  # type: ignore[no-untyped-def]
 def get_bom(bomcd: str):  # type: ignore[no-untyped-def]
     data = BomService.get_bom(bomcd)
     if data is None:
-        return error_response("BOM不存在", 404)
+        return success_response(data=None, message="BOM不存在")
     return success_response(data=data)
 
 
