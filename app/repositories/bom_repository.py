@@ -41,7 +41,7 @@ class BomRepository:
     @staticmethod
     def create_bom(data: dict[str, Any]) -> Bom:
         bom = Bom(**data)
-        bom.opercd = g.get("user_cd", "")
+        bom.opercd = g.get("current_user", "")
         bom.gendate = datetime.now(timezone.utc)
         bom.upddate = datetime.now(timezone.utc)
         db.session.add(bom)
@@ -72,7 +72,7 @@ class BomRepository:
     @staticmethod
     def add_detail(data: dict[str, Any]) -> BomDt:
         dt = BomDt(**data)
-        dt.opercd = g.get("user_cd", "")
+        dt.opercd = g.get("current_user", "")
         dt.gendate = datetime.now(timezone.utc)
         dt.upddate = datetime.now(timezone.utc)
         db.session.add(dt)
