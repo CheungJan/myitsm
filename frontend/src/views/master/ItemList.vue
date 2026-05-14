@@ -115,10 +115,10 @@
                     <el-input-number v-model="itemForm.minorder" :min="0" style="width:100%" />
                 </el-form-item>
                 <el-divider content-position="left">周期与采购</el-divider>
-                <el-form-item label="新品周期">
+                <el-form-item label="新品周期(天)">
                     <el-input-number v-model="itemForm.newperiod" :min="0" style="width:100%" />
                 </el-form-item>
-                <el-form-item label="旧品周期">
+                <el-form-item label="旧品周期(天)">
                     <el-input-number v-model="itemForm.oldperiod" :min="0" style="width:100%" />
                 </el-form-item>
                 <el-form-item label="采购负责人">
