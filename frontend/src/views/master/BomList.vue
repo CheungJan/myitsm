@@ -3,7 +3,7 @@
         <!-- 左侧：物料分类树 -->
         <div class="tree-panel">
             <el-card shadow="never">
-                <template #header><span>物料分类</span></template>
+                <template #header><span>成品分类</span></template>
                 <el-input v-model="treeFilter" placeholder="过滤分类" size="small" clearable />
                 <el-tree :data="treeData" :props="{ label: 'class_nm', children: 'children' }"
                     node-key="class_cd" highlight-current :filter-node-method="filterNode"
