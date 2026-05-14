@@ -381,13 +381,18 @@ async function openAddPrice() {
     if (!itemEditing.value) return
     try {
         const { addItemPrice, fetchItemPrices } = await import('@/api/master')
-        // 自动找未被占用的 busityp
-        const used = new Set(itemPrices.value.map(p => p.busityp as string))
-        const typ = (priceTypes.value.find(p => !used.has(p.code_cd)) || priceTypes.value[0])?.code_cd || '10'
-        await addItemPrice(itemEditing.value.item_cd, { busityp: typ, itemprice: 0, unitcd: '', is_current: true })
-        const r = await fetchItemPrices(itemEditing.value.item_cd)
+        // 逐个尝试 busityp，直到成功
+        let added = false
+        for (const pt of priceTypes.value) {
+            try {
+                await addItemPrice(itemEditing.value!.item_cd, { busityp: pt.code_cd, itemprice: 0, unitcd: '', is_current: true })
+                added = true; break
+            } catch { continue }
+        }
+        if (!added) { ElMessage.error('所有价格类型已存在'); return }
+        const r = await fetchItemPrices(itemEditing.value!.item_cd)
         itemPrices.value = r.data || []
-    } catch { ElMessage.error('添加失败（可能已存在）') }
+    } catch { ElMessage.error('添加失败') }
 }
 async function handleDeletePrice(row: Record<string,unknown>) {
     if (!itemEditing.value) return
@@ -404,12 +409,20 @@ async function handleUpdatePrice(row: Record<string,unknown>, field: string, val
     try {
         const { updateItemPrice, deleteItemPrice, addItemPrice } = await import('@/api/master')
         if (field === 'busityp') {
-            // 用原始 busityp 删旧，新 busityp 建新
             const idx = itemPrices.value.indexOf(row)
             const oldTyp = _priceKeys.value[`${row.itemcd}_${idx}`] || row.busityp
             await deleteItemPrice(itemEditing.value.item_cd, oldTyp as string)
-            await addItemPrice(itemEditing.value.item_cd, { ...row, busityp: val, itemcd: itemEditing.value.item_cd })
+            const payload: Record<string,unknown> = { itemcd: itemEditing.value.item_cd, busityp: val, itemprice: row.itemprice ?? 0, unitcd: row.unitcd ?? '', is_current: row.is_current ?? true }
+            if (row.effective_date) payload.effective_date = row.effective_date
+            if (row.expire_date) payload.expire_date = row.expire_date
+            await addItemPrice(itemEditing.value.item_cd, payload)
             _priceKeys.value[`${row.itemcd}_${idx}`] = val as string
+            // 同步刷新
+            const { fetchItemPrices } = await import('@/api/master')
+            const r = await fetchItemPrices(itemEditing.value.item_cd)
+            itemPrices.value = r.data || []
+            itemPrices.value.forEach((p,i) => _priceKeys.value[`${p.itemcd}_${i}`] = p.busityp as string)
+            return
         } else {
             await updateItemPrice(itemEditing.value.item_cd, row.busityp as string, { [field]: val })
         }
