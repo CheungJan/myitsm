@@ -22,8 +22,10 @@ def check_bom_status():  # type: ignore[no-untyped-def]
     itemcds = [i.strip().upper() for i in items.split(",") if i.strip()]
     from app.extensions import db
     from app.models.master import Bom
-    rows = db.session.query(Bom.bomcd, Bom.useflg).filter(Bom.bomcd.in_(itemcds)).all()
-    result = {r[0]: r[1] for r in rows}
+    rows = db.session.query(Bom.bomcd, Bom.useflg, Bom.bomnm).filter(Bom.bomcd.in_(itemcds)).all()
+    result = {}
+    for r in rows:
+        result[r[0]] = {"useflg": r[1], "bomnm": r[2]}
     for cd in itemcds:
         if cd not in result:
             result[cd] = None
