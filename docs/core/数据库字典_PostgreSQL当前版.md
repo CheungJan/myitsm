@@ -26,7 +26,6 @@
 | 销售 (tsl) | 3 | 销售/延期 |
 | 财务 (tfn) | 5 | 账务/支付 |
 | 财务 (tac/tht) | 1 | 合同/发票 |
-| 财务 (tht) | 1 | 合同管理 |
 | 考勤 (tkq) | 2 | 考勤 |
 | 库存预警 (tiv) | 4 | 预警规则/库存明细 |
 | 结算 (tbl) | 4 | 结算规则/账单 |
@@ -41,7 +40,7 @@
 | 价格 (tip) | 3 | 价格规则 |
 | 预计划 (plan) | 1 | 预计划客户 |
 | 采购验收 (tmp) | 1 | 采购验收明细 |
-| **合计** | **143** | |
+| **合计** | **142** | |
 
 ---
 
@@ -2163,31 +2162,6 @@
 | 22 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-### 财务 (tht) — 1 张表
-> 合同管理
-
-#### 1. tht01_htgl
-
-| # | 列名 | 类型 | 约束 | 说明 |
-|---|------|------|------|------|
-| 1 | htbh | VARCHAR(20) | PK NOT NULL | 合同编号 |
-| 2 | years | VARCHAR(4) |  | 年份 |
-| 3 | classcd | VARCHAR(6) |  | 区域 |
-| 4 | busityp | VARCHAR(2) |  | 合同属性 |
-| 5 | feetyp | VARCHAR(2) |  | 费用类型 |
-| 6 | qdis | VARCHAR(1) |  | 签订与否 |
-| 7 | qddate | date |  | 签订日期 |
-| 8 | htbgr | VARCHAR(20) |  | 合同保管人 |
-| 9 | remark | VARCHAR(200) |  | 备注 |
-| 10 | opercd | VARCHAR(6) |  | 更新人 |
-| 11 | upddate | TIMESTAMP |  | 更新日期 |
-| 12 | yxqfrom | date |  | 有效期起始 |
-| 13 | yxqto | date |  | 有效期截止 |
-| 14 | htamount | NUMERIC(10,2) |  | 合同金额 |
-| 15 | created_at | TIMESTAMP | NOT NULL |  |
-| 16 | updated_at | TIMESTAMP | NOT NULL |  |
-
-
 ### 考勤 (tkq) — 2 张表
 > 考勤
 
@@ -3115,7 +3089,6 @@
 | `tsl%` | 销售 (tsl) | 销售/延期 |
 | `tfn%` | 财务 (tfn) | 账务/支付 |
 | `tac%` | 财务 (tac/tht) | 合同/发票 |
-| `tht%` | 财务 (tht) | 合同管理 |
 | `tkq%` | 考勤 (tkq) | 考勤 |
 | `tiv%` | 库存预警 (tiv) | 预警规则/库存明细 |
 | `tbl%` | 结算 (tbl) | 结算规则/账单 |
