@@ -209,6 +209,10 @@ watch(addTreeFilter, (v) => { (addTreeRef.value as any)?.filter(v) })
 
 function onAddTreeCheck(_node: ItemClassNode, checked: { checkedNodes: ItemClassNode[] }) {
     checkedItems.value = checked.checkedNodes.filter(n => n.type === 'item')
+    for (const it of checkedItems.value) {
+        if (!(it.class_cd in checkQtys)) checkQtys[it.class_cd] = 1
+        if (!(it.class_cd in checkTyps)) checkTyps[it.class_cd] = '0'
+    }
 }
 
 async function handleBatchAddDetail() {
