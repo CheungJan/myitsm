@@ -131,13 +131,12 @@
                 <el-tab-pane label="商品价格" name="price" v-if="itemEditing">
                     <div style="margin-bottom:8px"><el-button type="primary" size="small" @click="openAddPrice">添加价格</el-button></div>
                     <el-table :data="itemPrices" size="small" stripe>
-                        <el-table-column label="业务类型" width="90"><template #default="{row}"><el-select v-model="row.busityp" size="small" style="width:80px" @change="(v:unknown) => handleUpdatePrice(row, 'busityp', v)"><el-option v-for="p in priceTypes" :key="p.code_cd" :label="p.code_nm" :value="p.code_cd" /></el-select></template></el-table-column>
-                        <el-table-column label="单价" width="100"><template #default="{row}"><el-input-number v-model="row.itemprice" size="small" :min="0" controls-position="right" style="width:90px" @change="(v:number|undefined) => handleUpdatePrice(row, 'itemprice', v)" /></template></el-table-column>
-                        <el-table-column prop="unitcd" label="单位" width="70" />
-                        <el-table-column label="有效" width="70"><template #default="{row}"><el-switch :model-value="row.is_current" size="small" @change="(v:boolean) => handleUpdatePrice(row, 'is_current', v)" /></template></el-table-column>
-                        <el-table-column label="生效" width="110"><template #default="{row}"><el-date-picker v-model="row.effective_date" type="date" size="small" style="width:100px" @change="(v:unknown) => handleUpdatePrice(row, 'effective_date', v)" /></template></el-table-column>
-                        <el-table-column label="失效" width="110"><template #default="{row}"><el-date-picker v-model="row.expire_date" type="date" size="small" style="width:100px" @change="(v:unknown) => handleUpdatePrice(row, 'expire_date', v)" /></template></el-table-column>
-                        <el-table-column label="操作" width="60"><template #default="{row}"><el-button link type="danger" size="small" @click="handleDeletePrice(row)">删除</el-button></template></el-table-column>
+                        <el-table-column label="业务类型" width="100"><template #default="{row}"><template v-if="row._editing"><el-select v-model="row._busityp" size="small" style="width:80px"><el-option v-for="p in priceTypes" :key="p.code_cd" :label="p.code_nm" :value="p.code_cd" /></el-select></template><template v-else>{{ priceTypes.find(p=>p.code_cd===row.busityp)?.code_nm || row.busityp }}</template></template></el-table-column>
+                        <el-table-column label="单价" width="100"><template #default="{row}"><template v-if="row._editing"><el-input-number v-model="row._itemprice" size="small" :min="0" controls-position="right" style="width:90px" /></template><template v-else>{{ row.itemprice }}</template></template></el-table-column>
+                        <el-table-column label="有效" width="70"><template #default="{row}"><el-switch v-if="row._editing" v-model="row._is_current" size="small" /><el-tag v-else :type="row.is_current?'success':'info'" size="small">{{ row.is_current?'有效':'失效' }}</el-tag></template></el-table-column>
+                        <el-table-column label="生效" width="110"><template #default="{row}"><template v-if="row._editing"><el-date-picker v-model="row._effective_date" type="date" size="small" style="width:100px" /></template><template v-else>{{ row.effective_date || '-' }}</template></template></el-table-column>
+                        <el-table-column label="失效" width="110"><template #default="{row}"><template v-if="row._editing"><el-date-picker v-model="row._expire_date" type="date" size="small" style="width:100px" /></template><template v-else>{{ row.expire_date || '-' }}</template></template></el-table-column>
+                        <el-table-column label="操作" width="120"><template #default="{row}"><template v-if="row._editing"><el-button link type="primary" size="small" @click="handleSavePrice(row)">保存</el-button><el-button link size="small" @click="handleCancelEditPrice(row)">取消</el-button></template><template v-else><el-button link type="primary" size="small" @click="handleEditPrice(row)">编辑</el-button><el-button link type="danger" size="small" @click="handleDeletePrice(row)">删除</el-button></template></template></el-table-column>
                     </el-table>
                 </el-tab-pane>
                 <el-tab-pane :label="itemEditing?.typflg==='0' ? '所属BOM' : '相关BOM'" name="bom" v-if="itemEditing">
@@ -403,19 +402,26 @@ async function handleDeletePrice(row: Record<string,unknown>) {
         itemPrices.value = r.data || []
     } catch { ElMessage.error('删除失败') }
 }
-async function handleUpdatePrice(row: Record<string,unknown>, field: string, val: unknown) {
+function handleEditPrice(row: Record<string,unknown>) {
+    row._editing = true; row._busityp = row.busityp; row._itemprice = row.itemprice
+    row._is_current = row.is_current; row._effective_date = row.effective_date; row._expire_date = row.expire_date
+}
+async function handleSavePrice(row: Record<string,unknown>) {
     if (!itemEditing.value) return
     try {
         const { updateItemPrice, fetchItemPrices } = await import('@/api/master')
         const oldBusityp = row._orig_busityp as string || row.busityp as string
-        await updateItemPrice(itemEditing.value.item_cd, oldBusityp, { [field]: val })
-        if (field === 'busityp') {
-            row._orig_busityp = val as string
+        await updateItemPrice(itemEditing.value.item_cd, oldBusityp, { busityp: row._busityp, itemprice: row._itemprice, is_current: row._is_current, effective_date: row._effective_date, expire_date: row._expire_date })
+        row._editing = false; row.busityp = row._busityp; row.itemprice = row._itemprice
+        row.is_current = row._is_current; row.effective_date = row._effective_date; row.expire_date = row._expire_date
+        row._orig_busityp = row._busityp
+        if (row.busityp !== oldBusityp) {
             const r = await fetchItemPrices(itemEditing.value.item_cd)
             itemPrices.value = (r.data || []).map((p: Record<string,unknown>) => ({ ...p, _orig_busityp: p.busityp }))
         }
-    } catch { ElMessage.error('更新失败') }
+    } catch { ElMessage.error('保存失败') }
 }
+function handleCancelEditPrice(row: Record<string,unknown>) { row._editing = false }
 async function openAddSupplier() {
     supplierDialogVisible.value = true; selectedSuppCd.value = ''
     if (!allSuppliers.value.length) {
