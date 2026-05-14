@@ -81,7 +81,7 @@ export function fetchItemClassTree() {
 }
 
 export function fetchSuppliers() {
-    return request.get<never, { data: { supp_cd: string; supp_nm: string }[] }>('/system/suppliers')
+    return request.get<never, { data: { supp_cd: string; supp_nm: string }[] }>('/suppliers')
 }
 
 export function fetchBomClassTree() {

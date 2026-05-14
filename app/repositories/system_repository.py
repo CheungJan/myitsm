@@ -439,7 +439,8 @@ class SystemRepository:
     @staticmethod
     def list_all_suppliers():
         from app.models.master import Supplier
-        return list(db.session.query(Supplier.supp_cd, Supplier.supp_nm).order_by(Supplier.supp_cd).all())
+        rows = db.session.query(Supplier.supp_cd, Supplier.supp_nm).order_by(Supplier.supp_cd).all()
+        return [{"supp_cd": r[0], "supp_nm": r[1]} for r in rows]
 
     @staticmethod
     def create_item_class(data: dict[str, Any]) -> ItemClass:
