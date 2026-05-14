@@ -24,7 +24,7 @@ def check_bom_status():  # type: ignore[no-untyped-def]
     itemcds = [i.strip().upper() for i in items.split(",") if i.strip()]
     from app.extensions import db
     from app.models.master import Bom
-    rows = db.session.query(Bom.bomcd, Bom.useflg, Bom.bomnm, Bom.opercd, Bom.upddate).filter(Bom.bomcd.in_(itemcds)).all()
+    rows = db.session.query(Bom.bomcd, Bom.useflg, Bom.bomnm, Bom.opercd, db.func.coalesce(Bom.upddate, Bom.gendate)).filter(Bom.bomcd.in_(itemcds)).all()
     # 批量查操作员名称
     opercds = list({r[3].strip() for r in rows if r[3]})
     user_map: dict[str, str] = {}

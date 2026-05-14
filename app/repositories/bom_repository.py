@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
+
+from flask import g
 
 from app.extensions import db
 from app.models.master import Bom, BomDt
@@ -38,6 +41,9 @@ class BomRepository:
     @staticmethod
     def create_bom(data: dict[str, Any]) -> Bom:
         bom = Bom(**data)
+        bom.opercd = g.get("user_cd", "")
+        bom.gendate = datetime.now(timezone.utc)
+        bom.upddate = datetime.now(timezone.utc)
         db.session.add(bom)
         db.session.commit()
         return bom
@@ -46,6 +52,7 @@ class BomRepository:
     def update_bom(bom: Bom, data: dict[str, Any]) -> Bom:
         for k, v in data.items():
             setattr(bom, k, v)
+        bom.upddate = datetime.now(timezone.utc)
         db.session.commit()
         return bom
 
@@ -65,6 +72,9 @@ class BomRepository:
     @staticmethod
     def add_detail(data: dict[str, Any]) -> BomDt:
         dt = BomDt(**data)
+        dt.opercd = g.get("user_cd", "")
+        dt.gendate = datetime.now(timezone.utc)
+        dt.upddate = datetime.now(timezone.utc)
         db.session.add(dt)
         db.session.commit()
         return dt
@@ -73,6 +83,7 @@ class BomRepository:
     def update_detail(dt: BomDt, data: dict[str, Any]) -> BomDt:
         for k, v in data.items():
             setattr(dt, k, v)
+        dt.upddate = datetime.now(timezone.utc)
         db.session.commit()
         return dt
 
