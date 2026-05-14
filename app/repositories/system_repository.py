@@ -411,6 +411,21 @@ class SystemRepository:
         return result
 
     @staticmethod
+    def get_related_boms(item_cd: str) -> list[dict[str, Any]]:
+        """反查：该物料作为配件出现在哪些 BOM 中。"""
+        from app.models.master import Bom, BomDt
+        bomcds = [r[0] for r in db.session.query(BomDt.bomcd).filter(BomDt.itemcd == item_cd).distinct().all()]
+        if not bomcds:
+            return []
+        boms = db.session.query(Bom).filter(Bom.bomcd.in_(bomcds)).all()
+        result = []
+        for b in boms:
+            d = b.to_dict()
+            d["details"] = [dt.to_dict() for dt in db.session.query(BomDt).filter(BomDt.bomcd == b.bomcd).all()]
+            result.append(d)
+        return result
+
+    @staticmethod
     def get_item_prices(item_cd: str) -> list[dict[str, Any]]:
         from app.models.inventory import Price
         rows = db.session.query(Price).filter(Price.itemcd == item_cd).all()

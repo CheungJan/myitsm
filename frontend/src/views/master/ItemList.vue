@@ -138,7 +138,7 @@
                         <el-table-column prop="expire_date" label="失效日期" width="110" />
                     </el-table>
                 </el-tab-pane>
-                <el-tab-pane label="相关BOM" name="bom" v-if="itemEditing">
+                <el-tab-pane :label="itemEditing?.typflg==='0' ? '所属BOM' : '相关BOM'" name="bom" v-if="itemEditing">
                     <el-table :data="itemBoms" size="small" stripe>
                         <el-table-column prop="bomcd" label="BOM编码" width="90" />
                         <el-table-column prop="bomnm" label="BOM名称" min-width="150" show-overflow-tooltip />
@@ -440,7 +440,11 @@ async function openItemDialog(row?: ItemRecord) {
         itemActiveTab.value = 'base'
         import('@/api/master').then(m => {
             m.fetchItemSuppliers(row!.item_cd).then(r => itemSuppliers.value = r.data || []).catch(() => itemSuppliers.value = [])
-            m.fetchBom(row!.item_cd).then(r => itemBoms.value = r.data ? [r.data] : []).catch(() => itemBoms.value = [])
+            if (row.typflg === '0') {
+                m.fetchRelatedBoms(row!.item_cd).then(r => itemBoms.value = r.data || []).catch(() => itemBoms.value = [])
+            } else {
+                m.fetchBom(row!.item_cd).then(r => itemBoms.value = r.data ? [r.data] : []).catch(() => itemBoms.value = [])
+            }
             m.fetchItemPrices(row!.item_cd).then(r => itemPrices.value = r.data || []).catch(() => itemPrices.value = [])
         })
     } else {

@@ -427,6 +427,13 @@ def list_all_suppliers():  # type: ignore[no-untyped-def]
     return success_response(data=_service.list_all_suppliers())
 
 
+@system_bp.get("/items/<item_cd>/related-boms")
+@login_required
+def get_related_boms(item_cd: str):  # type: ignore[no-untyped-def]
+    """反查包含该物料的 BOM 列表（该物料作为配件的所有整机 BOM）。"""
+    return success_response(data=_service.get_related_boms(item_cd))
+
+
 @system_bp.get("/items/<item_cd>/prices")
 @login_required
 def get_item_prices(item_cd: str):  # type: ignore[no-untyped-def]

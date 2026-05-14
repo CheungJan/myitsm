@@ -193,6 +193,10 @@ class SystemService:
         """查询物料关联的价格记录。"""
         return self._repo.get_item_prices(item_cd)
 
+    def get_related_boms(self, item_cd: str) -> list[dict[str, Any]]:
+        """反查包含该物料的 BOM 列表。"""
+        return self._repo.get_related_boms(item_cd)
+
     def add_item_supplier(self, data: dict[str, Any]) -> dict[str, Any]:
         return self._repo.add_item_supplier(data).to_dict()
 
