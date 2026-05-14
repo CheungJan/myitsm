@@ -67,7 +67,7 @@
                 <el-form-item label="BOM 名称">
                     <el-input v-model="bomForm.bomnm" placeholder="如 TFP4000 4LR4" />
                 </el-form-item>
-                <el-form-item label="状态" v-if="isEditingBom">
+                <el-form-item label="状态">
                     <el-select v-model="bomForm.useflg" style="width: 100%">
                         <el-option label="有效" value="1" /><el-option label="无效" value="0" />
                     </el-select>
@@ -82,8 +82,9 @@
         <!-- BOM 详情弹窗 -->
         <el-dialog :title="(selectedItem?.item_nm || '') + ' BOM 配置'" v-model="bomDetailVisible" width="750px" @opened="onBomDetailOpened">
             <template v-if="selectedBom">
-                <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
                     <span style="font-weight:bold">{{ selectedItem?.item_cd }}</span>
+                    <span style="color:#999;font-size:13px">{{ selectedBom.bomnm || selectedItem?.item_nm }}</span>
                     <el-tag :type="bomType.type" size="small">{{ bomType.label }}</el-tag>
                     <el-tag :type="selectedBom.useflg==='0'?'danger':'success'" size="small">{{ selectedBom.useflg==='0'?'无效':'有效' }}</el-tag>
                     <el-button type="primary" size="small" @click="openAddDetail">添加物料</el-button>
