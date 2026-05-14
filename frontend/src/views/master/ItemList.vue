@@ -112,12 +112,20 @@
                     <div style="margin-bottom:8px"><el-button type="primary" size="small" @click="openAddSupplier">添加供应商</el-button></div>
                     <el-table :data="itemSuppliers" size="small" stripe>
                         <el-table-column prop="custcd" label="供应商编码" width="100" />
-                        <el-table-column prop="supp_nm" label="供应商名称" min-width="150" show-overflow-tooltip />
-                        <el-table-column label="默认" width="70"><template #default="{row}"><el-tag :type="row.dfltflg==='Y'?'success':''" size="small">{{ row.dfltflg==='Y'?'默认':'' }}</el-tag></template></el-table-column>
-                        <el-table-column prop="guaranteeperiod" label="保修期(天)" width="100" />
-                        <el-table-column prop="delivercycle" label="配送周期" width="80" />
-                        <el-table-column prop="servicecycle" label="服务周期" width="80" />
-                        <el-table-column label="操作" width="80"><template #default="{row}"><el-button link type="danger" size="small" @click="handleRemoveSupplier(row)">移除</el-button></template></el-table-column>
+                        <el-table-column prop="supp_nm" label="供应商名称" min-width="140" show-overflow-tooltip />
+                        <el-table-column label="默认" width="70"><template #default="{row}">
+                            <el-switch :model-value="row.dfltflg==='Y'" size="small" @change="(v:boolean) => handleSetDefaultSupplier(row, v)" />
+                        </template></el-table-column>
+                        <el-table-column label="保修期(天)" width="110"><template #default="{row}">
+                            <el-input-number v-model="row.guaranteeperiod" :min="0" size="small" controls-position="right" style="width:90px" @change="(v:number|undefined) => handleUpdateSupplier(row, 'guaranteeperiod', v)" />
+                        </template></el-table-column>
+                        <el-table-column label="配送周期" width="100"><template #default="{row}">
+                            <el-input-number v-model="row.delivercycle" :min="0" size="small" controls-position="right" style="width:80px" @change="(v:number|undefined) => handleUpdateSupplier(row, 'delivercycle', v)" />
+                        </template></el-table-column>
+                        <el-table-column label="服务周期" width="100"><template #default="{row}">
+                            <el-input-number v-model="row.servicecycle" :min="0" size="small" controls-position="right" style="width:80px" @change="(v:number|undefined) => handleUpdateSupplier(row, 'servicecycle', v)" />
+                        </template></el-table-column>
+                        <el-table-column label="操作" width="70"><template #default="{row}"><el-button link type="danger" size="small" @click="handleRemoveSupplier(row)">移除</el-button></template></el-table-column>
                     </el-table>
                 </el-tab-pane>
                 <el-tab-pane label="相关BOM" name="bom" v-if="itemEditing">
@@ -365,6 +373,16 @@ async function handleAddSupplier() {
         const r = await fetchItemSuppliers(itemEditing.value.item_cd)
         itemSuppliers.value = r.data || []
     } catch { ElMessage.error('添加失败') }
+}
+async function handleUpdateSupplier(row: Record<string,unknown>, field: string, val: unknown) {
+    if (!itemEditing.value) return
+    try { const { updateItemSupplier } = await import('@/api/master'); await updateItemSupplier(itemEditing.value.item_cd, row.custcd as string, { [field]: val }) } catch { ElMessage.error('更新失败') }
+}
+async function handleSetDefaultSupplier(row: Record<string,unknown>, val: boolean) {
+    if (!itemEditing.value || !val) return
+    try { const { updateItemSupplier } = await import('@/api/master'); await updateItemSupplier(itemEditing.value.item_cd, row.custcd as string, { dfltflg: 'Y' }) } catch { ElMessage.error('设置失败') }
+    // 刷新列表
+    const { fetchItemSuppliers } = await import('@/api/master'); const r = await fetchItemSuppliers(itemEditing.value.item_cd); itemSuppliers.value = r.data || []
 }
 async function handleRemoveSupplier(row: Record<string,unknown>) {
     if (!itemEditing.value) return

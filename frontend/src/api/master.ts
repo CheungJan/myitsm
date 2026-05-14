@@ -96,6 +96,10 @@ export function addItemSupplier(itemCd: string, data: Record<string, unknown>) {
     return request.post<never, { data: Record<string, unknown> }>(`/items/${itemCd}/suppliers`, data)
 }
 
+export function updateItemSupplier(itemCd: string, custCd: string, data: Record<string, unknown>) {
+    return request.put<never, { data: Record<string, unknown> }>(`/items/${itemCd}/suppliers/${custCd}`, data)
+}
+
 export function deleteItemSupplier(itemCd: string, custCd: string) {
     return request.delete<never, unknown>(`/items/${itemCd}/suppliers/${custCd}`)
 }
