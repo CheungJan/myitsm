@@ -12,10 +12,12 @@
 
 单人开发，按依赖链递进，边铺页面边提取可复用模式。
 
+规划和实现过程中，遇到字段含义、按钮行为、单据状态、流转条件、明细录入规则等细节不确定时，优先参考 `PBsrc/` 中对应 PowerBuilder 模块的原业务逻辑。PB 源码只作为业务细节参考源，不作为照搬对象；原系统存在历史包袱、重复逻辑、硬编码状态、字段语义不清和用户体验不足等问题，最终实现应以后端已重构 API、当前核心文档、P0 优化方案、数据库当前结构和前端可用性为准。
+
 ```
 第1步：预计划（1-2天）        → plan_cust 列表/创建/详情
 第2步：仓储（2天）            → 入库/出库/库存/盘点
-第3步：采购+质检（2天）        → 采购+验收+质检结果
+第3步：采购（1.5天）            → 采购+验收（质检 F3 补）
 第4步：ITSM 高频工单（3天）    → 维修/开通/翻新/变更
 第5步：ITSM 剩余工单（2天）    → 回收/保养/关店/关单/附表
 第6步：补全（2天）            → 详情/审核/批量/状态流转
@@ -43,7 +45,7 @@
 | `GET /inventory` | 库存查询/盘点 |
 | `GET /overlost` | 盘亏列表 |
 
-### 2.3 采购+质检（`/procurement`、`/quality`）
+### 2.3 采购（`/procurement`）
 
 | API | 页面 |
 |-----|------|
@@ -51,7 +53,8 @@
 | `GET /purchase-registers` | 采购登记列表 |
 | `GET /purchase-bills` | 采购单据列表 |
 | `GET /check-in` | 采购验收列表 |
-| `GET /quality-results` | 质检结果列表 |
+
+> **质检延期**：`tqc10/11` 仅有模型无 API 蓝图，F3 阶段补后端接口+前端页面。
 
 ### 2.4 ITSM 工单（`/itsm`，10 类）
 
@@ -99,7 +102,6 @@
 /procurement/register  → PurchaseRegisterList.vue
 /procurement/bills     → PurchaseBillList.vue
 /procurement/check-in  → CheckInList.vue
-/quality/results       → QualityResultList.vue
 /itsm/maintenance      → MaintenanceList.vue (维修)
 /itsm/open             → OpenList.vue (开通)
 /itsm/renovate         → RenovateList.vue (翻新)
