@@ -149,6 +149,7 @@
             </el-tabs>
             <template #footer>
                 <el-button @click="itemDialogVisible = false">取消</el-button>
+                <el-button v-if="!!itemEditing" type="danger" @click="handleDeleteItem(itemEditing)">删除</el-button>
                 <el-button type="primary" @click="handleSaveItem" :loading="itemSaving">保存</el-button>
             </template>
         </el-dialog>
@@ -489,11 +490,10 @@ async function handleDeleteItem(row: ItemRecord) {
         await ElMessageBox.confirm(`确定删除物料 ${row.item_cd}？`, '确认删除')
         await deleteItem(row.item_cd)
         ElMessage.success('已删除')
+        itemDialogVisible.value = false; itemEditing.value = null
         loadItems()
     } catch (e: unknown) {
-        if (e !== 'cancel') {
-            ElMessage.error('删除失败')
-        }
+        if (e !== 'cancel') ElMessage.error('删除失败')
     }
 }
 </script>
