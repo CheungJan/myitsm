@@ -329,10 +329,10 @@ class SystemRepository:
         # CTE 生成完整树（含所有分类）
         sql = db.text("""
             WITH RECURSIVE tree AS (
-                SELECT class_cd, class_nm, childflg, parent_cd, opercd, gendate, 0 AS depth
+                SELECT class_cd, class_nm, childflg, parent_cd, opercd, COALESCE(gendate, created_at) AS gendate, 0 AS depth
                 FROM tmm11_itemclass WHERE parent_cd IS NULL
                 UNION ALL
-                SELECT c.class_cd, c.class_nm, c.childflg, c.parent_cd, c.opercd, c.gendate, t.depth + 1
+                SELECT c.class_cd, c.class_nm, c.childflg, c.parent_cd, c.opercd, COALESCE(c.gendate, c.created_at), t.depth + 1
                 FROM tmm11_itemclass c JOIN tree t ON c.parent_cd = t.class_cd
             )
             SELECT class_cd, class_nm, childflg, parent_cd, opercd, gendate, depth

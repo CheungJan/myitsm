@@ -271,6 +271,9 @@ class ItemClass(BaseModel):
     classtyp = db.Column(db.String(1), comment="分类类型")
     childflg = db.Column(db.String(1), comment="子节点标志")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
 
 
 class Item(BaseModel):

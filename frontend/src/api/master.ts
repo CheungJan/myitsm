@@ -11,6 +11,7 @@ export interface ItemClassNode {
     parent_cd?: string
     opercd?: string
     gendate?: string
+    created_at?: string
 }
 
 export interface ItemRecord {

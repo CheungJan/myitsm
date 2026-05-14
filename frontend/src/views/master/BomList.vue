@@ -21,8 +21,12 @@
                         <el-table-column prop="class_cd" label="类别代码" width="100" />
                         <el-table-column prop="class_nm" label="类别名称" min-width="150" show-overflow-tooltip />
                         <el-table-column prop="parent_cd" label="所属大类" width="80" />
-                        <el-table-column prop="opercd" label="操作员" width="80" />
-                        <el-table-column prop="gendate" label="最后更新" width="110" />
+                        <el-table-column prop="opercd" label="操作员" width="80">
+                            <template #default="{ row }">{{ (row as ItemClassNode).opercd || '-' }}</template>
+                        </el-table-column>
+                        <el-table-column label="创建日期" width="110">
+                            <template #default="{ row }">{{ (row as ItemClassNode).gendate || '-' }}</template>
+                        </el-table-column>
                     </el-table>
                 </el-card>
             </div>
