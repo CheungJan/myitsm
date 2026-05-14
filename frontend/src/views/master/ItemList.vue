@@ -408,15 +408,11 @@ async function handleUpdatePrice(row: Record<string,unknown>, field: string, val
     try {
         const { updateItemPrice, fetchItemPrices } = await import('@/api/master')
         const oldBusityp = row._orig_busityp as string || row.busityp as string
-        const payload: Record<string,unknown> = { [field]: val }
+        await updateItemPrice(itemEditing.value.item_cd, oldBusityp, { [field]: val })
         if (field === 'busityp') {
-            payload.busityp = val  // 告诉后端新 busityp，后端内部处理删旧建新
-            await updateItemPrice(itemEditing.value.item_cd, oldBusityp, payload)
-            // 刷新列表
+            row._orig_busityp = val as string
             const r = await fetchItemPrices(itemEditing.value.item_cd)
             itemPrices.value = (r.data || []).map((p: Record<string,unknown>) => ({ ...p, _orig_busityp: p.busityp }))
-        } else {
-            await updateItemPrice(itemEditing.value.item_cd, oldBusityp, payload)
         }
     } catch { ElMessage.error('更新失败') }
 }
