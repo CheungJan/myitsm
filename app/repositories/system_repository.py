@@ -349,10 +349,6 @@ class SystemRepository:
         """)
         rows = db.session.execute(sql).fetchall()
 
-        # 成品叶子节点
-        finished_items = list(db.session.query(Item.item_cd, Item.item_nm, Item.class_cd)
-                              .filter(Item.typflg == "1").order_by(Item.item_cd).all())
-
         node_map: dict[str, dict[str, Any]] = {}
         roots: list[dict[str, Any]] = []
         for r in rows:
