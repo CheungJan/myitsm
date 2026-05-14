@@ -274,6 +274,11 @@ function collapseAll() {
 }
 
 function onTreeClick(node: ItemClassNode) {
+    // 点击具体物料 → 直接打开编辑弹窗
+    if (node.type === 'item') {
+        openItemDialog({ item_cd: node.class_cd, item_nm: node.class_nm } as ItemRecord)
+        return
+    }
     selectedClassCd.value = node.class_cd
     searchText.value = ''
     page.value = 1
@@ -406,8 +411,17 @@ async function handleRemoveSupplier(row: Record<string,unknown>) {
     } catch { ElMessage.error('移除失败') }
 }
 
-function openItemDialog(row?: ItemRecord) {
+async function openItemDialog(row?: ItemRecord) {
     if (row) {
+        // 从树节点点击时只有 item_cd/item_nm，需补全字段
+        if (!row.class_cd) {
+            try {
+                const params: Record<string,unknown> = { per_page: 1, search: row.item_cd }
+                const r = await fetchItems(params as any)
+                const full = (r.data as ItemsPage).items?.find((i: ItemRecord) => i.item_cd === row.item_cd)
+                if (full) row = full
+            } catch { /* fallback to partial */ }
+        }
         itemEditing.value = row
         itemForm.item_cd = row.item_cd || ''
         itemForm.item_nm = row.item_nm || ''
@@ -422,12 +436,11 @@ function openItemDialog(row?: ItemRecord) {
         itemForm.spec = (row as Record<string,unknown>).spec || ''
         itemForm.typflg = (row as Record<string,unknown>).typflg || '0'
         itemForm.pcrep = (row as Record<string,unknown>).pcrep || ''
-        // 加载供应商和BOM
         itemActiveTab.value = 'base'
         import('@/api/master').then(m => {
-            m.fetchItemSuppliers(row.item_cd).then(r => itemSuppliers.value = r.data || []).catch(() => itemSuppliers.value = [])
-            m.fetchBom(row.item_cd).then(r => itemBoms.value = r.data ? [r.data] : []).catch(() => itemBoms.value = [])
-            m.fetchItemPrices(row.item_cd).then(r => itemPrices.value = r.data || []).catch(() => itemPrices.value = [])
+            m.fetchItemSuppliers(row!.item_cd).then(r => itemSuppliers.value = r.data || []).catch(() => itemSuppliers.value = [])
+            m.fetchBom(row!.item_cd).then(r => itemBoms.value = r.data ? [r.data] : []).catch(() => itemBoms.value = [])
+            m.fetchItemPrices(row!.item_cd).then(r => itemPrices.value = r.data || []).catch(() => itemPrices.value = [])
         })
     } else {
         itemEditing.value = null
