@@ -370,6 +370,15 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | GET | `/supplier-appraisals/<appid>` | 供应商评价详情 | - |
 | POST | `/supplier-appraisals` | 创建供应商评价（含明细） | Body + `details[]` |
 
+#### 质检管理
+
+路由前缀：`/api/v1/qc`
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/qc` | 质检结果列表（分页） | `page`,`per_page`,`search` |
+| GET | `/qc/<qcbillid>` | 质检详情（含按产品明细+按EID明细） | - |
+
 ---
 
 ### 2.5 销售管理 `sales`
@@ -763,9 +772,10 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | portal | /api/v1/portal | 9 | 阶段5 |
 | mes | /api/v1/mes | 10 | 阶段5 |
 | iot | /api/v1/iot | 10 | 阶段5 |
+| qc | /api/v1/qc | 2 | P0 补 |
 | transactions | /api/v1/transactions | 4 | 阶段6 |
 | reports | /api/v1/reports | 8 | 阶段6 |
-| **合计** | | **205** | |
+| **合计** | | **207** | |
 
 ---
 

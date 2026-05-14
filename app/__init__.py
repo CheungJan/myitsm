@@ -60,6 +60,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.api.mes import mes_bp
     from app.api.notification import notification_bp
     from app.api.portal import portal_bp
+    from app.api.qc import qc_bp
     from app.api.procurement import procurement_bp
     from app.api.reports import report_bp
     from app.api.sales import sales_bp
@@ -88,6 +89,8 @@ def _register_blueprints(app: Flask) -> None:
     # Tier-3 扩展
     app.register_blueprint(mes_bp, url_prefix="/api/v1/mes")
     app.register_blueprint(iot_bp, url_prefix="/api/v1/iot")
+    # 质检
+    app.register_blueprint(qc_bp, url_prefix="/api/v1/qc")
     # 事务查询与报表
     app.register_blueprint(transaction_bp, url_prefix="/api/v1/transactions")
     app.register_blueprint(report_bp, url_prefix="/api/v1/reports")
