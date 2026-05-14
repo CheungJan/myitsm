@@ -71,6 +71,28 @@ class Price(BaseModel):
     gendate = db.Column(db.DateTime, comment="创建日期")
     upddate = db.Column(db.DateTime, comment="更新日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    effective_date = db.Column(db.Date, comment="生效日期")
+    expire_date = db.Column(db.Date, comment="失效日期")
+    is_current = db.Column(db.Boolean, default=True, comment="是否当前有效")
+
+
+class SupplierPrice(BaseModel):
+    """供应商价格表（TIP02_SUPPLIER_PRICE，P0 新增）。"""
+
+    __tablename__ = "tip02_supplier_price"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    supp_cd = db.Column(db.String(8), nullable=False, comment="供应商编码")
+    min_qty = db.Column(db.Numeric, default=0, comment="起订量")
+    itemprice = db.Column(db.Numeric(12, 2), nullable=False, comment="供应商报价")
+    effective_date = db.Column(db.Date, comment="生效日期")
+    expire_date = db.Column(db.Date, comment="失效日期")
+    is_current = db.Column(db.Boolean, default=True, comment="是否当前有效")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
 
 class AdjustPrice(BaseModel):

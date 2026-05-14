@@ -35,6 +35,7 @@ from app.models.inventory import (
     InventoryLimit,
     InventoryLimitHistory,
     Price,
+    SupplierPrice,
 )
 from app.models.iot import (
     AlertLog,
@@ -301,6 +302,7 @@ __all__ = [
     "InventoryLimit",
     "InventoryLimitHistory",
     "Price",
+    "SupplierPrice",
     "AdjustPrice",
     "InventoryDetail",
     "InventoryDetailDt",

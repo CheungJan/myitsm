@@ -88,6 +88,10 @@ export function fetchBomClassTree() {
     return request.get<never, { data: ItemClassNode[] }>('/itemclasses/bom-tree')
 }
 
+export function fetchItemPrices(itemCd: string) {
+    return request.get<never, { data: Record<string, unknown>[] }>(`/items/${itemCd}/prices`)
+}
+
 export function fetchItemSuppliers(itemCd: string) {
     return request.get<never, { data: { custcd: string; supp_nm: string; dfltflg: string; delivercycle: number; servicecycle: number; guaranteeperiod: number }[] }>(`/items/${itemCd}/suppliers`)
 }

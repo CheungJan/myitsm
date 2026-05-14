@@ -411,6 +411,12 @@ class SystemRepository:
         return result
 
     @staticmethod
+    def get_item_prices(item_cd: str) -> list[dict[str, Any]]:
+        from app.models.inventory import Price
+        rows = db.session.query(Price).filter(Price.itemcd == item_cd).all()
+        return [r.to_dict() for r in rows]
+
+    @staticmethod
     def get_item_supplier(item_cd: str, cust_cd: str):
         from app.models.master import CustItems
         return db.session.get(CustItems, (item_cd, cust_cd))

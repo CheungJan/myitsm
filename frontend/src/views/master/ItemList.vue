@@ -128,6 +128,16 @@
                         <el-table-column label="操作" width="70"><template #default="{row}"><el-button link type="danger" size="small" @click="handleRemoveSupplier(row)">移除</el-button></template></el-table-column>
                     </el-table>
                 </el-tab-pane>
+                <el-tab-pane label="商品价格" name="price" v-if="itemEditing">
+                    <el-table :data="itemPrices" size="small" stripe>
+                        <el-table-column prop="busityp" label="业务类型" width="90" />
+                        <el-table-column prop="itemprice" label="单价" width="100" />
+                        <el-table-column prop="unitcd" label="单位" width="70" />
+                        <el-table-column label="当前有效" width="80"><template #default="{row}"><el-tag :type="row.is_current?'success':'info'" size="small">{{ row.is_current?'有效':'失效' }}</el-tag></template></el-table-column>
+                        <el-table-column prop="effective_date" label="生效日期" width="110" />
+                        <el-table-column prop="expire_date" label="失效日期" width="110" />
+                    </el-table>
+                </el-tab-pane>
                 <el-tab-pane label="相关BOM" name="bom" v-if="itemEditing">
                     <el-table :data="itemBoms" size="small" stripe>
                         <el-table-column prop="bomcd" label="BOM编码" width="90" />
@@ -207,7 +217,7 @@ const total = ref(0)
 
 // ---- 物料弹窗 ----
 const itemDialogVisible = ref(false); const itemActiveTab = ref('base')
-const itemSuppliers = ref<Record<string,unknown>[]>([]); const itemBoms = ref<Record<string,unknown>[]>([])
+const itemSuppliers = ref<Record<string,unknown>[]>([]); const itemBoms = ref<Record<string,unknown>[]>([]); const itemPrices = ref<Record<string,unknown>[]>([])
 const supplierDialogVisible = ref(false); const selectedSuppCd = ref('')
 const allSuppliers = ref<{supp_cd:string;supp_nm:string}[]>([])
 const itemEditing = ref<ItemRecord | null>(null)
@@ -417,6 +427,7 @@ function openItemDialog(row?: ItemRecord) {
         import('@/api/master').then(m => {
             m.fetchItemSuppliers(row.item_cd).then(r => itemSuppliers.value = r.data || []).catch(() => itemSuppliers.value = [])
             m.fetchBom(row.item_cd).then(r => itemBoms.value = r.data ? [r.data] : []).catch(() => itemBoms.value = [])
+            m.fetchItemPrices(row.item_cd).then(r => itemPrices.value = r.data || []).catch(() => itemPrices.value = [])
         })
     } else {
         itemEditing.value = null

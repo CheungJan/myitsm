@@ -189,6 +189,10 @@ class SystemService:
         """查询物料关联的供应商列表。"""
         return self._repo.get_item_suppliers(item_cd)
 
+    def get_item_prices(self, item_cd: str) -> list[dict[str, Any]]:
+        """查询物料关联的价格记录。"""
+        return self._repo.get_item_prices(item_cd)
+
     def add_item_supplier(self, data: dict[str, Any]) -> dict[str, Any]:
         return self._repo.add_item_supplier(data).to_dict()
 

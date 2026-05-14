@@ -427,6 +427,13 @@ def list_all_suppliers():  # type: ignore[no-untyped-def]
     return success_response(data=_service.list_all_suppliers())
 
 
+@system_bp.get("/items/<item_cd>/prices")
+@login_required
+def get_item_prices(item_cd: str):  # type: ignore[no-untyped-def]
+    """查询物料关联的价格记录。"""
+    return success_response(data=_service.get_item_prices(item_cd))
+
+
 @system_bp.get("/items/<item_cd>/suppliers")
 @login_required
 def get_item_suppliers(item_cd: str):  # type: ignore[no-untyped-def]
