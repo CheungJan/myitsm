@@ -137,6 +137,7 @@
                         <el-table-column label="有效" width="70"><template #default="{row}"><el-switch :model-value="row.is_current" size="small" @change="(v:boolean) => handleUpdatePrice(row, 'is_current', v)" /></template></el-table-column>
                         <el-table-column label="生效" width="110"><template #default="{row}"><el-date-picker v-model="row.effective_date" type="date" size="small" style="width:100px" @change="(v:unknown) => handleUpdatePrice(row, 'effective_date', v)" /></template></el-table-column>
                         <el-table-column label="失效" width="110"><template #default="{row}"><el-date-picker v-model="row.expire_date" type="date" size="small" style="width:100px" @change="(v:unknown) => handleUpdatePrice(row, 'expire_date', v)" /></template></el-table-column>
+                        <el-table-column label="操作" width="60"><template #default="{row}"><el-button link type="danger" size="small" @click="handleDeletePrice(row)">删除</el-button></template></el-table-column>
                     </el-table>
                 </el-tab-pane>
                 <el-tab-pane :label="itemEditing?.typflg==='0' ? '所属BOM' : '相关BOM'" name="bom" v-if="itemEditing">
@@ -379,12 +380,23 @@ function onSearch() {
 async function openAddPrice() {
     if (!itemEditing.value) return
     try {
-        const { addItemPrice } = await import('@/api/master')
-        await addItemPrice(itemEditing.value.item_cd, { busityp: '10', itemprice: 0, unitcd: '', is_current: true })
-        const { fetchItemPrices } = await import('@/api/master')
+        const { addItemPrice, fetchItemPrices } = await import('@/api/master')
+        // 自动找未被占用的 busityp
+        const used = new Set(itemPrices.value.map(p => p.busityp as string))
+        const typ = (priceTypes.value.find(p => !used.has(p.code_cd)) || priceTypes.value[0])?.code_cd || '10'
+        await addItemPrice(itemEditing.value.item_cd, { busityp: typ, itemprice: 0, unitcd: '', is_current: true })
         const r = await fetchItemPrices(itemEditing.value.item_cd)
         itemPrices.value = r.data || []
-    } catch { ElMessage.error('添加失败') }
+    } catch { ElMessage.error('添加失败（可能已存在）') }
+}
+async function handleDeletePrice(row: Record<string,unknown>) {
+    if (!itemEditing.value) return
+    try {
+        const { deleteItemPrice, fetchItemPrices } = await import('@/api/master')
+        await deleteItemPrice(itemEditing.value.item_cd, row.busityp as string)
+        const r = await fetchItemPrices(itemEditing.value.item_cd)
+        itemPrices.value = r.data || []
+    } catch { ElMessage.error('删除失败') }
 }
 const _priceOrigBusityp = ref<Record<number, string>>({})
 async function handleUpdatePrice(row: Record<string,unknown>, field: string, val: unknown) {
