@@ -196,7 +196,7 @@ const bomType = computed(() => {
 })
 
 watch(page, () => loadItems()); watch(perPage, () => { page.value = 1; loadItems() })
-onMounted(() => { loadTree(); loadItems() })
+onMounted(() => { loadTree(); showItems.value = true; loadItems() })
 
 async function loadItems() {
     loading.value = true
