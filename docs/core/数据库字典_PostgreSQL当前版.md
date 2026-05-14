@@ -10,7 +10,7 @@
 
 | 指标 | 值 |
 |------|----|
-| 业务表总数 | 142 |
+| 业务表总数 | 143 |
 | 非主键索引 | 16 |
 | 数据库大小 | 715 MB |
 
@@ -26,6 +26,7 @@
 | 销售 (tsl) | 3 | 销售/延期 |
 | 财务 (tfn) | 5 | 账务/支付 |
 | 财务 (tac/tht) | 1 | 合同/发票 |
+| 财务 (tht) | 1 | 合同管理 |
 | 考勤 (tkq) | 2 | 考勤 |
 | 库存预警 (tiv) | 4 | 预警规则/库存明细 |
 | 结算 (tbl) | 4 | 结算规则/账单 |
@@ -37,10 +38,10 @@
 | 押金 (tmm61) | 5 | 押金管理 |
 | 质检 (tqc) | 3 | 质检结果 |
 | 调拨 (ttx) | 1 | 调拨科目 |
-| 价格 (tip) | 2 | 价格规则 |
+| 价格 (tip) | 3 | 价格规则 |
 | 预计划 (plan) | 1 | 预计划客户 |
 | 采购验收 (tmp) | 1 | 采购验收明细 |
-| **合计** | **141** | |
+| **合计** | **143** | |
 
 ---
 
@@ -2162,6 +2163,31 @@
 | 22 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
+### 财务 (tht) — 1 张表
+> 合同管理
+
+#### 1. tht01_htgl
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | htbh | VARCHAR(20) | PK NOT NULL | 合同编号 |
+| 2 | years | VARCHAR(4) |  | 年份 |
+| 3 | classcd | VARCHAR(6) |  | 区域 |
+| 4 | busityp | VARCHAR(2) |  | 合同属性 |
+| 5 | feetyp | VARCHAR(2) |  | 费用类型 |
+| 6 | qdis | VARCHAR(1) |  | 签订与否 |
+| 7 | qddate | date |  | 签订日期 |
+| 8 | htbgr | VARCHAR(20) |  | 合同保管人 |
+| 9 | remark | VARCHAR(200) |  | 备注 |
+| 10 | opercd | VARCHAR(6) |  | 更新人 |
+| 11 | upddate | TIMESTAMP |  | 更新日期 |
+| 12 | yxqfrom | date |  | 有效期起始 |
+| 13 | yxqto | date |  | 有效期截止 |
+| 14 | htamount | NUMERIC(10,2) |  | 合同金额 |
+| 15 | created_at | TIMESTAMP | NOT NULL |  |
+| 16 | updated_at | TIMESTAMP | NOT NULL |  |
+
+
 ### 考勤 (tkq) — 2 张表
 > 考勤
 
@@ -2902,7 +2928,7 @@
 | 10 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-### 价格 (tip) — 2 张表
+### 价格 (tip) — 3 张表
 > 价格规则
 
 #### 1. tip01_price
@@ -2919,8 +2945,30 @@
 | 8 | useflg | VARCHAR(1) |  | 有效标志 |
 | 9 | created_at | TIMESTAMP | NOT NULL |  |
 | 10 | updated_at | TIMESTAMP | NOT NULL |  |
+| 11 | effective_date | date |  |  |
+| 12 | expire_date | date |  |  |
+| 13 | is_current | BOOLEAN |  |  |
 
-#### 2. tip03_adjprice
+#### 2. tip02_supplier_price
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | id | INTEGER | PK NOT NULL |  |
+| 2 | itemcd | VARCHAR(6) | NOT NULL |  |
+| 3 | supp_cd | VARCHAR(8) | NOT NULL |  |
+| 4 | min_qty | numeric |  |  |
+| 5 | itemprice | NUMERIC(12,2) | NOT NULL |  |
+| 6 | effective_date | date |  |  |
+| 7 | expire_date | date |  |  |
+| 8 | is_current | BOOLEAN |  |  |
+| 9 | opercd | VARCHAR(6) |  |  |
+| 10 | gendate | TIMESTAMP |  |  |
+| 11 | upddate | TIMESTAMP |  |  |
+| 12 | useflg | VARCHAR(1) |  |  |
+| 13 | created_at | TIMESTAMP |  |  |
+| 14 | updated_at | TIMESTAMP |  |  |
+
+#### 3. tip03_adjprice
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
@@ -3067,6 +3115,7 @@
 | `tsl%` | 销售 (tsl) | 销售/延期 |
 | `tfn%` | 财务 (tfn) | 账务/支付 |
 | `tac%` | 财务 (tac/tht) | 合同/发票 |
+| `tht%` | 财务 (tht) | 合同管理 |
 | `tkq%` | 考勤 (tkq) | 考勤 |
 | `tiv%` | 库存预警 (tiv) | 预警规则/库存明细 |
 | `tbl%` | 结算 (tbl) | 结算规则/账单 |
