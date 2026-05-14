@@ -273,8 +273,11 @@ async function onSelectItem(row: ItemRecord) {
 async function openCreateBomForItem() {
     if (!selectedItem.value) return
     try {
-        await createBom({ bomcd: selectedItem.value.item_cd, bomnm: selectedItem.value.item_nm })
-    } catch { /* already exists, just load it */ }
+        const existing = await fetchBom(selectedItem.value.item_cd)
+        if (!existing.data || !existing.data.bomcd) {
+            await createBom({ bomcd: selectedItem.value.item_cd, bomnm: selectedItem.value.item_nm })
+        }
+    } catch { /* */ }
     await onSelectItem(selectedItem.value)
 }
 
