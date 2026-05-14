@@ -56,40 +56,6 @@
                 </el-card>
             </div>
 
-            <div class="detail-panel" v-if="selectedItem">
-                <el-card shadow="never">
-                    <template #header>
-                        <div class="panel-header">
-                            <span>{{ selectedItem.item_cd }} — {{ selectedItem.item_nm }} BOM 明细</span>
-                            <template v-if="selectedBom">
-                                <div style="display:flex;gap:8px;align-items:center">
-                                    <el-tag :type="bomType.type" size="small">{{ bomType.label }}</el-tag>
-                                    <el-tag :type="selectedBom.useflg==='0'?'danger':'success'" size="small">{{ selectedBom.useflg==='0'?'无效':'有效' }}</el-tag>
-                                    <el-button type="primary" size="small" @click="openAddDetail">添加物料</el-button>
-                                    <el-button size="small" @click="openEditBom">重命名</el-button>
-                                </div>
-                            </template>
-                            <el-button v-else type="primary" size="small" @click="openCreateBomForItem">新建 BOM</el-button>
-                        </div>
-                    </template>
-                    <template v-if="selectedBom">
-                        <el-table :data="details" v-loading="detailLoading" stripe size="small">
-                            <el-table-column prop="itemcd" label="物料代码" width="100" />
-                            <el-table-column prop="item_nm" label="物料名称" min-width="160" show-overflow-tooltip />
-                            <el-table-column label="数量" width="80" align="center">
-                                <template #default="{ row }"><el-input-number v-model="row.bomqty" :min="1" size="small" controls-position="right" style="width:70px" @change="(v: number|undefined) => handleUpdateDetail(row, 'bomqty', v)" /></template>
-                            </el-table-column>
-                            <el-table-column label="类型" width="110" align="center">
-                                <template #default="{ row }"><el-select v-model="row.itemtyp" size="small" style="width:100px" @change="(v: unknown) => handleUpdateDetail(row, 'itemtyp', v)"><el-option label="外设配件" value="0" /><el-option label="核心配件" value="1" /></el-select></template>
-                            </el-table-column>
-                            <el-table-column label="操作" width="70" align="center">
-                                <template #default="{ row }"><el-button type="danger" link size="small" @click="handleDeleteDetail(row)">删除</el-button></template>
-                            </el-table-column>
-                        </el-table>
-                    </template>
-                    <div v-else class="empty-hint">该成品暂无 BOM 配置</div>
-                </el-card>
-            </div>
         </div>
 
         <!-- BOM 编辑/新建弹窗 -->
@@ -111,6 +77,35 @@
                 <el-button @click="bomDialogVisible = false">取消</el-button>
                 <el-button type="primary" @click="handleSaveBom" :loading="saving">确定</el-button>
             </template>
+        </el-dialog>
+
+        <!-- BOM 详情弹窗 -->
+        <el-dialog :title="(selectedItem?.item_nm || '') + ' BOM 配置'" v-model="bomDetailVisible" width="750px" @opened="onBomDetailOpened">
+            <template v-if="selectedBom">
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+                    <span style="font-weight:bold">{{ selectedItem?.item_cd }}</span>
+                    <el-tag :type="bomType.type" size="small">{{ bomType.label }}</el-tag>
+                    <el-tag :type="selectedBom.useflg==='0'?'danger':'success'" size="small">{{ selectedBom.useflg==='0'?'无效':'有效' }}</el-tag>
+                    <el-button type="primary" size="small" @click="openAddDetail">添加物料</el-button>
+                    <el-button size="small" @click="openEditBom">重命名</el-button>
+                </div>
+                <el-table :data="details" stripe size="small">
+                    <el-table-column prop="itemcd" label="物料代码" width="100" />
+                    <el-table-column prop="item_nm" label="物料名称" min-width="160" show-overflow-tooltip />
+                    <el-table-column label="数量" width="80" align="center">
+                        <template #default="{ row }"><el-input-number v-model="row.bomqty" :min="1" size="small" controls-position="right" style="width:70px" @change="(v: number|undefined) => handleUpdateDetail(row, 'bomqty', v)" /></template>
+                    </el-table-column>
+                    <el-table-column label="类型" width="110" align="center">
+                        <template #default="{ row }"><el-select v-model="row.itemtyp" size="small" style="width:100px" @change="(v: unknown) => handleUpdateDetail(row, 'itemtyp', v)"><el-option label="外设配件" value="0" /><el-option label="核心配件" value="1" /></el-select></template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="70" align="center">
+                        <template #default="{ row }"><el-button type="danger" link size="small" @click="handleDeleteDetail(row)">删除</el-button></template>
+                    </el-table-column>
+                </el-table>
+            </template>
+            <div v-else class="empty-hint">该成品暂无 BOM 配置
+                <el-button type="primary" size="small" style="margin-top:12px" @click="openCreateBomForItem">新建 BOM</el-button>
+            </div>
         </el-dialog>
 
         <!-- 添加物料弹窗（树形多选） -->
@@ -191,6 +186,7 @@ const total = ref(0); const page = ref(1); const perPage = ref(20); const search
 const selectedItem = ref<ItemRecord | null>(null)
 const selectedBom = ref<BomRecord | null>(null)
 const details = ref<BomDetailRecord[]>([]); const detailLoading = ref(false)
+const bomDetailVisible = ref(false)
 
 const bomDialogVisible = ref(false); const isEditingBom = ref(false); const saving = ref(false)
 const bomForm = reactive({ bomcd: '', bomnm: '', useflg: '1' })
@@ -266,8 +262,9 @@ async function onSelectItem(row: ItemRecord) {
     } catch {
         selectedBom.value = null; details.value = []
     }
-    finally { detailLoading.value = false }
+    finally { detailLoading.value = false; bomDetailVisible.value = true }
 }
+function onBomDetailOpened() { if (!selectedBom.value) return }
 
 async function openCreateBomForItem() {
     if (!selectedItem.value) return
