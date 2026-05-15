@@ -51,7 +51,9 @@ export const FRONTEND_MENUS: MenuConfig[] = [
     {
         menu_cd: 'itsm', menu_nm: 'ITSM工单',
         children: [
-            { menu_cd: 'maintenance', menu_nm: '日常维修', path: '/itsm/maintenance' }
+            { menu_cd: 'maintenance', menu_nm: '日常维修', path: '/itsm/maintenance' },
+            { menu_cd: 'renovate', menu_nm: '旧机翻新', path: '/itsm/renovate' },
+            { menu_cd: 'device-change', menu_nm: '设备变更', path: '/itsm/device-change' }
         ]
     },
     {
