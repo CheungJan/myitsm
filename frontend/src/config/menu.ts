@@ -42,6 +42,13 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         ]
     },
     {
+        menu_cd: 'procurement', menu_nm: '采购管理',
+        children: [
+            { menu_cd: 'proc-plans', menu_nm: '采购计划', path: '/procurement/plans' },
+            { menu_cd: 'proc-registers', menu_nm: '采购登记', path: '/procurement/registers' }
+        ]
+    },
+    {
         menu_cd: 'sales', menu_nm: '销售管理',
         children: [
             { menu_cd: 'plans', menu_nm: '预计划管理', path: '/sales/plans' }

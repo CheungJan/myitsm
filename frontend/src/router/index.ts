@@ -100,6 +100,18 @@ const router = createRouter({
                     meta: { title: '出库单管理' }
                 },
                 {
+                    path: 'procurement/plans',
+                    name: 'PurchasePlanList',
+                    component: () => import('@/views/procurement/PurchasePlanList.vue'),
+                    meta: { title: '采购计划' }
+                },
+                {
+                    path: 'procurement/registers',
+                    name: 'PurchaseRegisterList',
+                    component: () => import('@/views/procurement/PurchaseRegisterList.vue'),
+                    meta: { title: '采购登记' }
+                },
+                {
                     path: 'sales/plans',
                     name: 'PlanList',
                     component: () => import('@/views/sales/PlanList.vue'),
