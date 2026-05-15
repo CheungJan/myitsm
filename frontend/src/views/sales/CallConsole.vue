@@ -1,0 +1,2 @@
+<template><div class="page"><div class="page-header"><h2>话务台</h2></div><el-card shadow="never"><div style="text-align:center;padding:60px 0;color:#909399"><p style="font-size:48px;margin-bottom:16px">📞</p><p>话务台功能将在 F3 阶段实现</p><p style="font-size:12px;margin-top:8px">包括：来电客户识别、预计划确认/呼出、维修进度查询</p></div></el-card></div></template>
+<style scoped>.page{padding:0}.page-header{display:flex;justify-content:space-between;margin-bottom:16px}.page-header h2{font-size:18px;font-weight:600;margin:0}</style>

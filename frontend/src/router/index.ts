@@ -151,6 +151,18 @@ const router = createRouter({
                     meta: { title: '日常维修' }
                 },
                 {
+                    path: 'sales/extends', name: 'SalesExtendList', component: () => import('@/views/sales/SalesExtendList.vue'), meta: { title: '延期管理' }
+                },
+                {
+                    path: 'sales/calls', name: 'CallConsole', component: () => import('@/views/sales/CallConsole.vue'), meta: { title: '话务台' }
+                },
+                {
+                    path: 'warehouse/pos-change', name: 'PosChangeList', component: () => import('@/views/warehouse/PosChangeList.vue'), meta: { title: '设备回收确认' }
+                },
+                {
+                    path: 'procurement/appraisals', name: 'SupplierAppraisalList', component: () => import('@/views/procurement/SupplierAppraisalList.vue'), meta: { title: '供应商评价' }
+                },
+                {
                     path: 'sales/plans',
                     name: 'PlanList',
                     component: () => import('@/views/sales/PlanList.vue'),

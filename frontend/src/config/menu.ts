@@ -40,7 +40,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'stock-in', menu_nm: '入库单管理', path: '/warehouse/stock-in' },
             { menu_cd: 'stock-out', menu_nm: '出库单管理', path: '/warehouse/stock-out' },
             { menu_cd: 'stock', menu_nm: '库存查询', path: '/warehouse/stock-balance' },
-            { menu_cd: 'asset-check', menu_nm: '资产盘点', path: '/warehouse/asset-check' }
+            { menu_cd: 'asset-check', menu_nm: '资产盘点', path: '/warehouse/asset-check' },
+            { menu_cd: 'pos-change', menu_nm: '设备回收确认', path: '/warehouse/pos-change' }
         ]
     },
     {
@@ -49,7 +50,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'proc-plans', menu_nm: '采购计划', path: '/procurement/plans' },
             { menu_cd: 'proc-registers', menu_nm: '采购登记', path: '/procurement/registers' },
             { menu_cd: 'proc-bills', menu_nm: '采购单据', path: '/procurement/bills' },
-            { menu_cd: 'suppliers', menu_nm: '供应商管理', path: '/procurement/suppliers' }
+            { menu_cd: 'suppliers', menu_nm: '供应商管理', path: '/procurement/suppliers' },
+            { menu_cd: 'appraisals', menu_nm: '供应商评价', path: '/procurement/appraisals' }
         ]
     },
     {
@@ -67,7 +69,9 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         menu_cd: 'sales', menu_nm: '销售管理',
         children: [
             { menu_cd: 'plans', menu_nm: '预计划管理', path: '/sales/plans' },
-            { menu_cd: 'sales-bills', menu_nm: '销售单据', path: '/sales/bills' }
+            { menu_cd: 'sales-bills', menu_nm: '销售单据', path: '/sales/bills' },
+            { menu_cd: 'sales-extend', menu_nm: '延期管理', path: '/sales/extends' },
+            { menu_cd: 'calls', menu_nm: '话务台', path: '/sales/calls' }
         ]
     },
     {
