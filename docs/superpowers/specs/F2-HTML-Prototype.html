@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F2 业务主链前端设计原型</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f7fa;
+            color: #303133;
+        }
+        .header {
+            background: #fff;
+            border-bottom: 1px solid #e4e7ed;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 18px;
+            font-weight: 500;
+            color: #303133;
+        }
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+        }
+        .nav-tab {
+            padding: 8px 16px;
+            background: #f5f7fa;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .nav-tab:hover {
+            background: #e9e9eb;
+        }
+        .nav-tab.active {
+            background: #409eff;
+            color: white;
+            border-color: #409eff;
+        }
+        .content {
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+        .page-title {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            color: #303133;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #e4e7ed;
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .search-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+        }
+        .search-input input,
+        .search-input select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background: #f5f7fa;
+        }
+        .btn-primary {
+            background: #409eff;
+            color: white;
+            border-color: #409eff;
+        }
+        .btn-primary:hover {
+            background: #66b1ff;
+        }
+        .table-container {
+            border: 1px solid #e4e7ed;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background: #f5f7fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 500;
+            font-size: 14px;
+            color: #606266;
+            border-bottom: 1px solid #e4e7ed;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e4e7ed;
+            font-size: 14px;
+        }
+        tr:hover {
+            background: #f5f7fa;
+        }
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .tag-success {
+            background: #f0f9eb;
+            color: #67c23a;
+            border: 1px solid #e1f3d8;
+        }
+        .tag-warning {
+            background: #fdf6ec;
+            color: #e6a23c;
+            border: 1px solid #faecd8;
+        }
+        .tag-danger {
+            background: #fef0f0;
+            color: #f56c6c;
+            border: 1px solid #fde2e2;
+        }
+        .tag-info {
+            background: #f4f4f5;
+            color: #909399;
+            border: 1px solid #e9e9eb;
+        }
+        .pagination {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .pagination span {
+            font-size: 14px;
+            color: #606266;
+        }
+        .drawer {
+            position: fixed;
+            top: 0;
+            right: -600px;
+            width: 600px;
+            height: 100%;
+            background: #fff;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+            transition: right 0.3s;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        .drawer.open {
+            right: 0;
+        }
+        .drawer-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e4e7ed;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .drawer-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .drawer-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #909399;
+        }
+        .drawer-body {
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #606266;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        .detail-section {
+            margin-bottom: 24px;
+        }
+        .detail-section h4 {
+            font-size: 14px;
+            font-weight: 500;
+            color: #303133;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e4e7ed;
+        }
+        .detail-row {
+            display: flex;
+            margin-bottom: 12px;
+        }
+        .detail-row .label {
+            width: 100px;
+            color: #909399;
+            font-size: 14px;
+        }
+        .detail-row .value {
+            flex: 1;
+            color: #303133;
+            font-size: 14px;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            z-index: 999;
+        }
+        .overlay.show {
+            display: block;
+        }
+        .section-title {
+            font-size: 12px;
+            color: #909399;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>F2 业务主链前端设计原型</h1>
+        <div class="nav-tabs">
+            <div class="nav-tab active" onclick="showPage('plan')">预计划</div>
+            <div class="nav-tab" onclick="showPage('warehouse')">仓储</div>
+            <div class="nav-tab" onclick="showPage('procurement')">采购</div>
+            <div class="nav-tab" onclick="showPage('qc')">质检</div>
+            <div class="nav-tab" onclick="showPage('itsm')">ITSM</div>
+        </div>
+    </div>
+
+    <div class="content">
+        <!-- 预计划页面 -->
+        <div id="plan" class="page active">
+            <div class="page-title">预计划列表</div>
+            <div class="card">
+                <div class="search-bar">
+                    <div class="search-input">
+                        <input type="text" placeholder="预计划单号/客户名称">
+                    </div>
+                    <div class="search-input" style="width: 150px;">
+                        <select>
+                            <option>全部状态</option>
+                            <option>待确认</option>
+                            <option>已确认</option>
+                            <option>已取消</option>
+                        </select>
+                    </div>
+                    <div class="search-input" style="width: 150px;">
+                        <select>
+                            <option>全部类型</option>
+                            <option>新机</option>
+                            <option>旧机</option>
+                            <option>翻新</option>
+                        </select>
+                    </div>
+                    <button class="btn">搜索</button>
+                    <button class="btn btn-primary">新建预计划</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>预计划单号</th>
+                                <th>客户名称</th>
+                                <th>物料编码</th>
+                                <th>物料名称</th>
+                                <th>数量</th>
+                                <th>类型</th>
+                                <th>状态</th>
+                                <th>期望交付日期</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>PP20250514001</td>
+                                <td>北京客户A</td>
+                                <td>1Q001</td>
+                                <td>TFP4000 4LR4</td>
+                                <td>10</td>
+                                <td><span class="tag tag-info">新机</span></td>
+                                <td><span class="tag tag-warning">待确认</span></td>
+                                <td>2025-05-20</td>
+                                <td>
+                                    <button class="btn">详情</button>
+                                    <button class="btn">编辑</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>PP20250514002</td>
+                                <td>上海客户B</td>
+                                <td>1Q002</td>
+                                <td>TFP5000 6LR6</td>
+                                <td>5</td>
+                                <td><span class="tag tag-info">旧机</span></td>
+                                <td><span class="tag tag-success">已确认</span></td>
+                                <td>2025-05-18</td>
+                                <td>
+                                    <button class="btn">详情</button>
+                                    <button class="btn">编辑</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <span>共 2 条</span>
+                    <button class="btn">上一页</button>
+                    <button class="btn">下一页</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 仓储页面 -->
+        <div id="warehouse" class="page">
+            <div class="page-title">仓储管理</div>
+            <div class="card">
+                <div class="section-title">功能入口</div>
+                <div class="search-bar">
+                    <button class="btn btn-primary">入库管理</button>
+                    <button class="btn btn-primary">出库管理</button>
+                    <button class="btn btn-primary">库存查询</button>
+                    <button class="btn btn-primary">资产盘点</button>
+                    <button class="btn btn-primary">设备回收确认</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="page-title">入库单列表</div>
+                <div class="search-bar">
+                    <div class="search-input">
+                        <input type="text" placeholder="入库单号">
+                    </div>
+                    <div class="search-input" style="width: 150px;">
+                        <select>
+                            <option>全部仓库</option>
+                            <option>主仓库</option>
+                            <option>分仓库A</option>
+                        </select>
+                    </div>
+                    <div class="search-input" style="width: 150px;">
+                        <select>
+                            <option>全部状态</option>
+                            <option>待审核</option>
+                            <option>已审核</option>
+                            <option>已完成</option>
+                        </select>
+                    </div>
+                    <button class="btn">搜索</button>
+                    <button class="btn btn-primary">新建入库单</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>入库单号</th>
+                                <th>仓库</th>
+                                <th>入库类型</th>
+                                <th>物料编码</th>
+                                <th>物料名称</th>
+                                <th>数量</th>
+                                <th>状态</th>
+                                <th>入库日期</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>SI20250514001</td>
+                                <td>主仓库</td>
+                                <td>采购入库</td>
+                                <td>1Q001</td>
+                                <td>TFP4000 4LR4</td>
+                                <td>20</td>
+                                <td><span class="tag tag-success">已审核</span></td>
+                                <td>2025-05-14</td>
+                                <td>
+                                    <button class="btn">详情</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 采购页面 -->
+        <div id="procurement" class="page">
+            <div class="page-title">采购管理</div>
+            <div class="card">
+                <div class="section-title">功能入口</div>
+                <div class="search-bar">
+                    <button class="btn btn-primary">供应商管理</button>
+                    <button class="btn btn-primary">采购计划</button>
+                    <button class="btn btn-primary">采购登记</button>
+                    <button class="btn btn-primary">采购单据</button>
+                    <button class="btn btn-primary">供应商评价</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="page-title">采购计划列表</div>
+                <div class="search-bar">
+                    <div class="search-input">
+                        <input type="text" placeholder="计划单号">
+                    </div>
+                    <div class="search-input" style="width: 150px;">
+                        <select>
+                            <option>全部状态</option>
+                            <option>待审核</option>
+                            <option>已审核</option>
+                            <option>执行中</option>
+                            <option>已完成</option>
+                        </select>
+                    </div>
+                    <button class="btn">搜索</button>
+                    <button class="btn btn-primary">新建采购计划</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>计划单号</th>
+                                <th>供应商</th>
+                                <th>物料编码</th>
+                                <th>物料名称</th>
+                                <th>计划数量</th>
+                                <th>单价</th>
+                                <th>总金额</th>
+                                <th>状态</th>
+                                <th>期望交付日期</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>PP20250514001</td>
+                                <td>供应商A</td>
+                                <td>1Q001</td>
+                                <td>TFP4000 4LR4</td>
+                                <td>50</td>
+                                <td>¥1,200.00</td>
+                                <td>¥60,000.00</td>
+                                <td><span class="tag tag-warning">执行中</span></td>
+                                <td>2025-05-25</td>
+                                <td>
+                                    <button class="btn">详情</button>
+                                    <button class="btn">编辑</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 质检页面 -->
+        <div id="qc" class="page">
+            <div class="page-title">质检结果</div>
+            <div class="card">
+                <div class="search-bar">
+                    <div class="search-input">
+                        <input type="text" placeholder="质检单号">
+                    </div>
+                    <div class="search-input" style="width: 150px;">
+                        <select>
+                            <option>全部结果</option>
+                            <option>合格</option>
+                            <option>不合格</option>
+                            <option>待质检</option>
+                        </select>
+                    </div>
+                    <button class="btn">搜索</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>质检单号</th>
+                                <th>来源单据</th>
+                                <th>物料编码</th>
+                                <th>物料名称</th>
+                                <th>批次</th>
+                                <th>质检结果</th>
+                                <th>质检日期</th>
+                                <th>质检员</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>QC20250514001</td>
+                                <td>SI20250514001</td>
+                                <td>1Q001</td>
+                                <td>TFP4000 4LR4</td>
+                                <td>BATCH001</td>
+                                <td><span class="tag tag-success">合格</span></td>
+                                <td>2025-05-14</td>
+                                <td>张三</td>
+                                <td>
+                                    <button class="btn">详情</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>QC20250514002</td>
+                                <td>SI20250514002</td>
+                                <td>1Q002</td>
+                                <td>TFP5000 6LR6</td>
+                                <td>BATCH002</td>
+                                <td><span class="tag tag-danger">不合格</span></td>
+                                <td>2025-05-14</td>
+                                <td>李四</td>
+                                <td>
+                                    <button class="btn">详情</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ITSM页面 -->
+        <div id="itsm" class="page">
+            <div class="page-title">ITSM工单管理</div>
+            <div class="card">
+                <div class="section-title">高频工单</div>
+                <div class="search-bar">
+                    <button class="btn btn-primary">日常维护单</button>
+                    <button class="btn btn-primary">新机开通</button>
+                    <button class="btn btn-primary">旧机翻新</button>
+                    <button class="btn btn-primary">设备变更</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="section-title">剩余工单</div>
+                <div class="search-bar">
+                    <button class="btn">门店关闭</button>
+                    <button class="btn">回收任务</button>
+                    <button class="btn">日常保养</button>
+                    <button class="btn">免费更换</button>
+                    <button class="btn">未关单跟踪</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="page-title">日常维护单列表</div>
+                <div class="search-bar">
+                    <div class="search-input">
+                        <input type="text" placeholder="工单号/客户名称">
+                    </div>
+                    <div class="search-input" style="width: 150px;">
+                        <select>
+                            <option>全部状态</option>
+                            <option>待派工</option>
+                            <option>派工中</option>
+                            <option>处理中</option>
+                            <option>已完成</option>
+                            <option>已关闭</option>
+                        </select>
+                    </div>
+                    <button class="btn">搜索</button>
+                    <button class="btn btn-primary">新建工单</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>工单号</th>
+                                <th>客户名称</th>
+                                <th>设备序列号</th>
+                                <th>物料编码</th>
+                                <th>物料名称</th>
+                                <th>故障描述</th>
+                                <th>状态</th>
+                                <th>创建日期</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>MD20250514001</td>
+                                <td>北京客户A</td>
+                                <td>EID001234567</td>
+                                <td>1Q001</td>
+                                <td>TFP4000 4LR4</td>
+                                <td>屏幕显示异常</td>
+                                <td><span class="tag tag-warning">处理中</span></td>
+                                <td>2025-05-14</td>
+                                <td>
+                                    <button class="btn">详情</button>
+                                    <button class="btn">派工</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>MD20250514002</td>
+                                <td>上海客户B</td>
+                                <td>EID001234568</td>
+                                <td>1Q002</td>
+                                <td>TFP5000 6LR6</td>
+                                <td>无法开机</td>
+                                <td><span class="tag tag-success">已完成</span></td>
+                                <td>2025-05-13</td>
+                                <td>
+                                    <button class="btn">详情</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <span>共 2 条</span>
+                    <button class="btn">上一页</button>
+                    <button class="btn">下一页</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 抽屉 -->
+    <div class="overlay" id="overlay" onclick="closeDrawer()"></div>
+    <div class="drawer" id="drawer">
+        <div class="drawer-header">
+            <h3>预计划详情</h3>
+            <button class="drawer-close" onclick="closeDrawer()">&times;</button>
+        </div>
+        <div class="drawer-body">
+            <div class="detail-section">
+                <h4>基本信息</h4>
+                <div class="detail-row">
+                    <span class="label">预计划单号：</span>
+                    <span class="value">PP20250514001</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">客户名称：</span>
+                    <span class="value">北京客户A</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">物料编码：</span>
+                    <span class="value">1Q001</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">物料名称：</span>
+                    <span class="value">TFP4000 4LR4</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">数量：</span>
+                    <span class="value">10</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">类型：</span>
+                    <span class="value"><span class="tag tag-info">新机</span></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">状态：</span>
+                    <span class="value"><span class="tag tag-warning">待确认</span></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">期望交付日期：</span>
+                    <span class="value">2025-05-20</span>
+                </div>
+            </div>
+            <div class="detail-section">
+                <h4>库存决策</h4>
+                <div class="detail-row">
+                    <span class="label">当前库存：</span>
+                    <span class="value">5 台</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">库存不足：</span>
+                    <span class="value">5 台</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">决策建议：</span>
+                    <span class="value"><span class="tag tag-warning">需采购</span></span>
+                </div>
+            </div>
+            <div class="detail-section">
+                <h4>操作</h4>
+                <div class="search-bar">
+                    <button class="btn btn-primary">确认预计划</button>
+                    <button class="btn">生成采购需求</button>
+                    <button class="btn">生成生产需求</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showPage(pageId) {
+            // 隐藏所有页面
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            // 移除所有标签的active类
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            // 显示目标页面
+            document.getElementById(pageId).classList.add('active');
+            // 激活对应标签
+            event.target.classList.add('active');
+        }
+
+        function openDrawer() {
+            document.getElementById('drawer').classList.add('open');
+            document.getElementById('overlay').classList.add('show');
+        }
+
+        function closeDrawer() {
+            document.getElementById('drawer').classList.remove('open');
+            document.getElementById('overlay').classList.remove('show');
+        }
+
+        // 为表格中的详情按钮添加点击事件
+        document.querySelectorAll('table button').forEach(btn => {
+            if (btn.textContent === '详情') {
+                btn.addEventListener('click', openDrawer);
+            }
+        });
+    </script>
+</body>
+</html>

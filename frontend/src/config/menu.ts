@@ -34,5 +34,11 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'warehouses', menu_nm: '仓库管理', path: '/master/warehouses' }
         ]
     }
+    {
+        menu_cd: 'sales', menu_nm: '销售管理',
+        children: [
+            { menu_cd: 'plans', menu_nm: '预计划管理', path: '/sales/plans' }
+        ]
+    }
     // F2+ 模块将在后续阶段追加
 ]

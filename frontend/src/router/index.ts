@@ -90,6 +90,13 @@ const router = createRouter({
             ]
         },
         {
+            path: '/sales',
+            component: () => import('@/layout/AppLayout.vue'),
+            children: [
+                { path: 'plans', name: 'PlanList', component: () => import('@/views/sales/PlanList.vue'), meta: { title: '预计划管理' } }
+            ]
+        },
+        {
             path: '/:pathMatch(.*)*',
             redirect: '/'
         }
