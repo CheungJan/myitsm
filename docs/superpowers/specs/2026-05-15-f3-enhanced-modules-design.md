@@ -47,64 +47,69 @@ F3.6 全局搜索+通用组件（收尾）
 
 ## 3. 模块蓝图与页面
 
-### F3.1 客户门户 + SLA + 通知（~15页）
+### F3.1 客户门户 + SLA + 通知（~9页）
 
-| 模块 | 页面 | API 前缀 |
-|------|------|---------|
-| 门户用户 | PortalUserList | `/portal` |
-| 自助报修 | RepairRequestList | `/portal` |
-| 服务评价 | ServiceRatingList | `/portal` |
-| SLA定义 | SlaDefinitionList | `/sla` |
-| SLA工单监控 | SlaTicketList | `/sla` |
-| 通知模板 | NotificationTemplateList | `/notification` |
-| 通知记录 | NotificationList | `/notification` |
+| 页面 | 路由 | API |
+|------|------|-----|
+| PortalUserList | `/portal/users` | portal |
+| RepairRequestList（自助报修） | `/portal/repairs` | portal |
+| ServiceRatingList | `/portal/ratings` | portal |
+| SlaDefinitionList | `/sla/definitions` | sla |
+| SlaTicketList（SLA监控） | `/sla/tickets` | sla |
+| NotificationTemplateList | `/notification/templates` | notification |
+| NotificationList | `/notification/notifications` | notification |
 
-### F3.2 合同 + 发票 + 结算 + 财务（~10页）
+> **话务台增强**（F2已有 CallConsole.vue 占位）：报修接收 + 转派给不同部门（技术部/实施部）+ 关单确认。调用 F2 已有 `/itsm/maintenance-daily/<id>/transition` 分派 API。
 
-| 模块 | 页面 | API 前缀 |
-|------|------|---------|
-| 合同管理 | ContractList | `/contract` |
-| 发票管理 | InvoiceList | `/contract` |
-| 结算规则 | BillingRuleList | `/billing` |
-| 账单管理 | BillList | `/billing` |
-| 会计科目 | AccountList | `/finance` |
-| 应收管理 | ReceivableList | `/finance` |
-| 应付管理 | PayableList | `/finance` |
-| 收付款 | PaymentList | `/finance` |
-| 设备折旧 | DepreciationList | `/finance` |
+### F3.2 合同 + 发票 + 结算 + 财务（~9页）
 
-### F3.3 押金 + 资产属性（~5页）
+| 页面 | 路由 | API |
+|------|------|-----|
+| ContractList | `/contract/contracts` | contract |
+| InvoiceList | `/contract/invoices` | contract |
+| BillingRuleList | `/billing/rules` | billing |
+| BillList（账单管理） | `/billing/bills` | billing |
+| AccountList（会计科目） | `/finance/accounts` | finance |
+| ReceivableList（应收） | `/finance/receivables` | finance |
+| PayableList（应付） | `/finance/payables` | finance |
+| PaymentList（收付款） | `/finance/payments` | finance |
+| DepreciationList（折旧） | `/finance/depreciations` | finance |
 
-| 模块 | 页面 | API 前缀 |
-|------|------|---------|
-| 押金主表 | DepositList | `/deposit` |
-| 押金明细 | DepositDetailList | `/deposit` |
-| 押金出入 | DepositIOList | `/deposit` |
-| 资产属性扩展 | AssetAttribList | `/system` |
+### F3.3 保养计划 + 押金 + 资产属性（~7页）
+
+| 页面 | 路由 | API |
+|------|------|-----|
+| MaintenancePlanList（保养计划 CRUD） | `/itsm/maintenance-plans` | itsm |
+| MaintenanceList（保养工单） | `/itsm/maintenance` | itsm |
+| DepositList | `/deposit/deposits` | deposit |
+| DepositDetailList | `/deposit/details` | deposit |
+| DepositIOList | `/deposit/io` | deposit |
+| AssetAttribList（资产属性扩展） | `/master/asset-attrib` | system |
 
 ### F3.4 考勤 + 预警/价格（~5页）
 
-| 模块 | 页面 | API 前缀 |
-|------|------|---------|
-| 考勤记录 | AttendanceList | `/attendance` |
-| 考勤汇总 | AttendanceCountList | `/attendance` |
-| 库存预警 | InventoryLimitList | `/inventory` |
-| 价格规则 | PriceList | `/inventory` |
+| 页面 | 路由 | API |
+|------|------|-----|
+| AttendanceList | `/attendance/records` | attendance |
+| AttendanceCountList | `/attendance/summary` | attendance |
+| InventoryLimitList | `/inventory/limits` | inventory |
+| PriceList | `/inventory/prices` | inventory |
+| AdjustPriceList（调价记录） | `/inventory/adjust-prices` | inventory |
 
 ### F3.5 MES + IoT + 调拨 + 报表（~10页）
 
-| 模块 | 页面 | API 前缀 |
-|------|------|---------|
-| 生产工单 | WorkOrderList | `/mes` |
-| 工序定义 | ProcessDefList | `/mes` |
-| 工单工序 | WorkProcessList | `/mes` |
-| 物料消耗 | MaterialConsumeList | `/mes` |
-| 设备接入 | DeviceConnList | `/iot` |
-| 设备数据 | DeviceDataList | `/iot` |
-| 报警规则 | AlertRuleList | `/iot` |
-| 报警记录 | AlertLogList | `/iot` |
-| 调拨科目 | TransferAccountList | `/system` |
-| 报表中心 | ReportCenter | `/reports` |
+| 页面 | 路由 | API |
+|------|------|-----|
+| WorkOrderList | `/mes/work-orders` | mes |
+| ProcessDefList | `/mes/processes` | mes |
+| WorkProcessList | `/mes/work-processes` | mes |
+| MaterialConsumeList | `/mes/materials` | mes |
+| DeviceConnList | `/iot/connections` | iot |
+| DeviceDataList | `/iot/data` | iot |
+| AlertRuleList | `/iot/alert-rules` | iot |
+| AlertLogList | `/iot/alerts` | iot |
+| TransferAccountList | `/system/transfers` | system |
+| ReportCenter | `/reports/center` | reports |
 
 ### F3.6 全局搜索 + 通用组件
 
