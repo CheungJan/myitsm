@@ -186,7 +186,16 @@ class SystemRepository:
 
     @staticmethod
     def get_user_permissions(user_cd: str) -> list[dict[str, str]]:
-        """获取用户的有效权限（通过其所属于的用户组，并集去重）。"""
+        """获取用户的有效权限（管理员组99自动拥有全部权限）。"""
+        # 管理员组(99)直接返回全部菜单权限
+        is_admin = db.session.query(UserGroup).filter(
+            UserGroup.user_cd == user_cd, UserGroup.group_cd == "99"
+        ).first()
+        if is_admin:
+            rows = db.session.query(MenuDetail.menu_cd, MenuDetail.func_cd).filter(
+                MenuDetail.useflg == "1"
+            ).all()
+            return [{"menu_cd": r.menu_cd, "func_cd": r.func_cd or "view"} for r in rows]
         rows = (
             db.session.query(GroupRight.menu_cd, GroupRight.func_cd)
             .join(UserGroup, GroupRight.group_cd == UserGroup.group_cd)
