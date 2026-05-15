@@ -79,6 +79,28 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         children: [
             { menu_cd: 'qc-results', menu_nm: '质检结果', path: '/qc/results' }
         ]
+    },
+    {
+        menu_cd: 'portal', menu_nm: '客户门户',
+        children: [
+            { menu_cd: 'portal-users', menu_nm: '门户用户', path: '/portal/users' },
+            { menu_cd: 'repairs', menu_nm: '自助报修', path: '/portal/repairs' },
+            { menu_cd: 'ratings', menu_nm: '服务评价', path: '/portal/ratings' }
+        ]
+    },
+    {
+        menu_cd: 'sla', menu_nm: 'SLA管理',
+        children: [
+            { menu_cd: 'sla-defs', menu_nm: 'SLA定义', path: '/sla/definitions' },
+            { menu_cd: 'sla-tickets', menu_nm: 'SLA监控', path: '/sla/tickets' }
+        ]
+    },
+    {
+        menu_cd: 'notification', menu_nm: '通知管理',
+        children: [
+            { menu_cd: 'notif-tpl', menu_nm: '通知模板', path: '/notification/templates' },
+            { menu_cd: 'notif-list', menu_nm: '通知记录', path: '/notification/notifications' }
+        ]
     }
-    // F2+ 模块将在后续阶段追加
+    // F3+ 模块将在后续阶段追加
 ]

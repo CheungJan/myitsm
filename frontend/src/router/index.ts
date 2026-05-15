@@ -167,7 +167,14 @@ const router = createRouter({
                     name: 'PlanList',
                     component: () => import('@/views/sales/PlanList.vue'),
                     meta: { title: '预计划管理' }
-                }
+                },
+                { path: 'portal/users', name: 'PortalUserList', component: () => import('@/views/portal/PortalUserList.vue'), meta: { title: '门户用户' } },
+                { path: 'portal/repairs', name: 'RepairRequestList', component: () => import('@/views/portal/RepairRequestList.vue'), meta: { title: '自助报修' } },
+                { path: 'portal/ratings', name: 'ServiceRatingList', component: () => import('@/views/portal/ServiceRatingList.vue'), meta: { title: '服务评价' } },
+                { path: 'sla/definitions', name: 'SlaDefinitionList', component: () => import('@/views/sla/SlaDefinitionList.vue'), meta: { title: 'SLA定义' } },
+                { path: 'sla/tickets', name: 'SlaTicketList', component: () => import('@/views/sla/SlaTicketList.vue'), meta: { title: 'SLA监控' } },
+                { path: 'notification/templates', name: 'NotificationTemplateList', component: () => import('@/views/notification/NotificationTemplateList.vue'), meta: { title: '通知模板' } },
+                { path: 'notification/notifications', name: 'NotificationList', component: () => import('@/views/notification/NotificationList.vue'), meta: { title: '通知记录' } }
             ]
         },
         {

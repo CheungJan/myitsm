@@ -34,15 +34,21 @@
           <el-descriptions-item label="完成日期">{{ detail.close_time || '-' }}</el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ detail.detail_description || detail.memo || '-' }}</el-descriptions-item>
         </el-descriptions>
+        <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+          <el-button type="primary" @click="doTransition(detail,'1')" v-if="detail.current_status==='0'">分派维修</el-button>
+          <el-button type="success" @click="doTransition(detail,'2')" v-if="detail.current_status==='1'">开始维修</el-button>
+          <el-button type="warning" @click="doTransition(detail,'3')" v-if="detail.current_status==='2'">确认关单</el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
 </template>
-<script setup lang="ts">import {reactive} from 'vue';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {fetchMaintenanceDaily} from '@/api/itsm';import type {MntRecord} from '@/api/itsm'
+<script setup lang="ts">import {reactive} from 'vue';import {ElMessage} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {fetchMaintenanceDaily} from '@/api/itsm';import type {MntRecord} from '@/api/itsm';import request from '@/api/request'
 const{items,loading,page,perPage,total,onSearch}=useListPage<MntRecord>(fetchMaintenanceDaily)
 const{drawer,detail,open}=useDetailDrawer<MntRecord>()
 const search=reactive({id:'',status:''})
 function statusTag(s:unknown){const m:Record<string,string>={'0':'warning','1':'primary','2':'info','3':'success'};return m[s as string]||'info'}
 function statusLabel(s:unknown){const m:Record<string,string>={'0':'待分派','1':'维修中','2':'待关单','3':'已完成'};return m[s as string]||s as string}
-function doSearch(){const p:Record<string,string>={};if(search.id)p.maintenance_id=search.id;if(search.status)p.current_status=search.status;onSearch(p)}</script>
+function doSearch(){const p:Record<string,string>={};if(search.id)p.maintenance_id=search.id;if(search.status)p.current_status=search.status;onSearch(p)}
+async function doTransition(row:MntRecord,toStatus:string){try{await request.post(`/itsm/maintenance-daily/${row.maintenance_id}/transition`,{to_status:toStatus});ElMessage.success('状态流转成功');onSearch({})}catch{ElMessage.error('状态流转失败')}}</script>
 <style scoped>.page{padding:0}.page-header{display:flex;justify-content:space-between;margin-bottom:16px}.page-header h2{font-size:18px;font-weight:600;margin:0}.search-bar{display:flex;gap:12px;align-items:center}.field{display:flex;align-items:center;gap:6px}.field label{font-size:13px;color:#606266}</style>
