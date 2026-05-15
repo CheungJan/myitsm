@@ -112,6 +112,12 @@ const router = createRouter({
                     meta: { title: '采购登记' }
                 },
                 {
+                    path: 'itsm/maintenance',
+                    name: 'MaintenanceList',
+                    component: () => import('@/views/itsm/MaintenanceList.vue'),
+                    meta: { title: '日常维修' }
+                },
+                {
                     path: 'sales/plans',
                     name: 'PlanList',
                     component: () => import('@/views/sales/PlanList.vue'),

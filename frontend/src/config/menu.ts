@@ -49,6 +49,12 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         ]
     },
     {
+        menu_cd: 'itsm', menu_nm: 'ITSM工单',
+        children: [
+            { menu_cd: 'maintenance', menu_nm: '日常维修', path: '/itsm/maintenance' }
+        ]
+    },
+    {
         menu_cd: 'sales', menu_nm: '销售管理',
         children: [
             { menu_cd: 'plans', menu_nm: '预计划管理', path: '/sales/plans' }
