@@ -78,7 +78,8 @@ class WarehouseQuery(BaseModel):
 class StockQuery(BaseModel):
     """库存查询参数。"""
 
-    whcd: str = Field(..., max_length=2)
+    whcd: str | None = Field(None, max_length=2)
     itemcd: str | None = Field(None, max_length=6)
+    search: str | None = Field(None, max_length=50)
     page: int = Field(1, ge=1)
     per_page: int = Field(20, ge=1, le=100)

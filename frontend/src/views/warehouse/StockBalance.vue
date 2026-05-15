@@ -3,5 +3,5 @@
 const{items,loading,page,perPage,total,onSearch}=useListPage<StockItem>(fetchStock)
 const search=reactive({item:'',whcd:''});const whOptions=ref<{whcd:string;whnm:string}[]>([])
 onMounted(async()=>{try{const r=await fetchWarehouses();whOptions.value=r.data||[]}catch{}})
-function doSearch(){const p:Record<string,string>={};if(search.item)p.search=search.item;if(search.whcd)p.whcd=search.whcd;onSearch(p)}</script>
+function doSearch(){const p:Record<string,string>={};if(search.item)p.search=search.item;p.whcd=search.whcd||whOptions.value[0]?.whcd||'';onSearch(p)}</script>
 <style scoped>.page{padding:0}.page-header{display:flex;justify-content:space-between;margin-bottom:16px}.page-header h2{font-size:18px;font-weight:600;margin:0}.search-bar{display:flex;gap:12px;align-items:center}.field{display:flex;align-items:center;gap:6px}.field label{font-size:13px;color:#606266}</style>
