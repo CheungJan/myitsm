@@ -5,7 +5,7 @@
 const{items,loading,page,perPage,total,onSearch}=useListPage<StockOutRecord>(fetchStockOut)
 const s=reactive({bill:'',whcd:''});const whOptions=ref<{whcd:string;whnm:string}[]>([])
 const drawer=ref(false);const detail=ref<StockOutRecord|null>(null)
-onMounted(async()=>{try{const r=await fetchWarehouses();whOptions.value=r.data||[]}catch{}})
+onMounted(async()=>{try{const r=await fetchWarehouses();whOptions.value=(r.data||[]).map((w:any)=>({whcd:w.wh_cd,whnm:w.wh_nm}))}catch{}})
 function doSearch(){const p:Record<string,string>={};if(s.bill)p.outbillid=s.bill;if(s.whcd)p.whcd=s.whcd;onSearch(p)}
 async function openDrawer(row:StockOutRecord){drawer.value=true;try{const r=await fetchStockOutDetail(row.outbillid);detail.value=r.data}catch{detail.value=row}}</script>
 <style scoped>.page{padding:0}.page-header{display:flex;justify-content:space-between;margin-bottom:16px}.page-header h2{font-size:18px;font-weight:600;margin:0}.search-bar{display:flex;gap:12px;align-items:center}.field{display:flex;align-items:center;gap:6px}.field label{font-size:13px;color:#606266}</style>

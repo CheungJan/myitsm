@@ -35,6 +35,7 @@ export function fetchStockInDetail(id:string) { return request.get<never,{data:S
 export interface StockOutRecord { outbillid: string; whcd: string; custcd?: string; gendate: string; opercd: string; invtyp?: string; details?: Record<string,unknown>[]; [key:string]: unknown }
 export interface StockOutPage { items: StockOutRecord[]; total: number }
 export function fetchStockOut(params?: Record<string,string>) { return request.get<never,{data:StockOutPage}>('/warehouse/stock-out',{params}) }
+export function fetchStockOutDetail(id:string) { return request.get<never,{data:StockOutRecord}>(`/warehouse/stock-out/${id}`) }
 
 // ---- 库存 ----
 export interface StockItem { itemcd: string; item_nm: string; whcd: string; storeqty: number; upperlimit?: number; lowerlimit?: number; [key:string]: unknown }

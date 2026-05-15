@@ -39,7 +39,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         children: [
             { menu_cd: 'stock-in', menu_nm: '入库单管理', path: '/warehouse/stock-in' },
             { menu_cd: 'stock-out', menu_nm: '出库单管理', path: '/warehouse/stock-out' },
-            { menu_cd: 'stock', menu_nm: '库存查询', path: '/warehouse/stock-balance' }
+            { menu_cd: 'stock', menu_nm: '库存查询', path: '/warehouse/stock-balance' },
+            { menu_cd: 'asset-check', menu_nm: '资产盘点', path: '/warehouse/asset-check' }
         ]
     },
     {
