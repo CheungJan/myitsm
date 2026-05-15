@@ -136,6 +136,21 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'deposit-dtl', menu_nm: '押金明细', path: '/deposit/details' },
             { menu_cd: 'deposit-io', menu_nm: '押金流水', path: '/deposit/io' }
         ]
+    },
+    {
+        menu_cd: 'attendance', menu_nm: '考勤管理',
+        children: [
+            { menu_cd: 'attend-records', menu_nm: '考勤记录', path: '/attendance/records' },
+            { menu_cd: 'attend-summary', menu_nm: '考勤汇总', path: '/attendance/summary' }
+        ]
+    },
+    {
+        menu_cd: 'inv-mgmt', menu_nm: '库存管理',
+        children: [
+            { menu_cd: 'inv-limits', menu_nm: '库存预警', path: '/inventory/limits' },
+            { menu_cd: 'prices', menu_nm: '价格管理', path: '/inventory/prices' },
+            { menu_cd: 'adjust-prices', menu_nm: '调价记录', path: '/inventory/adjust-prices' }
+        ]
     }
     // F3+ 模块将在后续阶段追加
 ]

@@ -189,7 +189,12 @@ const router = createRouter({
                 { path: 'deposit/deposits', name: 'DepositList', component: () => import('@/views/deposit/DepositList.vue'), meta: { title: '押金管理' } },
                 { path: 'deposit/details', name: 'DepositDetailList', component: () => import('@/views/deposit/DepositDetailList.vue'), meta: { title: '押金明细' } },
                 { path: 'deposit/io', name: 'DepositIOList', component: () => import('@/views/deposit/DepositIOList.vue'), meta: { title: '押金流水' } },
-                { path: 'master/asset-attrib', name: 'AssetAttribList', component: () => import('@/views/master/AssetAttribList.vue'), meta: { title: '资产属性' } }
+                { path: 'master/asset-attrib', name: 'AssetAttribList', component: () => import('@/views/master/AssetAttribList.vue'), meta: { title: '资产属性' } },
+                { path: 'attendance/records', name: 'AttendanceList', component: () => import('@/views/attendance/AttendanceList.vue'), meta: { title: '考勤记录' } },
+                { path: 'attendance/summary', name: 'AttendanceCountList', component: () => import('@/views/attendance/AttendanceCountList.vue'), meta: { title: '考勤汇总' } },
+                { path: 'inventory/limits', name: 'InventoryLimitList', component: () => import('@/views/inventory/InventoryLimitList.vue'), meta: { title: '库存预警' } },
+                { path: 'inventory/prices', name: 'PriceList', component: () => import('@/views/inventory/PriceList.vue'), meta: { title: '价格管理' } },
+                { path: 'inventory/adjust-prices', name: 'AdjustPriceList', component: () => import('@/views/inventory/AdjustPriceList.vue'), meta: { title: '调价记录' } }
             ]
         },
         {
