@@ -1,0 +1,6 @@
+<template><div class="page"><div class="page-header"><h2>采购单据</h2></div><el-card shadow="never"><el-table :data="items" v-loading="loading" stripe size="small"><el-table-column prop="pcbillid" label="单据号" width="110"/><el-table-column prop="gendate" label="日期" width="110"/></el-table><AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:12px;justify-content:flex-end"/></el-card></div></template>
+<script setup lang="ts">import {ref,watch,onMounted} from 'vue';import {ElMessage} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {fetchProcBills} from '@/api/procurement'
+const items=ref<Record<string,unknown>[]>([]);const loading=ref(false);const page=ref(1);const perPage=ref(20);const total=ref(0)
+watch(page,()=>load());watch(perPage,()=>{page.value=1;load()});onMounted(()=>load())
+async function load(){loading.value=true;try{const r=await fetchProcBills({page:String(page.value),per_page:String(perPage.value)});items.value=r.data.items||[];total.value=r.data.total||0}catch{ElMessage.error('加载失败')}finally{loading.value=false}}</script>
+<style scoped>.page{padding:0}.page-header{display:flex;justify-content:space-between;margin-bottom:16px}.page-header h2{font-size:18px;font-weight:600;margin:0}</style>

@@ -121,6 +121,9 @@ const router = createRouter({
                     path: 'itsm/store-close', name: 'StoreCloseList', component: () => import('@/views/itsm/StoreCloseList.vue'), meta: { title: '门店关闭' }
                 },
                 {
+                    path: 'procurement/bills', name: 'PurchaseBillList', component: () => import('@/views/procurement/PurchaseBillList.vue'), meta: { title: '采购单据' }
+                },
+                {
                     path: 'itsm/maintenance',
                     name: 'MaintenanceList',
                     component: () => import('@/views/itsm/MaintenanceList.vue'),
