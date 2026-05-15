@@ -174,7 +174,16 @@ const router = createRouter({
                 { path: 'sla/definitions', name: 'SlaDefinitionList', component: () => import('@/views/sla/SlaDefinitionList.vue'), meta: { title: 'SLA定义' } },
                 { path: 'sla/tickets', name: 'SlaTicketList', component: () => import('@/views/sla/SlaTicketList.vue'), meta: { title: 'SLA监控' } },
                 { path: 'notification/templates', name: 'NotificationTemplateList', component: () => import('@/views/notification/NotificationTemplateList.vue'), meta: { title: '通知模板' } },
-                { path: 'notification/notifications', name: 'NotificationList', component: () => import('@/views/notification/NotificationList.vue'), meta: { title: '通知记录' } }
+                { path: 'notification/notifications', name: 'NotificationList', component: () => import('@/views/notification/NotificationList.vue'), meta: { title: '通知记录' } },
+                { path: 'contract/contracts', name: 'ContractList', component: () => import('@/views/contract/ContractList.vue'), meta: { title: '合同管理' } },
+                { path: 'contract/invoices', name: 'InvoiceList', component: () => import('@/views/contract/InvoiceList.vue'), meta: { title: '发票管理' } },
+                { path: 'billing/rules', name: 'BillingRuleList', component: () => import('@/views/billing/BillingRuleList.vue'), meta: { title: '结算规则' } },
+                { path: 'billing/bills', name: 'BillList', component: () => import('@/views/billing/BillList.vue'), meta: { title: '账单管理' } },
+                { path: 'finance/accounts', name: 'AccountList', component: () => import('@/views/finance/AccountList.vue'), meta: { title: '会计科目' } },
+                { path: 'finance/receivables', name: 'ReceivableList', component: () => import('@/views/finance/ReceivableList.vue'), meta: { title: '应收管理' } },
+                { path: 'finance/payables', name: 'PayableList', component: () => import('@/views/finance/PayableList.vue'), meta: { title: '应付管理' } },
+                { path: 'finance/payments', name: 'PaymentList', component: () => import('@/views/finance/PaymentList.vue'), meta: { title: '收付款管理' } },
+                { path: 'finance/depreciations', name: 'DepreciationList', component: () => import('@/views/finance/DepreciationList.vue'), meta: { title: '设备折旧' } }
             ]
         },
         {

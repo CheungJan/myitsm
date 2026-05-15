@@ -101,6 +101,30 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'notif-tpl', menu_nm: '通知模板', path: '/notification/templates' },
             { menu_cd: 'notif-list', menu_nm: '通知记录', path: '/notification/notifications' }
         ]
+    },
+    {
+        menu_cd: 'contract', menu_nm: '合同管理',
+        children: [
+            { menu_cd: 'contracts', menu_nm: '合同管理', path: '/contract/contracts' },
+            { menu_cd: 'invoices', menu_nm: '发票管理', path: '/contract/invoices' }
+        ]
+    },
+    {
+        menu_cd: 'billing', menu_nm: '结算管理',
+        children: [
+            { menu_cd: 'billing-rules', menu_nm: '结算规则', path: '/billing/rules' },
+            { menu_cd: 'bills', menu_nm: '账单管理', path: '/billing/bills' }
+        ]
+    },
+    {
+        menu_cd: 'finance', menu_nm: '财务管理',
+        children: [
+            { menu_cd: 'accounts', menu_nm: '会计科目', path: '/finance/accounts' },
+            { menu_cd: 'receivables', menu_nm: '应收管理', path: '/finance/receivables' },
+            { menu_cd: 'payables', menu_nm: '应付管理', path: '/finance/payables' },
+            { menu_cd: 'payments', menu_nm: '收付款管理', path: '/finance/payments' },
+            { menu_cd: 'depreciations', menu_nm: '设备折旧', path: '/finance/depreciations' }
+        ]
     }
     // F3+ 模块将在后续阶段追加
 ]
