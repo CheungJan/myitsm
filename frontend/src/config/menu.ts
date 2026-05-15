@@ -20,7 +20,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'depts', menu_nm: '部门管理', path: '/system/departments' },
             { menu_cd: 'groups', menu_nm: '用户组管理', path: '/system/groups' },
             { menu_cd: 'params', menu_nm: '系统参数', path: '/system/params' },
-            { menu_cd: 'codes', menu_nm: '系统字典', path: '/system/codes' }
+            { menu_cd: 'codes', menu_nm: '系统字典', path: '/system/codes' },
+            { menu_cd: 'transfers', menu_nm: '调拨科目', path: '/system/transfers' }
         ]
     },
     {
@@ -150,6 +151,30 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'inv-limits', menu_nm: '库存预警', path: '/inventory/limits' },
             { menu_cd: 'prices', menu_nm: '价格管理', path: '/inventory/prices' },
             { menu_cd: 'adjust-prices', menu_nm: '调价记录', path: '/inventory/adjust-prices' }
+        ]
+    },
+    {
+        menu_cd: 'mes', menu_nm: '生产管理',
+        children: [
+            { menu_cd: 'work-orders', menu_nm: '生产工单', path: '/mes/work-orders' },
+            { menu_cd: 'processes', menu_nm: '工序定义', path: '/mes/processes' },
+            { menu_cd: 'work-processes', menu_nm: '工单工序', path: '/mes/work-processes' },
+            { menu_cd: 'materials', menu_nm: '物料消耗', path: '/mes/materials' }
+        ]
+    },
+    {
+        menu_cd: 'iot', menu_nm: 'IoT物联',
+        children: [
+            { menu_cd: 'connections', menu_nm: '设备接入', path: '/iot/connections' },
+            { menu_cd: 'device-data', menu_nm: '设备数据', path: '/iot/data' },
+            { menu_cd: 'alert-rules', menu_nm: '报警规则', path: '/iot/alert-rules' },
+            { menu_cd: 'alerts', menu_nm: '报警记录', path: '/iot/alerts' }
+        ]
+    },
+    {
+        menu_cd: 'reports', menu_nm: '报表中心',
+        children: [
+            { menu_cd: 'report-center', menu_nm: '报表中心', path: '/reports/center' }
         ]
     }
     // F3+ 模块将在后续阶段追加

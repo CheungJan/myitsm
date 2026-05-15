@@ -194,7 +194,17 @@ const router = createRouter({
                 { path: 'attendance/summary', name: 'AttendanceCountList', component: () => import('@/views/attendance/AttendanceCountList.vue'), meta: { title: '考勤汇总' } },
                 { path: 'inventory/limits', name: 'InventoryLimitList', component: () => import('@/views/inventory/InventoryLimitList.vue'), meta: { title: '库存预警' } },
                 { path: 'inventory/prices', name: 'PriceList', component: () => import('@/views/inventory/PriceList.vue'), meta: { title: '价格管理' } },
-                { path: 'inventory/adjust-prices', name: 'AdjustPriceList', component: () => import('@/views/inventory/AdjustPriceList.vue'), meta: { title: '调价记录' } }
+                { path: 'inventory/adjust-prices', name: 'AdjustPriceList', component: () => import('@/views/inventory/AdjustPriceList.vue'), meta: { title: '调价记录' } },
+                { path: 'mes/work-orders', name: 'WorkOrderList', component: () => import('@/views/mes/WorkOrderList.vue'), meta: { title: '生产工单' } },
+                { path: 'mes/processes', name: 'ProcessDefList', component: () => import('@/views/mes/ProcessDefList.vue'), meta: { title: '工序定义' } },
+                { path: 'mes/work-processes', name: 'WorkProcessList', component: () => import('@/views/mes/WorkProcessList.vue'), meta: { title: '工单工序' } },
+                { path: 'mes/materials', name: 'MaterialConsumeList', component: () => import('@/views/mes/MaterialConsumeList.vue'), meta: { title: '物料消耗' } },
+                { path: 'iot/connections', name: 'DeviceConnList', component: () => import('@/views/iot/DeviceConnList.vue'), meta: { title: '设备接入' } },
+                { path: 'iot/data', name: 'DeviceDataList', component: () => import('@/views/iot/DeviceDataList.vue'), meta: { title: '设备数据' } },
+                { path: 'iot/alert-rules', name: 'AlertRuleList', component: () => import('@/views/iot/AlertRuleList.vue'), meta: { title: '报警规则' } },
+                { path: 'iot/alerts', name: 'AlertLogList', component: () => import('@/views/iot/AlertLogList.vue'), meta: { title: '报警记录' } },
+                { path: 'system/transfers', name: 'TransferAccountList', component: () => import('@/views/system/TransferAccountList.vue'), meta: { title: '调拨科目' } },
+                { path: 'reports/center', name: 'ReportCenter', component: () => import('@/views/reports/ReportCenter.vue'), meta: { title: '报表中心' } }
             ]
         },
         {
