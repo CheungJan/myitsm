@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <div class="page-header"><h2>入库单管理</h2></div>
+    <div class="page-header"><h2>入库单管理</h2><el-button type="primary" size="small" @click="openCreate">＋ 新建入库单</el-button></div>
     <el-card shadow="never" style="margin-bottom:16px">
       <div class="search-bar">
         <div class="field"><label>入库单号</label><el-input v-model="s.bill" placeholder="单号" size="small" style="width:140px" clearable @keyup.enter="onSearch" /></div>
