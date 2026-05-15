@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITSM 维修工单 — myITSM F2 Demo</title>
+<style>
+:root{--primary:#409eff;--success:#67c23a;--warning:#e6a23c;--danger:#f56c6c;--info:#909399;--bg:#f5f7fa;--border:#e4e7ed;--sidebar-w:220px;--navbar-h:50px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Helvetica Neue",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:#303133}
+.layout{display:flex;height:100vh}
+.sidebar{width:var(--sidebar-w);background:#304156;color:#bfcbd9;flex-shrink:0;display:flex;flex-direction:column}
+.sidebar .logo{height:var(--navbar-h);display:flex;align-items:center;padding:0 20px;font-size:16px;font-weight:700;color:#fff;border-bottom:1px solid rgba(255,255,255,.08)}
+.sidebar .nav-item{padding:12px 20px;cursor:pointer;font-size:14px;transition:all .2s;display:flex;align-items:center;gap:8px;border-left:3px solid transparent}
+.sidebar .nav-item:hover,.sidebar .nav-item.active{background:rgba(255,255,255,.05);color:#fff}
+.sidebar .nav-item.active{border-left-color:var(--primary)}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.navbar{height:var(--navbar-h);background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;justify-content:space-between;font-size:14px}
+.navbar .breadcrumb{color:#909399}
+.content{flex:1;padding:20px;overflow:auto}
+.page-header{margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.page-header h2{font-size:18px;font-weight:600}
+.search-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:16px;background:#fff;border-radius:4px;border:1px solid var(--border);align-items:center}
+.search-bar .field{display:flex;align-items:center;gap:6px}
+.search-bar .field label{font-size:13px;color:#606266;white-space:nowrap}
+.search-bar input,.search-bar select{height:32px;border:1px solid #dcdfe6;border-radius:4px;padding:0 8px;font-size:13px;color:#606266;background:#fff}
+.search-bar input:focus,.search-bar select:focus{outline:none;border-color:var(--primary)}
+.card{background:#fff;border-radius:4px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:#fafafa;padding:10px 12px;text-align:left;font-weight:600;color:#909399;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--border)}tbody tr:hover{background:#f5f7fa;cursor:pointer}
+.btn{display:inline-flex;align-items:center;gap:4px;padding:7px 15px;border-radius:4px;font-size:13px;cursor:pointer;border:none;transition:all .2s;font-weight:500}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:#66b1ff}
+.btn-success{background:var(--success);color:#fff}.btn-success:hover{background:#85ce61}
+.btn-text{background:transparent;color:var(--primary);padding:4px 8px}
+.tag{display:inline-flex;padding:2px 8px;border-radius:3px;font-size:12px;font-weight:500}
+.tag-warning{background:#fdf6ec;color:#e6a23c;border:1px solid #faecd8}
+.tag-success{background:#f0f9eb;color:#67c23a;border:1px solid #e1f3d8}
+.tag-primary{background:#ecf5ff;color:#409eff;border:1px solid #d9ecff}
+.tag-danger{background:#fef0f0;color:#f56c6c;border:1px solid #fde2e2}
+.tag-info{background:#f4f4f5;color:#909399;border:1px solid #e9e9eb}
+.pagination{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:12px 16px;font-size:13px;color:#606266}
+.pagination span{cursor:pointer;padding:4px 10px;border-radius:3px}
+.pagination span.active{background:var(--primary);color:#fff}
+
+.flow-bar{display:flex;align-items:center;gap:4px;font-size:11px}
+.flow-dot{width:8px;height:8px;border-radius:50%}
+.flow-dot.done{background:var(--success)}.flow-dot.active{background:var(--primary);box-shadow:0 0 0 3px rgba(64,158,255,.3)}
+.flow-dot.pending{background:#dcdfe6}
+.flow-line{width:16px;height:1px;background:#dcdfe6}
+.flow-label{font-size:11px;color:#909399;margin-left:2px}
+
+.dialog-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:1000;display:none;align-items:center;justify-content:center}
+.dialog-overlay.open{display:flex}
+.dialog{background:#fff;border-radius:8px;width:700px;max-height:80vh;overflow:auto;box-shadow:0 8px 30px rgba(0,0,0,.15);animation:dialogIn .2s ease}
+@keyframes dialogIn{from{opacity:0;transform:scale(.95) translateY(-10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.dialog-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1}
+.dialog-header h3{font-size:16px}.dialog-close{cursor:pointer;font-size:20px;color:#909399;background:none;border:none}
+.dialog-body{padding:20px}
+.dialog-body .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.dialog-body .info-item{font-size:13px}.dialog-body .info-item span{color:#909399}.dialog-body .info-item strong{color:#303133;margin-left:4px}
+.section-title{font-size:13px;font-weight:600;margin:16px 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--border);display:flex;align-items:center;gap:8px}
+.mono{font-family:"SF Mono",Monaco,monospace;font-size:12px;background:#f5f7fa;padding:1px 5px;border-radius:2px}
+.stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:6px;border:1px solid var(--border);padding:16px;text-align:center}
+.stat-card .num{font-size:28px;font-weight:700;margin-bottom:4px}
+.stat-card .label{font-size:12px;color:#909399}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">⚙ myITSM</div>
+    <div class="nav-item">🏠 首页</div><div class="nav-item">⚙ 系统管理</div><div class="nav-item">📋 基础数据</div><div class="nav-item">📦 仓储管理</div><div class="nav-item">🛒 采购管理</div>
+    <div class="nav-item active">🔧 ITSM工单</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">日常维修</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">新机开通</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">旧机翻新</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">设备变更</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">日常保养</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">门店关闭</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">回收任务</div>
+  </aside>
+  <div class="main">
+    <nav class="navbar"><span class="breadcrumb">ITSM / 日常维修</span><div class="user"><span>👤 admin</span></div></nav>
+    <div class="content">
+      <div class="page-header"><h2>日常维修工单</h2><button class="btn btn-primary">＋ 新建工单</button></div>
+
+      <div class="stat-cards">
+        <div class="stat-card"><div class="num" style="color:var(--warning)">23</div><div class="label">待分派</div></div>
+        <div class="stat-card"><div class="num" style="color:var(--primary)">45</div><div class="label">维修中</div></div>
+        <div class="stat-card"><div class="num" style="color:var(--info)">12</div><div class="label">待关单</div></div>
+        <div class="stat-card"><div class="num" style="color:var(--success)">1,248</div><div class="label">已完成</div></div>
+      </div>
+
+      <div class="search-bar">
+        <div class="field"><label>工单号</label><input placeholder="输入工单号" style="width:140px"></div>
+        <div class="field"><label>客户</label><input placeholder="输入客户/磁卡号" style="width:160px"></div>
+        <div class="field"><label>状态</label><select style="width:110px"><option>全部</option><option>待分派</option><option>维修中</option><option>待关单</option><option>已完成</option></select></div>
+        <div class="field"><label>日期</label><input type="date" style="width:130px"><span style="font-size:12px;color:#999">—</span><input type="date" style="width:130px"></div>
+        <button class="btn btn-primary" style="margin-left:auto">🔍 查询</button>
+      </div>
+
+      <div class="card"><div class="table-wrap">
+        <table>
+          <thead><tr><th>工单号</th><th>客户</th><th>磁卡号</th><th>报修内容</th><th>状态流转</th><th>维修员</th><th>创建日期</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr onclick="openDetail('MT0042')"><td><span class="mono">MT20240042</span></td><td>上海市奉贤区克文食品商店</td><td>33313867</td><td>POS机无法开机</td>
+              <td><div class="flow-bar"><span class="flow-dot done"></span><span class="flow-line"></span><span class="flow-dot done"></span><span class="flow-line"></span><span class="flow-dot active"></span><span class="flow-line"></span><span class="flow-dot pending"></span><span class="flow-label">维修中</span></div></td>
+              <td>黄飞</td><td>2024-01-15</td><td><button class="btn btn-text" onclick="event.stopPropagation();openDetail('MT0042')">详情</button><button class="btn btn-success" style="font-size:12px;padding:3px 8px;margin-left:4px" onclick="event.stopPropagation()">关单</button></td></tr>
+            <tr onclick="openDetail('MT0041')"><td><span class="mono">MT20240041</span></td><td>龙飞食品店</td><td>33310934</td><td>打印机卡纸</td>
+              <td><div class="flow-bar"><span class="flow-dot done"></span><span class="flow-line"></span><span class="flow-dot done"></span><span class="flow-line"></span><span class="flow-dot done"></span><span class="flow-line"></span><span class="flow-dot done"></span><span class="flow-label" style="color:var(--success)">已完成</span></div></td>
+              <td>黄飞</td><td>2024-01-14</td><td><button class="btn btn-text" onclick="event.stopPropagation();openDetail('MT0041')">详情</button></td></tr>
+            <tr onclick="openDetail('MT0040')"><td><span class="mono">MT20240040</span></td><td>上海闵基贸易商场</td><td>38315947</td><td>屏幕不亮</td>
+              <td><div class="flow-bar"><span class="flow-dot active"></span><span class="flow-line"></span><span class="flow-dot pending"></span><span class="flow-line"></span><span class="flow-dot pending"></span><span class="flow-line"></span><span class="flow-dot pending"></span><span class="flow-label" style="color:var(--warning)">待分派</span></div></td>
+              <td>—</td><td>2024-01-14</td><td><button class="btn btn-text" onclick="event.stopPropagation()">分派</button><button class="btn btn-text" onclick="event.stopPropagation();openDetail('MT0040')">详情</button></td></tr>
+            <tr onclick="openDetail('MT0039')"><td><span class="mono">MT20240039</span></td><td>（名）名烟名酒店</td><td>13312044</td><td>钱箱无法打开</td>
+              <td><div class="flow-bar"><span class="flow-dot done"></span><span class="flow-line"></span><span class="flow-dot done"></span><span class="flow-line"></span><span class="flow-dot done"></span><span class="flow-line"></span><span class="flow-dot pending"></span><span class="flow-label">待关单</span></div></td>
+              <td>admin</td><td>2024-01-13</td><td><button class="btn btn-text" onclick="event.stopPropagation();openDetail('MT0039')">详情</button><button class="btn btn-success" style="font-size:12px;padding:3px 8px;margin-left:4px" onclick="event.stopPropagation()">关单</button></td></tr>
+            <tr onclick="openDetail('MT0038')"><td><span class="mono">MT20240038</span></td><td>上海烟草包装印刷有限公司第三经营部</td><td>38315948</td><td>系统卡顿</td>
+              <td><div class="flow-bar"><span class="flow-dot done"></span><span class="flow-line"></span><span class="flow-dot done"></span><span class="flow-line"></span><span class="flow-dot done"></span><span class="flow-line"></span><span class="flow-dot done"></span><span class="flow-label" style="color:var(--success)">已完成</span></div></td>
+              <td>admin</td><td>2024-01-12</td><td><button class="btn btn-text" onclick="event.stopPropagation();openDetail('MT0038')">详情</button></td></tr>
+          </tbody>
+        </table>
+        <div class="pagination"><span>共 1,328 条</span><span>‹</span><span class="active">1</span><span>2</span><span>3</span><span>…</span><span>133</span><span>›</span></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<div class="dialog-overlay" id="detailDialog" onclick="if(event.target===this)closeDetail()">
+  <div class="dialog">
+    <div class="dialog-header"><h3>工单详情 — MT20240042</h3><button class="dialog-close" onclick="closeDetail()">✕</button></div>
+    <div class="dialog-body">
+      <div class="info-grid">
+        <div class="info-item"><span>工单号</span><strong>MT20240042</strong></div>
+        <div class="info-item"><span>客户</span><strong>上海市奉贤区克文食品商店</strong></div>
+        <div class="info-item"><span>磁卡号</span><strong>33313867</strong></div>
+        <div class="info-item"><span>报修日期</span><strong>2024-01-15</strong></div>
+        <div class="info-item"><span>维修员</span><strong>黄飞</strong></div>
+        <div class="info-item"><span>当前状态</span><strong><span class="tag tag-primary">维修中</span></strong></div>
+      </div>
+      <div class="flow-bar" style="justify-content:center;margin:16px 0;font-size:12px">
+        <span class="tag tag-success">待分派 ✓</span> <span style="font-size:18px;color:#c0c4cc">→</span>
+        <span class="tag tag-primary" style="background:var(--primary);color:#fff;border-color:var(--primary)">维修中 ●</span> <span style="font-size:18px;color:#c0c4cc">→</span>
+        <span class="tag tag-info">待关单</span> <span style="font-size:18px;color:#c0c4cc">→</span>
+        <span class="tag tag-info">已完成</span>
+      </div>
+      <div class="section-title">📋 报修信息</div>
+      <div class="info-grid"><div class="info-item"><span>故障描述</span><strong>POS机无法开机</strong></div><div class="info-item"><span>维修类型</span><strong>上门维修</strong></div></div>
+      <div class="section-title">🔧 维修明细</div>
+      <table><thead><tr><th>物料代码</th><th>物料名称</th><th>数量</th><th>类型</th></tr></thead>
+      <tbody><tr><td>PW4A01</td><td>400W ATX电源</td><td>1</td><td><span class="tag tag-warning">更换</span></td></tr></tbody></table>
+      <div style="text-align:right;margin-top:16px"><button class="btn btn-success">✓ 关单</button></div>
+    </div>
+  </div>
+</div>
+<script>function openDetail(id){document.getElementById('detailDialog').classList.add('open')}function closeDetail(){document.getElementById('detailDialog').classList.remove('open')}</script>
+</body>
+</html>

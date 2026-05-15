@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>预计划管理 — myITSM F2 Demo</title>
+<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+<style>
+:root { --ep-color-primary: #409eff; --ep-color-success: #67c23a; --ep-color-warning: #e6a23c; --ep-color-danger: #f56c6c; --ep-bg-color: #f5f7fa; --ep-border-color: #e4e7ed; --sidebar-w: 220px; --navbar-h: 50px; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Microsoft YaHei", sans-serif; background:var(--ep-bg-color); color:#303133; }
+.layout { display:flex; height:100vh; }
+.sidebar { width:var(--sidebar-w); background:#304156; color:#bfcbd9; flex-shrink:0; display:flex; flex-direction:column; }
+.sidebar .logo { height:var(--navbar-h); display:flex; align-items:center; padding:0 20px; font-size:16px; font-weight:700; color:#fff; border-bottom:1px solid rgba(255,255,255,.08); }
+.sidebar .nav-item { padding:12px 20px; cursor:pointer; font-size:14px; transition:all .2s; display:flex; align-items:center; gap:8px; border-left:3px solid transparent; }
+.sidebar .nav-item:hover,.sidebar .nav-item.active { background:rgba(255,255,255,.05); color:#fff; }
+.sidebar .nav-item.active { border-left-color:var(--ep-color-primary); }
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.navbar { height:var(--navbar-h); background:#fff; border-bottom:1px solid var(--ep-border-color); display:flex; align-items:center; padding:0 20px; justify-content:space-between; font-size:14px; }
+.navbar .breadcrumb { color:#909399; }
+.navbar .user { display:flex; align-items:center; gap:12px; }
+.content { flex:1; padding:20px; overflow:auto; }
+.page-header { margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; }
+.page-header h2 { font-size:18px; font-weight:600; }
+.search-bar { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; padding:16px; background:#fff; border-radius:4px; border:1px solid var(--ep-border-color); align-items:center; }
+.search-bar .field { display:flex; align-items:center; gap:6px; }
+.search-bar .field label { font-size:13px; color:#606266; white-space:nowrap; }
+.search-bar input,.search-bar select { height:32px; border:1px solid #dcdfe6; border-radius:4px; padding:0 8px; font-size:13px; color:#606266; background:#fff; }
+.search-bar input:focus,.search-bar select:focus { outline:none; border-color:var(--ep-color-primary); }
+.card { background:#fff; border-radius:4px; border:1px solid var(--ep-border-color); }
+.table-wrap { padding:0; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+thead th { background:#fafafa; padding:10px 12px; text-align:left; font-weight:600; color:#909399; border-bottom:1px solid var(--ep-border-color); white-space:nowrap; }
+tbody td { padding:10px 12px; border-bottom:1px solid var(--ep-border-color); }
+tbody tr:hover { background:#f5f7fa; }
+.btn { display:inline-flex; align-items:center; gap:4px; padding:7px 15px; border-radius:4px; font-size:13px; cursor:pointer; border:none; transition:all .2s; font-weight:500; }
+.btn-primary { background:var(--ep-color-primary); color:#fff; }
+.btn-primary:hover { background:#66b1ff; }
+.btn-success { background:var(--ep-color-success); color:#fff; }
+.btn-default { background:#fff; color:#606266; border:1px solid #dcdfe6; }
+.btn-text { background:transparent; color:var(--ep-color-primary); padding:4px 8px; }
+.btn-text.danger { color:var(--ep-color-danger); }
+.tag { display:inline-flex; padding:2px 8px; border-radius:3px; font-size:12px; font-weight:500; }
+.tag-warning { background:#fdf6ec; color:#e6a23c; border:1px solid #faecd8; }
+.tag-primary { background:#ecf5ff; color:#409eff; border:1px solid #d9ecff; }
+.tag-success { background:#f0f9eb; color:#67c23a; border:1px solid #e1f3d8; }
+.tag-danger { background:#fef0f0; color:#f56c6c; border:1px solid #fde2e2; }
+.pagination { display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:12px 16px; font-size:13px; color:#606266; }
+.pagination span { cursor:pointer; padding:4px 10px; border-radius:3px; }
+.pagination span.active { background:var(--ep-color-primary); color:#fff; }
+.sep { width:1px; height:20px; background:#dcdfe6; margin:0 4px; }
+.amount { font-weight:600; color:#303133; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">⚙ myITSM</div>
+    <div class="nav-item">🏠 首页</div>
+    <div class="nav-item">⚙ 系统管理</div>
+    <div class="nav-item active">📋 基础数据</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">物料管理</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">BOM管理</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">客户管理</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">EID管理</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">资产台账</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">仓库管理</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">预计划管理</div>
+    <div class="nav-item">📦 仓储管理</div>
+    <div class="nav-item">🛒 采购管理</div>
+    <div class="nav-item">🔧 ITSM工单</div>
+  </aside>
+  <div class="main">
+    <nav class="navbar">
+      <span class="breadcrumb">基础数据 / 预计划管理</span>
+      <div class="user"><span>👤 admin（系统管理员）</span></div>
+    </nav>
+    <div class="content">
+      <div class="page-header"><h2>预计划管理</h2><button class="btn btn-primary">＋ 新建预计划</button></div>
+      <div class="search-bar">
+        <div class="field"><label>计划单号</label><input placeholder="输入单号" style="width:140px"></div>
+        <div class="field"><label>客户名称</label><input placeholder="输入客户" style="width:160px"></div>
+        <div class="field"><label>状态</label><select style="width:120px"><option>全部</option><option>待确认</option><option>已确认</option><option>已完成</option><option>已取消</option></select></div>
+        <div class="field"><label>日期范围</label><input type="date" style="width:130px"><span style="font-size:12px;color:#999">—</span><input type="date" style="width:130px"></div>
+        <button class="btn btn-primary" style="margin-left:auto">🔍 查询</button>
+        <button class="btn btn-default">↻ 重置</button>
+      </div>
+      <div class="card"><div class="table-wrap">
+        <table>
+          <thead><tr><th>计划单号</th><th>客户名称</th><th>磁卡号</th><th>计划日期</th><th>计划金额</th><th>状态</th><th>操作员</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td>PL005094</td><td>上海市奉贤区克文食品商店</td><td>33313867</td><td>2021-07-09</td><td class="amount">¥14,800.00</td><td><span class="tag tag-success">已确认</span></td><td>admin</td><td><button class="btn btn-text">详情</button><span class="sep"></span><button class="btn btn-text">编辑</button></td></tr>
+            <tr><td>PL005093</td><td>上海闵基贸易商场</td><td>38315947</td><td>2021-06-28</td><td class="amount">¥12,500.00</td><td><span class="tag tag-warning">待确认</span></td><td>黄飞</td><td><button class="btn btn-text">详情</button><span class="sep"></span><button class="btn btn-text">编辑</button></td></tr>
+            <tr><td>PL005092</td><td>龙飞食品店</td><td>33310934</td><td>2021-06-15</td><td class="amount">¥8,900.00</td><td><span class="tag tag-primary">已完成</span></td><td>admin</td><td><button class="btn btn-text">详情</button></td></tr>
+            <tr><td>PL005091</td><td>（名）名烟名酒店</td><td>13312044</td><td>2021-05-20</td><td class="amount">¥22,300.00</td><td><span class="tag tag-danger">已取消</span></td><td>SYS</td><td><button class="btn btn-text">详情</button></td></tr>
+            <tr><td>PL005090</td><td>上海烟草包装印刷有限公司第三经营部</td><td>38315948</td><td>2021-05-10</td><td class="amount">¥6,700.00</td><td><span class="tag tag-success">已确认</span></td><td>黄飞</td><td><button class="btn btn-text">详情</button><span class="sep"></span><button class="btn btn-text">编辑</button></td></tr>
+          </tbody>
+        </table>
+        <div class="pagination"><span>共 156 条</span><span>‹</span><span class="active">1</span><span>2</span><span>3</span><span>…</span><span>16</span><span>›</span><select style="margin-left:8px;height:28px;font-size:13px"><option>20条/页</option><option>50条/页</option></select></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>入库单管理 — myITSM F2 Demo</title>
+<style>
+:root{--primary:#409eff;--success:#67c23a;--warning:#e6a23c;--danger:#f56c6c;--bg:#f5f7fa;--border:#e4e7ed;--sidebar-w:220px;--navbar-h:50px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Helvetica Neue",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:#303133}
+.layout{display:flex;height:100vh}
+.sidebar{width:var(--sidebar-w);background:#304156;color:#bfcbd9;flex-shrink:0;display:flex;flex-direction:column}
+.sidebar .logo{height:var(--navbar-h);display:flex;align-items:center;padding:0 20px;font-size:16px;font-weight:700;color:#fff;border-bottom:1px solid rgba(255,255,255,.08)}
+.sidebar .nav-item{padding:12px 20px;cursor:pointer;font-size:14px;transition:all .2s;display:flex;align-items:center;gap:8px;border-left:3px solid transparent}
+.sidebar .nav-item:hover,.sidebar .nav-item.active{background:rgba(255,255,255,.05);color:#fff}
+.sidebar .nav-item.active{border-left-color:var(--primary)}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.navbar{height:var(--navbar-h);background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;justify-content:space-between;font-size:14px}
+.navbar .breadcrumb{color:#909399}
+.content{flex:1;padding:20px;overflow:auto;position:relative}
+.page-header{margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.page-header h2{font-size:18px;font-weight:600}
+.search-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:16px;background:#fff;border-radius:4px;border:1px solid var(--border);align-items:center}
+.search-bar .field{display:flex;align-items:center;gap:6px}
+.search-bar .field label{font-size:13px;color:#606266;white-space:nowrap}
+.search-bar input,.search-bar select{height:32px;border:1px solid #dcdfe6;border-radius:4px;padding:0 8px;font-size:13px;color:#606266;background:#fff}
+.search-bar input:focus,.search-bar select:focus{outline:none;border-color:var(--primary)}
+.card{background:#fff;border-radius:4px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:#fafafa;padding:10px 12px;text-align:left;font-weight:600;color:#909399;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--border)}
+tbody tr:hover{background:#f5f7fa;cursor:pointer}
+.btn{display:inline-flex;align-items:center;gap:4px;padding:7px 15px;border-radius:4px;font-size:13px;cursor:pointer;border:none;transition:all .2s;font-weight:500}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:#66b1ff}
+.btn-default{background:#fff;color:#606266;border:1px solid #dcdfe6}
+.btn-text{background:transparent;color:var(--primary);padding:4px 8px}.btn-text.danger{color:var(--danger)}
+.tag{display:inline-flex;padding:2px 8px;border-radius:3px;font-size:12px;font-weight:500}
+.tag-warning{background:#fdf6ec;color:#e6a23c;border:1px solid #faecd8}
+.tag-success{background:#f0f9eb;color:#67c23a;border:1px solid #e1f3d8}
+.tag-primary{background:#ecf5ff;color:#409eff;border:1px solid #d9ecff}
+.pagination{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:12px 16px;font-size:13px;color:#606266}
+.pagination span{cursor:pointer;padding:4px 10px;border-radius:3px}
+.pagination span.active{background:var(--primary);color:#fff}
+
+.drawer-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.3);z-index:1000;display:none;justify-content:flex-end}
+.drawer-overlay.open{display:flex}
+.drawer{width:600px;background:#fff;height:100%;overflow:auto;box-shadow:-4px 0 12px rgba(0,0,0,.1);animation:slideIn .25s ease}
+@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+.drawer-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1}
+.drawer-header h3{font-size:16px}.drawer-close{cursor:pointer;font-size:20px;color:#909399;background:none;border:none}
+.drawer-body{padding:20px}
+.drawer-body .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.drawer-body .info-item{font-size:13px}.drawer-body .info-item span{color:#909399}
+.drawer-body .info-item strong{color:#303133;margin-left:4px}
+.flow-steps{display:flex;align-items:center;gap:0;margin-bottom:16px;font-size:12px}
+.flow-step{padding:4px 12px;border-radius:12px;background:#ecf5ff;color:var(--primary)}
+.flow-arrow{color:#c0c4cc;margin:0 2px}
+.flow-step.done{background:#f0f9eb;color:var(--success)}
+.flow-step.active{background:var(--primary);color:#fff}
+.field-val{font-family:"SF Mono",Monaco,monospace;font-size:12px;background:#f5f7fa;padding:1px 6px;border-radius:2px}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">⚙ myITSM</div>
+    <div class="nav-item">🏠 首页</div>
+    <div class="nav-item">⚙ 系统管理</div>
+    <div class="nav-item">📋 基础数据</div>
+    <div class="nav-item active">📦 仓储管理</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">入库单管理</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">出库单管理</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">库存查询</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">盘点管理</div>
+    <div class="nav-item">🛒 采购管理</div>
+    <div class="nav-item">🔧 ITSM工单</div>
+  </aside>
+  <div class="main">
+    <nav class="navbar"><span class="breadcrumb">仓储管理 / 入库单管理</span><div class="user"><span>👤 admin</span></div></nav>
+    <div class="content">
+      <div class="page-header"><h2>入库单管理</h2><button class="btn btn-primary">＋ 新建入库单</button></div>
+      <div class="search-bar">
+        <div class="field"><label>入库单号</label><input placeholder="输入单号" style="width:140px"></div>
+        <div class="field"><label>仓库</label><select style="width:130px"><option>全部</option><option>03-主仓库</option><option>01-备件仓</option></select></div>
+        <div class="field"><label>供应商</label><input placeholder="输入供应商" style="width:150px"></div>
+        <div class="field"><label>状态</label><select style="width:110px"><option>全部</option><option>待审核</option><option>已入库</option></select></div>
+        <div class="field"><label>日期</label><input type="date" style="width:130px"><span style="font-size:12px;color:#999">—</span><input type="date" style="width:130px"></div>
+        <button class="btn btn-primary" style="margin-left:auto">🔍 查询</button>
+      </div>
+      <div class="card"><div class="table-wrap">
+        <table>
+          <thead><tr><th>入库单号</th><th>仓库</th><th>供应商</th><th>入库日期</th><th>物料种类</th><th>总数量</th><th>状态</th><th>操作员</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr onclick="openDrawer('IN2024001')"><td><span class="field-val">IN2024001</span></td><td>03-主仓库</td><td>上海霍讯物联网科技有限公司</td><td>2024-01-15</td><td>12</td><td>480</td><td><span class="tag tag-success">已入库</span></td><td>admin</td><td><button class="btn btn-text" onclick="event.stopPropagation();openDrawer('IN2024001')">详情</button></td></tr>
+            <tr onclick="openDrawer('IN2024002')"><td><span class="field-val">IN2024002</span></td><td>01-备件仓</td><td>深圳市华科智能有限公司</td><td>2024-01-14</td><td>8</td><td>320</td><td><span class="tag tag-warning">待审核</span></td><td>黄飞</td><td><button class="btn btn-text" onclick="event.stopPropagation();openDrawer('IN2024002')">详情</button></td></tr>
+            <tr onclick="openDrawer('IN2024003')"><td><span class="field-val">IN2024003</span></td><td>03-主仓库</td><td>广州视源电子科技股份有限公司</td><td>2024-01-12</td><td>15</td><td>600</td><td><span class="tag tag-success">已入库</span></td><td>admin</td><td><button class="btn btn-text" onclick="event.stopPropagation();openDrawer('IN2024003')">详情</button></td></tr>
+          </tbody>
+        </table>
+        <div class="pagination"><span>共 89 条</span><span>‹</span><span class="active">1</span><span>2</span><span>3</span><span>…</span><span>9</span><span>›</span></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<div class="drawer-overlay" id="drawer" onclick="if(event.target===this)closeDrawer()">
+  <div class="drawer">
+    <div class="drawer-header"><h3>入库单详情 — <span id="d-code">IN2024001</span></h3><button class="drawer-close" onclick="closeDrawer()">✕</button></div>
+    <div class="drawer-body">
+      <div class="info-grid">
+        <div class="info-item"><span>入库单号</span><strong id="dno">IN2024001</strong></div>
+        <div class="info-item"><span>仓库</span><strong>03-主仓库</strong></div>
+        <div class="info-item"><span>供应商</span><strong>上海霍讯物联网科技有限公司</strong></div>
+        <div class="info-item"><span>入库日期</span><strong>2024-01-15</strong></div>
+        <div class="info-item"><span>操作员</span><strong>admin</strong></div>
+        <div class="info-item"><span>状态</span><strong><span class="tag tag-success">已入库</span></strong></div>
+      </div>
+      <div class="flow-steps"><span class="flow-step done">创建</span><span class="flow-arrow">→</span><span class="flow-step done">待审核</span><span class="flow-arrow">→</span><span class="flow-step active">已入库</span></div>
+      <h4 style="font-size:14px;margin-bottom:8px">入库明细</h4>
+      <table style="margin-top:8px">
+        <thead><tr><th>物料编码</th><th>物料名称</th><th>规格</th><th>数量</th><th>批次号</th></tr></thead>
+        <tbody>
+          <tr><td>BS4001</td><td>HR11一维码USB扫描枪</td><td>标准</td><td>100</td><td>B20240115-001</td></tr>
+          <tr><td>CB3400</td><td>335钱箱</td><td>标准</td><td>50</td><td>B20240115-001</td></tr>
+          <tr><td>CD4A02</td><td>安卓通用型LED8-2中文客显</td><td>LED8-2</td><td>80</td><td>B20240115-001</td></tr>
+          <tr><td>HDAN16</td><td>500GB 2.5寸SATA硬盘</td><td>500GB</td><td>60</td><td>B20240115-001</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+function openDrawer(code){document.getElementById('drawer').classList.add('open')}
+function closeDrawer(){document.getElementById('drawer').classList.remove('open')}
+</script>
+</body>
+</html>
