@@ -31,7 +31,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'customers', menu_nm: '客户管理', path: '/master/customers' },
             { menu_cd: 'eid', menu_nm: 'EID 管理', path: '/master/eid' },
             { menu_cd: 'assets', menu_nm: '资产台账', path: '/master/assets' },
-            { menu_cd: 'warehouses', menu_nm: '仓库管理', path: '/master/warehouses' }
+            { menu_cd: 'warehouses', menu_nm: '仓库管理', path: '/master/warehouses' },
+            { menu_cd: 'asset-attrib', menu_nm: '资产属性', path: '/master/asset-attrib' }
         ]
     },
     {
@@ -62,7 +63,9 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'device-change', menu_nm: '设备变更', path: '/itsm/device-change' },
             { menu_cd: 'store-close', menu_nm: '门店关闭', path: '/itsm/store-close' },
             { menu_cd: 'itsm-open', menu_nm: '新机开通', path: '/itsm/open' },
-            { menu_cd: 'recycle', menu_nm: '回收任务', path: '/itsm/recycle' }
+            { menu_cd: 'recycle', menu_nm: '回收任务', path: '/itsm/recycle' },
+            { menu_cd: 'maint-plans', menu_nm: '保养计划', path: '/itsm/maintenance-plans' },
+            { menu_cd: 'maint-t17', menu_nm: '保养工单', path: '/itsm/maintenance-t17' }
         ]
     },
     {
@@ -124,6 +127,14 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'payables', menu_nm: '应付管理', path: '/finance/payables' },
             { menu_cd: 'payments', menu_nm: '收付款管理', path: '/finance/payments' },
             { menu_cd: 'depreciations', menu_nm: '设备折旧', path: '/finance/depreciations' }
+        ]
+    },
+    {
+        menu_cd: 'deposit', menu_nm: '押金管理',
+        children: [
+            { menu_cd: 'deposits', menu_nm: '押金台账', path: '/deposit/deposits' },
+            { menu_cd: 'deposit-dtl', menu_nm: '押金明细', path: '/deposit/details' },
+            { menu_cd: 'deposit-io', menu_nm: '押金流水', path: '/deposit/io' }
         ]
     }
     // F3+ 模块将在后续阶段追加

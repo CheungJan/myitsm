@@ -183,7 +183,13 @@ const router = createRouter({
                 { path: 'finance/receivables', name: 'ReceivableList', component: () => import('@/views/finance/ReceivableList.vue'), meta: { title: '应收管理' } },
                 { path: 'finance/payables', name: 'PayableList', component: () => import('@/views/finance/PayableList.vue'), meta: { title: '应付管理' } },
                 { path: 'finance/payments', name: 'PaymentList', component: () => import('@/views/finance/PaymentList.vue'), meta: { title: '收付款管理' } },
-                { path: 'finance/depreciations', name: 'DepreciationList', component: () => import('@/views/finance/DepreciationList.vue'), meta: { title: '设备折旧' } }
+                { path: 'finance/depreciations', name: 'DepreciationList', component: () => import('@/views/finance/DepreciationList.vue'), meta: { title: '设备折旧' } },
+                { path: 'itsm/maintenance-plans', name: 'MaintenancePlanList', component: () => import('@/views/itsm/MaintenancePlanList.vue'), meta: { title: '保养计划' } },
+                { path: 'itsm/maintenance-t17', name: 'MaintenanceT17List', component: () => import('@/views/itsm/MaintenanceT17List.vue'), meta: { title: '保养工单' } },
+                { path: 'deposit/deposits', name: 'DepositList', component: () => import('@/views/deposit/DepositList.vue'), meta: { title: '押金管理' } },
+                { path: 'deposit/details', name: 'DepositDetailList', component: () => import('@/views/deposit/DepositDetailList.vue'), meta: { title: '押金明细' } },
+                { path: 'deposit/io', name: 'DepositIOList', component: () => import('@/views/deposit/DepositIOList.vue'), meta: { title: '押金流水' } },
+                { path: 'master/asset-attrib', name: 'AssetAttribList', component: () => import('@/views/master/AssetAttribList.vue'), meta: { title: '资产属性' } }
             ]
         },
         {

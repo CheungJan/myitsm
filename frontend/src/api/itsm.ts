@@ -9,3 +9,5 @@ export function fetchMaintenanceRenovate(p?:Record<string,string>){return reques
 export function fetchDeviceChange(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/device-change',{params:p})}
 export function fetchStoreClose(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/store-close',{params:p})}
 export function fetchRecycleTask(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/recycle-task',{params:p})}
+export function fetchMaintenancePlans(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/maintenance-plans',{params:p})}
+export function fetchMaintenanceT17(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/maintenance',{params:p})}
