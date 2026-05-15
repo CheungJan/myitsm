@@ -21,3 +21,5 @@ export function createPlan(data: Record<string, unknown>) {
 export function updatePlan(planno: string, data: Record<string, unknown>) {
     return request.put<never, { data: PlanRecord }>(`/sales/plans/${planno}`, data)
 }
+
+export function fetchSalesBills(p?:Record<string,string>){return request.get<never,{data:PlanPage}>('/sales/bills',{params:p})}
