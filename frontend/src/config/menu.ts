@@ -38,7 +38,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         menu_cd: 'warehouse', menu_nm: '仓储管理',
         children: [
             { menu_cd: 'stock-in', menu_nm: '入库单管理', path: '/warehouse/stock-in' },
-            { menu_cd: 'stock-out', menu_nm: '出库单管理', path: '/warehouse/stock-out' }
+            { menu_cd: 'stock-out', menu_nm: '出库单管理', path: '/warehouse/stock-out' },
+            { menu_cd: 'stock', menu_nm: '库存查询', path: '/warehouse/stock' }
         ]
     },
     {
@@ -46,7 +47,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         children: [
             { menu_cd: 'proc-plans', menu_nm: '采购计划', path: '/procurement/plans' },
             { menu_cd: 'proc-registers', menu_nm: '采购登记', path: '/procurement/registers' },
-            { menu_cd: 'proc-bills', menu_nm: '采购单据', path: '/procurement/bills' }
+            { menu_cd: 'proc-bills', menu_nm: '采购单据', path: '/procurement/bills' },
+            { menu_cd: 'suppliers', menu_nm: '供应商管理', path: '/procurement/suppliers' }
         ]
     },
     {

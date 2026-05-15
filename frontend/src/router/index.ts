@@ -94,6 +94,12 @@ const router = createRouter({
                     meta: { title: '入库单管理' }
                 },
                 {
+                    path: 'warehouse/stock', name: 'StockBalance', component: () => import('@/views/warehouse/StockBalance.vue'), meta: { title: '库存查询' }
+                },
+                {
+                    path: 'procurement/suppliers', name: 'SupplierList', component: () => import('@/views/procurement/SupplierList.vue'), meta: { title: '供应商管理' }
+                },
+                {
                     path: 'warehouse/stock-out',
                     name: 'StockOutList',
                     component: () => import('@/views/warehouse/StockOutList.vue'),
