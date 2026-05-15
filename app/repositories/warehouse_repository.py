@@ -20,6 +20,7 @@ from app.models.warehouse import (
     StockOut,
     StockOutDetailEid,
     StockOutDetailPrd,
+    TransferAccount,
     Warehouse,
 )
 
@@ -376,3 +377,33 @@ class PosChangeRepository:
         )
         db.session.add(detail)
         return detail
+
+
+class TransferAccountRepository:
+    """调拨科目数据访问（TTX01_TXKMG）。"""
+
+    @staticmethod
+    def get_by_id(txkno: str) -> TransferAccount | None:
+        return db.session.get(TransferAccount, txkno)
+
+    @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> tuple[list[TransferAccount], int]:
+        query = db.session.query(TransferAccount).order_by(TransferAccount.txkno)
+        total: int = query.count()
+        items: list[TransferAccount] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> TransferAccount:
+        now = datetime.now(UTC)
+        record = TransferAccount(opercd=creator, upddate=now, **data)
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: TransferAccount, data: dict[str, Any], updator: str) -> TransferAccount:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.upddate = datetime.now(UTC)
+        record.opercd = updator
+        return record

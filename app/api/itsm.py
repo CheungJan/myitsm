@@ -20,6 +20,8 @@ from app.schemas.itsm import (
     MaintenanceDailyCreate,
     MaintenanceDailyUpdate,
     MaintenanceOpenCreate,
+    MaintenancePlanCreate,
+    MaintenancePlanUpdate,
     MaintenanceQuery,
     MaintenanceRenovateCreate,
     RecycleTaskCreate,
@@ -37,7 +39,9 @@ from app.services.itsm_service import (
     DispatchService,
     MaintenanceDailyService,
     MaintenanceOpenService,
+    MaintenancePlanService,
     MaintenanceRenovateService,
+    MaintenanceT17Service,
     RecycleTaskService,
     RVService,
     StoreCloseService,
@@ -520,3 +524,74 @@ def add_recycle_detail(recycle_id: str):  # type: ignore[no-untyped-def]
     _ = user_cd
     data = RecycleTaskService.add_detail(recycle_id, body.model_dump(exclude_none=True))
     return success_response(data=data, code=201)
+
+
+# ---- 保养计划 (TIT17_PLAN) ----
+
+
+@itsm_bp.get("/maintenance-plans")
+@login_required
+def list_maintenance_plans():  # type: ignore[no-untyped-def]
+    """保养计划列表。"""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    data = MaintenancePlanService.list_records(page=page, per_page=per_page)
+    return success_response(data=data)
+
+
+@itsm_bp.get("/maintenance-plans/<int:plan_id>")
+@login_required
+def get_maintenance_plan(plan_id: int):  # type: ignore[no-untyped-def]
+    """保养计划详情。"""
+    data = MaintenancePlanService.get(plan_id)
+    if data is None:
+        return error_response(message="保养计划不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/maintenance-plans")
+@login_required
+def create_maintenance_plan():  # type: ignore[no-untyped-def]
+    """创建保养计划。"""
+    body = MaintenancePlanCreate.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = MaintenancePlanService.create(body.model_dump(exclude_none=True), creator=user_cd)
+    return success_response(data=data, message="创建成功", code=201)
+
+
+@itsm_bp.put("/maintenance-plans/<int:plan_id>")
+@login_required
+def update_maintenance_plan(plan_id: int):  # type: ignore[no-untyped-def]
+    """更新保养计划。"""
+    body = MaintenancePlanUpdate.model_validate(request.get_json(silent=True) or {})
+    data = MaintenancePlanService.update(plan_id, body.model_dump(exclude_unset=True))
+    if data is None:
+        return error_response(message="保养计划不存在", code=404)
+    return success_response(data=data)
+
+
+# ---- 日常保养工单 (TIT17_MAINTENANCE) ----
+
+
+@itsm_bp.get("/maintenance")
+@login_required
+def list_t17_maintenance():  # type: ignore[no-untyped-def]
+    """日常保养工单列表。"""
+    params = MaintenanceQuery.model_validate(request.args.to_dict())
+    data = MaintenanceT17Service.list_records(
+        status=params.status,
+        store_id=params.store_id,
+        page=params.page,
+        per_page=params.per_page,
+    )
+    return success_response(data=data)
+
+
+@itsm_bp.get("/maintenance/<maintenance_id>")
+@login_required
+def get_t17_maintenance(maintenance_id: str):  # type: ignore[no-untyped-def]
+    """日常保养工单详情。"""
+    data = MaintenanceT17Service.get(maintenance_id)
+    if data is None:
+        return error_response(message="保养工单不存在", code=404)
+    return success_response(data=data)

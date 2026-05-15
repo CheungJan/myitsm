@@ -11,6 +11,7 @@ from app.repositories.warehouse_repository import (
     StockDetailRepository,
     StockInRepository,
     StockOutRepository,
+    TransferAccountRepository,
     WarehouseRepository,
 )
 
@@ -326,4 +327,40 @@ class PosChangeService:
         if record is None:
             return None
         record = PosChangeRepository.update(record, data)
+        return record.to_dict()
+
+
+class TransferAccountService:
+    """调拨科目服务（TTX01_TXKMG）。"""
+
+    @staticmethod
+    def get(txkno: str) -> dict[str, Any] | None:
+        record = TransferAccountRepository.get_by_id(txkno)
+        if record is None:
+            return None
+        return record.to_dict()
+
+    @staticmethod
+    def list_records(page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = TransferAccountRepository.list_all(page=page, per_page=per_page)
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        record = TransferAccountRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(txkno: str, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = TransferAccountRepository.get_by_id(txkno)
+        if record is None:
+            return None
+        TransferAccountRepository.update(record, data, updator)
+        db.session.commit()
         return record.to_dict()

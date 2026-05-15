@@ -83,3 +83,28 @@ class StockQuery(BaseModel):
     search: str | None = Field(None, max_length=50)
     page: int = Field(1, ge=1)
     per_page: int = Field(20, ge=1, le=100)
+
+
+# ---------------------------------------------------------------------------
+# 调拨科目 (TTX01_TXKMG)
+# ---------------------------------------------------------------------------
+
+
+class TransferAccountCreate(BaseModel):
+    """创建调拨科目。"""
+
+    txkno: str = Field(..., max_length=30, description="调拨科目编号")
+    commmode: str | None = Field(None, max_length=10, description="通讯方式")
+    remark: str | None = Field(None, max_length=100, description="备注")
+    by1: str | None = Field(None, max_length=10, description="备用字段1")
+    by2: str | None = Field(None, max_length=10, description="备用字段2")
+
+
+class TransferAccountUpdate(BaseModel):
+    """更新调拨科目。"""
+
+    commmode: str | None = Field(None, max_length=10)
+    remark: str | None = Field(None, max_length=100)
+    by1: str | None = Field(None, max_length=10)
+    by2: str | None = Field(None, max_length=10)
+    useflg: str | None = Field(None, max_length=1)

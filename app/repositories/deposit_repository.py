@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import desc
 
 from app.extensions import db
-from app.models.deposit import Deposit, DepositDetail, DepositPosModel
+from app.models.deposit import Deposit, DepositDetail, DepositIO, DepositPosModel
 
 
 class DepositRepository:
@@ -94,3 +94,21 @@ class DepositPosModelRepository:
         for key, value in data.items():
             setattr(record, key, value)
         return record
+
+
+class DepositIORepository:
+    """押金出入流水数据访问。"""
+
+    @staticmethod
+    def list_by_filters(
+        custcd: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list[DepositIO], int]:
+        query = db.session.query(DepositIO)
+        if custcd:
+            query = query.filter(DepositIO.custcd == custcd)
+        query = query.order_by(desc(DepositIO.update_time))
+        total: int = query.count()
+        items: list[DepositIO] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total

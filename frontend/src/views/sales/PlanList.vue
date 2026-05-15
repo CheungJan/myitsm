@@ -22,10 +22,13 @@
         <el-table-column prop="phoneno" label="电话" width="120" />
         <el-table-column prop="address" label="地址" min-width="120" show-overflow-tooltip />
         <el-table-column label="计划类型" width="80"><template #default="{row}">{{ row.plantyp || '-' }}</template></el-table-column>
+        <el-table-column label="租赁/购买" width="70"><template #default="{row}"><el-tag :type="row.is_rent==='Y'?'success':'info'" size="small">{{ row.is_rent==='Y'?'租赁':'购买' }}</el-tag></template></el-table-column>
+        <el-table-column label="机型" width="80"><template #default="{row}">{{ row.pos_item || '-' }}</template></el-table-column>
         <el-table-column label="状态" width="80" align="center">
           <template #default="{row}"><el-tag :type="statusTag(row.plan_status)" size="small">{{ statusLabel(row.plan_status) }}</el-tag></template>
         </el-table-column>
         <el-table-column label="合同" width="60"><template #default="{row}"><el-tag :type="row.is_contract==='1'?'success':'info'" size="small">{{ row.is_contract==='1'?'是':'否' }}</el-tag></template></el-table-column>
+        <el-table-column prop="deposit" label="押金" width="100" align="right"><template #default="{row}">{{ row.deposit ? '¥'+Number(row.deposit).toLocaleString() : '-' }}</template></el-table-column>
         <el-table-column prop="opercd" label="操作员" width="80" />
         <el-table-column label="操作" width="120" fixed="right"><template #default="{row}"><el-button link type="primary" size="small" @click.stop="openDetail(row)">详情</el-button><el-button link type="primary" size="small" @click.stop="openEdit(row)">编辑</el-button></template></el-table-column>
       </el-table>
@@ -43,6 +46,10 @@
         <el-form-item label="电话"><el-input v-model="form.phoneno"/></el-form-item>
         <el-form-item label="地址"><el-input v-model="form.address"/></el-form-item>
         <el-form-item label="计划类型"><el-input v-model="form.plantyp"/></el-form-item>
+        <el-form-item label="租赁/购买"><el-radio-group v-model="form.is_rent"><el-radio value="Y">租赁</el-radio><el-radio value="N">购买</el-radio></el-radio-group></el-form-item>
+        <el-form-item label="机型"><el-input v-model="form.pos_item" placeholder="POS物料编码"/></el-form-item>
+        <el-form-item label="押金金额"><el-input-number v-model="form.deposit" :min="0" :precision="2" style="width:100%" controls-position="right"/></el-form-item>
+        <el-form-item label="运营类型"><el-input v-model="form.yun_type" placeholder="运营类型编码"/></el-form-item>
         <el-form-item label="状态"><el-select v-model="form.plan_status" style="width:100%"><el-option label="待确认" value="0"/><el-option label="已确认" value="1"/><el-option label="已完成" value="2"/></el-select></el-form-item>
       </el-form>
       <template #footer><el-button @click="dialogVisible=false">取消</el-button><el-button type="primary" @click="handleSave" :loading="saving">保存</el-button></template>
@@ -80,12 +87,12 @@ async function loadData() {
   finally { loading.value = false }
 }
 function onSearch() { page.value = 1; loadData() }
-const dialogVisible=ref(false);const isEdit=ref(false);const form=reactive({planno:'',custnm:'',custcard:'',custcd:'',plantyp:'',plan_status:'0',plandate:''})
+const dialogVisible=ref(false);const isEdit=ref(false);const form=reactive<PlanRecord & {deposit?:number;is_rent?:string;yun_type?:string;pos_item?:string}>({planno:'',custnm:'',custcard:'',custcd:'',plantyp:'',plan_status:'0',plandate:'',is_rent:'N',deposit:0,yun_type:'',pos_item:''})
 const saving=ref(false)
 function openDetail(row:PlanRecord){isEdit.value=true;Object.assign(form,row);dialogVisible.value=true}
 function openEdit(row:PlanRecord){isEdit.value=true;Object.assign(form,row);dialogVisible.value=true}
-function openCreate(){isEdit.value=false;form.planno='';form.custnm='';form.custcard='';form.custcd='';form.plantyp='';form.plan_status='0';form.plandate='';dialogVisible.value=true}
-async function handleSave(){saving.value=true;try{if(isEdit.value){await updatePlan(form.planno,{custnm:form.custnm,custcard:form.custcard,plan_status:form.plan_status})}else{await createPlan({planno:form.planno,custnm:form.custnm,custcard:form.custcard,custcd:form.custcd,plantyp:form.plantyp,plan_status:form.plan_status})};dialogVisible.value=false;loadData()}catch{ElMessage.error('保存失败')}finally{saving.value=false}}
+function openCreate(){isEdit.value=false;Object.assign(form,{planno:'',custnm:'',custcard:'',custcd:'',plantyp:'',plan_status:'0',plandate:'',is_rent:'N',deposit:0,yun_type:'',pos_item:''});dialogVisible.value=true}
+async function handleSave(){saving.value=true;try{const payload={custnm:form.custnm,custcard:form.custcard,custrnm:form.custrnm,address:form.address,contactor:form.contactor,phoneno:form.phoneno,plantyp:form.plantyp,busityp:form.busityp,plan_status:form.plan_status,is_rent:form.is_rent,deposit:form.deposit,yun_type:form.yun_type,pos_item:form.pos_item};if(isEdit.value){await updatePlan(form.planno,payload)}else{await createPlan({planno:form.planno,custcd:form.custcd,...payload})};dialogVisible.value=false;loadData()}catch{ElMessage.error('保存失败')}finally{saving.value=false}}
 </script>
 
 <style scoped>

@@ -10,6 +10,8 @@ from flask import Blueprint, request
 
 from app.api.auth import login_required
 from app.services.system_service import SystemService
+from app.services.warehouse_service import TransferAccountService
+from app.schemas.warehouse import TransferAccountCreate, TransferAccountUpdate
 from app.utils.response import error_response, success_response
 
 __all__ = ["system_bp"]
@@ -758,3 +760,48 @@ def update_asset(asset_id: int):  # type: ignore[no-untyped-def]
             setattr(e, k, v)
     db.session.commit()
     return success_response(data=e.to_dict())
+
+
+# ---- 调拨科目 (TTX01_TXKMG) ----
+
+
+@system_bp.get("/transfers")
+@login_required
+def list_transfers():  # type: ignore[no-untyped-def]
+    """调拨科目列表。"""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    data = TransferAccountService.list_records(page=page, per_page=per_page)
+    return success_response(data=data)
+
+
+@system_bp.get("/transfers/<txkno>")
+@login_required
+def get_transfer(txkno: str):  # type: ignore[no-untyped-def]
+    """调拨科目详情。"""
+    data = TransferAccountService.get(txkno)
+    if data is None:
+        return error_response(message="调拨科目不存在", code=404)
+    return success_response(data=data)
+
+
+@system_bp.post("/transfers")
+@login_required
+def create_transfer():  # type: ignore[no-untyped-def]
+    """创建调拨科目。"""
+    body = TransferAccountCreate.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = TransferAccountService.create(body.model_dump(exclude_none=True), creator=user_cd)
+    return success_response(data=data, message="创建成功", code=201)
+
+
+@system_bp.put("/transfers/<txkno>")
+@login_required
+def update_transfer(txkno: str):  # type: ignore[no-untyped-def]
+    """更新调拨科目。"""
+    body = TransferAccountUpdate.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = TransferAccountService.update(txkno, body.model_dump(exclude_unset=True), updator=user_cd)
+    if data is None:
+        return error_response(message="调拨科目不存在", code=404)
+    return success_response(data=data)

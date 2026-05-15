@@ -7,6 +7,7 @@ from typing import Any
 from app.extensions import db
 from app.repositories.deposit_repository import (
     DepositDetailRepository,
+    DepositIORepository,
     DepositPosModelRepository,
     DepositRepository,
 )
@@ -90,3 +91,23 @@ class DepositPosModelService:
         DepositPosModelRepository.update(record, data)
         db.session.commit()
         return record.to_dict()
+
+
+class DepositIOService:
+    """押金出入流水服务。"""
+
+    @staticmethod
+    def list_records(
+        custcd: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> dict[str, Any]:
+        items, total = DepositIORepository.list_by_filters(
+            custcd=custcd, page=page, per_page=per_page
+        )
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }

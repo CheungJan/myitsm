@@ -240,3 +240,23 @@ class MaintenanceQuery(BaseModel):
     store_id: str | None = Field(None, max_length=8, description="门店ID过滤")
     page: int = Field(1, ge=1, description="页码")
     per_page: int = Field(20, ge=1, le=100, description="每页条数")
+
+
+# ---------------------------------------------------------------------------
+# 保养计划 (TIT17_PLAN)
+# ---------------------------------------------------------------------------
+
+
+class MaintenancePlanCreate(BaseModel):
+    """创建保养计划。"""
+
+    plan_y: str = Field(..., max_length=4, description="计划年")
+    plan_yymm: str = Field(..., max_length=6, description="计划年月")
+    area_id: int = Field(..., description="区域ID")
+    plan_qty: int | None = Field(None, ge=0, description="计划保养数量")
+
+
+class MaintenancePlanUpdate(BaseModel):
+    """更新保养计划。"""
+
+    plan_qty: int | None = Field(None, ge=0, description="计划保养数量")

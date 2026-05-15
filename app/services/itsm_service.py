@@ -18,6 +18,8 @@ from app.repositories.itsm_repository import (
     RecycleTaskRepository,
     RVRepository,
     StoreCloseRepository,
+    MaintenancePlanRepository,
+    MaintenanceT17Repository,
 )
 from app.services.state_machine import StateMachine
 
@@ -488,3 +490,67 @@ class RecycleTaskService(_BaseMaintenanceService):
     def list_details(recycle_id: str) -> list[dict[str, Any]]:
         items = RecycleTaskRepository.list_details(recycle_id)
         return [item.to_dict() for item in items]
+
+
+class MaintenancePlanService:
+    """保养计划服务（TIT17_PLAN）。"""
+
+    @staticmethod
+    def get(plan_id: int) -> dict[str, Any] | None:
+        record = MaintenancePlanRepository.get_by_id(plan_id)
+        if record is None:
+            return None
+        return record.to_dict()
+
+    @staticmethod
+    def list_records(page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = MaintenancePlanRepository.list_all(page=page, per_page=per_page)
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        record = MaintenancePlanRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(plan_id: int, data: dict[str, Any]) -> dict[str, Any] | None:
+        record = MaintenancePlanRepository.get_by_id(plan_id)
+        if record is None:
+            return None
+        MaintenancePlanRepository.update(record, data)
+        db.session.commit()
+        return record.to_dict()
+
+
+class MaintenanceT17Service:
+    """日常保养工单服务（TIT17_MAINTENANCE）。"""
+
+    @staticmethod
+    def get(maintenance_id: str) -> dict[str, Any] | None:
+        record = MaintenanceT17Repository.get_by_id(maintenance_id)
+        if record is None:
+            return None
+        return record.to_dict()
+
+    @staticmethod
+    def list_records(
+        status: str | None = None,
+        store_id: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> dict[str, Any]:
+        items, total = MaintenanceT17Repository.list_by_filters(
+            status=status, store_id=store_id, page=page, per_page=per_page
+        )
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }

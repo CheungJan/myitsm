@@ -2,8 +2,11 @@ import request from './request'
 
 export interface PlanRecord {
     planno: string; plantyp: string; custcd: string; custnm: string
-    custcard: string; plandate: string; plan_status: string
+    custcard: string; custrnm?: string; plandate: string; plan_status: string
     opercd: string; gendate: string
+    is_rent?: string; deposit?: number; yun_type?: string
+    pos_item?: string; is_contract?: string
+    address?: string; contactor?: string; phoneno?: string; busityp?: string
     [key: string]: unknown
 }
 

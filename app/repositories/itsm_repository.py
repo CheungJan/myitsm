@@ -23,6 +23,8 @@ from app.models.itsm import (
     RecycleTask,
     RecycleTaskDtl,
     StoreClose,
+    MaintenancePlan,
+    Maintenance,
 )
 from app.models.master import CustomerHistory
 
@@ -517,3 +519,61 @@ class RecycleTaskRepository:
         return (
             db.session.query(RecycleTaskDtl).filter(RecycleTaskDtl.recycle_id == recycle_id).all()
         )
+
+
+class MaintenancePlanRepository:
+    """保养计划数据访问（TIT17_PLAN）。"""
+
+    @staticmethod
+    def get_by_id(plan_id: int) -> MaintenancePlan | None:
+        return db.session.get(MaintenancePlan, plan_id)
+
+    @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> tuple[list[MaintenancePlan], int]:
+        query = db.session.query(MaintenancePlan).order_by(desc(MaintenancePlan.plan_yymm))
+        total: int = query.count()
+        items: list[MaintenancePlan] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> MaintenancePlan:
+        now = datetime.now(UTC)
+        record = MaintenancePlan(
+            create_time=now,
+            creator=creator,
+            **data,
+        )
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: MaintenancePlan, data: dict[str, Any]) -> MaintenancePlan:
+        for key, value in data.items():
+            if hasattr(record, key):
+                setattr(record, key, value)
+        return record
+
+
+class MaintenanceT17Repository:
+    """日常保养工单数据访问（TIT17_MAINTENANCE）。"""
+
+    @staticmethod
+    def get_by_id(maintenance_id: str) -> Maintenance | None:
+        return db.session.get(Maintenance, maintenance_id)
+
+    @staticmethod
+    def list_by_filters(
+        status: str | None = None,
+        store_id: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list[Maintenance], int]:
+        query = db.session.query(Maintenance)
+        if status:
+            query = query.filter(Maintenance.current_status == status)
+        if store_id:
+            query = query.filter(Maintenance.store_id == store_id)
+        query = query.order_by(desc(Maintenance.create_time))
+        total: int = query.count()
+        items: list[Maintenance] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total

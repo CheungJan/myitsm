@@ -12,12 +12,14 @@ from app.api.auth import login_required
 from app.schemas.deposit import (
     DepositCreate,
     DepositDetailCreate,
+    DepositIOQuery,
     DepositPosModelCreate,
     DepositPosModelUpdate,
     DepositUpdate,
 )
 from app.services.deposit_service import (
     DepositDetailService,
+    DepositIOService,
     DepositPosModelService,
     DepositService,
 )
@@ -122,3 +124,19 @@ def update_deposit_model(model_cd: str):  # type: ignore[no-untyped-def]
     if data is None:
         return error_response(message="型号标准不存在", code=404)
     return success_response(data=data, message="更新成功")
+
+
+# ---- 押金出入流水 ----
+
+
+@deposit_bp.get("/deposits/io")
+@login_required
+def list_deposit_io():  # type: ignore[no-untyped-def]
+    """押金出入流水列表。"""
+    params = DepositIOQuery.model_validate(request.args.to_dict())
+    data = DepositIOService.list_records(
+        custcd=params.custcd,
+        page=params.page,
+        per_page=params.per_page,
+    )
+    return success_response(data=data)
