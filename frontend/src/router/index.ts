@@ -118,6 +118,9 @@ const router = createRouter({
                     path: 'itsm/device-change', name: 'DeviceChangeList', component: () => import('@/views/itsm/DeviceChangeList.vue'), meta: { title: '设备变更' }
                 },
                 {
+                    path: 'itsm/store-close', name: 'StoreCloseList', component: () => import('@/views/itsm/StoreCloseList.vue'), meta: { title: '门店关闭' }
+                },
+                {
                     path: 'itsm/maintenance',
                     name: 'MaintenanceList',
                     component: () => import('@/views/itsm/MaintenanceList.vue'),
