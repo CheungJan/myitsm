@@ -66,7 +66,7 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'plans', menu_nm: '预计划管理', path: '/sales/plans' },
             { menu_cd: 'sales-bills', menu_nm: '销售单据', path: '/sales/bills' }
         ]
-    }
+    },
     {
         menu_cd: 'qc', menu_nm: '质检管理',
         children: [
