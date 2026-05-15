@@ -26,14 +26,26 @@
       </el-table>
       <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:12px;justify-content:flex-end" />
     </el-card>
+
+    <el-dialog :title="isEdit?'编辑预计划':'新建预计划'" v-model="dialogVisible" width="500px">
+      <el-form :model="form" label-width="80px">
+        <el-form-item label="计划单号" required><el-input v-model="form.planno" :disabled="isEdit"/></el-form-item>
+        <el-form-item label="客户名称"><el-input v-model="form.custnm"/></el-form-item>
+        <el-form-item label="磁卡号"><el-input v-model="form.custcard"/></el-form-item>
+        <el-form-item label="客户编码"><el-input v-model="form.custcd"/></el-form-item>
+        <el-form-item label="计划类型"><el-input v-model="form.plantyp"/></el-form-item>
+        <el-form-item label="状态"><el-select v-model="form.plan_status" style="width:100%"><el-option label="待确认" value="0"/><el-option label="已确认" value="1"/><el-option label="已完成" value="2"/></el-select></el-form-item>
+      </el-form>
+      <template #footer><el-button @click="dialogVisible=false">取消</el-button><el-button type="primary" @click="handleSave" :loading="saving">保存</el-button></template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
-import { fetchPlans } from '@/api/sales'
+import { fetchPlans, createPlan, updatePlan } from '@/api/sales'
 import type { PlanRecord } from '@/api/sales'
 
 const plans = ref<PlanRecord[]>([]); const loading = ref(false)
@@ -59,9 +71,12 @@ async function loadData() {
   finally { loading.value = false }
 }
 function onSearch() { page.value = 1; loadData() }
-function openDetail(row: PlanRecord) { ElMessage.info(`详情: ${row.planno}`) }
-function openEdit(row: PlanRecord) { ElMessage.info(`编辑: ${row.planno}`) }
-function openCreate() { ElMessage.info('新建预计划 — F2 后续实现') }
+const dialogVisible=ref(false);const isEdit=ref(false);const form=reactive({planno:'',custnm:'',custcard:'',custcd:'',plantyp:'',plan_status:'0',plandate:''})
+const saving=ref(false)
+function openDetail(row:PlanRecord){isEdit.value=true;Object.assign(form,row);dialogVisible.value=true}
+function openEdit(row:PlanRecord){isEdit.value=true;Object.assign(form,row);dialogVisible.value=true}
+function openCreate(){isEdit.value=false;form.planno='';form.custnm='';form.custcard='';form.custcd='';form.plantyp='';form.plan_status='0';form.plandate='';dialogVisible.value=true}
+async function handleSave(){saving.value=true;try{if(isEdit.value){await updatePlan(form.planno,{custnm:form.custnm,custcard:form.custcard,plan_status:form.plan_status})}else{await createPlan({planno:form.planno,custnm:form.custnm,custcard:form.custcard,custcd:form.custcd,plantyp:form.plantyp,plan_status:form.plan_status})};dialogVisible.value=false;loadData()}catch{ElMessage.error('保存失败')}finally{saving.value=false}}
 </script>
 
 <style scoped>

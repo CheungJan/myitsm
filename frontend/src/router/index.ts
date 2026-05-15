@@ -124,6 +124,18 @@ const router = createRouter({
                     path: 'procurement/bills', name: 'PurchaseBillList', component: () => import('@/views/procurement/PurchaseBillList.vue'), meta: { title: '采购单据' }
                 },
                 {
+                    path: 'sales/bills', name: 'SalesBillList', component: () => import('@/views/sales/SalesBillList.vue'), meta: { title: '销售单据' }
+                },
+                {
+                    path: 'itsm/open', name: 'MaintenanceOpenList', component: () => import('@/views/itsm/MaintenanceOpenList.vue'), meta: { title: '新机开通' }
+                },
+                {
+                    path: 'itsm/recycle', name: 'RecycleTaskList', component: () => import('@/views/itsm/RecycleTaskList.vue'), meta: { title: '回收任务' }
+                },
+                {
+                    path: 'qc/results', name: 'QcResultList', component: () => import('@/views/qc/QcResultList.vue'), meta: { title: '质检结果' }
+                },
+                {
                     path: 'itsm/maintenance',
                     name: 'MaintenanceList',
                     component: () => import('@/views/itsm/MaintenanceList.vue'),
