@@ -35,6 +35,13 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         ]
     },
     {
+        menu_cd: 'warehouse', menu_nm: '仓储管理',
+        children: [
+            { menu_cd: 'stock-in', menu_nm: '入库单管理', path: '/warehouse/stock-in' },
+            { menu_cd: 'stock-out', menu_nm: '出库单管理', path: '/warehouse/stock-out' }
+        ]
+    },
+    {
         menu_cd: 'sales', menu_nm: '销售管理',
         children: [
             { menu_cd: 'plans', menu_nm: '预计划管理', path: '/sales/plans' }

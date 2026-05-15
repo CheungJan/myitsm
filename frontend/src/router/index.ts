@@ -88,6 +88,18 @@ const router = createRouter({
                     meta: { title: 'BOM管理' }
                 },
                 {
+                    path: 'warehouse/stock-in',
+                    name: 'StockInList',
+                    component: () => import('@/views/warehouse/StockInList.vue'),
+                    meta: { title: '入库单管理' }
+                },
+                {
+                    path: 'warehouse/stock-out',
+                    name: 'StockOutList',
+                    component: () => import('@/views/warehouse/StockOutList.vue'),
+                    meta: { title: '出库单管理' }
+                },
+                {
                     path: 'sales/plans',
                     name: 'PlanList',
                     component: () => import('@/views/sales/PlanList.vue'),
