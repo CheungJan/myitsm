@@ -33,7 +33,7 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'assets', menu_nm: '资产台账', path: '/master/assets' },
             { menu_cd: 'warehouses', menu_nm: '仓库管理', path: '/master/warehouses' }
         ]
-    }
+    },
     {
         menu_cd: 'sales', menu_nm: '销售管理',
         children: [
