@@ -1,4 +1,6 @@
 <template>
+  <h2>出库单管理 TEST v3</h2>
+  <p>组件加载成功</p>
   <div class="page">
     <div class="page-header"><h2>出库单管理</h2></div>
     <el-card shadow="never" style="margin-bottom:16px">
