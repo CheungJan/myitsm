@@ -92,6 +92,11 @@ class WorkProcessService:
     """工单工序服务。"""
 
     @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = WorkProcessRepository.list_all(page=page, per_page=per_page)
+        return {"items": [item.to_dict() for item in items], "total": total, "page": page, "per_page": per_page}
+
+    @staticmethod
     def list_by_wo(wo_id: str) -> list[dict[str, Any]]:
         records = WorkProcessRepository.list_by_wo(wo_id)
         return [r.to_dict() for r in records]
@@ -118,6 +123,11 @@ class WorkProcessService:
 
 class MaterialConsumeService:
     """物料消耗服务。"""
+
+    @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = MaterialConsumeRepository.list_all(page=page, per_page=per_page)
+        return {"items": [item.to_dict() for item in items], "total": total, "page": page, "per_page": per_page}
 
     @staticmethod
     def list_by_wo(wo_id: str) -> list[dict[str, Any]]:

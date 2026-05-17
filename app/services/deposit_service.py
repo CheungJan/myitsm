@@ -53,6 +53,11 @@ class DepositDetailService:
     """押金变更明细服务。"""
 
     @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = DepositDetailRepository.list_all(page=page, per_page=per_page)
+        return {"items": [r.to_dict() for r in items], "total": total, "page": page, "per_page": per_page}
+
+    @staticmethod
     def list_by_customer(custcd: str, page: int = 1, per_page: int = 20) -> dict[str, Any]:
         items, total = DepositDetailRepository.list_by_customer(custcd, page, per_page)
         return {

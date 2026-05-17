@@ -5,8 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from app.extensions import db
+from app.models.master import Item
+from app.models.warehouse import Warehouse
 from app.repositories.warehouse_repository import (
     AssetCheckRepository,
+    OverLostRepository,
     PosChangeRepository,
     StockDetailRepository,
     StockInRepository,
@@ -14,6 +17,38 @@ from app.repositories.warehouse_repository import (
     TransferAccountRepository,
     WarehouseRepository,
 )
+
+
+def _enrich_warehouse_names(rows: list[dict[str, Any]]) -> None:
+    """批量补充仓库名称 whnm。"""
+    whcds = list({r.get("whcd") for r in rows if r.get("whcd")})
+    if not whcds:
+        return
+    wh_map = dict(
+        db.session.query(Warehouse.whcd, Warehouse.whnm)
+        .filter(Warehouse.whcd.in_(whcds))
+        .all()
+    )
+    for r in rows:
+        cd = r.get("whcd")
+        if cd and not r.get("whnm"):
+            r["whnm"] = wh_map.get(cd, "")
+
+
+def _enrich_item_names(details: list[dict[str, Any]]) -> None:
+    """批量补充明细中的物料名称 item_nm。"""
+    itemcds = list({d.get("itemcd") for d in details if d.get("itemcd")})
+    if not itemcds:
+        return
+    item_map = dict(
+        db.session.query(Item.item_cd, Item.item_nm)
+        .filter(Item.item_cd.in_(itemcds))
+        .all()
+    )
+    for d in details:
+        cd = d.get("itemcd")
+        if cd:
+            d["item_nm"] = item_map.get(cd, "")
 
 
 class WarehouseService:
@@ -57,6 +92,8 @@ class StockInService:
             return None
         result = record.to_dict()
         result["details"] = [d.to_dict() for d in record.details]  # type: ignore[attr-defined]
+        _enrich_warehouse_names([result])
+        _enrich_item_names(result["details"])
         return result
 
     @staticmethod
@@ -70,8 +107,10 @@ class StockInService:
         items, total = StockInRepository.list_by_filters(
             whcd=whcd, invtyp=invtyp, auditflg=auditflg, page=page, per_page=per_page
         )
+        data = [item.to_dict() for item in items]
+        _enrich_warehouse_names(data)
         return {
-            "items": [item.to_dict() for item in items],
+            "items": data,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -99,7 +138,7 @@ class StockInService:
         record = StockInRepository.get_by_id(inbillid)
         if record is None:
             return {"success": False, "error": "入库单不存在"}
-        if record.auditflg == "1":
+        if record.auditflg == "2":
             return {"success": False, "error": "已审核，不可重复审核"}
         StockInRepository.audit(record, auditor)
         for detail in record.details:  # type: ignore[attr-defined]
@@ -124,6 +163,9 @@ class StockOutService:
         result = record.to_dict()
         result["details_eid"] = [d.to_dict() for d in record.details_eid]  # type: ignore[attr-defined]
         result["details_prd"] = [d.to_dict() for d in record.details_prd]  # type: ignore[attr-defined]
+        _enrich_warehouse_names([result])
+        _enrich_item_names(result["details_eid"])
+        _enrich_item_names(result["details_prd"])
         return result
 
     @staticmethod
@@ -137,8 +179,10 @@ class StockOutService:
         items, total = StockOutRepository.list_by_filters(
             whcd=whcd, invtyp=invtyp, auditflg=auditflg, page=page, per_page=per_page
         )
+        data = [item.to_dict() for item in items]
+        _enrich_warehouse_names(data)
         return {
-            "items": [item.to_dict() for item in items],
+            "items": data,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -176,7 +220,7 @@ class StockOutService:
         record = StockOutRepository.get_by_id(outbillid)
         if record is None:
             return {"success": False, "error": "出库单不存在"}
-        if record.auditflg == "1":
+        if record.auditflg == "2":
             return {"success": False, "error": "已审核，不可重复审核"}
         StockOutRepository.audit(record, auditor)
         for detail in record.details_eid:  # type: ignore[attr-defined]
@@ -364,3 +408,65 @@ class TransferAccountService:
         TransferAccountRepository.update(record, data, updator)
         db.session.commit()
         return record.to_dict()
+
+
+class OverLostService:
+    """盘盈盘亏业务服务（TWH17_OVERLOST + TWH18 明细）。"""
+
+    @staticmethod
+    def get(olbillid: str) -> dict[str, Any] | None:
+        record = OverLostRepository.get_by_id(olbillid)
+        if record is None:
+            return None
+        result = record.to_dict()
+        result["details"] = [d.to_dict() for d in record.details]  # type: ignore[attr-defined]
+        result["details_eid"] = [d.to_dict() for d in record.details_eid]  # type: ignore[attr-defined]
+        return result
+
+    @staticmethod
+    def list_records(
+        whcd: str | None = None,
+        oltyp: str | None = None,
+        auditflg: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> dict[str, Any]:
+        items, total = OverLostRepository.list_by_filters(
+            whcd=whcd, oltyp=oltyp, auditflg=auditflg, page=page, per_page=per_page
+        )
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(
+        data: dict[str, Any],
+        details: list[dict[str, Any]],
+        eid_details: list[dict[str, Any]],
+        creator: str,
+    ) -> dict[str, Any]:
+        record = OverLostRepository.create(data, creator)
+        for idx, detail_data in enumerate(details, start=1):
+            OverLostRepository.add_detail(
+                olbillid=record.olbillid, lineno=idx, data=detail_data
+            )
+        for idx, eid_data in enumerate(eid_details, start=1):
+            OverLostRepository.add_eid_detail(
+                olbillid=record.olbillid, lineno=idx, data=eid_data
+            )
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def audit(olbillid: str, auditor: str) -> dict[str, object]:
+        record = OverLostRepository.get_by_id(olbillid)
+        if record is None:
+            return {"success": False, "error": "盘点单不存在"}
+        if record.auditflg == "1":
+            return {"success": False, "error": "已审核"}
+        OverLostRepository.audit(record, auditor)
+        db.session.commit()
+        return {"success": True, "olbillid": record.olbillid}

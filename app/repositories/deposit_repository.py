@@ -46,6 +46,18 @@ class DepositDetailRepository:
     """押金变更明细数据访问。"""
 
     @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> tuple[list[DepositDetail], int]:
+        query = db.session.query(DepositDetail).filter(DepositDetail.useflg == "1")
+        total: int = query.count()
+        items: list[DepositDetail] = (
+            query.order_by(desc(DepositDetail.gendate))
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+        return items, total
+
+    @staticmethod
     def list_by_customer(
         custcd: str, page: int = 1, per_page: int = 20
     ) -> tuple[list[DepositDetail], int]:

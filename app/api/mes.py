@@ -113,6 +113,16 @@ def update_process(process_cd: str):  # type: ignore[no-untyped-def]
 # ---- 工单工序 ----
 
 
+@mes_bp.get("/work-processes")
+@login_required
+def list_all_work_processes():  # type: ignore[no-untyped-def]
+    """工单工序列表（全部）。"""
+    page: int = request.args.get("page", 1, type=int)
+    per_page: int = request.args.get("per_page", 20, type=int)
+    data = WorkProcessService.list_all(page=page, per_page=per_page)
+    return success_response(data=data)
+
+
 @mes_bp.get("/work-orders/<wo_id>/processes")
 @login_required
 def list_work_processes(wo_id: str):  # type: ignore[no-untyped-def]
@@ -144,6 +154,16 @@ def update_work_process(wp_id: int):  # type: ignore[no-untyped-def]
 
 
 # ---- 物料消耗 ----
+
+
+@mes_bp.get("/materials")
+@login_required
+def list_all_materials():  # type: ignore[no-untyped-def]
+    """物料消耗列表（全部）。"""
+    page: int = request.args.get("page", 1, type=int)
+    per_page: int = request.args.get("per_page", 20, type=int)
+    data = MaterialConsumeService.list_all(page=page, per_page=per_page)
+    return success_response(data=data)
 
 
 @mes_bp.get("/work-orders/<wo_id>/materials")

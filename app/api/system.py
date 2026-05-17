@@ -9,9 +9,9 @@ from __future__ import annotations
 from flask import Blueprint, request
 
 from app.api.auth import login_required
+from app.schemas.warehouse import TransferAccountCreate, TransferAccountUpdate
 from app.services.system_service import SystemService
 from app.services.warehouse_service import TransferAccountService
-from app.schemas.warehouse import TransferAccountCreate, TransferAccountUpdate
 from app.utils.response import error_response, success_response
 
 __all__ = ["system_bp"]
@@ -697,8 +697,9 @@ def get_asset_bom():  # type: ignore[no-untyped-def]
     eid = request.args.get("eid", "")
     if not eid:
         return error_response("缺少 eid 参数", 400)
-    from app.models.master import CustPosRl, Customer, PosREid, Item, Eid as EidModel
     from app.extensions import db
+    from app.models.master import Customer, CustPosRl, Item, PosREid
+    from app.models.master import Eid as EidModel
 
     rows = db.session.query(PosREid).filter(PosREid.posid == eid).all()
 
@@ -750,8 +751,8 @@ def update_asset(asset_id: int):  # type: ignore[no-untyped-def]
     itemcd, eid = r.get("item_cd"), r.get("eid")
     if not itemcd or not eid:
         return error_response("无法定位设备", 400)
-    from app.models.master import Eid
     from app.extensions import db
+    from app.models.master import Eid
     e = db.session.get(Eid, (itemcd, eid))
     if not e:
         return error_response("设备不存在", 404)

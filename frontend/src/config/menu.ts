@@ -43,7 +43,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'stock-out', menu_nm: '出库单管理', path: '/warehouse/stock-out' },
             { menu_cd: 'stock', menu_nm: '库存查询', path: '/warehouse/stock-balance' },
             { menu_cd: 'asset-check', menu_nm: '资产盘点', path: '/warehouse/asset-check' },
-            { menu_cd: 'pos-change', menu_nm: '设备回收确认', path: '/warehouse/pos-change' }
+            { menu_cd: 'pos-change', menu_nm: '设备回收确认', path: '/warehouse/pos-change' },
+            { menu_cd: 'overlost', menu_nm: '盘盈盘亏', path: '/warehouse/overlost' }
         ]
     },
     {
@@ -53,7 +54,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'proc-registers', menu_nm: '采购登记', path: '/procurement/registers' },
             { menu_cd: 'proc-bills', menu_nm: '采购单据', path: '/procurement/bills' },
             { menu_cd: 'suppliers', menu_nm: '供应商管理', path: '/procurement/suppliers' },
-            { menu_cd: 'appraisals', menu_nm: '供应商评价', path: '/procurement/appraisals' }
+            { menu_cd: 'appraisals', menu_nm: '供应商评价', path: '/procurement/appraisals' },
+            { menu_cd: 'proc-returns', menu_nm: '采购退货', path: '/procurement/returns' }
         ]
     },
     {
@@ -66,7 +68,9 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'itsm-open', menu_nm: '新机开通', path: '/itsm/open' },
             { menu_cd: 'recycle', menu_nm: '回收任务', path: '/itsm/recycle' },
             { menu_cd: 'maint-plans', menu_nm: '保养计划', path: '/itsm/maintenance-plans' },
-            { menu_cd: 'maint-t17', menu_nm: '保养工单', path: '/itsm/maintenance-t17' }
+            { menu_cd: 'maint-t17', menu_nm: '保养工单', path: '/itsm/maintenance-t17' },
+            { menu_cd: 'free-replace', menu_nm: '免费更换', path: '/itsm/free-replace' },
+            { menu_cd: 'archives', menu_nm: '归档记录', path: '/itsm/archives' }
         ]
     },
     {
@@ -81,7 +85,16 @@ export const FRONTEND_MENUS: MenuConfig[] = [
     {
         menu_cd: 'qc', menu_nm: '质检管理',
         children: [
-            { menu_cd: 'qc-results', menu_nm: '质检结果', path: '/qc/results' }
+            { menu_cd: 'qc-results', menu_nm: '质检结果', path: '/qc/results' },
+            { menu_cd: 'qc-input', menu_nm: '质检录入', path: '/qc/input' },
+            { menu_cd: 'qc-audit', menu_nm: '质检审核', path: '/qc/audit' }
+        ]
+    },
+    {
+        menu_cd: 'transactions', menu_nm: '事务查询',
+        children: [
+            { menu_cd: 'all-transactions', menu_nm: '全模块查询', path: '/transactions/bills' },
+            { menu_cd: 'transfer', menu_nm: '调拨流转', path: '/transactions/transfer' }
         ]
     },
     {
@@ -127,26 +140,26 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'receivables', menu_nm: '应收管理', path: '/finance/receivables' },
             { menu_cd: 'payables', menu_nm: '应付管理', path: '/finance/payables' },
             { menu_cd: 'payments', menu_nm: '收付款管理', path: '/finance/payments' },
-            { menu_cd: 'depreciations', menu_nm: '设备折旧', path: '/finance/depreciations' }
+            { menu_cd: 'depreciation', menu_nm: '设备折旧', path: '/finance/depreciations' }
         ]
     },
     {
         menu_cd: 'deposit', menu_nm: '押金管理',
         children: [
             { menu_cd: 'deposits', menu_nm: '押金台账', path: '/deposit/deposits' },
-            { menu_cd: 'deposit-dtl', menu_nm: '押金明细', path: '/deposit/details' },
+            { menu_cd: 'deposit-details', menu_nm: '押金明细', path: '/deposit/details' },
             { menu_cd: 'deposit-io', menu_nm: '押金流水', path: '/deposit/io' }
         ]
     },
     {
         menu_cd: 'attendance', menu_nm: '考勤管理',
         children: [
-            { menu_cd: 'attend-records', menu_nm: '考勤记录', path: '/attendance/records' },
-            { menu_cd: 'attend-summary', menu_nm: '考勤汇总', path: '/attendance/summary' }
+            { menu_cd: 'attendance-list', menu_nm: '考勤记录', path: '/attendance/records' },
+            { menu_cd: 'attendance-count', menu_nm: '考勤汇总', path: '/attendance/summary' }
         ]
     },
     {
-        menu_cd: 'inv-mgmt', menu_nm: '库存管理',
+        menu_cd: 'inventory', menu_nm: '库存管理',
         children: [
             { menu_cd: 'inv-limits', menu_nm: '库存预警', path: '/inventory/limits' },
             { menu_cd: 'prices', menu_nm: '价格管理', path: '/inventory/prices' },
@@ -157,24 +170,25 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         menu_cd: 'mes', menu_nm: '生产管理',
         children: [
             { menu_cd: 'work-orders', menu_nm: '生产工单', path: '/mes/work-orders' },
-            { menu_cd: 'processes', menu_nm: '工序定义', path: '/mes/processes' },
+            { menu_cd: 'process-defs', menu_nm: '工序定义', path: '/mes/processes' },
             { menu_cd: 'work-processes', menu_nm: '工单工序', path: '/mes/work-processes' },
-            { menu_cd: 'materials', menu_nm: '物料消耗', path: '/mes/materials' }
+            { menu_cd: 'materials', menu_nm: '物料消耗', path: '/mes/materials' },
+            { menu_cd: 'labels', menu_nm: '标签管理', path: '/mes/labels' }
         ]
     },
     {
         menu_cd: 'iot', menu_nm: 'IoT物联',
         children: [
-            { menu_cd: 'connections', menu_nm: '设备接入', path: '/iot/connections' },
+            { menu_cd: 'device-conn', menu_nm: '设备接入', path: '/iot/connections' },
             { menu_cd: 'device-data', menu_nm: '设备数据', path: '/iot/data' },
             { menu_cd: 'alert-rules', menu_nm: '报警规则', path: '/iot/alert-rules' },
-            { menu_cd: 'alerts', menu_nm: '报警记录', path: '/iot/alerts' }
+            { menu_cd: 'alert-logs', menu_nm: '报警记录', path: '/iot/alerts' }
         ]
     },
     {
         menu_cd: 'reports', menu_nm: '报表中心',
         children: [
-            { menu_cd: 'report-center', menu_nm: '报表中心', path: '/reports/center' }
+            { menu_cd: 'reports-center', menu_nm: '报表中心', path: '/reports/center' }
         ]
     }
     // F3+ 模块将在后续阶段追加

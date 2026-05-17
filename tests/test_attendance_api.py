@@ -37,11 +37,11 @@ class TestAttendanceAPI:
         data: dict[str, Any] = resp.get_json()
         assert data["data"]["total"] >= 1
 
-    def test_list_attendance_missing_amonth(
+    def test_list_attendance_default_amonth(
         self, client: FlaskClient, auth_header: dict[str, str]
     ) -> None:
         resp = client.get("/api/v1/attendance/attendance", headers=auth_header)
-        assert resp.status_code == 400
+        assert resp.status_code == 200
 
     def test_list_attendance_summary(
         self, client: FlaskClient, auth_header: dict[str, str]

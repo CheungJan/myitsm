@@ -8,6 +8,7 @@ from app.extensions import db
 from app.repositories.procurement_repository import (
     PurchaseBillRepository,
     PurchasePlanRepository,
+    PurchasePlanStatusRepository,
     PurchaseRegisterRepository,
     ReturnPurchaseRepository,
     SupplierAppraisalRepository,
@@ -170,8 +171,32 @@ class ReturnPurchaseService:
         return result
 
     @staticmethod
-    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+    def list_records(
+        whcd: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> dict[str, Any]:
+        items, total = ReturnPurchaseRepository.list_by_filters(
+            whcd=whcd, page=page, per_page=per_page
+        )
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(
+        data: dict[str, Any],
+        details: list[dict[str, Any]],
+        creator: str,
+    ) -> dict[str, Any]:
         record = ReturnPurchaseRepository.create(data, creator)
+        for idx, detail_data in enumerate(details, start=1):
+            ReturnPurchaseRepository.add_detail(
+                pcbillid=record.pcbillid, lineno=idx, data=detail_data
+            )
         db.session.commit()
         return record.to_dict()
 
@@ -213,5 +238,41 @@ class SupplierAppraisalService:
         record = SupplierAppraisalRepository.create(data, creator)
         for idx, detail_data in enumerate(details, start=1):
             SupplierAppraisalRepository.add_detail(appid=record.appid, lineno=idx, data=detail_data)
+        db.session.commit()
+        return record.to_dict()
+
+
+class PurchasePlanStatusService:
+    """采购计划状态汇总服务（TPC03_PCPLANSTATUS）。"""
+
+    @staticmethod
+    def get(itemcd: str) -> dict[str, Any] | None:
+        record = PurchasePlanStatusRepository.get_by_id(itemcd)
+        if record is None:
+            return None
+        return record.to_dict()
+
+    @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = PurchasePlanStatusRepository.list_all(page=page, per_page=per_page)
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        record = PurchasePlanStatusRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(itemcd: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        record = PurchasePlanStatusRepository.get_by_id(itemcd)
+        if record is None:
+            return None
+        PurchasePlanStatusRepository.update(record, data)
         db.session.commit()
         return record.to_dict()

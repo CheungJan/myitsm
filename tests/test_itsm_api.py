@@ -72,7 +72,7 @@ class TestMaintenanceDaily:
         resp2 = _post(
             client,
             f"/api/v1/itsm/maintenance-daily/{mid}/transition",
-            {"to_status": "01"},
+            {"to_status": "2"},
             headers,
         )
         assert resp2.status_code == 200
@@ -91,7 +91,7 @@ class TestMaintenanceDaily:
         resp2 = _post(
             client,
             f"/api/v1/itsm/maintenance-daily/{mid}/transition",
-            {"to_status": "05"},
+            {"to_status": "5"},
             headers,
         )
         assert resp2.status_code == 400
@@ -268,12 +268,12 @@ class TestRecycleTask:
         resp2 = _post(
             client,
             f"/api/v1/itsm/recycle-task/{rid}/transition",
-            {"to_status": "01"},
+            {"to_status": "2"},
             headers,
         )
         assert resp2.status_code == 200
-        assert resp2.get_json()["data"]["from_status"] == "00"
-        assert resp2.get_json()["data"]["to_status"] == "01"
+        assert resp2.get_json()["data"]["from_status"] == "1"
+        assert resp2.get_json()["data"]["to_status"] == "2"
 
     def test_add_detail(self, app: Flask, client: FlaskClient) -> None:
         headers = _auth_header(app)

@@ -455,11 +455,11 @@ TWH01_WAREHOUSE (Warehouse)
 | Oracle 表 | 字段数 | 原用途 | 说明 |
 |-----------|--------|--------|------|
 | TMM48_FIXEDASSET | 9 | 固定资产 | 简单台账，可用 CustPosRl 替代部分功能 |
-| TMM40_LABEL | 6 | 标签管理 | PB 打印标签，B/S 暂无直接需求 |
+| TMM40_LABEL | 6 | 标签管理 | ✅ 已迁移(164,690行)+API+页面，见 `app/models/inventory.py:Label` |
 | TMM45_SUPPAPPRAISAL | 7 | 供应商考核主表 | 已有 TPC20/21，可能重复 |
 | TMM49_G3NO | 8 | 3G 号码管理 | 3G 技术过时，仅历史数据参考 |
 | TMM50_MFLOG | 6 | 制造流转日志 | PB 专属流转标记 |
-| TMM52_POSSTATUS | 9 | POS 状态码表 | 可用 TMM31_SYSCODES 编码表替代 |
+| TMM52_POSSTATUS | 9 | POS 状态码表 | ⚠️ 已迁移但标记废弃，codecd/codecd1 与 TMM31_SYSCODES(ST/ZZ) 完全重合，新功能使用 syscodes |
 | TMM33_MESSAGE | 8 | 系统消息 | 已有 TNTF01/02 通知系统替代 |
 
 ---

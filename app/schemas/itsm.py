@@ -260,3 +260,198 @@ class MaintenancePlanUpdate(BaseModel):
     """更新保养计划。"""
 
     plan_qty: int | None = Field(None, ge=0, description="计划保养数量")
+
+
+# ---------------------------------------------------------------------------
+# 归档 (TIT12)
+# ---------------------------------------------------------------------------
+
+
+class ArchiveCreate(BaseModel):
+    """创建归档记录。"""
+
+    maintenance_id: str = Field(..., max_length=8, description="维护单ID")
+    fault_cd: str | None = Field(None, max_length=10, description="故障编码")
+    fault_cd_audit: str | None = Field(None, max_length=10, description="故障编码（审核后）")
+    fault_type: str | None = Field(None, max_length=10, description="故障大类")
+    fault_detail_type: str | None = Field(None, max_length=10, description="故障小类")
+    description: str | None = Field(None, max_length=200, description="描述")
+    is_audit: str | None = Field(None, max_length=1, description="审核标记")
+
+
+class ArchiveUpdate(BaseModel):
+    """更新归档记录。"""
+
+    fault_cd: str | None = Field(None, max_length=10)
+    fault_cd_audit: str | None = Field(None, max_length=10)
+    fault_type: str | None = Field(None, max_length=10)
+    fault_detail_type: str | None = Field(None, max_length=10)
+    description: str | None = Field(None, max_length=200)
+    is_audit: str | None = Field(None, max_length=1)
+
+
+# ---------------------------------------------------------------------------
+# 免费更换 (TIT28)
+# ---------------------------------------------------------------------------
+
+
+class FreeReplaceCreate(BaseModel):
+    """创建免费更换工单。"""
+
+    company_id: str | None = Field(None, max_length=8, description="所属区域公司ID")
+    store_id: str | None = Field(None, max_length=8, description="门店ID")
+    request_time: datetime | None = Field(None, description="请求时间")
+    requset_paper_id: str | None = Field(None, max_length=8, description="请求单号")
+    old_device_id: str | None = Field(None, max_length=13, description="旧设备编号")
+    new_device_id: str | None = Field(None, max_length=13, description="换新设备编号")
+    deliver_no: str | None = Field(None, max_length=8, description="送货单号")
+    count: int | None = Field(None, description="变更数量")
+    expected_completion_time: datetime | None = Field(None, description="合同要求完成时间")
+    short_description: str | None = Field(None, max_length=80, description="简述")
+    detail_description: str | None = Field(None, max_length=200, description="详细描述")
+    is_success: str | None = Field(None, max_length=1, description="成功标志")
+    is_old: str | None = Field(None, max_length=1, description="是否补单")
+    is_back: str | None = Field(None, max_length=1, description="设备是否返回")
+
+
+class FreeReplaceDetailCreate(BaseModel):
+    """免费更换设备明细。"""
+
+    device_id: str | None = Field(None, max_length=13, description="旧机ID")
+    new_device_id: str | None = Field(None, max_length=13, description="新机ID")
+    delivery_id: str | None = Field(None, max_length=8, description="送货单号")
+    is_finish: str | None = Field(None, max_length=1, description="是否完成")
+
+
+# ---------------------------------------------------------------------------
+# ITSM 附表 Schema（P1 补全）
+# ---------------------------------------------------------------------------
+
+
+class PayListCreate(BaseModel):
+    """创建收费记录（TIT26）。"""
+
+    maintenance_id: str = Field(..., max_length=8, description="维修单ID")
+    store_id: str | None = Field(None, max_length=8, description="门店ID")
+    engineer_id: str | None = Field(None, max_length=6, description="工程师ID")
+    receipt_id: str | None = Field(None, max_length=8, description="收据号")
+    delivery_id: str | None = Field(None, max_length=8, description="送货单号")
+    paytype: str | None = Field(None, max_length=30, description="收费类型")
+    payje: float | None = Field(None, description="收款金额")
+    memo: str | None = Field(None, max_length=250, description="备注")
+    paydate: str | None = Field(None, description="收款日期")
+
+
+class MaintenanceLiabilityCreate(BaseModel):
+    """创建维护单责任豁免（TIT10_LIABILITY）。"""
+
+    maintenance_id: str = Field(..., max_length=8, description="维护单ID")
+    exceptions_cd: str | None = Field(None, max_length=10, description="免责条款编码")
+    exceptions_nm: str | None = Field(None, max_length=200, description="条款名称")
+    dept_nm: str | None = Field(None, max_length=20, description="审核部门")
+    assess_flg: str | None = Field(None, max_length=1, description="是否考核")
+    exempt_flg: str | None = Field(None, max_length=1, description="是否豁免")
+    type: str | None = Field(None, max_length=1, description="类型")
+    is_finish: str | None = Field(None, max_length=1, description="处理状态")
+    set_from: str | None = Field(None, max_length=10, description="来源")
+
+
+class MaintenanceLiabilityUpdate(BaseModel):
+    """更新维护单责任豁免。"""
+
+    exceptions_cd: str | None = Field(None, max_length=10)
+    exceptions_nm: str | None = Field(None, max_length=200)
+    dept_nm: str | None = Field(None, max_length=20)
+    assess_flg: str | None = Field(None, max_length=1)
+    exempt_flg: str | None = Field(None, max_length=1)
+    type: str | None = Field(None, max_length=1)
+    is_finish: str | None = Field(None, max_length=1)
+
+
+class LiabilityRegCreate(BaseModel):
+    """创建责任豁免字典（TIT02）。"""
+
+    liab_cd: str = Field(..., max_length=4, description="科目编码")
+    liab_nm: str = Field(..., max_length=20, description="科目名称")
+    describe: str | None = Field(None, max_length=200, description="描述")
+    liab_type: str | None = Field(None, max_length=1, description="分类")
+    parent: str | None = Field(None, max_length=4, description="上级编码")
+    child_flg: str | None = Field(None, max_length=1, description="子类别标志")
+
+
+class LiabilityRegDetailCreate(BaseModel):
+    """创建责任豁免字典明细。"""
+
+    lbdt_cd: str = Field(..., max_length=8, description="明细编码")
+    define: str | None = Field(None, max_length=200, description="明细定义")
+
+
+class MaintenanceAttcCreate(BaseModel):
+    """创建附件（TIT11）。"""
+
+    maintenance_id: str = Field(..., max_length=8, description="维护单ID")
+    attc_id: str | None = Field(None, max_length=8, description="附件ID")
+    attc_nm: str | None = Field(None, max_length=40, description="附件名称")
+    business_operation_id: int | None = Field(None, description="业务操作流水ID")
+
+
+class PosDetailCreate(BaseModel):
+    """创建换机配件明细（TIT10_POS_DETAIL）。"""
+
+    bill_id: str = Field(..., max_length=8, description="单据编号")
+    sm_id: int | None = Field(None, description="SM表ID")
+    noflg: str | None = Field(None, max_length=1, description="新旧设备标记")
+    device_id: str | None = Field(None, max_length=13, description="整机ID")
+    item_cd: str | None = Field(None, max_length=6, description="配件类型")
+    accessories_id: str | None = Field(None, max_length=13, description="配件编号")
+    status: str | None = Field(None, max_length=1, description="状态")
+
+
+class NoCloseTrackCreate(BaseModel):
+    """创建未关单跟踪（TIT29）。"""
+
+    maintenance_id: str = Field(..., max_length=8, description="维护单号")
+    idnum: int | None = Field(None, description="编号")
+    dispos_dept: str | None = Field(None, max_length=20, description="处理部门")
+    cause_main: str | None = Field(None, max_length=20, description="原因大类")
+    cause_detail: str | None = Field(None, max_length=20, description="原因小类")
+    cause_memo: str | None = Field(None, max_length=200, description="原因说明")
+    description: str | None = Field(None, max_length=250, description="详情")
+    feedback: str | None = Field(None, max_length=200, description="部门反馈")
+
+
+class RepairInfoCreate(BaseModel):
+    """创建报修信息（TIT05）。"""
+
+    rep_type: str = Field(..., max_length=2, description="类型（01客户/02配件）")
+    obj_cd: str = Field(..., max_length=8, description="对象编号")
+
+
+class TimepointAreaCreate(BaseModel):
+    """创建时间点级别（TIT01）。"""
+
+    levels: str = Field(..., max_length=2, description="响应等级")
+    explain: str | None = Field(None, max_length=20, description="说明")
+    timepoint: str | None = Field(None, description="时间点")
+    before_tm: float | None = Field(None, description="时间点前（小时）")
+    after_tm: float | None = Field(None, description="时间点后（小时）")
+
+
+class TimepointAreaUpdate(BaseModel):
+    """更新时间点级别。"""
+
+    explain: str | None = Field(None, max_length=20)
+    before_tm: float | None = Field(None)
+    after_tm: float | None = Field(None)
+
+
+class OnChooseDtCreate(BaseModel):
+    """创建开通选择明细（TIT19）。"""
+
+    bill_id: str = Field(..., max_length=8, description="单据编号")
+    business_id: int | None = Field(None, description="设备操作流水")
+    oldflg: str | None = Field(None, max_length=1, description="新旧设备标记")
+    device_id: str | None = Field(None, max_length=13, description="整机ID")
+    item_cd: str | None = Field(None, max_length=6, description="配件类型")
+    accessories_id: str | None = Field(None, max_length=13, description="配件编号")
+    chooseflg: str | None = Field(None, max_length=1, description="选取标记")

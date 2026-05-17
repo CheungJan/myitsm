@@ -140,8 +140,8 @@ class MaintenanceDaily(BaseModel):
     """
     日常维护单主表（TIT10_MAINTENANCEDAY）。
 
-    CURRENT_STATUS 状态码：
-        00=草稿, 01=已计划, 04=已派工, 02=实施中, 05=已完成, 09=已取消
+    CURRENT_STATUS 状态码（对齐 PB ZT 字典）：
+        1=新建, 2=分配, 3=关闭, 4=未解决, 5=已解决, 9=作废
     """
 
     __tablename__ = "tit10_maintenanceday"
@@ -161,7 +161,7 @@ class MaintenanceDaily(BaseModel):
     short_description = db.Column(db.String(80), comment="故障简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
     device_id = db.Column(db.String(13), comment="故障设备编号")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     faultcode = db.Column(db.String(80), comment="故障编码")
@@ -333,7 +333,7 @@ class MaintenanceOpen(BaseModel):
     deliver_no = db.Column(db.String(8), comment="送货单号")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     create_time = db.Column(db.DateTime, comment="创建时间")
@@ -403,7 +403,7 @@ class MaintenanceRenovate(BaseModel):
     deliver_no = db.Column(db.String(8), comment="送货单号")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     create_time = db.Column(db.DateTime, comment="创建时间")
@@ -477,7 +477,7 @@ class DeviceChange(BaseModel):
     expected_completion_time = db.Column(db.DateTime, comment="合同要求完成时间")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     create_time = db.Column(db.DateTime, comment="创建时间")
@@ -510,7 +510,7 @@ class Maintenance(BaseModel):
     request_time = db.Column(db.DateTime, comment="请求时间")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     create_time = db.Column(db.DateTime, comment="创建时间")
@@ -603,7 +603,7 @@ class StoreClose(BaseModel):
     expected_completion_time = db.Column(db.DateTime, comment="要求完成时间")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     create_time = db.Column(db.DateTime, comment="创建时间")
@@ -831,7 +831,7 @@ class FreeReplace(BaseModel):
     expected_completion_time = db.Column(db.DateTime, comment="合同要求完成时间")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     is_back = db.Column(db.String(1), comment="设备是否返回（Y/N）")
@@ -894,7 +894,7 @@ class RecycleTask(BaseModel):
     plan_no = db.Column(db.String(10), comment="来源预计划单号")
     maintenance_id = db.Column(db.String(8), comment="关联维护单号")
     cust_cd = db.Column(db.String(8), nullable=False, comment="门店代码")
-    task_status = db.Column(db.String(2), default="00", comment="任务状态")
+    task_status = db.Column(db.String(2), default="1", comment="任务状态")
     asset_count = db.Column(db.Integer, default=0, comment="应回收资产数量")
     asset_list = db.Column(db.String(500), comment="资产清单JSON")
     assigned_to = db.Column(db.String(6), comment="分配人员")
@@ -959,3 +959,24 @@ class NoCloseTrack(BaseModel):
     creator = db.Column(db.String(6), comment="创建人")
     update_time = db.Column(db.DateTime, comment="更新时间")
     updator = db.Column(db.String(6), comment="更新人")
+
+
+# ---------------------------------------------------------------------------
+# POS 状态字典 (TMM52_POSSTATUS)
+# ---------------------------------------------------------------------------
+
+
+class PosStatus(BaseModel):
+    """POS 状态字典（TMM52_POSSTATUS）。"""
+
+    __tablename__ = "tmm52_posstatus"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    codecd = db.Column(db.String(50), comment="状态编码")
+    codecd1 = db.Column(db.String(50), comment="状态编码1")
+    memo = db.Column(db.String(200), comment="备注")
+    sysflg = db.Column(db.String(1), comment="系统标志")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")

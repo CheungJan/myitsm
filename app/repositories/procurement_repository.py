@@ -13,9 +13,11 @@ from app.models.procurement import (
     PurchaseBill,
     PurchasePlan,
     PurchasePlanDt,
+    PurchasePlanStatus,
     PurchaseRegister,
     PurchaseRegisterDt,
     ReturnPurchaseBill,
+    ReturnPurchaseBillDt,
     SupplierAppraisal,
     SupplierAppraisalDt,
 )
@@ -178,12 +180,36 @@ class ReturnPurchaseRepository:
         return db.session.get(ReturnPurchaseBill, pcbillid)
 
     @staticmethod
+    def list_by_filters(
+        whcd: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list[ReturnPurchaseBill], int]:
+        query = db.session.query(ReturnPurchaseBill)
+        if whcd:
+            query = query.filter(ReturnPurchaseBill.whcd == whcd)
+        query = query.order_by(desc(ReturnPurchaseBill.gendate))
+        total: int = query.count()
+        items: list[ReturnPurchaseBill] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
     def create(data: dict[str, Any], creator: str) -> ReturnPurchaseBill:
         now = datetime.now(UTC)
         record = ReturnPurchaseBill(
             pcbillid=_gen_id(),
             opercd=creator,
             gendate=now,
+            **data,
+        )
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def add_detail(pcbillid: str, lineno: int, data: dict[str, Any]) -> ReturnPurchaseBillDt:
+        record = ReturnPurchaseBillDt(
+            pcbillid=pcbillid,
+            lineno=lineno,
             **data,
         )
         db.session.add(record)
@@ -232,4 +258,35 @@ class SupplierAppraisalRepository:
             **data,
         )
         db.session.add(record)
+        return record
+
+
+class PurchasePlanStatusRepository:
+    """采购计划状态汇总数据访问（TPC03_PCPLANSTATUS）。"""
+
+    @staticmethod
+    def get_by_id(itemcd: str) -> PurchasePlanStatus | None:
+        return db.session.get(PurchasePlanStatus, itemcd)
+
+    @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> tuple[list[PurchasePlanStatus], int]:
+        query = db.session.query(PurchasePlanStatus).order_by(PurchasePlanStatus.itemcd)
+        total: int = query.count()
+        items: list[PurchasePlanStatus] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> PurchasePlanStatus:
+        now = datetime.now(UTC)
+        record = PurchasePlanStatus(opercd=creator, gendate=now, **data)
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: PurchasePlanStatus, data: dict[str, Any]) -> PurchasePlanStatus:
+        now = datetime.now(UTC)
+        for key, value in data.items():
+            if hasattr(record, key):
+                setattr(record, key, value)
+        record.upddate = now
         return record

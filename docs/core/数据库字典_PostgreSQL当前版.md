@@ -1,6 +1,6 @@
 # 完整数据库字典（myitsm）
 
-> 生成时间：2026-05-13 | 数据库：myitsm | PostgreSQL 18.3 (Homebrew) | 存储：715 MB
+> 生成时间：2026-05-13 | 更新：2026-05-16 | 数据库：myitsm | PostgreSQL | +2表(tmm40,tmm52)
 > 🟢=自动生成（information_schema）| 🟡=手动维护 | 🔗=引用ER文档
 > 配套：`数据库ER关系文档.md`（ER关联）| `数据库变更追踪_迁移后.md`（变更历史）
 
@@ -10,7 +10,7 @@
 
 | 指标 | 值 |
 |------|----|
-| 业务表总数 | 143 |
+| 业务表总数 | 145 |
 | 非主键索引 | 16 |
 | 数据库大小 | 715 MB |
 
@@ -565,6 +565,22 @@
 | 18 | created_at | TIMESTAMP | NOT NULL |  |
 | 19 | updated_at | TIMESTAMP | NOT NULL |  |
 
+#### 17b. tmm40_label ⚠️ 新增迁移 (2026-05-16)
+
+> 来源：ortopbitsmdb | 行数：164,690 | 模型：`app/models/inventory.py:Label`
+> API：`GET /api/v1/inventory/labels` | 前端：`库存管理 → 标签管理`
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | labelid | VARCHAR(20) | PK NOT NULL | 标签ID |
+| 2 | classcd | VARCHAR(10) |  | 分类编码 |
+| 3 | opercd | VARCHAR(6) |  | 操作员 |
+| 4 | gendate | TIMESTAMP |  | 创建日期 |
+| 5 | upddate | TIMESTAMP |  | 更新日期 |
+| 6 | useflg | VARCHAR(1) |  | 有效标志 |
+| 7 | created_at | TIMESTAMP |  |  |
+| 8 | updated_at | TIMESTAMP |  |  |
+
 #### 18. tmm41_bom
 
 | # | 列名 | 类型 | 约束 | 说明 |
@@ -731,6 +747,25 @@
 | 8 | created_at | TIMESTAMP | NOT NULL |  |
 | 9 | updated_at | TIMESTAMP | NOT NULL |  |
 
+
+#### 26. tmm52_posstatus ⚠️ 新增迁移/标记废弃 (2026-05-16)
+
+> 来源：ortopbitsmdb | 行数：9 | 模型：`app/models/itsm.py:PosStatus`
+> ⚠️ 与 TMM31_SYSCODES (code_typ='ST'/'ZZ') 完全重合，建议使用系统字典替代
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | id | BIGINT | PK AUTO | 主键 |
+| 2 | codecd | VARCHAR(50) |  | 主状态编码（→tmm31_syscodes ST） |
+| 3 | codecd1 | VARCHAR(50) |  | 子状态编码（→tmm31_syscodes ZZ） |
+| 4 | memo | VARCHAR(200) |  | 备注 |
+| 5 | sysflg | VARCHAR(1) |  | 系统标志 |
+| 6 | opercd | VARCHAR(6) |  | 操作员 |
+| 7 | gendate | TIMESTAMP |  | 创建日期 |
+| 8 | upddate | TIMESTAMP |  | 更新日期 |
+| 9 | useflg | VARCHAR(1) |  | 有效标志 |
+| 10 | created_at | TIMESTAMP |  |  |
+| 11 | updated_at | TIMESTAMP |  |  |
 
 ### ITSM 核心 (tit) — 33 张表
 > 维护/翻新/开通/归档/变更
@@ -2746,8 +2781,11 @@
 | 4 | r_billid | VARCHAR(20) |  | 关联单号 |
 | 5 | modelcd | VARCHAR(20) |  | 型号编码 |
 | 6 | modelnm | VARCHAR(20) |  | 型号名称 |
-| 7 | created_at | TIMESTAMP | NOT NULL |  |
-| 8 | updated_at | TIMESTAMP | NOT NULL |  |
+| 7 | auditflg | VARCHAR(1) |  | 审核标志(0未审/1已审) ✨新增 |
+| 8 | auditman | VARCHAR(6) |  | 审核人 ✨新增 |
+| 9 | auditdate | TIMESTAMP |  | 审核日期 ✨新增 |
+| 10 | created_at | TIMESTAMP | NOT NULL |  |
+| 11 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 2. tmm61_deposit_dtl
 

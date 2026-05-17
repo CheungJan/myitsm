@@ -32,6 +32,9 @@ class Deposit(BaseModel):
     r_billid = db.Column(db.String(20), comment="关联单号")
     modelcd = db.Column(db.String(20), comment="型号编码")
     modelnm = db.Column(db.String(20), comment="型号名称")
+    auditflg = db.Column(db.String(1), default="0", comment="审核标志(0未审/1已审)")
+    auditman = db.Column(db.String(6), comment="审核人")
+    auditdate = db.Column(db.DateTime, comment="审核日期")
 
     details = db.relationship("DepositDetail", back_populates="deposit", lazy="dynamic")
 

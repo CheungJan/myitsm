@@ -11,6 +11,9 @@ from flask import Blueprint, g, request
 
 from app.api.auth import login_required
 from app.schemas.warehouse import (
+    OverLostCreate,
+    OverLostDetailCreate,
+    OverLostEidDetailCreate,
     StockInCreate,
     StockInDetailCreate,
     StockOutCreate,
@@ -22,6 +25,7 @@ from app.schemas.warehouse import (
 )
 from app.services.warehouse_service import (
     AssetCheckService,
+    OverLostService,
     PosChangeService,
     StockBalanceService,
     StockInService,
@@ -304,3 +308,57 @@ def update_pos_change(pk: int):  # type: ignore[no-untyped-def]
     if record is None:
         return error_response("变更记录不存在", code=404)
     return success_response(data=record)
+
+
+# ---- 盘盈盘亏 (TWH17_OVERLOST) ----
+
+
+@warehouse_bp.get("/overlost")
+@login_required
+def list_overlost():  # type: ignore[no-untyped-def]
+    """盘盈盘亏列表。"""
+    whcd = request.args.get("whcd")
+    oltyp = request.args.get("oltyp")
+    auditflg = request.args.get("auditflg")
+    page: int = request.args.get("page", 1, type=int)
+    per_page: int = request.args.get("per_page", 20, type=int)
+    data = OverLostService.list_records(
+        whcd=whcd, oltyp=oltyp, auditflg=auditflg, page=page, per_page=per_page
+    )
+    return success_response(data=data)
+
+
+@warehouse_bp.get("/overlost/<olbillid>")
+@login_required
+def get_overlost(olbillid: str):  # type: ignore[no-untyped-def]
+    """盘盈盘亏详情。"""
+    data = OverLostService.get(olbillid)
+    if data is None:
+        return error_response(message="盘点单不存在", code=404)
+    return success_response(data=data)
+
+
+@warehouse_bp.post("/overlost")
+@login_required
+def create_overlost():  # type: ignore[no-untyped-def]
+    """创建盘盈盘亏单。"""
+    json_data = request.get_json(silent=True) or {}
+    body = OverLostCreate.model_validate(json_data)
+    raw_details = json_data.get("details", [])
+    raw_eid_details = json_data.get("eid_details", [])
+    details = [OverLostDetailCreate.model_validate(d).model_dump() for d in raw_details]
+    eid_details = [OverLostEidDetailCreate.model_validate(d).model_dump() for d in raw_eid_details]
+    user_cd: str = g.current_user
+    data = OverLostService.create(body.model_dump(exclude_none=True), details, eid_details, user_cd)
+    return success_response(data=data, message="创建成功", code=201)
+
+
+@warehouse_bp.post("/overlost/<olbillid>/audit")
+@login_required
+def audit_overlost(olbillid: str):  # type: ignore[no-untyped-def]
+    """审核盘盈盘亏单。"""
+    user_cd: str = g.current_user
+    result = OverLostService.audit(olbillid, user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result)

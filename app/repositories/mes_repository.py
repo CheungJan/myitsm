@@ -94,6 +94,13 @@ class WorkProcessRepository:
     """工单工序数据访问。"""
 
     @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> tuple[list[WorkProcess], int]:
+        query = db.session.query(WorkProcess).order_by(WorkProcess.wo_id, WorkProcess.seq_no)
+        total: int = query.count()
+        items: list[WorkProcess] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
     def list_by_wo(wo_id: str) -> list[WorkProcess]:
         return (
             db.session.query(WorkProcess)
@@ -129,6 +136,13 @@ class WorkProcessRepository:
 
 class MaterialConsumeRepository:
     """物料消耗数据访问。"""
+
+    @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> tuple[list[MaterialConsume], int]:
+        query = db.session.query(MaterialConsume).order_by(MaterialConsume.id)
+        total: int = query.count()
+        items: list[MaterialConsume] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
 
     @staticmethod
     def list_by_wo(wo_id: str) -> list[MaterialConsume]:

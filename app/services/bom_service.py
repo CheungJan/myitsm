@@ -14,7 +14,9 @@ class BomService:
     @staticmethod
     def list_boms(page: int = 1, per_page: int = 20, search: str | None = None,
                   class_cd: str | None = None) -> dict[str, Any]:
-        items, total = BomRepository.list_boms(page=page, per_page=per_page, search=search, class_cd=class_cd)
+        items, total = BomRepository.list_boms(
+            page=page, per_page=per_page, search=search, class_cd=class_cd
+        )
         return {"items": [i.to_dict() for i in items], "total": total}
 
     @staticmethod
@@ -24,11 +26,19 @@ class BomService:
             return None
         data = bom.to_dict()
         details = []
-        for d in BomRepository.list_details(bomcd):
+        dt_list = BomRepository.list_details(bomcd)
+        # 批量查询物料名称，避免 N+1
+        from app.models.master import Item
+        itemcds = [d.itemcd for d in dt_list]
+        items_map: dict[str, str] = {}
+        if itemcds:
+            rows = db.session.query(Item.item_cd, Item.item_nm).filter(
+                Item.item_cd.in_(itemcds)
+            ).all()
+            items_map = {r.item_cd: r.item_nm for r in rows}
+        for d in dt_list:
             dd = d.to_dict()
-            from app.models.master import Item
-            item = db.session.get(Item, d.itemcd)
-            dd["item_nm"] = item.item_nm if item else ""
+            dd["item_nm"] = items_map.get(d.itemcd, "")
             details.append(dd)
         data["details"] = details
         return data

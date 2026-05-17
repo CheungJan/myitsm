@@ -8,43 +8,71 @@ ITSM 核心业务 API。
 
 from __future__ import annotations
 
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 
 from app.api.auth import login_required
 from app.schemas.itsm import (
     AccessoriesUpdateCreate,
+    ArchiveCreate,
+    ArchiveUpdate,
     CloseBillCreate,
     D2DCreate,
     DeviceChangeCreate,
     DispatchCreate,
+    FreeReplaceCreate,
+    FreeReplaceDetailCreate,
+    LiabilityRegCreate,
+    LiabilityRegDetailCreate,
+    MaintenanceAttcCreate,
     MaintenanceDailyCreate,
     MaintenanceDailyUpdate,
+    MaintenanceLiabilityCreate,
+    MaintenanceLiabilityUpdate,
     MaintenanceOpenCreate,
     MaintenancePlanCreate,
     MaintenancePlanUpdate,
     MaintenanceQuery,
     MaintenanceRenovateCreate,
+    NoCloseTrackCreate,
+    OnChooseDtCreate,
+    PayListCreate,
+    PosDetailCreate,
     RecycleTaskCreate,
     RecycleTaskDtlCreate,
     RecycleTaskQuery,
+    RepairInfoCreate,
     RVCreate,
     StatusTransition,
     StoreCloseCreate,
+    TimepointAreaCreate,
+    TimepointAreaUpdate,
 )
+from app.services.archive_service import ArchiveService
 from app.services.itsm_service import (
     AccessoriesUpdateService,
     CloseBillService,
     D2DService,
     DeviceChangeService,
     DispatchService,
+    FreeReplaceService,
+    LiabilityRegService,
+    MaintenanceAttcService,
     MaintenanceDailyService,
+    MaintenanceDailyTrackService,
+    MaintenanceLiabilityService,
     MaintenanceOpenService,
     MaintenancePlanService,
     MaintenanceRenovateService,
     MaintenanceT17Service,
+    NoCloseTrackService,
+    OnChooseDtService,
+    PayListService,
+    PosDetailService,
     RecycleTaskService,
+    RepairInfoService,
     RVService,
     StoreCloseService,
+    TimepointAreaService,
 )
 from app.utils.response import error_response, success_response
 
@@ -58,6 +86,8 @@ _renovate_svc = MaintenanceRenovateService()
 _device_change_svc = DeviceChangeService()
 _recycle_svc = RecycleTaskService()
 _store_close_svc = StoreCloseService()
+_free_replace_svc = FreeReplaceService()
+_t17_svc = MaintenanceT17Service()
 
 
 # ---- 日常维护单 (MD) ----
@@ -363,6 +393,63 @@ def transition_store_close(close_id: str):  # type: ignore[no-untyped-def]
     return success_response(data=result)
 
 
+# ---- 免费更换 (TIT28) ----
+
+
+@itsm_bp.get("/free-replace")
+@login_required
+def list_free_replace():  # type: ignore[no-untyped-def]
+    """免费更换工单列表。"""
+    params = MaintenanceQuery.model_validate(request.args.to_dict())
+    data = FreeReplaceService.list_records(
+        status=params.status,
+        store_id=params.store_id,
+        page=params.page,
+        per_page=params.per_page,
+    )
+    return success_response(data=data)
+
+
+@itsm_bp.get("/free-replace/<renew_id>")
+@login_required
+def get_free_replace(renew_id: str):  # type: ignore[no-untyped-def]
+    """免费更换工单详情。"""
+    data = FreeReplaceService.get(renew_id)
+    if data is None:
+        return error_response(message="免费更换单不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/free-replace")
+@login_required
+def create_free_replace():  # type: ignore[no-untyped-def]
+    """创建免费更换工单。"""
+    json_data = request.get_json(silent=True) or {}
+    body = FreeReplaceCreate.model_validate(json_data)
+    raw_details = json_data.get("details", [])
+    details = [FreeReplaceDetailCreate.model_validate(d).model_dump() for d in raw_details]
+    user_cd: str = g.current_user
+    data = _free_replace_svc.create(body.model_dump(exclude_none=True), details, user_cd)
+    return success_response(data=data, message="创建成功", code=201)
+
+
+@itsm_bp.post("/free-replace/<renew_id>/transition")
+@login_required
+def transition_free_replace(renew_id: str):  # type: ignore[no-untyped-def]
+    """免费更换工单状态流转。"""
+    body = StatusTransition(**request.get_json(force=True))
+    user_cd: str = g.current_user
+    result = _free_replace_svc.transition(
+        renew_id,
+        to_status=body.to_status,
+        operator=user_cd,
+        remark=body.remark,
+    )
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result)
+
+
 # ---- 公用附表 API ----
 
 
@@ -595,3 +682,464 @@ def get_t17_maintenance(maintenance_id: str):  # type: ignore[no-untyped-def]
     if data is None:
         return error_response(message="保养工单不存在", code=404)
     return success_response(data=data)
+
+
+@itsm_bp.post("/maintenance/<maintenance_id>/transition")
+@login_required
+def transition_t17_maintenance(maintenance_id: str):  # type: ignore[no-untyped-def]
+    """日常保养工单状态流转。"""
+    body = StatusTransition(**request.get_json(force=True))
+    user_cd: str = g.current_user
+    result = _t17_svc.transition(
+        maintenance_id,
+        to_status=body.to_status,
+        operator=user_cd,
+        remark=body.remark,
+    )
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result)
+
+
+# ---- ITSM 统计报表 ----
+
+
+@itsm_bp.get("/stats/daily")
+@login_required
+def itsm_daily_stats():  # type: ignore[no-untyped-def]
+    """日常维护日报：按状态统计数量。"""
+    from sqlalchemy import func
+
+    from app.extensions import db as _db
+    from app.models.itsm import MaintenanceDaily
+    rows = (
+        _db.session.query(
+            MaintenanceDaily.current_status,
+            func.count(MaintenanceDaily.maintenance_id).label("cnt"),
+        )
+        .group_by(MaintenanceDaily.current_status)
+        .all()
+    )
+    return success_response(data=[{"status": r[0], "count": r[1]} for r in rows])
+
+
+@itsm_bp.get("/stats/no-close")
+@login_required
+def itsm_no_close_stats():  # type: ignore[no-untyped-def]
+    """未关单统计：各类型工单未关闭数量。"""
+    from sqlalchemy import func
+
+    from app.extensions import db as _db
+    from app.models.itsm import (
+        DeviceChange,
+        FreeReplace,
+        Maintenance,
+        MaintenanceDaily,
+        MaintenanceOpen,
+        MaintenanceRenovate,
+        StoreClose,
+    )
+
+    def _count_open(model, pk_attr):
+        return _db.session.query(func.count(getattr(model, pk_attr))).filter(
+            model.current_status.notin_(["3", "9", "5"])
+        ).scalar() or 0
+
+    data = {
+        "maintenance_daily": _count_open(MaintenanceDaily, "maintenance_id"),
+        "maintenance_open": _count_open(MaintenanceOpen, "new_opening_id"),
+        "maintenance_renovate": _count_open(MaintenanceRenovate, "renew_id"),
+        "device_change": _count_open(DeviceChange, "device_change_id"),
+        "store_close": _count_open(StoreClose, "store_close_id"),
+        "free_replace": _count_open(FreeReplace, "renew_id"),
+        "maintenance_t17": _count_open(Maintenance, "daily_maintenance_id"),
+    }
+    data["total"] = sum(data.values())
+    return success_response(data=data)
+
+
+@itsm_bp.get("/stats/completion")
+@login_required
+def itsm_completion_stats():  # type: ignore[no-untyped-def]
+    """工单完成率统计。"""
+    from sqlalchemy import func
+
+    from app.extensions import db as _db
+    from app.models.itsm import MaintenanceDaily
+    total = _db.session.query(func.count(MaintenanceDaily.maintenance_id)).scalar() or 0
+    closed = (
+        _db.session.query(func.count(MaintenanceDaily.maintenance_id))
+        .filter(MaintenanceDaily.current_status.in_(["3", "5"]))
+        .scalar()
+    ) or 0
+    return success_response(data={
+        "total": total,
+        "closed": closed,
+        "completion_rate": round(closed / total * 100, 1) if total > 0 else 0,
+    })
+
+
+@itsm_bp.get("/stats/customer-summary")
+@login_required
+def itsm_customer_summary():  # type: ignore[no-untyped-def]
+    """客户工单汇总：按门店统计工单数量。"""
+    from sqlalchemy import func
+
+    from app.extensions import db as _db
+    from app.models.itsm import MaintenanceDaily
+    rows = (
+        _db.session.query(
+            MaintenanceDaily.store_id,
+            func.count(MaintenanceDaily.maintenance_id).label("cnt"),
+        )
+        .group_by(MaintenanceDaily.store_id)
+        .order_by(func.count(MaintenanceDaily.maintenance_id).desc())
+        .limit(50)
+        .all()
+    )
+    return success_response(data=[{"store_id": r[0], "count": r[1]} for r in rows])
+
+
+@itsm_bp.get("/stats/archive")
+@login_required
+def itsm_archive_stats():  # type: ignore[no-untyped-def]
+    """归档统计：按归档编码统计数量。"""
+    from sqlalchemy import func
+
+    from app.extensions import db as _db
+    from app.models.itsm import MaintenanceArchive
+    rows = (
+        _db.session.query(
+            MaintenanceArchive.fault_cd,
+            func.count(MaintenanceArchive.id).label("cnt"),
+        )
+        .group_by(MaintenanceArchive.fault_cd)
+        .order_by(func.count(MaintenanceArchive.id).desc())
+        .limit(50)
+        .all()
+    )
+    return success_response(data=[{"fault_cd": r[0] or "未分类", "count": r[1]} for r in rows])
+
+
+@itsm_bp.get("/stats/engineer")
+@login_required
+def itsm_engineer_stats():  # type: ignore[no-untyped-def]
+    """工程师工作量统计。"""
+    from sqlalchemy import func
+
+    from app.extensions import db as _db
+    from app.models.itsm import MaintenanceD2D
+    rows = (
+        _db.session.query(
+            MaintenanceD2D.d2d_engineer,
+            func.count(MaintenanceD2D.id).label("cnt"),
+        )
+        .group_by(MaintenanceD2D.d2d_engineer)
+        .order_by(func.count(MaintenanceD2D.id).desc())
+        .limit(50)
+        .all()
+    )
+    return success_response(data=[{"engineer": r[0] or "未分配", "count": r[1]} for r in rows])
+
+
+# ---- 归档 (TIT12) ----
+
+
+@itsm_bp.get("/archives/<maintenance_id>")
+@login_required
+def list_archives(maintenance_id: str):  # type: ignore[no-untyped-def]
+    """获取指定维护单的归档记录列表（含维护单基本信息）。"""
+    data = ArchiveService.list_by_maintenance(maintenance_id)
+    if data is None:
+        return error_response(message="维护单不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/archives")
+@login_required
+def create_archive():  # type: ignore[no-untyped-def]
+    """创建归档记录。"""
+    body = request.get_json(silent=True) or {}
+    try:
+        req = ArchiveCreate(**body)
+    except Exception as e:
+        return error_response(str(e), 400)
+    return success_response(data=ArchiveService.create_archive(req.model_dump()), code=201)
+
+
+@itsm_bp.put("/archives/<int:archive_id>")
+@login_required
+def update_archive(archive_id: int):  # type: ignore[no-untyped-def]
+    """更新归档记录。"""
+    body = request.get_json(silent=True) or {}
+    try:
+        req = ArchiveUpdate(**body)
+    except Exception as e:
+        return error_response(str(e), 400)
+    data = ArchiveService.update_archive(archive_id, req.model_dump(exclude_none=True))
+    if data is None:
+        return error_response(message="归档记录不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.delete("/archives/<int:archive_id>")
+@login_required
+def delete_archive(archive_id: int):  # type: ignore[no-untyped-def]
+    """删除归档记录。"""
+    if not ArchiveService.delete_archive(archive_id):
+        return error_response(message="归档记录不存在", code=404)
+    return success_response(message="已删除")
+
+
+# ---- POS 状态字典 (TMM52) ----
+
+
+@itsm_bp.get("/pos-status")
+@login_required
+def list_pos_status():  # type: ignore[no-untyped-def]
+    """POS 状态字典列表。"""
+    from app.extensions import db as _db
+    from app.models.itsm import PosStatus
+    items = _db.session.query(PosStatus).filter(PosStatus.useflg == "1").order_by(PosStatus.id).all()
+    return success_response(data=[{
+        "id": i.id, "codecd": i.codecd, "codecd1": i.codecd1,
+        "memo": i.memo, "sysflg": i.sysflg
+    } for i in items])
+
+
+# ---- P1 附表 API ----
+
+
+# -- 收费记录 (TIT26) --
+
+@itsm_bp.get("/paylist/<maintenance_id>")
+@login_required
+def list_paylist(maintenance_id: str):  # type: ignore[no-untyped-def]
+    data = PayListService.list_by_maintenance_id(maintenance_id)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/paylist")
+@login_required
+def create_paylist():  # type: ignore[no-untyped-def]
+    body = PayListCreate.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = g.current_user
+    data = PayListService.create(body.model_dump(exclude_none=True), user_cd)
+    return success_response(data=data, message="创建成功", code=201)
+
+
+# -- 维护单责任豁免 (TIT10_LIABILITY) --
+
+@itsm_bp.get("/liability/<maintenance_id>")
+@login_required
+def list_liability(maintenance_id: str):  # type: ignore[no-untyped-def]
+    data = MaintenanceLiabilityService.list_by_maintenance_id(maintenance_id)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/liability")
+@login_required
+def create_liability():  # type: ignore[no-untyped-def]
+    body = MaintenanceLiabilityCreate.model_validate(request.get_json(silent=True) or {})
+    data = MaintenanceLiabilityService.create(body.model_dump(exclude_none=True))
+    return success_response(data=data, message="创建成功", code=201)
+
+
+@itsm_bp.put("/liability/<int:record_id>")
+@login_required
+def update_liability(record_id: int):  # type: ignore[no-untyped-def]
+    body = MaintenanceLiabilityUpdate.model_validate(request.get_json(silent=True) or {})
+    data = MaintenanceLiabilityService.update(record_id, body.model_dump(exclude_none=True))
+    if data is None:
+        return error_response(message="记录不存在", code=404)
+    return success_response(data=data)
+
+
+# -- 责任豁免字典 (TIT02) --
+
+@itsm_bp.get("/liability-regs")
+@login_required
+def list_liability_regs():  # type: ignore[no-untyped-def]
+    data = LiabilityRegService.list_all()
+    return success_response(data=data)
+
+
+@itsm_bp.get("/liability-regs/<liab_cd>")
+@login_required
+def get_liability_reg(liab_cd: str):  # type: ignore[no-untyped-def]
+    data = LiabilityRegService.get(liab_cd)
+    if data is None:
+        return error_response(message="不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/liability-regs")
+@login_required
+def create_liability_reg():  # type: ignore[no-untyped-def]
+    json_data = request.get_json(silent=True) or {}
+    body = LiabilityRegCreate.model_validate(json_data)
+    raw_details = json_data.get("details", [])
+    details = [LiabilityRegDetailCreate.model_validate(d).model_dump() for d in raw_details]
+    data = LiabilityRegService.create(body.model_dump(exclude_none=True), details)
+    return success_response(data=data, message="创建成功", code=201)
+
+
+@itsm_bp.put("/liability-regs/<liab_cd>")
+@login_required
+def update_liability_reg(liab_cd: str):  # type: ignore[no-untyped-def]
+    body = request.get_json(silent=True) or {}
+    data = LiabilityRegService.update(liab_cd, body)
+    if data is None:
+        return error_response(message="不存在", code=404)
+    return success_response(data=data)
+
+
+# -- 附件 (TIT11) --
+
+@itsm_bp.get("/attachments/<maintenance_id>")
+@login_required
+def list_attachments(maintenance_id: str):  # type: ignore[no-untyped-def]
+    data = MaintenanceAttcService.list_by_maintenance_id(maintenance_id)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/attachments")
+@login_required
+def create_attachment():  # type: ignore[no-untyped-def]
+    body = MaintenanceAttcCreate.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = g.current_user
+    data = MaintenanceAttcService.create(body.model_dump(exclude_none=True), user_cd)
+    return success_response(data=data, message="创建成功", code=201)
+
+
+# -- 换机配件明细 (TIT10_POS_DETAIL) --
+
+@itsm_bp.get("/pos-details/<maintenance_id>")
+@login_required
+def list_pos_details(maintenance_id: str):  # type: ignore[no-untyped-def]
+    data = PosDetailService.list_by_maintenance_id(maintenance_id)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/pos-details")
+@login_required
+def create_pos_detail():  # type: ignore[no-untyped-def]
+    body = PosDetailCreate.model_validate(request.get_json(silent=True) or {})
+    data = PosDetailService.create(body.model_dump(exclude_none=True))
+    return success_response(data=data, message="创建成功", code=201)
+
+
+# -- 未关单跟踪 (TIT29) --
+
+@itsm_bp.get("/no-close-track/<maintenance_id>")
+@login_required
+def list_no_close_track(maintenance_id: str):  # type: ignore[no-untyped-def]
+    data = NoCloseTrackService.list_by_maintenance_id(maintenance_id)
+    return success_response(data=data)
+
+
+@itsm_bp.get("/no-close-tracks")
+@login_required
+def list_all_no_close():  # type: ignore[no-untyped-def]
+    page: int = request.args.get("page", 1, type=int)
+    per_page: int = request.args.get("per_page", 20, type=int)
+    data = NoCloseTrackService.list_all(page=page, per_page=per_page)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/no-close-track")
+@login_required
+def create_no_close_track():  # type: ignore[no-untyped-def]
+    body = NoCloseTrackCreate.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = g.current_user
+    data = NoCloseTrackService.create(body.model_dump(exclude_none=True), user_cd)
+    return success_response(data=data, message="创建成功", code=201)
+
+
+# -- 报修信息 (TIT05) --
+
+@itsm_bp.get("/repair-infos")
+@login_required
+def list_repair_infos():  # type: ignore[no-untyped-def]
+    page: int = request.args.get("page", 1, type=int)
+    per_page: int = request.args.get("per_page", 20, type=int)
+    data = RepairInfoService.list_all(page=page, per_page=per_page)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/repair-infos")
+@login_required
+def create_repair_info():  # type: ignore[no-untyped-def]
+    body = RepairInfoCreate.model_validate(request.get_json(silent=True) or {})
+    data = RepairInfoService.create(body.model_dump(exclude_none=True))
+    return success_response(data=data, message="创建成功", code=201)
+
+
+@itsm_bp.delete("/repair-infos/<int:record_id>")
+@login_required
+def delete_repair_info(record_id: int):  # type: ignore[no-untyped-def]
+    if not RepairInfoService.delete(record_id):
+        return error_response(message="记录不存在", code=404)
+    return success_response(message="已删除")
+
+
+# -- 时间点级别 (TIT01) --
+
+@itsm_bp.get("/timepoints")
+@login_required
+def list_timepoints():  # type: ignore[no-untyped-def]
+    data = TimepointAreaService.list_all()
+    return success_response(data=data)
+
+
+@itsm_bp.get("/timepoints/<levels>")
+@login_required
+def get_timepoint(levels: str):  # type: ignore[no-untyped-def]
+    data = TimepointAreaService.get(levels)
+    if data is None:
+        return error_response(message="不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/timepoints")
+@login_required
+def create_timepoint():  # type: ignore[no-untyped-def]
+    body = TimepointAreaCreate.model_validate(request.get_json(silent=True) or {})
+    data = TimepointAreaService.create(body.model_dump(exclude_none=True))
+    return success_response(data=data, message="创建成功", code=201)
+
+
+@itsm_bp.put("/timepoints/<levels>")
+@login_required
+def update_timepoint(levels: str):  # type: ignore[no-untyped-def]
+    body = TimepointAreaUpdate.model_validate(request.get_json(silent=True) or {})
+    data = TimepointAreaService.update(levels, body.model_dump(exclude_none=True))
+    if data is None:
+        return error_response(message="不存在", code=404)
+    return success_response(data=data)
+
+
+# -- 状态变更轨迹 (TIT10_MAIN_TRACK) --
+
+@itsm_bp.get("/tracks/<maintenance_id>")
+@login_required
+def list_tracks(maintenance_id: str):  # type: ignore[no-untyped-def]
+    data = MaintenanceDailyTrackService.list_by_maintenance_id(maintenance_id)
+    return success_response(data=data)
+
+
+# -- 开通选择明细 (TIT19) --
+
+@itsm_bp.get("/on-choose/<bill_id>")
+@login_required
+def list_on_choose(bill_id: str):  # type: ignore[no-untyped-def]
+    data = OnChooseDtService.list_by_bill_id(bill_id)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/on-choose")
+@login_required
+def create_on_choose():  # type: ignore[no-untyped-def]
+    body = OnChooseDtCreate.model_validate(request.get_json(silent=True) or {})
+    data = OnChooseDtService.create(body.model_dump(exclude_none=True))
+    return success_response(data=data, message="创建成功", code=201)

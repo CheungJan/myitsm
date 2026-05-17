@@ -144,6 +144,7 @@ const router = createRouter({
                 {
                     path: 'qc/results', name: 'QcResultList', component: () => import('@/views/qc/QcResultList.vue'), meta: { title: '质检结果' }
                 },
+                { path: 'qc/input', name: 'QcInput', component: () => import('@/views/qc/QcInput.vue'), meta: { title: '质检录入' } },
                 {
                     path: 'itsm/maintenance',
                     name: 'MaintenanceList',
@@ -186,6 +187,7 @@ const router = createRouter({
                 { path: 'finance/depreciations', name: 'DepreciationList', component: () => import('@/views/finance/DepreciationList.vue'), meta: { title: '设备折旧' } },
                 { path: 'itsm/maintenance-plans', name: 'MaintenancePlanList', component: () => import('@/views/itsm/MaintenancePlanList.vue'), meta: { title: '保养计划' } },
                 { path: 'itsm/maintenance-t17', name: 'MaintenanceT17List', component: () => import('@/views/itsm/MaintenanceT17List.vue'), meta: { title: '保养工单' } },
+                { path: 'itsm/archives', name: 'ArchiveList', component: () => import('@/views/itsm/ArchiveList.vue'), meta: { title: '归档记录' } },
                 { path: 'deposit/deposits', name: 'DepositList', component: () => import('@/views/deposit/DepositList.vue'), meta: { title: '押金管理' } },
                 { path: 'deposit/details', name: 'DepositDetailList', component: () => import('@/views/deposit/DepositDetailList.vue'), meta: { title: '押金明细' } },
                 { path: 'deposit/io', name: 'DepositIOList', component: () => import('@/views/deposit/DepositIOList.vue'), meta: { title: '押金流水' } },
@@ -204,7 +206,14 @@ const router = createRouter({
                 { path: 'iot/alert-rules', name: 'AlertRuleList', component: () => import('@/views/iot/AlertRuleList.vue'), meta: { title: '报警规则' } },
                 { path: 'iot/alerts', name: 'AlertLogList', component: () => import('@/views/iot/AlertLogList.vue'), meta: { title: '报警记录' } },
                 { path: 'system/transfers', name: 'TransferAccountList', component: () => import('@/views/system/TransferAccountList.vue'), meta: { title: '调拨科目' } },
-                { path: 'reports/center', name: 'ReportCenter', component: () => import('@/views/reports/ReportCenter.vue'), meta: { title: '报表中心' } }
+                { path: 'reports/center', name: 'ReportCenter', component: () => import('@/views/reports/ReportCenter.vue'), meta: { title: '报表中心' } },
+                { path: 'warehouse/overlost', name: 'OverLostList', component: () => import('@/views/warehouse/OverLostList.vue'), meta: { title: '盘盈盘亏' } },
+                { path: 'itsm/free-replace', name: 'FreeReplaceList', component: () => import('@/views/itsm/FreeReplaceList.vue'), meta: { title: '免费更换' } },
+                { path: 'procurement/returns', name: 'ReturnPurchaseList', component: () => import('@/views/procurement/ReturnPurchaseList.vue'), meta: { title: '采购退货' } },
+                { path: 'qc/audit', name: 'QcAudit', component: () => import('@/views/qc/QcAudit.vue'), meta: { title: '质检审核' } },
+                { path: 'transactions/bills', name: 'AllTransactionsList', component: () => import('@/views/transactions/AllTransactionsList.vue'), meta: { title: '全模块查询' } },
+                { path: 'transactions/transfer', name: 'TransferList', component: () => import('@/views/transactions/TransferList.vue'), meta: { title: '调拨流转' } },
+                { path: 'mes/labels', name: 'LabelList', component: () => import('@/views/inventory/LabelList.vue'), meta: { title: '标签管理' } }
             ]
         },
         {

@@ -3,17 +3,14 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import Engine, text
+from sqlalchemy import text
 
 from app.migration.config import MigrationConfig
 from app.migration.field_mapper import (
-    TableMapping,
     build_mapping,
-    read_source_rows,
-    write_target_rows,
     get_row_count,
-    truncate_table,
     sync_sequence,
+    truncate_table,
 )
 
 logger = logging.getLogger(__name__)

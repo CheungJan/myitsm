@@ -5,8 +5,33 @@ from __future__ import annotations
 from typing import Any
 
 from app.extensions import db
-from app.models.master import Area, City, ComMode, Country, CustClass, CustPosRl, Customer, Eid, EidTrack, Item, ItemClass, PosREid, Province, SysCode, Town
-from app.models.system import Department, Group, GroupRight, Menu, MenuDetail, SysParm, User, UserGroup
+from app.models.master import (
+    Area,
+    City,
+    ComMode,
+    Country,
+    CustClass,
+    Customer,
+    CustPosRl,
+    Eid,
+    EidTrack,
+    Item,
+    ItemClass,
+    PosREid,
+    Province,
+    SysCode,
+    Town,
+)
+from app.models.system import (
+    Department,
+    Group,
+    GroupRight,
+    Menu,
+    MenuDetail,
+    SysParm,
+    User,
+    UserGroup,
+)
 
 
 class SystemRepository:
@@ -748,8 +773,8 @@ class SystemRepository:
 
     @staticmethod
     def get_warehouses() -> list[Any]:
-        from app.models.warehouse import Warehouse
         from app.models.system import User
+        from app.models.warehouse import Warehouse
         whs = list(db.session.query(Warehouse).order_by(Warehouse.whcd).all())
         user_map: dict[str, str] = {}
         result = []
@@ -802,7 +827,8 @@ class SystemRepository:
                          sflg: str | None = None, cust_cd: str | None = None,
                          item_class: str | None = None) -> tuple[list[dict], int]:
         """资产台账列表（以 Eid 为主表，BOM 归属按页批量后解析）。"""
-        from app.models.master import Customer as CustModel, Item, CustClass
+        from app.models.master import CustClass, Item
+        from app.models.master import Customer as CustModel
 
         # BOM 配件归属子查询：找出所有"父设备有客户"的 BOM 配件 EID
         bom_cust_subq = (

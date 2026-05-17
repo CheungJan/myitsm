@@ -107,4 +107,43 @@ class TransferAccountUpdate(BaseModel):
     remark: str | None = Field(None, max_length=100)
     by1: str | None = Field(None, max_length=10)
     by2: str | None = Field(None, max_length=10)
+
+
+# ---------------------------------------------------------------------------
+# 盘盈盘亏 (TWH17_OVERLOST)
+# ---------------------------------------------------------------------------
+
+
+class OverLostCreate(BaseModel):
+    """创建盘盈盘亏单。"""
+
+    whcd: str = Field(..., max_length=2, description="仓库编码")
+    oltyp: str | None = Field(None, max_length=2, description="盘点类型")
+    oldate: str | None = Field(None, description="盘点日期")
+    memo: str | None = Field(None, max_length=60, description="备注")
+    olreason: str | None = Field(None, max_length=100, description="盘点原因")
+    olsign: str | None = Field(None, max_length=1, description="盘盈盘亏标志（+盈/-亏）")
+
+
+class OverLostDetailCreate(BaseModel):
+    """盘盈盘亏明细（按物料）。"""
+
+    whcd: str = Field(..., max_length=2, description="仓库编码")
+    itemtyp: str | None = Field(None, max_length=2, description="物料类型")
+    itemcd: str = Field(..., max_length=6, description="物料编码")
+    olqty: float = Field(0, description="盘点差异数量")
+    prddate: str | None = Field(None, description="生产日期")
+    memo: str | None = Field(None, max_length=255, description="备注")
+
+
+class OverLostEidDetailCreate(BaseModel):
+    """盘盈盘亏明细（按EID）。"""
+
+    whcd: str = Field(..., max_length=2, description="仓库编码")
+    itemtyp: str | None = Field(None, max_length=2, description="物料类型")
+    itemcd: str = Field(..., max_length=6, description="物料编码")
+    olqty: float = Field(0, description="差异数量")
+    prddate: str | None = Field(None, description="生产日期")
+    memo: str | None = Field(None, max_length=255, description="备注")
+    eid: str | None = Field(None, max_length=13, description="设备唯一标识")
     useflg: str | None = Field(None, max_length=1)

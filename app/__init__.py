@@ -50,6 +50,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.api.attendance import attendance_bp
     from app.api.auth import auth_bp
     from app.api.billing import billing_bp
+    from app.api.bom import bom_bp
     from app.api.contract import contract_bp
     from app.api.deposit import deposit_bp
     from app.api.finance import finance_bp
@@ -59,10 +60,9 @@ def _register_blueprints(app: Flask) -> None:
     from app.api.itsm import itsm_bp
     from app.api.mes import mes_bp
     from app.api.notification import notification_bp
-    from app.api.bom import bom_bp
     from app.api.portal import portal_bp
-    from app.api.qc import qc_bp
     from app.api.procurement import procurement_bp
+    from app.api.qc import qc_bp
     from app.api.reports import report_bp
     from app.api.sales import sales_bp
     from app.api.sla import sla_bp

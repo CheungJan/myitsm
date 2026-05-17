@@ -20,8 +20,9 @@
         <el-table-column prop="custrnm" label="客户实名" min-width="100" show-overflow-tooltip />
         <el-table-column prop="contactor" label="联系人" width="80" />
         <el-table-column prop="phoneno" label="电话" width="120" />
-        <el-table-column prop="address" label="地址" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="jl_contactor" label="经理" width="80" />
         <el-table-column label="计划类型" width="80"><template #default="{row}">{{ row.plantyp || '-' }}</template></el-table-column>
+        <el-table-column label="业务类型" width="80"><template #default="{row}">{{ row.busityp || '-' }}</template></el-table-column>
         <el-table-column label="租赁/购买" width="70"><template #default="{row}"><el-tag :type="row.is_rent==='Y'?'success':'info'" size="small">{{ row.is_rent==='Y'?'租赁':'购买' }}</el-tag></template></el-table-column>
         <el-table-column label="机型" width="80"><template #default="{row}">{{ row.pos_item || '-' }}</template></el-table-column>
         <el-table-column label="状态" width="80" align="center">
@@ -29,6 +30,7 @@
         </el-table-column>
         <el-table-column label="合同" width="60"><template #default="{row}"><el-tag :type="row.is_contract==='1'?'success':'info'" size="small">{{ row.is_contract==='1'?'是':'否' }}</el-tag></template></el-table-column>
         <el-table-column prop="deposit" label="押金" width="100" align="right"><template #default="{row}">{{ row.deposit ? '¥'+Number(row.deposit).toLocaleString() : '-' }}</template></el-table-column>
+        <el-table-column prop="gendate" label="日期" width="90" />
         <el-table-column prop="opercd" label="操作员" width="80" />
         <el-table-column label="操作" width="120" fixed="right"><template #default="{row}"><el-button link type="primary" size="small" @click.stop="openDetail(row)">详情</el-button><el-button link type="primary" size="small" @click.stop="openEdit(row)">编辑</el-button></template></el-table-column>
       </el-table>

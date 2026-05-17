@@ -70,6 +70,50 @@ class SupplierAppraisalDetailCreate(BaseModel):
     appscore: int | None = Field(None, description="评分")
 
 
+class ReturnPurchaseBillCreate(BaseModel):
+    """创建采购退货单。"""
+
+    custcd: str | None = Field(None, max_length=8, description="客户编码")
+    pcdate: datetime | None = Field(None, description="退货日期")
+    pcamt: int | None = Field(None, description="退货金额")
+    whcd: str | None = Field(None, max_length=2, description="仓库编码")
+    invoiceflg: str | None = Field(None, max_length=2, description="发票标志")
+    memo: str | None = Field(None, max_length=255, description="备注")
+
+
+class ReturnPurchaseBillDetailCreate(BaseModel):
+    """采购退货明细。"""
+
+    itemtyp: str | None = Field(None, max_length=2, description="物料类型")
+    itemcd: str = Field(..., max_length=6, description="物料编码")
+    eid: str | None = Field(None, max_length=13, description="设备EID")
+    seid: str | None = Field(None, max_length=30, description="序列号")
+    rpcqty: int = Field(0, description="退货数量")
+    invoiceqty: int = Field(0, description="发票数量")
+    units: str | None = Field(None, max_length=4, description="单位")
+
+
+class PurchasePlanStatusCreate(BaseModel):
+    """创建采购计划状态汇总。"""
+
+    itemcd: str = Field(..., max_length=6, description="物料编码")
+    rgstqty: int = Field(0, description="登记数量")
+    auditqty: int = Field(0, description="审批数量")
+    pcqty: int = Field(0, description="采购数量")
+    memo: str | None = Field(None, max_length=255, description="备注")
+    refbillid: str | None = Field(None, max_length=8, description="关联单号")
+
+
+class PurchasePlanStatusUpdate(BaseModel):
+    """更新采购计划状态汇总。"""
+
+    rgstqty: int | None = Field(None)
+    auditqty: int | None = Field(None)
+    pcqty: int | None = Field(None)
+    memo: str | None = Field(None, max_length=255)
+    refbillid: str | None = Field(None, max_length=8)
+
+
 class ProcurementQuery(BaseModel):
     """采购查询参数。"""
 

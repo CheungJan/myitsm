@@ -12,6 +12,9 @@ from app.extensions import db
 from app.models.warehouse import (
     AssetCheckAccept,
     AssetCheckAcceptDtl,
+    OverLost,
+    OverLostDt,
+    OverLostEid,
     PosChange,
     PosChangeDt,
     StockDetail,
@@ -122,7 +125,7 @@ class StockInRepository:
 
     @staticmethod
     def audit(record: StockIn, auditor: str) -> StockIn:
-        record.auditflg = "1"
+        record.auditflg = "2"  # 对齐 PB: 0=未审, 1=在审, 2=已审
         record.auditman = auditor
         record.auditdate = datetime.now(UTC)
         return record
@@ -202,7 +205,7 @@ class StockOutRepository:
 
     @staticmethod
     def audit(record: StockOut, auditor: str) -> StockOut:
-        record.auditflg = "1"
+        record.auditflg = "2"  # 对齐 PB: 0=未审, 1=在审, 2=已审
         record.auditman = auditor
         record.auditdate = datetime.now(UTC)
         return record
@@ -313,7 +316,7 @@ class AssetCheckRepository:
 
     @staticmethod
     def audit(record: AssetCheckAccept, auditor: str) -> AssetCheckAccept:
-        record.auditflg = "1"
+        record.auditflg = "2"  # 对齐 PB: 0=未审, 1=在审, 2=已审
         record.auditman = auditor
         record.auditdate = datetime.now(UTC)
         return record
@@ -406,4 +409,73 @@ class TransferAccountRepository:
             setattr(record, key, value)
         record.upddate = datetime.now(UTC)
         record.opercd = updator
+        return record
+
+
+class OverLostRepository:
+    """盘盈盘亏数据访问（TWH17_OVERLOST + TWH18 明细）。"""
+
+    @staticmethod
+    def get_by_id(olbillid: str) -> OverLost | None:
+        return db.session.get(OverLost, olbillid)
+
+    @staticmethod
+    def list_by_filters(
+        whcd: str | None = None,
+        oltyp: str | None = None,
+        auditflg: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list[OverLost], int]:
+        query = db.session.query(OverLost)
+        if whcd:
+            query = query.filter(OverLost.whcd == whcd)
+        if oltyp:
+            query = query.filter(OverLost.oltyp == oltyp)
+        if auditflg:
+            query = query.filter(OverLost.auditflg == auditflg)
+        query = query.order_by(desc(OverLost.gendate))
+        total: int = query.count()
+        items: list[OverLost] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> OverLost:
+        now = datetime.now(UTC)
+        record = OverLost(
+            olbillid=_gen_id(),
+            opercd=creator,
+            gendate=now,
+            auditflg="0",
+            **data,
+        )
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def add_detail(olbillid: str, lineno: int, data: dict[str, Any]) -> OverLostDt:
+        record = OverLostDt(
+            olbillid=olbillid,
+            lineno=lineno,
+            **data,
+        )
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def add_eid_detail(olbillid: str, lineno: int, data: dict[str, Any]) -> OverLostEid:
+        record = OverLostEid(
+            olbillid=olbillid,
+            lineno=lineno,
+            **data,
+        )
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def audit(record: OverLost, auditor: str) -> OverLost:
+        now = datetime.now(UTC)
+        record.auditflg = "1"
+        record.cfercd = auditor
+        record.cfdate = now
         return record

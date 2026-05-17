@@ -158,3 +158,21 @@ class InventoryDetailDt(BaseModel):
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
     inventory_detail = db.relationship("InventoryDetail", back_populates="detail_logs")
+
+
+# ---------------------------------------------------------------------------
+# 标签管理 (TMM40_LABEL) — 迁移自 ortopbitsmdb
+# ---------------------------------------------------------------------------
+
+
+class Label(BaseModel):
+    """标签管理（TMM40_LABEL）。"""
+
+    __tablename__ = "tmm40_label"
+
+    labelid = db.Column(db.String(20), primary_key=True, comment="标签ID")
+    classcd = db.Column(db.String(10), comment="分类编码")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")

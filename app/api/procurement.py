@@ -15,15 +15,21 @@ from app.schemas.procurement import (
     PurchaseBillCreate,
     PurchasePlanCreate,
     PurchasePlanDetailCreate,
+    PurchasePlanStatusCreate,
+    PurchasePlanStatusUpdate,
     PurchaseRegisterCreate,
     PurchaseRegisterDetailCreate,
+    ReturnPurchaseBillCreate,
+    ReturnPurchaseBillDetailCreate,
     SupplierAppraisalCreate,
     SupplierAppraisalDetailCreate,
 )
 from app.services.procurement_service import (
     PurchaseBillService,
     PurchasePlanService,
+    PurchasePlanStatusService,
     PurchaseRegisterService,
+    ReturnPurchaseService,
     SupplierAppraisalService,
 )
 from app.utils.response import error_response, success_response
@@ -169,6 +175,42 @@ def create_bill():  # type: ignore[no-untyped-def]
     return success_response(data=data, message="创建成功", code=201)
 
 
+# ---- 采购退货 ----
+
+@procurement_bp.get("/returns")
+@login_required
+def list_returns():  # type: ignore[no-untyped-def]
+    """采购退货列表。"""
+    params = ProcurementQuery.model_validate(request.args.to_dict())
+    data = ReturnPurchaseService.list_records(
+        whcd=params.whcd, page=params.page, per_page=params.per_page
+    )
+    return success_response(data=data)
+
+
+@procurement_bp.get("/returns/<pcbillid>")
+@login_required
+def get_return(pcbillid: str):  # type: ignore[no-untyped-def]
+    """采购退货详情。"""
+    data = ReturnPurchaseService.get(pcbillid)
+    if data is None:
+        return error_response(message="采购退货单不存在", code=404)
+    return success_response(data=data)
+
+
+@procurement_bp.post("/returns")
+@login_required
+def create_return():  # type: ignore[no-untyped-def]
+    """创建采购退货单。"""
+    json_data = request.get_json(silent=True) or {}
+    body = ReturnPurchaseBillCreate.model_validate(json_data)
+    raw_details = json_data.get("details", [])
+    details = [ReturnPurchaseBillDetailCreate.model_validate(d).model_dump() for d in raw_details]
+    user_cd: str = g.current_user
+    data = ReturnPurchaseService.create(body.model_dump(exclude_none=True), details, user_cd)
+    return success_response(data=data, message="创建成功", code=201)
+
+
 # ---- 供应商评价 ----
 
 
@@ -204,3 +246,47 @@ def create_appraisal():  # type: ignore[no-untyped-def]
     user_cd: str = g.current_user
     data = SupplierAppraisalService.create(body.model_dump(exclude_none=True), details, user_cd)
     return success_response(data=data, message="创建成功", code=201)
+
+
+# ---- 采购计划状态 (TPC03) ----
+
+
+@procurement_bp.get("/plan-status")
+@login_required
+def list_plan_status():  # type: ignore[no-untyped-def]
+    """采购计划状态汇总列表。"""
+    page: int = request.args.get("page", 1, type=int)
+    per_page: int = request.args.get("per_page", 20, type=int)
+    data = PurchasePlanStatusService.list_all(page=page, per_page=per_page)
+    return success_response(data=data)
+
+
+@procurement_bp.get("/plan-status/<itemcd>")
+@login_required
+def get_plan_status(itemcd: str):  # type: ignore[no-untyped-def]
+    """采购计划状态汇总详情。"""
+    data = PurchasePlanStatusService.get(itemcd)
+    if data is None:
+        return error_response(message="不存在", code=404)
+    return success_response(data=data)
+
+
+@procurement_bp.post("/plan-status")
+@login_required
+def create_plan_status():  # type: ignore[no-untyped-def]
+    """创建采购计划状态汇总。"""
+    body = PurchasePlanStatusCreate.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = g.current_user
+    data = PurchasePlanStatusService.create(body.model_dump(exclude_none=True), user_cd)
+    return success_response(data=data, message="创建成功", code=201)
+
+
+@procurement_bp.put("/plan-status/<itemcd>")
+@login_required
+def update_plan_status(itemcd: str):  # type: ignore[no-untyped-def]
+    """更新采购计划状态汇总。"""
+    body = PurchasePlanStatusUpdate.model_validate(request.get_json(silent=True) or {})
+    data = PurchasePlanStatusService.update(itemcd, body.model_dump(exclude_none=True))
+    if data is None:
+        return error_response(message="不存在", code=404)
+    return success_response(data=data)

@@ -6,7 +6,6 @@ from typing import Any
 
 from sqlalchemy import Engine, text
 
-
 # 目标库专属列（源库不存在，有 server default 或无数据来源）
 SKIP_TARGET_COLUMNS = {
     "created_at", "updated_at", "status", "password",

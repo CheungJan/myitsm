@@ -41,3 +41,8 @@ export function fetchStockOutDetail(id:string) { return request.get<never,{data:
 export interface StockItem { itemcd: string; item_nm: string; whcd: string; storeqty: number; upperlimit?: number; lowerlimit?: number; [key:string]: unknown }
 export interface StockPage { items: StockItem[]; total: number }
 export function fetchStock(params?: Record<string,string>) { return request.get<never,{data:StockPage}>('/warehouse/stock',{params}) }
+
+// ---- 盘盈盘亏 ----
+export interface OverLostRecord { olbillid: string; whcd: string; oltyp?: string; olsign?: string; olreason?: string; auditflg?: string; gendate?: string; opercd?: string; details?: Record<string,unknown>[]; details_eid?: Record<string,unknown>[]; [key:string]: unknown }
+export interface OverLostPage { items: OverLostRecord[]; total: number }
+export function fetchOverLost(params?: Record<string,string>) { return request.get<never,{data:OverLostPage}>('/warehouse/overlost',{params}) }

@@ -9,7 +9,6 @@ from sqlalchemy import func, text
 
 from app.extensions import db
 from app.models.itsm import MaintenanceDaily
-from app.models.master import Customer, CustomerHistory
 from app.models.procurement import (
     PurchaseBill,
     PurchasePlan,
@@ -17,7 +16,6 @@ from app.models.procurement import (
 )
 from app.models.sales import PlanCust, SalesBill, SalesExtend
 from app.models.warehouse import StockIn, StockOut
-
 
 # ──────────────────────────────────────────────────────────────
 # 全模块单据统一查询
@@ -227,7 +225,8 @@ class StockSummaryRepository:
         per_page: int = 20,
     ) -> tuple[list[dict[str, Any]], int]:
         """按物料汇总进销存数据。"""
-        from app.models.warehouse import StockDetailDt, Warehouse as Wh
+        from app.models.warehouse import StockDetailDt
+        from app.models.warehouse import Warehouse as Wh
 
         filters: list[Any] = []
         if whcd:

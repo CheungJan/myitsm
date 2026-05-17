@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 
 from app.api.auth import login_required
 from app.schemas.deposit import (
@@ -76,13 +76,34 @@ def update_deposit(custcd: str):  # type: ignore[no-untyped-def]
 # ---- 押金变更明细 ----
 
 
+@deposit_bp.get("/deposits/details")
+@login_required
+def list_all_deposit_details():  # type: ignore[no-untyped-def]
+    """押金变更明细列表（全部）。"""
+    page = int(request.args.get("page", "1"))
+    per_page = int(request.args.get("per_page", "20"))
+    data = DepositDetailService.list_all(page=page, per_page=per_page)
+    return success_response(data=data)
+
+
 @deposit_bp.get("/deposits/<custcd>/details")
 @login_required
 def list_deposit_details(custcd: str):  # type: ignore[no-untyped-def]
-    """押金变更明细列表。"""
+    """押金变更明细列表（按客户）。"""
     page = int(request.args.get("page", "1"))
     per_page = int(request.args.get("per_page", "20"))
     data = DepositDetailService.list_by_customer(custcd, page, per_page)
+    return success_response(data=data)
+
+
+# Backward compat: /deposit/details → /deposits/details
+@deposit_bp.get("/details")
+@login_required
+def list_all_deposit_details_short():  # type: ignore[no-untyped-def]
+    """押金变更明细列表。"""
+    page = int(request.args.get("page", "1"))
+    per_page = int(request.args.get("per_page", "20"))
+    data = DepositDetailService.list_all(page=page, per_page=per_page)
     return success_response(data=data)
 
 
@@ -140,3 +161,52 @@ def list_deposit_io():  # type: ignore[no-untyped-def]
         per_page=params.per_page,
     )
     return success_response(data=data)
+
+
+@deposit_bp.post("/deposits/<custcd>/audit")
+@login_required
+def audit_deposit(custcd: str):  # type: ignore[no-untyped-def]
+    """审核押金记录。"""
+    from datetime import UTC, datetime
+
+    from app.extensions import db as _db
+    from app.models.deposit import Deposit
+    record = _db.session.get(Deposit, custcd)
+    if record is None:
+        return error_response(message="押金记录不存在", code=404)
+    if record.auditflg == "1":
+        return error_response(message="已审核", code=400)
+    user_cd: str = g.current_user
+    record.auditflg = "1"
+    record.auditman = user_cd
+    record.auditdate = datetime.now(UTC)
+    _db.session.commit()
+    return success_response(data=record.to_dict(), message="审核成功")
+
+
+@deposit_bp.get("/stats")
+@login_required
+def deposit_stats():  # type: ignore[no-untyped-def]
+    """押金汇总统计。"""
+    from sqlalchemy import func
+
+    from app.extensions import db as _db
+    from app.models.deposit import Deposit, DepositIO
+    total_customers = _db.session.query(func.count(Deposit.custcd)).scalar() or 0
+    total_amount = _db.session.query(func.coalesce(func.sum(Deposit.amount_money), 0)).scalar() or 0
+    io_count = _db.session.query(func.count(DepositIO.id)).scalar() or 0
+    return success_response(data={
+        "total_customers": total_customers,
+        "total_deposit_amount": float(total_amount),
+        "io_record_count": io_count,
+    })
+
+
+# ---- 标签管理 (TMM40_LABEL) ----
+
+
+@deposit_bp.get("/labels")
+@login_required
+def list_labels():  # type: ignore[no-untyped-def]
+    """标签列表（占位 — 待 TMM40_LABEL 表建迁移后启用）。"""
+    return success_response(data={"items": [], "total": 0, "message": "TMM40_LABEL 表待迁移创建"})

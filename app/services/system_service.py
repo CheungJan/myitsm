@@ -562,8 +562,8 @@ class SystemService:
             if row:
                 reno_refid = row[0]
 
-        from app.models.warehouse import Warehouse
         from app.models.master import Customer
+        from app.models.warehouse import Warehouse
         wh_map: dict[str, str] = {}
         cust_map: dict[str, str] = {}
         result = []

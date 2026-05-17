@@ -34,6 +34,7 @@ from app.models.inventory import (
     InventoryDetailDt,
     InventoryLimit,
     InventoryLimitHistory,
+    Label,
     Price,
     SupplierPrice,
 )
@@ -71,6 +72,7 @@ from app.models.itsm import (
     OnChooseDt,
     PayList,
     PosDetail,
+    PosStatus,
     RecycleTask,
     RecycleTaskDtl,
     RepairInfo,

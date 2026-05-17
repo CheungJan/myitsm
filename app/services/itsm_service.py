@@ -12,14 +12,25 @@ from app.repositories.itsm_repository import (
     D2DRepository,
     DeviceChangeRepository,
     DispatchRepository,
+    FreeReplaceRepository,
+    LiabilityRegRepository,
+    MaintenanceAttcRepository,
     MaintenanceDailyRepository,
+    MaintenanceDailyTrackRepository,
+    MaintenanceLiabilityRepository,
     MaintenanceOpenRepository,
+    MaintenancePlanRepository,
     MaintenanceRenovateRepository,
+    MaintenanceT17Repository,
+    NoCloseTrackRepository,
+    OnChooseDtRepository,
+    PayListRepository,
+    PosDetailRepository,
     RecycleTaskRepository,
+    RepairInfoRepository,
     RVRepository,
     StoreCloseRepository,
-    MaintenancePlanRepository,
-    MaintenanceT17Repository,
+    TimepointAreaRepository,
 )
 from app.services.state_machine import StateMachine
 
@@ -38,7 +49,7 @@ class _BaseMaintenanceService:
         pk_field: str = "maintenance_id",
     ) -> dict[str, object]:
         """执行状态流转。"""
-        from_status: str = record.current_status or "00"
+        from_status: str = record.current_status or "1"
         result = StateMachine.validate_transition(from_status, to_status)
         if not result["valid"]:
             return {"success": False, "error": result.get("error", "状态流转验证失败")}
@@ -281,7 +292,7 @@ class DeviceChangeService(_BaseMaintenanceService):
         )
 
         if result.get("success"):
-            if to_status == "05" and record.change_type == "CK":
+            if to_status == "5" and record.change_type == "CK":
                 DeviceChangeRepository.save_customer_history(
                     {
                         "cust_cd": record.store_id or "",
@@ -472,7 +483,7 @@ class RecycleTaskService(_BaseMaintenanceService):
         record = RecycleTaskRepository.get_by_id(recycle_id)
         if record is None:
             return {"success": False, "error": "回收任务不存在"}
-        from_status: str = record.task_status or "00"
+        from_status: str = record.task_status or "1"
         result = StateMachine.validate_transition(from_status, to_status)
         if not result["valid"]:
             return {"success": False, "error": result.get("error", "状态流转验证失败")}
@@ -528,7 +539,7 @@ class MaintenancePlanService:
         return record.to_dict()
 
 
-class MaintenanceT17Service:
+class MaintenanceT17Service(_BaseMaintenanceService):
     """日常保养工单服务（TIT17_MAINTENANCE）。"""
 
     @staticmethod
@@ -554,3 +565,310 @@ class MaintenanceT17Service:
             "page": page,
             "per_page": per_page,
         }
+
+    def transition(
+        self,
+        maintenance_id: str,
+        to_status: str,
+        operator: str,
+        remark: str | None = None,
+    ) -> dict[str, object]:
+        record = MaintenanceT17Repository.get_by_id(maintenance_id)
+        if record is None:
+            return {"success": False, "error": "保养工单不存在"}
+        result = self._do_transition(
+            record, to_status, operator, remark, pk_field="maintenance_id"
+        )
+        if result.get("success"):
+            db.session.commit()
+        return result
+
+
+class FreeReplaceService(_BaseMaintenanceService):
+    """免费更换工单服务（TIT28_FREE_REPLACE）。"""
+
+    @staticmethod
+    def get(renew_id: str) -> dict[str, Any] | None:
+        record = FreeReplaceRepository.get_by_id(renew_id)
+        if record is None:
+            return None
+        result = record.to_dict()
+        result["equipments"] = [d.to_dict() for d in record.equipments]  # type: ignore[attr-defined]
+        return result
+
+    @staticmethod
+    def list_records(
+        status: str | None = None,
+        store_id: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> dict[str, Any]:
+        items, total = FreeReplaceRepository.list_by_filters(
+            status=status, store_id=store_id, page=page, per_page=per_page
+        )
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(
+        data: dict[str, Any],
+        details: list[dict[str, Any]],
+        creator: str,
+    ) -> dict[str, Any]:
+        record = FreeReplaceRepository.create(data, creator)
+        for detail_data in details:
+            FreeReplaceRepository.add_detail(
+                renew_id=record.renew_id, data=detail_data
+            )
+        db.session.commit()
+        return record.to_dict()
+
+    def transition(
+        self,
+        renew_id: str,
+        to_status: str,
+        operator: str,
+        remark: str | None = None,
+    ) -> dict[str, object]:
+        record = FreeReplaceRepository.get_by_id(renew_id)
+        if record is None:
+            return {"success": False, "error": "免费更换单不存在"}
+
+        result = self._do_transition(
+            record, to_status, operator, remark, pk_field="renew_id"
+        )
+
+        if result.get("success"):
+            FreeReplaceRepository.update_status(record, to_status, operator)
+            db.session.commit()
+        return result
+
+
+# ============================================================================
+# ITSM 附表 Service（P1 补全）
+# ============================================================================
+
+
+class PayListService:
+    """收费记录服务（TIT26_PAYLIST）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
+        items = PayListRepository.list_by_maintenance_id(maintenance_id)
+        return [item.to_dict() for item in items]
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        record = PayListRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+
+class MaintenanceLiabilityService:
+    """维护单责任豁免服务（TIT10_MAINTENANCE_LIABILITY）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
+        items = MaintenanceLiabilityRepository.list_by_maintenance_id(maintenance_id)
+        return [item.to_dict() for item in items]
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> dict[str, Any]:
+        record = MaintenanceLiabilityRepository.create(data)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(record_id: int, data: dict[str, Any]) -> dict[str, Any] | None:
+        from app.models.itsm import MaintenanceLiability
+        record = db.session.get(MaintenanceLiability, record_id)
+        if record is None:
+            return None
+        MaintenanceLiabilityRepository.update(record, data)
+        db.session.commit()
+        return record.to_dict()
+
+
+class LiabilityRegService:
+    """责任豁免字典服务（TIT02_LIABILITYREG）。"""
+
+    @staticmethod
+    def get(liab_cd: str) -> dict[str, Any] | None:
+        record = LiabilityRegRepository.get_by_id(liab_cd)
+        if record is None:
+            return None
+        result = record.to_dict()
+        result["details"] = [d.to_dict() for d in record.details]
+        return result
+
+    @staticmethod
+    def list_all() -> list[dict[str, Any]]:
+        items = LiabilityRegRepository.list_all()
+        return [item.to_dict() for item in items]
+
+    @staticmethod
+    def create(data: dict[str, Any], details: list[dict[str, Any]]) -> dict[str, Any]:
+        record = LiabilityRegRepository.create(data)
+        for detail_data in details:
+            LiabilityRegRepository.add_detail(liab_cd=record.liab_cd, data=detail_data)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(liab_cd: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        record = LiabilityRegRepository.get_by_id(liab_cd)
+        if record is None:
+            return None
+        LiabilityRegRepository.update(record, data)
+        db.session.commit()
+        return record.to_dict()
+
+
+class MaintenanceAttcService:
+    """附件服务（TIT11_MAINTENANCE_ATTC）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
+        items = MaintenanceAttcRepository.list_by_maintenance_id(maintenance_id)
+        return [item.to_dict() for item in items]
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        record = MaintenanceAttcRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+
+class PosDetailService:
+    """换机配件明细服务（TIT10_POS_DETAIL）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
+        items = PosDetailRepository.list_by_maintenance_id(maintenance_id)
+        return [item.to_dict() for item in items]
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> dict[str, Any]:
+        record = PosDetailRepository.create(data)
+        db.session.commit()
+        return record.to_dict()
+
+
+class NoCloseTrackService:
+    """未关单跟踪服务（TIT29_NOCLOSE_TRACK）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
+        items = NoCloseTrackRepository.list_by_maintenance_id(maintenance_id)
+        return [item.to_dict() for item in items]
+
+    @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = NoCloseTrackRepository.list_all(page=page, per_page=per_page)
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        record = NoCloseTrackRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+
+class RepairInfoService:
+    """报修信息服务（TIT05_REPAIRINFO）。"""
+
+    @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = RepairInfoRepository.list_all(page=page, per_page=per_page)
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> dict[str, Any]:
+        record = RepairInfoRepository.create(data)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def delete(record_id: int) -> bool:
+        from app.models.itsm import RepairInfo
+        record = db.session.get(RepairInfo, record_id)
+        if record is None:
+            return False
+        RepairInfoRepository.delete(record)
+        db.session.commit()
+        return True
+
+
+class TimepointAreaService:
+    """时间点级别服务（TIT01_TIMEPOINT_AREA）。"""
+
+    @staticmethod
+    def get(levels: str) -> dict[str, Any] | None:
+        record = TimepointAreaRepository.get_by_id(levels)
+        if record is None:
+            return None
+        return record.to_dict()
+
+    @staticmethod
+    def list_all() -> list[dict[str, Any]]:
+        items = TimepointAreaRepository.list_all()
+        return [item.to_dict() for item in items]
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> dict[str, Any]:
+        record = TimepointAreaRepository.create(data)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(levels: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        record = TimepointAreaRepository.get_by_id(levels)
+        if record is None:
+            return None
+        TimepointAreaRepository.update(record, data)
+        db.session.commit()
+        return record.to_dict()
+
+
+class MaintenanceDailyTrackService:
+    """状态变更轨迹服务（TIT10_MAIN_TRACK）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
+        items = MaintenanceDailyTrackRepository.list_by_maintenance_id(maintenance_id)
+        return [item.to_dict() for item in items]
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> dict[str, Any]:
+        record = MaintenanceDailyTrackRepository.create(data)
+        db.session.commit()
+        return record.to_dict()
+
+
+class OnChooseDtService:
+    """开通选择明细服务（TIT19_ON_CHOOSEDT）。"""
+
+    @staticmethod
+    def list_by_bill_id(bill_id: str) -> list[dict[str, Any]]:
+        items = OnChooseDtRepository.list_by_bill_id(bill_id)
+        return [item.to_dict() for item in items]
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> dict[str, Any]:
+        record = OnChooseDtRepository.create(data)
+        db.session.commit()
+        return record.to_dict()

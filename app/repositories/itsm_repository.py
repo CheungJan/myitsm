@@ -13,18 +13,30 @@ from app.models.itsm import (
     AccessoriesUpdate,
     CloseBills,
     DeviceChange,
+    FreeReplace,
+    FreeReplaceDt,
+    LiabilityReg,
+    LiabilityRegDt,
+    Maintenance,
+    MaintenanceAttc,
     MaintenanceD2D,
     MaintenanceDaily,
     MaintenanceDailyTrack,
     MaintenanceDispatch,
+    MaintenanceLiability,
     MaintenanceOpen,
+    MaintenancePlan,
     MaintenanceRenovate,
     MaintenanceRV,
+    NoCloseTrack,
+    OnChooseDt,
+    PayList,
+    PosDetail,
     RecycleTask,
     RecycleTaskDtl,
+    RepairInfo,
     StoreClose,
-    MaintenancePlan,
-    Maintenance,
+    TimepointArea,
 )
 from app.models.master import CustomerHistory
 
@@ -64,7 +76,7 @@ class MaintenanceDailyRepository:
         now = datetime.now(UTC)
         record = MaintenanceDaily(
             maintenance_id=_gen_id(),
-            current_status="00",
+            current_status="1",
             create_time=now,
             creator=creator,
             update_time=now,
@@ -142,7 +154,7 @@ class MaintenanceOpenRepository:
         now = datetime.now(UTC)
         record = MaintenanceOpen(
             new_opening_id=_gen_id(),
-            current_status="00",
+            current_status="1",
             create_time=now,
             creator=creator,
             update_time=now,
@@ -193,7 +205,7 @@ class MaintenanceRenovateRepository:
         now = datetime.now(UTC)
         record = MaintenanceRenovate(
             renew_id=_gen_id(),
-            current_status="00",
+            current_status="1",
             create_time=now,
             creator=creator,
             update_time=now,
@@ -247,7 +259,7 @@ class DeviceChangeRepository:
         now = datetime.now(UTC)
         record = DeviceChange(
             device_change_id=_gen_id(),
-            current_status="00",
+            current_status="1",
             create_time=now,
             creator=creator,
             update_time=now,
@@ -305,7 +317,7 @@ class StoreCloseRepository:
         now = datetime.now(UTC)
         record = StoreClose(
             store_close_id=_gen_id(),
-            current_status="00",
+            current_status="1",
             create_time=now,
             creator=creator,
             update_time=now,
@@ -491,7 +503,7 @@ class RecycleTaskRepository:
         now = datetime.now(UTC)
         record = RecycleTask(
             recycle_id=_gen_id("R"),
-            task_status="00",
+            task_status="1",
             create_time=now,
             creator=creator,
             update_time=now,
@@ -577,3 +589,305 @@ class MaintenanceT17Repository:
         total: int = query.count()
         items: list[Maintenance] = query.offset((page - 1) * per_page).limit(per_page).all()
         return items, total
+
+
+class FreeReplaceRepository:
+    """免费更换工单数据访问（TIT28_FREE_REPLACE）。"""
+
+    @staticmethod
+    def get_by_id(renew_id: str) -> FreeReplace | None:
+        return db.session.get(FreeReplace, renew_id)
+
+    @staticmethod
+    def list_by_filters(
+        status: str | None = None,
+        store_id: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list[FreeReplace], int]:
+        query = db.session.query(FreeReplace)
+        if status:
+            query = query.filter(FreeReplace.current_status == status)
+        if store_id:
+            query = query.filter(FreeReplace.store_id == store_id)
+        query = query.order_by(desc(FreeReplace.create_time))
+        total: int = query.count()
+        items: list[FreeReplace] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> FreeReplace:
+        now = datetime.now(UTC)
+        record = FreeReplace(
+            renew_id=_gen_id(),
+            current_status="1",
+            create_time=now,
+            creator=creator,
+            update_time=now,
+            updator=creator,
+            **data,
+        )
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update_status(
+        record: FreeReplace,
+        new_status: str,
+        updator: str,
+    ) -> FreeReplace:
+        record.current_status = new_status
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
+        return record
+
+    @staticmethod
+    def add_detail(renew_id: str, data: dict[str, Any]) -> FreeReplaceDt:
+        record = FreeReplaceDt(
+            renovate_id=renew_id,
+            **data,
+        )
+        db.session.add(record)
+        return record
+
+
+# ============================================================================
+# ITSM 附表 Repository（P1 补全）
+# ============================================================================
+
+
+class PayListRepository:
+    """收费记录数据访问（TIT26_PAYLIST）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[PayList]:
+        return (
+            db.session.query(PayList)
+            .filter(PayList.maintenance_id == maintenance_id)
+            .order_by(PayList.create_time)
+            .all()
+        )
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> PayList:
+        now = datetime.now(UTC)
+        record = PayList(create_time=now, creator=creator, update_time=now, updator=creator, **data)
+        db.session.add(record)
+        return record
+
+
+class MaintenanceLiabilityRepository:
+    """维护单责任豁免数据访问（TIT10_MAINTENANCE_LIABILITY）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[MaintenanceLiability]:
+        return (
+            db.session.query(MaintenanceLiability)
+            .filter(MaintenanceLiability.maintenance_id == maintenance_id)
+            .order_by(MaintenanceLiability.id)
+            .all()
+        )
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> MaintenanceLiability:
+        record = MaintenanceLiability(**data)
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: MaintenanceLiability, data: dict[str, Any]) -> MaintenanceLiability:
+        for key, value in data.items():
+            if hasattr(record, key):
+                setattr(record, key, value)
+        return record
+
+
+class LiabilityRegRepository:
+    """责任豁免字典数据访问（TIT02_LIABILITYREG）。"""
+
+    @staticmethod
+    def get_by_id(liab_cd: str) -> LiabilityReg | None:
+        return db.session.get(LiabilityReg, liab_cd)
+
+    @staticmethod
+    def list_all() -> list[LiabilityReg]:
+        return (
+            db.session.query(LiabilityReg)
+            .filter(LiabilityReg.useflg == "1")
+            .order_by(LiabilityReg.liab_cd)
+            .all()
+        )
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> LiabilityReg:
+        record = LiabilityReg(**data)
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: LiabilityReg, data: dict[str, Any]) -> LiabilityReg:
+        for key, value in data.items():
+            if hasattr(record, key):
+                setattr(record, key, value)
+        return record
+
+    @staticmethod
+    def add_detail(liab_cd: str, data: dict[str, Any]) -> LiabilityRegDt:
+        record = LiabilityRegDt(liab_cd=liab_cd, **data)
+        db.session.add(record)
+        return record
+
+
+class MaintenanceAttcRepository:
+    """附件数据访问（TIT11_MAINTENANCE_ATTC）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[MaintenanceAttc]:
+        return (
+            db.session.query(MaintenanceAttc)
+            .filter(MaintenanceAttc.maintenance_id == maintenance_id)
+            .order_by(MaintenanceAttc.create_time)
+            .all()
+        )
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> MaintenanceAttc:
+        now = datetime.now(UTC)
+        record = MaintenanceAttc(create_time=now, creator=creator, update_time=now, updator=creator, **data)
+        db.session.add(record)
+        return record
+
+
+class PosDetailRepository:
+    """换机配件明细数据访问（TIT10_POS_DETAIL）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[PosDetail]:
+        return (
+            db.session.query(PosDetail)
+            .filter(PosDetail.bill_id == maintenance_id)
+            .order_by(PosDetail.id)
+            .all()
+        )
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> PosDetail:
+        record = PosDetail(**data)
+        db.session.add(record)
+        return record
+
+
+class NoCloseTrackRepository:
+    """未关单跟踪数据访问（TIT29_NOCLOSE_TRACK）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[NoCloseTrack]:
+        return (
+            db.session.query(NoCloseTrack)
+            .filter(NoCloseTrack.maintenance_id == maintenance_id)
+            .order_by(NoCloseTrack.create_time)
+            .all()
+        )
+
+    @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> tuple[list[NoCloseTrack], int]:
+        query = db.session.query(NoCloseTrack).order_by(desc(NoCloseTrack.create_time))
+        total: int = query.count()
+        items: list[NoCloseTrack] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> NoCloseTrack:
+        now = datetime.now(UTC)
+        record = NoCloseTrack(create_time=now, creator=creator, update_time=now, updator=creator, **data)
+        db.session.add(record)
+        return record
+
+
+class RepairInfoRepository:
+    """报修信息数据访问（TIT05_REPAIRINFO）。"""
+
+    @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> tuple[list[RepairInfo], int]:
+        query = db.session.query(RepairInfo).order_by(RepairInfo.id)
+        total: int = query.count()
+        items: list[RepairInfo] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> RepairInfo:
+        record = RepairInfo(**data)
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def delete(record: RepairInfo) -> None:
+        db.session.delete(record)
+
+
+class TimepointAreaRepository:
+    """时间点级别数据访问（TIT01_TIMEPOINT_AREA）。"""
+
+    @staticmethod
+    def get_by_id(levels: str) -> TimepointArea | None:
+        return db.session.get(TimepointArea, levels)
+
+    @staticmethod
+    def list_all() -> list[TimepointArea]:
+        return (
+            db.session.query(TimepointArea)
+            .filter(TimepointArea.useflg == "1")
+            .order_by(TimepointArea.levels)
+            .all()
+        )
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> TimepointArea:
+        record = TimepointArea(**data)
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: TimepointArea, data: dict[str, Any]) -> TimepointArea:
+        for key, value in data.items():
+            if hasattr(record, key):
+                setattr(record, key, value)
+        return record
+
+
+class MaintenanceDailyTrackRepository:
+    """状态变更轨迹数据访问（TIT10_MAIN_TRACK）。"""
+
+    @staticmethod
+    def list_by_maintenance_id(maintenance_id: str) -> list[MaintenanceDailyTrack]:
+        return (
+            db.session.query(MaintenanceDailyTrack)
+            .filter(MaintenanceDailyTrack.maintenance_id == maintenance_id)
+            .order_by(desc(MaintenanceDailyTrack.updatetime))
+            .all()
+        )
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> MaintenanceDailyTrack:
+        record = MaintenanceDailyTrack(**data)
+        db.session.add(record)
+        return record
+
+
+class OnChooseDtRepository:
+    """开通选择明细数据访问（TIT19_ON_CHOOSEDT）。"""
+
+    @staticmethod
+    def list_by_bill_id(bill_id: str) -> list[OnChooseDt]:
+        return (
+            db.session.query(OnChooseDt)
+            .filter(OnChooseDt.bill_id == bill_id)
+            .order_by(OnChooseDt.id)
+            .all()
+        )
+
+    @staticmethod
+    def create(data: dict[str, Any]) -> OnChooseDt:
+        record = OnChooseDt(**data)
+        db.session.add(record)
+        return record
