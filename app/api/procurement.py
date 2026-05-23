@@ -2,7 +2,7 @@
 采购管理 API。
 
 路由前缀：/api/v1/procurement
-采购计划→登记→单据→退货→供应商评价全链路。
+采购需求→订单→结算单→退货→供应商评价全链路。
 """
 
 from __future__ import annotations
@@ -39,37 +39,39 @@ __all__ = ["procurement_bp"]
 procurement_bp = Blueprint("procurement", __name__)
 
 
-# ---- 采购计划 ----
+# ---- 采购需求 ----
 
 
-@procurement_bp.get("/plans")
+@procurement_bp.get("/requisitions")
 @login_required
-def list_plans():  # type: ignore[no-untyped-def]
-    """采购计划列表。"""
+def list_requisitions():  # type: ignore[no-untyped-def]
+    """采购需求列表。"""
     params = ProcurementQuery.model_validate(request.args.to_dict())
     data = PurchasePlanService.list_records(
         auditflg=params.auditflg,
         pctyp=params.pctyp,
+        start_date=params.start_date,
+        end_date=params.end_date,
         page=params.page,
         per_page=params.per_page,
     )
     return success_response(data=data)
 
 
-@procurement_bp.get("/plans/<pcplanid>")
+@procurement_bp.get("/requisitions/<pcplanid>")
 @login_required
-def get_plan(pcplanid: str):  # type: ignore[no-untyped-def]
-    """采购计划详情。"""
+def get_requisition(pcplanid: str):  # type: ignore[no-untyped-def]
+    """采购需求详情。"""
     data = PurchasePlanService.get(pcplanid)
     if data is None:
-        return error_response(message="采购计划不存在", code=404)
+        return error_response(message="采购需求不存在", code=404)
     return success_response(data=data)
 
 
-@procurement_bp.post("/plans")
+@procurement_bp.post("/requisitions")
 @login_required
-def create_plan():  # type: ignore[no-untyped-def]
-    """创建采购计划。"""
+def create_requisition():  # type: ignore[no-untyped-def]
+    """创建采购需求。"""
     json_data = request.get_json(silent=True) or {}
     body = PurchasePlanCreate.model_validate(json_data)
     raw_details = json_data.get("details", [])
@@ -79,10 +81,10 @@ def create_plan():  # type: ignore[no-untyped-def]
     return success_response(data=data, message="创建成功", code=201)
 
 
-@procurement_bp.post("/plans/<pcplanid>/audit")
+@procurement_bp.post("/requisitions/<pcplanid>/audit")
 @login_required
-def audit_plan(pcplanid: str):  # type: ignore[no-untyped-def]
-    """审核采购计划。"""
+def audit_requisition(pcplanid: str):  # type: ignore[no-untyped-def]
+    """审核采购需求。"""
     user_cd: str = g.current_user
     result = PurchasePlanService.audit(pcplanid, user_cd)
     if not result.get("success"):
@@ -90,13 +92,13 @@ def audit_plan(pcplanid: str):  # type: ignore[no-untyped-def]
     return success_response(data=result)
 
 
-# ---- 采购登记 ----
+# ---- 采购订单 ----
 
 
-@procurement_bp.get("/registers")
+@procurement_bp.get("/orders")
 @login_required
-def list_registers():  # type: ignore[no-untyped-def]
-    """采购登记列表。"""
+def list_orders():  # type: ignore[no-untyped-def]
+    """采购订单列表。"""
     params = ProcurementQuery.model_validate(request.args.to_dict())
     data = PurchaseRegisterService.list_records(
         suppliercd=params.suppliercd,
@@ -107,20 +109,20 @@ def list_registers():  # type: ignore[no-untyped-def]
     return success_response(data=data)
 
 
-@procurement_bp.get("/registers/<rgstbillid>")
+@procurement_bp.get("/orders/<rgstbillid>")
 @login_required
-def get_register(rgstbillid: str):  # type: ignore[no-untyped-def]
-    """采购登记详情。"""
+def get_order(rgstbillid: str):  # type: ignore[no-untyped-def]
+    """采购订单详情。"""
     data = PurchaseRegisterService.get(rgstbillid)
     if data is None:
-        return error_response(message="采购登记不存在", code=404)
+        return error_response(message="采购订单不存在", code=404)
     return success_response(data=data)
 
 
-@procurement_bp.post("/registers")
+@procurement_bp.post("/orders")
 @login_required
-def create_register():  # type: ignore[no-untyped-def]
-    """创建采购登记。"""
+def create_order():  # type: ignore[no-untyped-def]
+    """创建采购订单。"""
     json_data = request.get_json(silent=True) or {}
     body = PurchaseRegisterCreate.model_validate(json_data)
     raw_details = json_data.get("details", [])
@@ -130,10 +132,10 @@ def create_register():  # type: ignore[no-untyped-def]
     return success_response(data=data, message="创建成功", code=201)
 
 
-@procurement_bp.post("/registers/<rgstbillid>/audit")
+@procurement_bp.post("/orders/<rgstbillid>/audit")
 @login_required
-def audit_register(rgstbillid: str):  # type: ignore[no-untyped-def]
-    """审核采购登记。"""
+def audit_order(rgstbillid: str):  # type: ignore[no-untyped-def]
+    """审核采购订单。"""
     user_cd: str = g.current_user
     result = PurchaseRegisterService.audit(rgstbillid, user_cd)
     if not result.get("success"):
@@ -141,13 +143,13 @@ def audit_register(rgstbillid: str):  # type: ignore[no-untyped-def]
     return success_response(data=result)
 
 
-# ---- 采购单据 ----
+# ---- 采购结算单 ----
 
 
-@procurement_bp.get("/bills")
+@procurement_bp.get("/settlements")
 @login_required
-def list_bills():  # type: ignore[no-untyped-def]
-    """采购单据列表。"""
+def list_settlements():  # type: ignore[no-untyped-def]
+    """采购结算单列表。"""
     params = ProcurementQuery.model_validate(request.args.to_dict())
     data = PurchaseBillService.list_records(
         whcd=params.whcd, page=params.page, per_page=params.per_page
@@ -155,20 +157,20 @@ def list_bills():  # type: ignore[no-untyped-def]
     return success_response(data=data)
 
 
-@procurement_bp.get("/bills/<pcbillid>")
+@procurement_bp.get("/settlements/<pcbillid>")
 @login_required
-def get_bill(pcbillid: str):  # type: ignore[no-untyped-def]
-    """采购单据详情。"""
+def get_settlement(pcbillid: str):  # type: ignore[no-untyped-def]
+    """采购结算单详情。"""
     data = PurchaseBillService.get(pcbillid)
     if data is None:
-        return error_response(message="采购单据不存在", code=404)
+        return error_response(message="采购结算单不存在", code=404)
     return success_response(data=data)
 
 
-@procurement_bp.post("/bills")
+@procurement_bp.post("/settlements")
 @login_required
-def create_bill():  # type: ignore[no-untyped-def]
-    """创建采购单据。"""
+def create_settlement():  # type: ignore[no-untyped-def]
+    """创建采购结算单。"""
     body = PurchaseBillCreate.model_validate(request.get_json(silent=True) or {})
     user_cd: str = g.current_user
     data = PurchaseBillService.create(body.model_dump(exclude_none=True), user_cd)
@@ -176,6 +178,7 @@ def create_bill():  # type: ignore[no-untyped-def]
 
 
 # ---- 采购退货 ----
+
 
 @procurement_bp.get("/returns")
 @login_required
@@ -248,13 +251,13 @@ def create_appraisal():  # type: ignore[no-untyped-def]
     return success_response(data=data, message="创建成功", code=201)
 
 
-# ---- 采购计划状态 (TPC03) ----
+# ---- 采购需求执行看板 (原 TPC03，已冻结) ----
 
 
 @procurement_bp.get("/plan-status")
 @login_required
 def list_plan_status():  # type: ignore[no-untyped-def]
-    """采购计划状态汇总列表。"""
+    """@deprecated 采购需求执行看板（原 TPC03，后续迁移至视图）。"""
     page: int = request.args.get("page", 1, type=int)
     per_page: int = request.args.get("per_page", 20, type=int)
     data = PurchasePlanStatusService.list_all(page=page, per_page=per_page)
@@ -264,7 +267,7 @@ def list_plan_status():  # type: ignore[no-untyped-def]
 @procurement_bp.get("/plan-status/<itemcd>")
 @login_required
 def get_plan_status(itemcd: str):  # type: ignore[no-untyped-def]
-    """采购计划状态汇总详情。"""
+    """@deprecated 采购需求执行看板详情。"""
     data = PurchasePlanStatusService.get(itemcd)
     if data is None:
         return error_response(message="不存在", code=404)
@@ -274,7 +277,7 @@ def get_plan_status(itemcd: str):  # type: ignore[no-untyped-def]
 @procurement_bp.post("/plan-status")
 @login_required
 def create_plan_status():  # type: ignore[no-untyped-def]
-    """创建采购计划状态汇总。"""
+    """@deprecated 创建采购需求状态汇总（已冻结，不再使用）。"""
     body = PurchasePlanStatusCreate.model_validate(request.get_json(silent=True) or {})
     user_cd: str = g.current_user
     data = PurchasePlanStatusService.create(body.model_dump(exclude_none=True), user_cd)
@@ -284,7 +287,7 @@ def create_plan_status():  # type: ignore[no-untyped-def]
 @procurement_bp.put("/plan-status/<itemcd>")
 @login_required
 def update_plan_status(itemcd: str):  # type: ignore[no-untyped-def]
-    """更新采购计划状态汇总。"""
+    """@deprecated 更新采购需求状态汇总（已冻结，不再使用）。"""
     body = PurchasePlanStatusUpdate.model_validate(request.get_json(silent=True) or {})
     data = PurchasePlanStatusService.update(itemcd, body.model_dump(exclude_none=True))
     if data is None:

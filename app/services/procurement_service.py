@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime as dt
 from typing import Any
 
 from app.extensions import db
@@ -16,7 +17,7 @@ from app.repositories.procurement_repository import (
 
 
 class PurchasePlanService:
-    """采购计划服务。"""
+    """采购需求服务 (原采购计划，TPC01/TPC02)。"""
 
     @staticmethod
     def get(pcplanid: str) -> dict[str, Any] | None:
@@ -31,11 +32,13 @@ class PurchasePlanService:
     def list_records(
         auditflg: str | None = None,
         pctyp: str | None = None,
+        start_date: dt | None = None,
+        end_date: dt | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> dict[str, Any]:
         items, total = PurchasePlanRepository.list_by_filters(
-            auditflg=auditflg, pctyp=pctyp, page=page, per_page=per_page
+            auditflg=auditflg, pctyp=pctyp, start_date=start_date, end_date=end_date, page=page, per_page=per_page
         )
         return {
             "items": [item.to_dict() for item in items],
@@ -71,7 +74,7 @@ class PurchasePlanService:
 
 
 class PurchaseRegisterService:
-    """采购登记服务。"""
+    """采购订单服务 (原采购登记，TPC12/TPC13)。"""
 
     @staticmethod
     def get(rgstbillid: str) -> dict[str, Any] | None:
@@ -126,7 +129,7 @@ class PurchaseRegisterService:
 
 
 class PurchaseBillService:
-    """采购单据服务。"""
+    """采购结算单服务 (原采购单据，TPC14)。"""
 
     @staticmethod
     def get(pcbillid: str) -> dict[str, Any] | None:
@@ -159,7 +162,7 @@ class PurchaseBillService:
 
 
 class ReturnPurchaseService:
-    """采购退货服务。"""
+    """采购退货服务 (TPC16/TPC17)。"""
 
     @staticmethod
     def get(pcbillid: str) -> dict[str, Any] | None:
@@ -202,7 +205,7 @@ class ReturnPurchaseService:
 
 
 class SupplierAppraisalService:
-    """供应商评价服务。"""
+    """供应商评价服务 (TPC20/TPC21)。"""
 
     @staticmethod
     def get(appid: str) -> dict[str, Any] | None:
@@ -243,7 +246,7 @@ class SupplierAppraisalService:
 
 
 class PurchasePlanStatusService:
-    """采购计划状态汇总服务（TPC03_PCPLANSTATUS）。"""
+    """@deprecated 采购需求执行看板服务 (原 TPC03，已冻结)。"""
 
     @staticmethod
     def get(itemcd: str) -> dict[str, Any] | None:
