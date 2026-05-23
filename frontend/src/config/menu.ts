@@ -50,6 +50,7 @@ export const FRONTEND_MENUS: MenuConfig[] = [
     {
         menu_cd: 'procurement', menu_nm: '采购管理',
         children: [
+            { menu_cd: 'proc-dashboard', menu_nm: '执行看板', path: '/procurement/dashboard' },
             { menu_cd: 'proc-requisitions', menu_nm: '采购需求', path: '/procurement/requisitions' },
             { menu_cd: 'proc-orders', menu_nm: '采购订单', path: '/procurement/orders' },
             { menu_cd: 'proc-settlements', menu_nm: '采购结算单', path: '/procurement/settlements' },

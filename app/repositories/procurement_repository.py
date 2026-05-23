@@ -102,6 +102,49 @@ class PurchasePlanRepository:
         ).fetchone()
         return float(row.available_qty) if row else 0.0
 
+    @staticmethod
+    def dashboard_stats() -> dict[str, Any]:
+        stats = db.session.execute(sa.text("""
+            SELECT
+                COUNT(DISTINCT pcplanid) AS total,
+                COUNT(DISTINCT CASE WHEN execution_status = '已完成' THEN pcplanid END) AS completed,
+                COUNT(DISTINCT CASE WHEN execution_status IN ('已下单','执行中') THEN pcplanid END) AS in_progress,
+                COUNT(DISTINCT CASE WHEN execution_status = '未开始' THEN pcplanid END) AS not_started
+            FROM v_requisition_execution
+        """)).fetchone()
+
+        top_items = [
+            dict(row._mapping)
+            for row in db.session.execute(sa.text("""
+                SELECT itemcd, itemnm, SUM(plan_qty)::int AS total_plan,
+                    SUM(ordered_qty)::numeric AS total_ordered,
+                    SUM(received_qty)::numeric AS total_received,
+                    ROUND(AVG(execution_rate), 1) AS execution_rate
+                FROM v_requisition_execution
+                GROUP BY itemcd, itemnm
+                ORDER BY total_plan DESC LIMIT 10
+            """)).fetchall()
+        ]
+
+        overdue = [
+            dict(row._mapping)
+            for row in db.session.execute(sa.text("""
+                SELECT pcplanid, itemcd, itemnm, plandate::text,
+                    plan_qty, ordered_qty::numeric, received_qty::numeric,
+                    execution_status
+                FROM v_requisition_execution
+                WHERE execution_status != '已完成'
+                    AND plandate < CURRENT_DATE - INTERVAL '7 days'
+                ORDER BY plandate LIMIT 10
+            """)).fetchall()
+        ]
+
+        return {
+            "stats": dict(stats._mapping) if stats else {},
+            "top_items": top_items,
+            "overdue": overdue,
+        }
+
 
 class PurchaseRegisterRepository:
     """采购登记数据访问。"""

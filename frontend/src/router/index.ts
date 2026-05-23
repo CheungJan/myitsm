@@ -106,6 +106,9 @@ const router = createRouter({
                     meta: { title: '出库单管理' }
                 },
                 {
+                    path: 'procurement/dashboard', name: 'RequisitionDashboard', component: () => import('@/views/procurement/RequisitionDashboard.vue'), meta: { title: '执行看板' }
+                },
+                {
                     path: 'procurement/suppliers', name: 'SupplierList', component: () => import('@/views/procurement/SupplierList.vue'), meta: { title: '供应商管理' }
                 },
                 {

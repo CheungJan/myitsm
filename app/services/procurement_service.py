@@ -21,6 +21,11 @@ class PurchasePlanService:
     """采购需求服务 (原采购计划，TPC01/TPC02)。"""
 
     @staticmethod
+    def dashboard_stats() -> dict[str, Any]:
+        """执行看板统计数据。"""
+        return PurchasePlanRepository.dashboard_stats()
+
+    @staticmethod
     def get(pcplanid: str) -> dict[str, Any] | None:
         record = PurchasePlanRepository.get_by_id(pcplanid)
         if record is None:

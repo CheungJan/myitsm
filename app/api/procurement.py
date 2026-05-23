@@ -263,6 +263,16 @@ def create_appraisal():  # type: ignore[no-untyped-def]
     return success_response(data=data, message="创建成功", code=201)
 
 
+# ---- 执行看板 ----
+
+@procurement_bp.get("/dashboard/requisition")
+@login_required
+def dashboard_requisition():  # type: ignore[no-untyped-def]
+    """采购需求执行看板数据（查询 v_requisition_execution 视图）。"""
+    data = PurchasePlanService.dashboard_stats()
+    return success_response(data=data)
+
+
 # ---- 采购需求执行看板 (原 TPC03，已冻结) ----
 
 
