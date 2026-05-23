@@ -77,7 +77,7 @@
     <el-dialog title="新建采购需求" v-model="creating" width="650px" @closed="resetForm">
       <el-form :model="form" label-width="80px" size="small">
         <el-form-item label="采购类型"><el-select v-model="form.pctyp" style="width:100%"><el-option v-for="(nm,cd) in puMap" :key="cd" :label="nm" :value="cd"/></el-select></el-form-item>
-        <el-form-item label="销售单号"><el-input v-model="form.slbillid"/></el-form-item>
+        <el-form-item label="销售单号"><el-input v-model="form.slbillid" :disabled="form.pctyp==='12'" :placeholder="form.pctyp==='12'?'订单采购自动关联预计划单号':''"/></el-form-item>
         <el-form-item label="计划日期"><el-date-picker v-model="form.plandate" type="date" style="width:100%" value-format="YYYY-MM-DD"/></el-form-item>
         <el-form-item label="备注"><el-input v-model="form.memo" type="textarea" :rows="2"/></el-form-item>
         <el-form-item label="采购明细">
@@ -90,7 +90,8 @@
             <el-table v-if="formDetails.length>0" :data="formDetails" size="small" style="margin-top:8px">
               <el-table-column prop="itemcd" label="物料编码" width="100"/>
               <el-table-column prop="itemnm" label="物料名称" min-width="120"/>
-              <el-table-column label="数量" width="120"><template #default="{row,$index}"><el-input-number v-model="formDetails[$index].rgstqty" :min="1" size="small" style="width:100px"/></template></el-table-column>
+              <el-table-column label="数量" width="100"><template #default="{row,$index}"><el-input-number v-model="formDetails[$index].rgstqty" :min="1" size="small" style="width:80px"/></template></el-table-column>
+              <el-table-column label="用途" width="110"><template #default="{row,$index}"><el-select v-model="formDetails[$index].item_usage" size="small" style="width:100px"><el-option label="销售备货" value="sale"/><el-option label="维护消耗" value="maintenance"/><el-option label="内部使用" value="internal"/></el-select></template></el-table-column>
               <el-table-column prop="units" label="单位" width="60"/>
               <el-table-column label="操作" width="60"><template #default="{$index}"><el-button link type="danger" size="small" @click="formDetails.splice($index,1)">删除</el-button></template></el-table-column>
             </el-table>
@@ -150,7 +151,7 @@ async function openDetail(row:ProcRecord){drawer.value=true;try{const r=await fe
 // 新建 — 配件树（typflg='0' = 仅配件）
 const creating=ref(false);const saving=ref(false)
 const form=reactive({pctyp:'10',slbillid:'',plandate:'',memo:''})
-const formDetails=reactive<{itemcd:string;itemnm:string;rgstqty:number;units:string}[]>([])
+const formDetails=reactive<{itemcd:string;itemnm:string;rgstqty:number;units:string;item_usage:string}[]>([])
 const partTree=ref<ItemClassNode[]>([])
 const treeRef=ref<InstanceType<typeof ElTree>>()
 const itemSearch=ref('')
@@ -165,7 +166,7 @@ function addSelectedItems(){
   for(const node of nodes){
     if(!node.children||node.children.length===0){
       if(!formDetails.find(d=>d.itemcd===node.class_cd)){
-        formDetails.push({itemcd:node.class_cd,itemnm:node.class_nm,rgstqty:1,units:''})
+        formDetails.push({itemcd:node.class_cd,itemnm:node.class_nm,rgstqty:1,units:'',item_usage:'sale'})
       }
     }
   }
@@ -176,7 +177,7 @@ function resetForm(){form.pctyp='10';form.slbillid='';form.plandate='';form.memo
 async function doCreate(){
   saving.value=true
   try{
-    await createRequisition({...form,details:formDetails.map(d=>({itemcd:d.itemcd,rgstqty:d.rgstqty,units:d.units}))})
+    await createRequisition({...form,details:formDetails.map(d=>({itemcd:d.itemcd,rgstqty:d.rgstqty,units:d.units,item_usage:d.item_usage}))})
     ElMessage.success('创建成功');creating.value=false;doSearch()
   }catch(e:any){ElMessage.error(e?.response?.data?.message||'创建失败')}finally{saving.value=false}
 }

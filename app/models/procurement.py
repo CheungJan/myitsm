@@ -64,6 +64,7 @@ class PurchasePlanDt(BaseModel):
     lowlimit = db.Column(db.Integer, default=0, comment="库存下限")
     upperlimit = db.Column(db.Integer, default=0, comment="库存上限")
     auditqty = db.Column(db.Integer, default=0, comment="审批数量")
+    item_usage = db.Column(db.String(20), default="sale", comment="用途标记: sale=销售备货, maintenance=维护消耗品, internal=内部使用")
 
     plan = db.relationship("PurchasePlan", back_populates="details")
 

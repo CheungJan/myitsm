@@ -139,7 +139,7 @@ class PurchasePlanRepository:
                     ROUND(AVG(v.execution_rate), 1) AS execution_rate
                 FROM v_requisition_execution v
                 LEFT JOIN (
-                    SELECT rdt.itemcd, SUM(rdt.returnqty)::numeric AS total_returned
+                    SELECT rdt.itemcd, SUM(rdt.rpcqty)::numeric AS total_returned
                     FROM tpc17_rpcbilldt rdt
                     JOIN tpc16_rpcbill r ON rdt.pcbillid = r.pcbillid
                     WHERE r.useflg = '1'
