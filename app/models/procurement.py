@@ -186,6 +186,10 @@ class ReturnPurchaseBill(BaseModel):
     memo = db.Column(db.String(255), comment="备注")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     gendate = db.Column(db.DateTime, comment="创建日期")
+    ref_rgstbillid = db.Column(db.String(8), comment="来源采购订单号")
+    auditflg = db.Column(db.String(1), default="0", comment="审核标志")
+    auditman = db.Column(db.String(6), comment="审核人")
+    auditdate = db.Column(db.DateTime, comment="审核日期")
 
     details = db.relationship("ReturnPurchaseBillDt", back_populates="bill", lazy="dynamic")
 
@@ -210,6 +214,7 @@ class ReturnPurchaseBillDt(BaseModel):
     rpcqty = db.Column(db.Integer, default=0, comment="退货数量")
     invoiceqty = db.Column(db.Integer, default=0, comment="发票数量")
     units = db.Column(db.String(4), comment="单位")
+    ref_rgstlineno = db.Column(db.Integer, comment="来源订单行号")
 
     bill = db.relationship("ReturnPurchaseBill", back_populates="details")
 
