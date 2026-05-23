@@ -68,13 +68,22 @@ class PurchasePlanService:
         return record.to_dict()
 
     @staticmethod
-    def audit(pcplanid: str, auditor: str) -> dict[str, object]:
+    def audit(
+        pcplanid: str, auditor: str,
+        auditflg: str = "2", checkmemo: str = "",
+        details: list[dict[str, Any]] | None = None,
+    ) -> dict[str, object]:
         record = PurchasePlanRepository.get_by_id(pcplanid)
         if record is None:
             return {"success": False, "error": "采购需求不存在"}
-        if record.auditflg == "1":
-            return {"success": False, "error": "已审核"}
-        PurchasePlanRepository.audit(record, auditor)
+        if record.auditflg not in ("0", "1"):
+            return {"success": False, "error": "已审核，不可重复操作"}
+        PurchasePlanRepository.audit(record, auditor, auditflg, checkmemo)
+        if auditflg == "2" and details:
+            for d in details:
+                PurchasePlanRepository.update_audit_qty(
+                    pcplanid, int(d.get("lineno", 0)), int(d.get("auditqty", 0))
+                )
         db.session.commit()
         return {"success": True, "pcplanid": record.pcplanid}
 
@@ -150,13 +159,22 @@ class PurchaseRegisterService:
         return record.to_dict()
 
     @staticmethod
-    def audit(rgstbillid: str, auditor: str) -> dict[str, object]:
+    def audit(
+        rgstbillid: str, auditor: str,
+        auditflg: str = "2", checkmemo: str = "",
+        details: list[dict[str, Any]] | None = None,
+    ) -> dict[str, object]:
         record = PurchaseRegisterRepository.get_by_id(rgstbillid)
         if record is None:
             return {"success": False, "error": "采购订单不存在"}
-        if record.auditflg == "1":
-            return {"success": False, "error": "已审核"}
-        PurchaseRegisterRepository.audit(record, auditor)
+        if record.auditflg not in ("0", "1"):
+            return {"success": False, "error": "已审核，不可重复操作"}
+        PurchaseRegisterRepository.audit(record, auditor, auditflg, checkmemo)
+        if auditflg == "2" and details:
+            for d in details:
+                PurchaseRegisterRepository.update_audit_qty(
+                    rgstbillid, int(d.get("lineno", 0)), int(d.get("auditqty", 0))
+                )
         db.session.commit()
         return {"success": True, "rgstbillid": record.rgstbillid}
 

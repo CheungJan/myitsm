@@ -87,9 +87,15 @@ def create_requisition():  # type: ignore[no-untyped-def]
 @procurement_bp.post("/requisitions/<pcplanid>/audit")
 @login_required
 def audit_requisition(pcplanid: str):  # type: ignore[no-untyped-def]
-    """审核采购需求。"""
+    """审核采购需求（支持通过/拒绝、逐行审核数量、备注）。"""
     user_cd: str = g.current_user
-    result = PurchasePlanService.audit(pcplanid, user_cd)
+    json_data = request.get_json(silent=True) or {}
+    result = PurchasePlanService.audit(
+        pcplanid, user_cd,
+        auditflg=json_data.get("auditflg", "2"),
+        checkmemo=json_data.get("checkmemo", ""),
+        details=json_data.get("details"),
+    )
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
     return success_response(data=result)
@@ -138,9 +144,15 @@ def create_order():  # type: ignore[no-untyped-def]
 @procurement_bp.post("/orders/<rgstbillid>/audit")
 @login_required
 def audit_order(rgstbillid: str):  # type: ignore[no-untyped-def]
-    """审核采购订单。"""
+    """审核采购订单（支持通过/拒绝、逐行审核数量、备注）。"""
     user_cd: str = g.current_user
-    result = PurchaseRegisterService.audit(rgstbillid, user_cd)
+    json_data = request.get_json(silent=True) or {}
+    result = PurchaseRegisterService.audit(
+        rgstbillid, user_cd,
+        auditflg=json_data.get("auditflg", "2"),
+        checkmemo=json_data.get("checkmemo", ""),
+        details=json_data.get("details"),
+    )
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
     return success_response(data=result)

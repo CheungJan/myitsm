@@ -85,11 +85,20 @@ class PurchasePlanRepository:
         return record
 
     @staticmethod
-    def audit(record: PurchasePlan, auditor: str) -> PurchasePlan:
-        record.auditflg = "1"
+    def audit(record: PurchasePlan, auditor: str, auditflg: str = "2", checkmemo: str = "") -> PurchasePlan:
+        record.auditflg = auditflg
         record.auditman = auditor
         record.auditdate = datetime.now(UTC)
+        if checkmemo:
+            record.checkmemo = checkmemo
         return record
+
+    @staticmethod
+    def update_audit_qty(pcplanid: str, lineno: int, auditqty: int) -> None:
+        db.session.query(PurchasePlanDt).filter(
+            PurchasePlanDt.pcplanid == pcplanid,
+            PurchasePlanDt.lineno == lineno,
+        ).update({"auditqty": auditqty})
 
     @staticmethod
     def get_available_qty(pcplanid: str, pclineno: int) -> float:
@@ -194,11 +203,20 @@ class PurchaseRegisterRepository:
         return record
 
     @staticmethod
-    def audit(record: PurchaseRegister, auditor: str) -> PurchaseRegister:
-        record.auditflg = "1"
+    def audit(record: PurchaseRegister, auditor: str, auditflg: str = "2", checkmemo: str = "") -> PurchaseRegister:
+        record.auditflg = auditflg
         record.auditman = auditor
         record.auditdate = datetime.now(UTC)
+        if checkmemo:
+            record.checkmemo = checkmemo
         return record
+
+    @staticmethod
+    def update_audit_qty(rgstbillid: str, lineno: int, auditqty: int) -> None:
+        db.session.query(PurchaseRegisterDt).filter(
+            PurchaseRegisterDt.rgstbillid == rgstbillid,
+            PurchaseRegisterDt.lineno == lineno,
+        ).update({"auditqty": auditqty})
 
 
 class PurchaseBillRepository:
