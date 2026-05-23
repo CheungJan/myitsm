@@ -11,6 +11,7 @@ from app.repositories.procurement_repository import (
     PurchasePlanRepository,
     PurchasePlanStatusRepository,
     PurchaseRegisterRepository,
+    RequisitionOrderLinkRepository,
     ReturnPurchaseRepository,
     SupplierAppraisalRepository,
 )
@@ -65,7 +66,7 @@ class PurchasePlanService:
     def audit(pcplanid: str, auditor: str) -> dict[str, object]:
         record = PurchasePlanRepository.get_by_id(pcplanid)
         if record is None:
-            return {"success": False, "error": "采购计划不存在"}
+            return {"success": False, "error": "采购需求不存在"}
         if record.auditflg == "1":
             return {"success": False, "error": "已审核"}
         PurchasePlanRepository.audit(record, auditor)
@@ -108,11 +109,38 @@ class PurchaseRegisterService:
         details: list[dict[str, Any]],
         creator: str,
     ) -> dict[str, Any]:
+        # 校验余额：每个明细的采购数量不能超过来源需求单的可用余额
+        for d in details:
+            ref_pcplanid = d.get("ref_pcplanid")
+            ref_pclineno = d.get("ref_pclineno")
+            rgsqty = float(d.get("rgsqty", 0))
+            if ref_pcplanid and ref_pclineno is not None:
+                available = PurchasePlanRepository.get_available_qty(
+                    str(ref_pcplanid), int(ref_pclineno)
+                )
+                if rgsqty > available:
+                    raise ValueError(
+                        f"采购数量({rgsqty})超过需求 {ref_pcplanid} "
+                        f"行 {ref_pclineno} 的可用余额({available})"
+                    )
+
         record = PurchaseRegisterRepository.create(data, creator)
-        for idx, detail_data in enumerate(details, start=1):
+        rgstbillid = record.rgstbillid
+
+        for i, d in enumerate(details, start=1):
             PurchaseRegisterRepository.add_detail(
-                rgstbillid=record.rgstbillid, lineno=idx, data=detail_data
+                rgstbillid=rgstbillid, lineno=i, data=d
             )
+
+        # 写入 TPC20 关联表
+        link_details = [
+            {**d, "rgstbillid": rgstbillid, "rgstlineno": i}
+            for i, d in enumerate(details, start=1)
+            if d.get("ref_pcplanid") and d.get("ref_pclineno") is not None
+        ]
+        if link_details:
+            RequisitionOrderLinkRepository.create_links(link_details)
+
         db.session.commit()
         return record.to_dict()
 

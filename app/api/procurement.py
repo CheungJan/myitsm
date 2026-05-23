@@ -10,6 +10,9 @@ from __future__ import annotations
 from flask import Blueprint, g, request
 
 from app.api.auth import login_required
+from app.repositories.procurement_repository import (
+    RequisitionOrderLinkRepository,
+)
 from app.schemas.procurement import (
     ProcurementQuery,
     PurchaseBillCreate,
@@ -141,6 +144,15 @@ def audit_order(rgstbillid: str):  # type: ignore[no-untyped-def]
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
     return success_response(data=result)
+
+
+@procurement_bp.get("/available-items")
+@login_required
+def list_available_items():  # type: ignore[no-untyped-def]
+    """查询可采购商品及来源需求单（用于订单录入时选择来源需求单）。"""
+    suppliercd: str | None = request.args.get("suppliercd")
+    data = RequisitionOrderLinkRepository.get_available_items(suppliercd)
+    return success_response(data=data)
 
 
 # ---- 采购结算单 ----

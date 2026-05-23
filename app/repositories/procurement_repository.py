@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from datetime import datetime as dt
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import desc
 
 from app.extensions import db
@@ -16,6 +18,7 @@ from app.models.procurement import (
     PurchasePlanStatus,
     PurchaseRegister,
     PurchaseRegisterDt,
+    RequisitionOrderLink,
     ReturnPurchaseBill,
     ReturnPurchaseBillDt,
     SupplierAppraisal,
@@ -39,6 +42,8 @@ class PurchasePlanRepository:
     def list_by_filters(
         auditflg: str | None = None,
         pctyp: str | None = None,
+        start_date: dt | None = None,
+        end_date: dt | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> tuple[list[PurchasePlan], int]:
@@ -47,6 +52,10 @@ class PurchasePlanRepository:
             query = query.filter(PurchasePlan.auditflg == auditflg)
         if pctyp:
             query = query.filter(PurchasePlan.pctyp == pctyp)
+        if start_date:
+            query = query.filter(PurchasePlan.plandate >= start_date)
+        if end_date:
+            query = query.filter(PurchasePlan.plandate <= end_date)
         query = query.order_by(desc(PurchasePlan.gendate))
         total: int = query.count()
         items: list[PurchasePlan] = query.offset((page - 1) * per_page).limit(per_page).all()
@@ -81,6 +90,17 @@ class PurchasePlanRepository:
         record.auditman = auditor
         record.auditdate = datetime.now(UTC)
         return record
+
+    @staticmethod
+    def get_available_qty(pcplanid: str, pclineno: int) -> float:
+        row = db.session.execute(
+            sa.text(
+                "SELECT available_qty FROM v_requisition_execution "
+                "WHERE pcplanid = :pid AND lineno = :lno"
+            ),
+            {"pid": pcplanid, "lno": pclineno},
+        ).fetchone()
+        return float(row.available_qty) if row else 0.0
 
 
 class PurchaseRegisterRepository:
@@ -214,6 +234,40 @@ class ReturnPurchaseRepository:
         )
         db.session.add(record)
         return record
+
+
+class RequisitionOrderLinkRepository:
+    """需求-订单关联表数据访问。"""
+
+    @staticmethod
+    def create_links(details: list[dict[str, Any]]) -> None:
+        now = datetime.now(UTC)
+        for d in details:
+            link = RequisitionOrderLink(
+                pcplanid=d["ref_pcplanid"],
+                pclineno=d["ref_pclineno"],
+                rgstbillid=d["rgstbillid"],
+                rgstlineno=d["rgstlineno"],
+                linkqty=d["rgsqty"],
+                gendate=now,
+            )
+            db.session.add(link)
+
+    @staticmethod
+    def get_available_items(suppliercd: str | None = None) -> list[dict[str, Any]]:
+        sql = sa.text(
+            "SELECT * FROM v_item_requisition_status"
+            + (
+                " WHERE itemcd IN ("
+                "SELECT itemcd FROM tip02_supplier_price WHERE supp_cd = :supp_cd"
+                ")"
+                if suppliercd
+                else ""
+            )
+        )
+        params = {"supp_cd": suppliercd} if suppliercd else {}
+        result = db.session.execute(sql, params)
+        return [dict(row._mapping) for row in result]
 
 
 class SupplierAppraisalRepository:
