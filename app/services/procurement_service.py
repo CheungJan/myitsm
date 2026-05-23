@@ -153,7 +153,7 @@ class PurchaseRegisterService:
     def audit(rgstbillid: str, auditor: str) -> dict[str, object]:
         record = PurchaseRegisterRepository.get_by_id(rgstbillid)
         if record is None:
-            return {"success": False, "error": "采购登记不存在"}
+            return {"success": False, "error": "采购订单不存在"}
         if record.auditflg == "1":
             return {"success": False, "error": "已审核"}
         PurchaseRegisterRepository.audit(record, auditor)

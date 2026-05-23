@@ -11,6 +11,7 @@
         <el-table-column prop="gendate" label="日期" width="100"/>
         <el-table-column prop="memo" label="备注" min-width="120" show-overflow-tooltip/>
         <el-table-column label="操作员" width="80"><template #default="{row}">{{ userName(row.opercd) }}</template></el-table-column>
+        <el-table-column label="操作" width="90" fixed="right"><template #default="{row}"><el-button v-if="row.auditflg==='0'" link type="warning" size="small" @click.stop="openAudit(row)">审核</el-button></template></el-table-column>
       </el-table>
       <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:12px;justify-content:flex-end"/>
     </el-card>
@@ -27,6 +28,8 @@
         </el-descriptions>
       </template>
     </el-dialog>
+
+    <el-dialog title="审核采购订单" v-model="auditing" width="400px"><template v-if="auditTarget"><p>确认审核通过订单 <b>{{ auditTarget.rgstbillid }}</b>？</p></template><template #footer><el-button @click="auditing=false">取消</el-button><el-button type="primary" @click="doAudit" :loading="auditLoading">确认审核</el-button></template></el-dialog>
 
     <el-dialog title="新建采购订单" v-model="creating" width="650px" @closed="resetForm">
       <el-form :model="form" label-width="80px" size="small">
@@ -55,12 +58,23 @@
     </el-dialog>
   </div>
 </template>
-<script setup lang="ts">import {ref,reactive,onMounted} from 'vue';import {ElMessage,ElTree} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchOrders,createOrder} from '@/api/procurement';import type {ProcRecord} from '@/api/procurement';import {fetchBomClassTree} from '@/api/master';import type {ItemClassNode} from '@/api/master'
+<script setup lang="ts">import {ref,reactive,onMounted} from 'vue';import {ElMessage,ElTree} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchOrders,createOrder} from '@/api/procurement';import type {ProcRecord} from '@/api/procurement';import {fetchBomClassTree} from '@/api/master';import type {ItemClassNode} from '@/api/master';import request from '@/api/request'
 
 const{userName}=useUserNames()
 const{dictLabel:afLabel}=useDict('AF')
 const{items,loading,page,perPage,total,load}=useListPage<ProcRecord>(fetchOrders)
 const{drawer,detail,open}=useDetailDrawer<ProcRecord>()
+
+// 审核
+const auditing=ref(false);const auditLoading=ref(false);const auditTarget=ref<ProcRecord|null>(null)
+function openAudit(row:ProcRecord){auditTarget.value=row;auditing.value=true}
+async function doAudit(){
+  auditLoading.value=true
+  try{
+    await request.post('/procurement/orders/'+auditTarget.value!.rgstbillid+'/audit')
+    ElMessage.success('审核成功');auditing.value=false;load()
+  }catch(e:any){ElMessage.error(e?.response?.data?.message||'审核失败')}finally{auditLoading.value=false}
+}
 
 // 新建 — 配件树（typflg='0' = 仅配件）
 const creating=ref(false);const saving=ref(false)
