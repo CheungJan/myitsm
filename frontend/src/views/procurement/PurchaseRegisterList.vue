@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <div class="page-header"><h2>采购订单</h2><el-button type="primary" size="small" @click="openCreate">新建订单</el-button></div>
+    <div class="page-header"><h2>采购订单</h2><div style="display:flex;gap:8px"><el-button type="warning" size="small" plain @click="quickFilter('1')">待审核</el-button><el-button type="primary" size="small" @click="openCreate">新建订单</el-button></div></div>
 
     <el-card shadow="never">
       <el-table :data="items" v-loading="loading" stripe size="small" highlight-current-row @row-click="open">
@@ -81,8 +81,10 @@
 
 const{userName}=useUserNames()
 const{dictLabel:afLabel}=useDict('AF')
-const{items,loading,page,perPage,total,load}=useListPage<ProcRecord>(fetchOrders)
+const{items,loading,page,perPage,total,load,onSearch}=useListPage<ProcRecord>(fetchOrders)
 const{drawer,detail,open}=useDetailDrawer<ProcRecord>()
+
+function quickFilter(flg:string){onSearch({auditflg:flg})}
 
 // 审核
 const auditing=ref(false);const auditLoading=ref(false);const auditTarget=ref<ProcRecord|null>(null)

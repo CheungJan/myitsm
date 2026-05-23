@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <div class="page-header"><h2>采购需求</h2><el-button type="primary" size="small" @click="openCreate">新建需求</el-button></div>
+    <div class="page-header"><h2>采购需求</h2><div style="display:flex;gap:8px"><el-button type="warning" size="small" plain @click="quickFilter('1')">待审核</el-button><el-button type="primary" size="small" @click="openCreate">新建需求</el-button></div></div>
 
     <el-card shadow="never" style="margin-bottom:16px">
       <div class="search-bar">
@@ -136,6 +136,7 @@ async function doAudit(flg:string){
 const searchPctyp=ref('');const searchAuditflg=ref('');const searchStartDate=ref('');const searchEndDate=ref('')
 function doSearch(){const p:Record<string,string>={};if(searchPctyp.value)p.pctyp=searchPctyp.value;if(searchAuditflg.value)p.auditflg=searchAuditflg.value;if(searchStartDate.value)p.start_date=searchStartDate.value;if(searchEndDate.value)p.end_date=searchEndDate.value;onSearch(p)}
 function doReset(){searchPctyp.value='';searchAuditflg.value='';searchStartDate.value='';searchEndDate.value='';onSearch({})}
+function quickFilter(flg:string){searchAuditflg.value=flg;doSearch()}
 
 // 详情
 const drawer=ref(false);const detail=ref<ProcRecord|null>(null)
