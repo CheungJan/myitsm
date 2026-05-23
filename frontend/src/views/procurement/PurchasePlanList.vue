@@ -104,7 +104,7 @@
     </el-dialog>
   </div>
 </template>
-<script setup lang="ts">import {ref,reactive,onMounted,shallowRef} from 'vue';import {ElMessage,ElTree} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchRequisitions,fetchRequisitionDetail,createRequisition,type ProcRecord} from '@/api/procurement';import {fetchBomClassTree} from '@/api/master';import type {ItemClassNode} from '@/api/master';import request from '@/api/request'
+<script setup lang="ts">import {ref,reactive,onMounted} from 'vue';import {ElMessage,ElTree} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchRequisitions,fetchRequisitionDetail,createRequisition,type ProcRecord} from '@/api/procurement';import {fetchBomClassTree} from '@/api/master';import type {ItemClassNode} from '@/api/master';import request from '@/api/request'
 
 const{userName}=useUserNames()
 const{dictMap:afMap,dictLabel:afLabel}=useDict('AF')
@@ -115,18 +115,19 @@ const{items,loading,page,perPage,total,onSearch}=useListPage<ProcRecord>(fetchRe
 // 审核
 const auditing=ref(false);const auditLoading=ref(false);const auditTarget=ref<ProcRecord|null>(null)
 const auditMemo=ref('')
-const auditQtyMap=shallowRef<Record<number,number>>({})
+const auditQtys:Record<number,number>={}  // plain object, not reactive
+const _tick=ref(0)  // version counter to force reactivity
 const auditDetailList=ref<any[]>([])
-function getAuditQty(lineno:number):number{return auditQtyMap.value[lineno]??0}
-function setAuditQty(lineno:number,val:number|null){auditQtyMap.value={...auditQtyMap.value,[lineno]:val??0}}
+function getAuditQty(lineno:number):number{void _tick.value;return auditQtys[lineno]??0}
+function setAuditQty(lineno:number,val:number|null){auditQtys[lineno]=val??0;_tick.value++}
 async function openAudit(row:ProcRecord){
-  auditTarget.value=row;auditMemo.value='';auditQtyMap.value={}
+  auditTarget.value=row;auditMemo.value=''
+  for(const k of Object.keys(auditQtys))delete auditQtys[k as any];_tick.value++
   try{const r=await fetchRequisitionDetail(row.pcplanid as string);auditTarget.value=r.data}catch{/* use row data */}
   if(auditTarget.value?.details){
     auditDetailList.value=auditTarget.value.details as any[]
-    for(const d of auditDetailList.value){
-      auditQtyMap.value={...auditQtyMap.value,[d.lineno]:d.rgstqty||0}
-    }
+    for(const d of auditDetailList.value){auditQtys[d.lineno]=d.rgstqty||0}
+    _tick.value++
   }else{auditDetailList.value=[]}
   auditing.value=true
 }
@@ -136,14 +137,15 @@ async function doSubmit(row:ProcRecord){
 async function doAudit(flg:string){
   auditLoading.value=true
   try{
-    const details=Object.entries(auditQtyMap.value).map(([lineno,auditqty])=>({lineno:Number(lineno),auditqty}))
+    const details=Object.entries(auditQtys).map(([lineno,auditqty])=>({lineno:Number(lineno),auditqty}))
     await request.post('/procurement/requisitions/'+auditTarget.value!.pcplanid+'/audit',{auditflg:flg,checkmemo:auditMemo.value,details})
     ElMessage.success(flg==='2'?'审核通过':'已退回');auditing.value=false;doSearch()
   }catch(e:any){ElMessage.error(e?.response?.data?.message||'审核失败')}finally{auditLoading.value=false}
 }
 function resetAudit(){
   auditTarget.value=null;auditMemo.value=''
-  auditQtyMap.value={};auditDetailList.value=[]
+  for(const k of Object.keys(auditQtys))delete auditQtys[k as any]
+  auditDetailList.value=[];_tick.value++
 }
 
 // 筛选条件

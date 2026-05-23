@@ -29,7 +29,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog title="审核采购订单" v-model="auditing" width="600px" @closed="auditDetails.length=0">
+    <el-dialog title="审核采购订单" v-model="auditing" width="600px" @closed="Object.keys(auditQtys).forEach(k=>delete auditQtys[k as any]);_auditTick.value++">
       <template v-if="auditTarget">
         <el-descriptions :column="2" border size="small"><el-descriptions-item label="订单号">{{ auditTarget.rgstbillid }}</el-descriptions-item><el-descriptions-item label="供应商">{{ auditTarget.suppliercd||'-' }}</el-descriptions-item></el-descriptions>
         <h4 style="margin:12px 0 8px">审核明细</h4>
@@ -84,7 +84,7 @@
     </el-dialog>
   </div>
 </template>
-<script setup lang="ts">import {ref,reactive,onMounted,shallowRef} from 'vue';import {ElMessage} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchOrders,createOrder,fetchAvailableItems} from '@/api/procurement';import type {ProcRecord} from '@/api/procurement';import {fetchSuppliers} from '@/api/master';import request from '@/api/request'
+<script setup lang="ts">import {ref,reactive,onMounted} from 'vue';import {ElMessage} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchOrders,createOrder,fetchAvailableItems} from '@/api/procurement';import type {ProcRecord} from '@/api/procurement';import {fetchSuppliers} from '@/api/master';import request from '@/api/request'
 
 const{userName}=useUserNames()
 const{dictLabel:afLabel}=useDict('AF')
@@ -96,15 +96,15 @@ function quickFilter(flg:string){onSearch({auditflg:flg})}
 // 审核
 const auditing=ref(false);const auditLoading=ref(false);const auditTarget=ref<ProcRecord|null>(null)
 const auditMemo=ref('')
-const auditQtyMap=shallowRef<Record<number,number>>({})
-function getAuditQty(lineno:number):number{return auditQtyMap.value[lineno]??0}
-function setAuditQty(lineno:number,val:number|null){auditQtyMap.value={...auditQtyMap.value,[lineno]:val??0}}
+const auditQtys:Record<number,number>={};const _auditTick=ref(0)
+function getAuditQty(lineno:number):number{void _auditTick.value;return auditQtys[lineno]??0}
+function setAuditQty(lineno:number,val:number|null){auditQtys[lineno]=val??0;_auditTick.value++}
 async function openAudit(row:ProcRecord){
-  auditTarget.value=row;auditMemo.value='';auditQtyMap.value={}
+  auditTarget.value=row;auditMemo.value=''
+  for(const k of Object.keys(auditQtys))delete auditQtys[k as any];_auditTick.value++
   if(auditTarget.value?.details){
-    for(const d of auditTarget.value.details as any[]){
-      auditQtyMap.value={...auditQtyMap.value,[d.lineno]:d.rgsqty||0}
-    }
+    for(const d of auditTarget.value.details as any[]){auditQtys[d.lineno]=d.rgstqty||0}
+    _auditTick.value++
   }
   auditing.value=true
 }
@@ -114,7 +114,7 @@ async function doSubmit(row:ProcRecord){
 async function doAudit(flg:string){
   auditLoading.value=true
   try{
-    const details=Object.entries(auditQtyMap.value).map(([lineno,auditqty])=>({lineno:Number(lineno),auditqty}))
+    const details=Object.entries(auditQtys).map(([lineno,auditqty])=>({lineno:Number(lineno),auditqty}))
     await request.post('/procurement/orders/'+auditTarget.value!.rgstbillid+'/audit',{auditflg:flg,checkmemo:auditMemo.value,details})
     ElMessage.success(flg==='2'?'审核通过':'已退回');auditing.value=false;load()
   }catch(e:any){ElMessage.error(e?.response?.data?.message||'审核失败')}finally{auditLoading.value=false}
