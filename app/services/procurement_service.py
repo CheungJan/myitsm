@@ -27,11 +27,19 @@ class PurchasePlanService:
 
     @staticmethod
     def get(pcplanid: str) -> dict[str, Any] | None:
+        from app.models.master import Item
         record = PurchasePlanRepository.get_by_id(pcplanid)
         if record is None:
             return None
         result = record.to_dict()
         details = [d.to_dict() for d in record.details]  # type: ignore[attr-defined]
+        # 补充物料名称
+        item_cds = [d["itemcd"] for d in details if d.get("itemcd")]
+        if item_cds:
+            items = db.session.query(Item.item_cd, Item.item_nm).filter(Item.item_cd.in_(item_cds)).all()
+            item_nm_map = {row.item_cd: row.item_nm for row in items}
+            for d in details:
+                d["item_nm"] = item_nm_map.get(d.get("itemcd", ""), "")
         # 补充执行跟踪数据
         exec_data = PurchasePlanRepository.get_execution_by_plan(pcplanid)
         exec_map: dict[int, dict[str, Any]] = {}

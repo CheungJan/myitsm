@@ -32,12 +32,12 @@
       <template v-if="detail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="计划号">{{ detail.pcplanid }}</el-descriptions-item>
-          <el-descriptions-item label="采购类型">{{ puLabel(detail.pctyp) }}</el-descriptions-item>
+          <el-descriptions-item label="采购类型">{{ puLabel(detail.pctyp as string) }}</el-descriptions-item>
           <el-descriptions-item label="销售单号">{{ detail.slbillid || '-' }}</el-descriptions-item>
           <el-descriptions-item label="计划日期">{{ detail.plandate || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="审批状态"><el-tag :type="detail.auditflg==='2'?'success':detail.auditflg==='1'?'warning':'info'" size="small">{{ afLabel(detail.auditflg) }}</el-tag></el-descriptions-item>
+          <el-descriptions-item label="审批状态"><el-tag :type="detail.auditflg==='2'?'success':detail.auditflg==='1'?'warning':'info'" size="small">{{ afLabel(detail.auditflg as string) }}</el-tag></el-descriptions-item>
           <el-descriptions-item label="生成时间">{{ detail.gendate || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="操作员">{{ userName(detail.opercd) }}</el-descriptions-item>
+          <el-descriptions-item label="操作员">{{ userName(detail.opercd as string) }}</el-descriptions-item>
           <el-descriptions-item label="审批人">{{ detail.auditman || '-' }}</el-descriptions-item>
           <el-descriptions-item label="审批日期">{{ detail.auditdate || '-' }}</el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ detail.memo || detail.checkmemo || '-' }}</el-descriptions-item>
@@ -56,16 +56,16 @@
       </template>
     </el-dialog>
 
-    <el-dialog title="审核采购需求" v-model="auditing" width="600px" @closed="auditDetails.length=0">
+    <el-dialog title="审核采购需求" v-model="auditing" width="600px" @closed="resetAudit">
       <template v-if="auditTarget">
-        <el-descriptions :column="2" border size="small"><el-descriptions-item label="需求单号">{{ auditTarget.pcplanid }}</el-descriptions-item><el-descriptions-item label="采购类型">{{ puLabel(auditTarget.pctyp) }}</el-descriptions-item></el-descriptions>
+        <el-descriptions :column="2" border size="small"><el-descriptions-item label="需求单号">{{ auditTarget.pcplanid }}</el-descriptions-item><el-descriptions-item label="采购类型">{{ puLabel(auditTarget.pctyp as string) }}</el-descriptions-item></el-descriptions>
         <h4 style="margin:12px 0 8px">审核明细</h4>
-        <el-table :data="auditTarget.details||[]" size="small" stripe>
+        <el-table :data="auditDetailList" size="small" stripe>
           <el-table-column prop="lineno" label="行号" width="60"/>
           <el-table-column prop="itemcd" label="物料编码" width="100"/>
           <el-table-column prop="item_nm" label="物料名称" min-width="120"/>
           <el-table-column prop="rgstqty" label="申请数量" width="80"/>
-          <el-table-column label="审核数量" width="120"><template #default="{row}"><el-input-number v-model="auditQtyMap[row.lineno]" :min="0" :max="row.rgstqty||0" size="small" style="width:100px"/></template></el-table-column>
+          <el-table-column label="审核数量" width="120"><template #default="{row}"><el-input-number :model-value="getAuditQty(row.lineno)" @update:model-value="(v:number|null)=>setAuditQty(row.lineno,v)" :min="0" :max="row.rgstqty||0" size="small" style="width:100px"/></template></el-table-column>
         </el-table>
         <el-input v-model="auditMemo" type="textarea" :rows="2" placeholder="审核备注" style="margin-top:12px"/>
       </template>
@@ -92,8 +92,8 @@
             <el-table v-if="formDetails.length>0" :data="formDetails" size="small" style="margin-top:8px">
               <el-table-column prop="itemcd" label="物料编码" width="100"/>
               <el-table-column prop="itemnm" label="物料名称" min-width="120"/>
-              <el-table-column label="数量" width="100"><template #default="{row,$index}"><el-input-number v-model="formDetails[$index].rgstqty" :min="1" size="small" style="width:80px"/></template></el-table-column>
-              <el-table-column label="用途" width="110"><template #default="{row,$index}"><el-select v-model="formDetails[$index].item_usage" size="small" style="width:100px"><el-option label="销售备货" value="sale"/><el-option label="维护消耗" value="maintenance"/><el-option label="内部使用" value="internal"/></el-select></template></el-table-column>
+              <el-table-column label="数量" width="100"><template #default="{$index}"><el-input-number v-model="formDetails[$index].rgstqty" :min="1" size="small" style="width:80px"/></template></el-table-column>
+              <el-table-column label="用途" width="110"><template #default="{$index}"><el-select v-model="formDetails[$index].item_usage" size="small" style="width:100px"><el-option label="销售备货" value="sale"/><el-option label="维护消耗" value="maintenance"/><el-option label="内部使用" value="internal"/></el-select></template></el-table-column>
               <el-table-column prop="units" label="单位" width="60"/>
               <el-table-column label="操作" width="60"><template #default="{$index}"><el-button link type="danger" size="small" @click="formDetails.splice($index,1)">删除</el-button></template></el-table-column>
             </el-table>
@@ -104,7 +104,7 @@
     </el-dialog>
   </div>
 </template>
-<script setup lang="ts">import {ref,reactive,onMounted} from 'vue';import {ElMessage,ElTree} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchRequisitions,fetchRequisitionDetail,createRequisition,type ProcRecord} from '@/api/procurement';import {fetchBomClassTree} from '@/api/master';import type {ItemClassNode} from '@/api/master';import request from '@/api/request'
+<script setup lang="ts">import {ref,reactive,onMounted,shallowRef} from 'vue';import {ElMessage,ElTree} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchRequisitions,fetchRequisitionDetail,createRequisition,type ProcRecord} from '@/api/procurement';import {fetchBomClassTree} from '@/api/master';import type {ItemClassNode} from '@/api/master';import request from '@/api/request'
 
 const{userName}=useUserNames()
 const{dictMap:afMap,dictLabel:afLabel}=useDict('AF')
@@ -115,17 +115,19 @@ const{items,loading,page,perPage,total,onSearch}=useListPage<ProcRecord>(fetchRe
 // 审核
 const auditing=ref(false);const auditLoading=ref(false);const auditTarget=ref<ProcRecord|null>(null)
 const auditMemo=ref('')
-const auditQtyMap=reactive<Record<number,number>>({})
+const auditQtyMap=shallowRef<Record<number,number>>({})
+const auditDetailList=ref<any[]>([])
+function getAuditQty(lineno:number):number{return auditQtyMap.value[lineno]??0}
+function setAuditQty(lineno:number,val:number|null){auditQtyMap.value={...auditQtyMap.value,[lineno]:val??0}}
 async function openAudit(row:ProcRecord){
-  auditTarget.value=row;auditMemo.value=''
-  // 清空旧的审核数量
-  for(const k of Object.keys(auditQtyMap))delete auditQtyMap[k as any]
+  auditTarget.value=row;auditMemo.value='';auditQtyMap.value={}
   try{const r=await fetchRequisitionDetail(row.pcplanid as string);auditTarget.value=r.data}catch{/* use row data */}
   if(auditTarget.value?.details){
-    for(const d of auditTarget.value.details as any[]){
-      auditQtyMap[Number(d.lineno)]=d.rgstqty||0
+    auditDetailList.value=auditTarget.value.details as any[]
+    for(const d of auditDetailList.value){
+      auditQtyMap.value={...auditQtyMap.value,[d.lineno]:d.rgstqty||0}
     }
-  }
+  }else{auditDetailList.value=[]}
   auditing.value=true
 }
 async function doSubmit(row:ProcRecord){
@@ -134,10 +136,14 @@ async function doSubmit(row:ProcRecord){
 async function doAudit(flg:string){
   auditLoading.value=true
   try{
-    const details=Object.entries(auditQtyMap).map(([lineno,auditqty])=>({lineno:Number(lineno),auditqty}))
+    const details=Object.entries(auditQtyMap.value).map(([lineno,auditqty])=>({lineno:Number(lineno),auditqty}))
     await request.post('/procurement/requisitions/'+auditTarget.value!.pcplanid+'/audit',{auditflg:flg,checkmemo:auditMemo.value,details})
     ElMessage.success(flg==='2'?'审核通过':'已退回');auditing.value=false;doSearch()
   }catch(e:any){ElMessage.error(e?.response?.data?.message||'审核失败')}finally{auditLoading.value=false}
+}
+function resetAudit(){
+  auditTarget.value=null;auditMemo.value=''
+  auditQtyMap.value={};auditDetailList.value=[]
 }
 
 // 筛选条件
@@ -160,7 +166,7 @@ const itemSearch=ref('')
 
 onMounted(async()=>{try{const r=await fetchBomClassTree('0');partTree.value=r.data||[]}catch{}})
 
-function filterNode(value:string,data:ItemClassNode){if(!value)return true;return (data.class_nm||'').toLowerCase().includes(value.toLowerCase())}
+function filterNode(value:string,data:any){if(!value)return true;return (data.class_nm||'').toLowerCase().includes(value.toLowerCase())}
 function filterTree(){if(treeRef.value)(treeRef.value as any).filter(itemSearch.value)}
 
 function addSelectedItems(){
