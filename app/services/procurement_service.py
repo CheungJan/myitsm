@@ -31,7 +31,21 @@ class PurchasePlanService:
         if record is None:
             return None
         result = record.to_dict()
-        result["details"] = [d.to_dict() for d in record.details]  # type: ignore[attr-defined]
+        details = [d.to_dict() for d in record.details]  # type: ignore[attr-defined]
+        # 补充执行跟踪数据
+        exec_data = PurchasePlanRepository.get_execution_by_plan(pcplanid)
+        exec_map: dict[int, dict[str, Any]] = {}
+        for row in exec_data:
+            exec_map[int(row["lineno"])] = row
+        for d in details:
+            lineno = int(d.get("lineno", 0))
+            if lineno in exec_map:
+                d["ordered_qty"] = str(exec_map[lineno].get("ordered_qty", 0))
+                d["received_qty"] = str(exec_map[lineno].get("received_qty", 0))
+                d["available_qty"] = str(exec_map[lineno].get("available_qty", 0))
+                d["execution_status"] = exec_map[lineno].get("execution_status", "")
+                d["execution_rate"] = str(exec_map[lineno].get("execution_rate", 0))
+        result["details"] = details
         return result
 
     @staticmethod

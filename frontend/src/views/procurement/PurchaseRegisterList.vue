@@ -57,17 +57,24 @@
         <el-form-item label="备注"><el-input v-model="form.memo" type="textarea" :rows="2"/></el-form-item>
         <el-form-item label="采购明细">
           <div style="width:100%">
-            <div style="margin-bottom:8px;display:flex;gap:8px">
-              <el-input v-model="itemSearch" size="small" placeholder="搜索配件..." style="width:200px" clearable @input="filterTree"/>
-              <el-button size="small" @click="addSelectedItems">添加选中配件</el-button>
-            </div>
-            <el-tree ref="treeRef" :data="partTree" node-key="class_cd" show-checkbox check-strictly :filter-node-method="filterNode" :props="{label:'class_nm',children:'children'}" style="max-height:200px;overflow:auto;border:1px solid #dcdfe6;border-radius:4px;padding:8px"/>
-            <el-table v-if="formDetails.length>0" :data="formDetails" size="small" style="margin-top:8px">
-              <el-table-column prop="itemcd" label="物料编码" width="100"/>
+            <el-alert v-if="!form.suppliercd" title="请先选择供应商" type="info" :closable="false" show-icon style="margin-bottom:8px"/>
+            <el-button v-else size="small" @click="loadAvailableItems" :loading="availLoading" style="margin-bottom:8px">加载可采购商品</el-button>
+            <el-table v-if="availItems.length>0" :data="availItems" size="small" max-height="300" @selection-change="onAvailSelect" style="margin-bottom:8px">
+              <el-table-column type="selection" width="40"/>
+              <el-table-column prop="itemcd" label="物料编码" width="90"/>
               <el-table-column prop="itemnm" label="物料名称" min-width="100"/>
-              <el-table-column label="数量" width="100"><template #default="{row,$index}"><el-input-number v-model="formDetails[$index].rgsqty" :min="1" size="small" style="width:80px"/></template></el-table-column>
-              <el-table-column label="单价" width="100"><template #default="{row,$index}"><el-input-number v-model="formDetails[$index].rgstprice" :min="0" :precision="2" size="small" style="width:90px"/></template></el-table-column>
-              <el-table-column prop="units" label="单位" width="60"/>
+              <el-table-column prop="available_for_order" label="可购余额" width="80"/>
+              <el-table-column label="采购数量" width="100"><template #default="{row}"><el-input-number v-model="row._qty" :min="0" :max="Number(row.available_for_order)||0" size="small" style="width:80px"/></template></el-table-column>
+              <el-table-column label="单价" width="90"><template #default="{row}"><el-input-number v-model="row._price" :min="0" :precision="2" size="small" style="width:80px"/></template></el-table-column>
+              <el-table-column prop="wunit" label="单位" width="60"/>
+            </el-table>
+            <el-button v-if="availItems.length>0" size="small" type="primary" @click="addAvailItems" style="margin-bottom:8px">添加到订单</el-button>
+            <el-table v-if="formDetails.length>0" :data="formDetails" size="small" style="margin-top:8px">
+              <el-table-column prop="itemcd" label="物料编码" width="90"/>
+              <el-table-column prop="itemnm" label="物料名称" min-width="100"/>
+              <el-table-column prop="ref_pcplanid" label="来源需求" width="90"/>
+              <el-table-column prop="rgsqty" label="数量" width="60"/>
+              <el-table-column prop="rgstprice" label="单价" width="70"/>
               <el-table-column label="操作" width="60"><template #default="{$index}"><el-button link type="danger" size="small" @click="formDetails.splice($index,1)">删除</el-button></template></el-table-column>
             </el-table>
           </div>
@@ -77,7 +84,7 @@
     </el-dialog>
   </div>
 </template>
-<script setup lang="ts">import {ref,reactive,onMounted} from 'vue';import {ElMessage,ElTree} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchOrders,createOrder} from '@/api/procurement';import type {ProcRecord} from '@/api/procurement';import {fetchBomClassTree,fetchSuppliers} from '@/api/master';import type {ItemClassNode} from '@/api/master';import request from '@/api/request'
+<script setup lang="ts">import {ref,reactive,onMounted} from 'vue';import {ElMessage} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchOrders,createOrder,fetchAvailableItems} from '@/api/procurement';import type {ProcRecord} from '@/api/procurement';import {fetchSuppliers} from '@/api/master';import request from '@/api/request'
 
 const{userName}=useUserNames()
 const{dictLabel:afLabel}=useDict('AF')
@@ -112,40 +119,50 @@ async function doAudit(flg:string){
   }catch(e:any){ElMessage.error(e?.response?.data?.message||'审核失败')}finally{auditLoading.value=false}
 }
 
-// 新建 — 配件树（typflg='0' = 仅配件）
+// 新建 — 从可用商品选择（关联来源需求单）
 const creating=ref(false);const saving=ref(false)
 const form=reactive({suppliercd:'',pcrep:'',rgstdate:'',memo:''})
-const formDetails=reactive<{itemcd:string;itemnm:string;rgsqty:number;rgstprice:number;units:string}[]>([])
-const partTree=ref<ItemClassNode[]>([])
-const treeRef=ref<InstanceType<typeof ElTree>>()
-const itemSearch=ref('')
+const formDetails=reactive<{itemcd:string;itemnm:string;rgsqty:number;rgstprice:number;units:string;ref_pcplanid:string;ref_pclineno:number}[]>([])
+const availItems=ref<Record<string,any>[]>([])
+const availLoading=ref(false)
 const suppliers=ref<{supp_cd:string;supp_nm:string}[]>([])
 
 onMounted(async()=>{
-  try{const r=await fetchBomClassTree('0');partTree.value=r.data||[]}catch{}
   try{const r=await fetchSuppliers();suppliers.value=r.data||[]}catch{}
 })
 
-function filterNode(value:string,data:ItemClassNode){if(!value)return true;return (data.class_nm||'').toLowerCase().includes(value.toLowerCase())}
-function filterTree(){if(treeRef.value)(treeRef.value as any).filter(itemSearch.value)}
+async function loadAvailableItems(){
+  availLoading.value=true
+  try{
+    const r=await fetchAvailableItems({suppliercd:form.suppliercd})
+    const items=(r.data||[]) as any[]
+    for(const it of items){it._qty=0;it._price=0}
+    availItems.value=items
+  }catch{ElMessage.error('加载可采购商品失败')}finally{availLoading.value=false}
+}
 
-function addSelectedItems(){
-  const nodes=(treeRef.value as any)?.getCheckedNodes(false)||[]
-  for(const node of nodes){
-    if(!node.children||node.children.length===0){
-      if(!formDetails.find(d=>d.itemcd===node.class_cd)){
-        formDetails.push({itemcd:node.class_cd,itemnm:node.class_nm,rgsqty:1,rgstprice:0,units:''})
-      }
+function onAvailSelect(rows:any[]){/* 由checkbox自动处理 */}
+
+function addAvailItems(){
+  for(const it of availItems.value){
+    if(it._qty>0){
+      const pd=JSON.parse((it.plan_details||'[{}]')[0])||{}
+      formDetails.push({
+        itemcd:it.itemcd,itemnm:it.itemnm,
+        rgsqty:it._qty,rgstprice:it._price||0,
+        units:it.wunit||'',
+        ref_pcplanid:pd.pcplanid||'',ref_pclineno:pd.pclineno||0
+      })
     }
   }
 }
 
 function openCreate(){creating.value=true}
-function resetForm(){form.suppliercd='';form.pcrep='';form.rgstdate='';form.memo='';formDetails.length=0}
+function resetForm(){form.suppliercd='';form.pcrep='';form.rgstdate='';form.memo='';formDetails.length=0;availItems.value=[]}
 async function doCreate(){
   saving.value=true
   try{
-    await createOrder({...form,details:formDetails.map(d=>({itemcd:d.itemcd,rgsqty:d.rgsqty,rgstprice:d.rgstprice,units:d.units}))})
+    await createOrder({...form,details:formDetails.map(d=>({itemcd:d.itemcd,rgsqty:d.rgsqty,rgstprice:d.rgstprice,units:d.units,ref_pcplanid:d.ref_pcplanid,ref_pclineno:d.ref_pclineno}))})
     ElMessage.success('创建成功');creating.value=false;load()
   }catch(e:any){ElMessage.error(e?.response?.data?.message||'创建失败')}finally{saving.value=false}
 }

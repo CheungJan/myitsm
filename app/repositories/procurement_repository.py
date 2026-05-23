@@ -112,6 +112,14 @@ class PurchasePlanRepository:
         return float(row.available_qty) if row else 0.0
 
     @staticmethod
+    def get_execution_by_plan(pcplanid: str) -> list[dict[str, Any]]:
+        rows = db.session.execute(sa.text(
+            "SELECT lineno, ordered_qty, received_qty, available_qty, execution_status, execution_rate "
+            "FROM v_requisition_execution WHERE pcplanid = :pid"
+        ), {"pid": pcplanid}).fetchall()
+        return [dict(r._mapping) for r in rows]
+
+    @staticmethod
     def dashboard_stats() -> dict[str, Any]:
         stats = db.session.execute(sa.text("""
             SELECT

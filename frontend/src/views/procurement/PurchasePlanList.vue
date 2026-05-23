@@ -42,14 +42,16 @@
           <el-descriptions-item label="审批日期">{{ detail.auditdate || '-' }}</el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ detail.memo || detail.checkmemo || '-' }}</el-descriptions-item>
         </el-descriptions>
-        <h4 style="margin:16px 0 8px">采购明细</h4>
+        <h4 style="margin:16px 0 8px">采购明细及执行跟踪</h4>
         <el-table :data="detail.details||[]" size="small" stripe>
           <el-table-column prop="itemcd" label="物料编码" width="100"/>
-          <el-table-column prop="item_nm" label="物料名称" min-width="140"/>
-          <el-table-column prop="rgstqty" label="登记数量" width="80"/>
-          <el-table-column prop="units" label="单位" width="60"/>
-          <el-table-column prop="storeqty" label="库存量" width="80"/>
-          <el-table-column prop="auditqty" label="审核数量" width="80"/>
+          <el-table-column prop="item_nm" label="物料名称" min-width="120"/>
+          <el-table-column prop="rgstqty" label="计划数量" width="70"/>
+          <el-table-column prop="auditqty" label="审核数量" width="70"/>
+          <el-table-column label="已下单" width="70"><template #default="{row}">{{ row.ordered_qty||0 }}</template></el-table-column>
+          <el-table-column label="已入库" width="70"><template #default="{row}">{{ row.received_qty||0 }}</template></el-table-column>
+          <el-table-column label="可用余额" width="80"><template #default="{row}">{{ row.available_qty||0 }}</template></el-table-column>
+          <el-table-column label="执行状态" width="80"><template #default="{row}"><el-tag :type="row.execution_status==='已完成'?'success':row.execution_status==='未开始'?'info':'warning'" size="small">{{ row.execution_status||'未开始' }}</el-tag></template></el-table-column>
         </el-table>
       </template>
     </el-dialog>
@@ -121,7 +123,7 @@ async function openAudit(row:ProcRecord){
   try{const r=await fetchRequisitionDetail(row.pcplanid as string);auditTarget.value=r.data}catch{/* use row data */}
   if(auditTarget.value?.details){
     for(const d of auditTarget.value.details as any[]){
-      auditQtyMap[d.lineno]=d.rgstqty||0
+      auditQtyMap[Number(d.lineno)]=d.rgstqty||0
     }
   }
   auditing.value=true
