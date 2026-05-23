@@ -109,16 +109,16 @@ const router = createRouter({
                     path: 'procurement/suppliers', name: 'SupplierList', component: () => import('@/views/procurement/SupplierList.vue'), meta: { title: '供应商管理' }
                 },
                 {
-                    path: 'procurement/plans',
-                    name: 'PurchasePlanList',
+                    path: 'procurement/requisitions',
+                    name: 'RequisitionList',
                     component: () => import('@/views/procurement/PurchasePlanList.vue'),
-                    meta: { title: '采购计划' }
+                    meta: { title: '采购需求' }
                 },
                 {
-                    path: 'procurement/registers',
-                    name: 'PurchaseRegisterList',
+                    path: 'procurement/orders',
+                    name: 'OrderList',
                     component: () => import('@/views/procurement/PurchaseRegisterList.vue'),
-                    meta: { title: '采购登记' }
+                    meta: { title: '采购订单' }
                 },
                 {
                     path: 'itsm/renovate', name: 'RenovateList', component: () => import('@/views/itsm/RenovateList.vue'), meta: { title: '旧机翻新' }
@@ -130,7 +130,7 @@ const router = createRouter({
                     path: 'itsm/store-close', name: 'StoreCloseList', component: () => import('@/views/itsm/StoreCloseList.vue'), meta: { title: '门店关闭' }
                 },
                 {
-                    path: 'procurement/bills', name: 'PurchaseBillList', component: () => import('@/views/procurement/PurchaseBillList.vue'), meta: { title: '采购单据' }
+                    path: 'procurement/settlements', name: 'SettlementList', component: () => import('@/views/procurement/PurchaseBillList.vue'), meta: { title: '采购结算单' }
                 },
                 {
                     path: 'sales/bills', name: 'SalesBillList', component: () => import('@/views/sales/SalesBillList.vue'), meta: { title: '销售单据' }

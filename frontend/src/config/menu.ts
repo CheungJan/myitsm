@@ -50,9 +50,9 @@ export const FRONTEND_MENUS: MenuConfig[] = [
     {
         menu_cd: 'procurement', menu_nm: '采购管理',
         children: [
-            { menu_cd: 'proc-plans', menu_nm: '采购计划', path: '/procurement/plans' },
-            { menu_cd: 'proc-registers', menu_nm: '采购登记', path: '/procurement/registers' },
-            { menu_cd: 'proc-bills', menu_nm: '采购单据', path: '/procurement/bills' },
+            { menu_cd: 'proc-requisitions', menu_nm: '采购需求', path: '/procurement/requisitions' },
+            { menu_cd: 'proc-orders', menu_nm: '采购订单', path: '/procurement/orders' },
+            { menu_cd: 'proc-settlements', menu_nm: '采购结算单', path: '/procurement/settlements' },
             { menu_cd: 'suppliers', menu_nm: '供应商管理', path: '/procurement/suppliers' },
             { menu_cd: 'appraisals', menu_nm: '供应商评价', path: '/procurement/appraisals' },
             { menu_cd: 'proc-returns', menu_nm: '采购退货', path: '/procurement/returns' }
