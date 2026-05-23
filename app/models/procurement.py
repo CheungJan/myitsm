@@ -28,7 +28,7 @@ class PurchasePlan(BaseModel):
 
     pcplanid = db.Column(db.String(8), primary_key=True, comment="采购计划号")
     slbillid = db.Column(db.String(8), comment="关联销售单号")
-    pctyp = db.Column(db.String(1), comment="采购类型")
+    pctyp = db.Column(db.String(2), comment="采购类型")
     ptimes = db.Column(db.Integer, comment="打印次数")
     opercd = db.Column(db.String(6), comment="操作员")
     memo = db.Column(db.String(255), comment="备注")
@@ -134,6 +134,8 @@ class PurchaseRegisterDt(BaseModel):
     deliverdate = db.Column(db.DateTime, comment="交付日期")
     inqty = db.Column(db.Integer, default=0, comment="已入库数量")
     auditqty = db.Column(db.Integer, default=0, comment="审批数量")
+    ref_pcplanid = db.Column(db.String(20), comment="来源需求单号")
+    ref_pclineno = db.Column(db.Integer, comment="来源需求行号")
 
     register = db.relationship("PurchaseRegister", back_populates="details")
 
@@ -255,6 +257,38 @@ class SupplierAppraisalDt(BaseModel):
     appflg = db.Column(db.String(1), comment="评价标志")
 
     appraisal = db.relationship("SupplierAppraisal", back_populates="details")
+
+
+# ---------------------------------------------------------------------------
+# 采购需求与订单关联（TPC20_REQUISITION_ORDER_LINK）
+# ---------------------------------------------------------------------------
+
+
+class RequisitionOrderLink(BaseModel):
+    """采购需求与采购订单关联表（TPC20_REQUISITION_ORDER_LINK）。"""
+
+    __tablename__ = "tpc20_requisition_order_link"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    pcplanid = db.Column(db.String(20), nullable=False, comment="来源需求单号")
+    pclineno = db.Column(db.Integer, nullable=False, comment="来源需求行号")
+    rgstbillid = db.Column(db.String(20), nullable=False, comment="采购订单号")
+    rgstlineno = db.Column(db.Integer, nullable=False, comment="订单行号")
+    linkqty = db.Column(db.Numeric(12, 2), default=0, comment="关联数量")
+    linkstatus = db.Column(
+        db.String(20), default="ordered",
+        comment="关联状态: ordered/partial_in/completed/cancelled"
+    )
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    opercd = db.Column(db.String(20), comment="操作员")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "pcplanid", "pclineno", "rgstbillid", "rgstlineno",
+            name="uk_link_unique"
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
