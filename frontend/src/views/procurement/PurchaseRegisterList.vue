@@ -38,7 +38,7 @@
           <el-table-column prop="itemcd" label="物料编码" width="100"/>
           <el-table-column prop="item_nm" label="物料名称" min-width="120"/>
           <el-table-column prop="rgsqty" label="采购数量" width="80"/>
-          <el-table-column label="审核数量" width="120"><template #default="{row}"><el-input-number v-model="auditQtyMap[row.lineno]" :min="0" :max="row.rgsqty||0" size="small" style="width:100px"/></template></el-table-column>
+          <el-table-column label="审核数量" width="120"><template #default="{row}"><el-input-number v-model="row._auditQty" :min="0" :max="row.rgsqty||0" size="small" style="width:100px"/></template></el-table-column>
         </el-table>
         <el-input v-model="auditMemo" type="textarea" :rows="2" placeholder="审核备注" style="margin-top:12px"/>
       </template>
@@ -88,11 +88,11 @@ function quickFilter(flg:string){onSearch({auditflg:flg})}
 
 // 审核
 const auditing=ref(false);const auditLoading=ref(false);const auditTarget=ref<ProcRecord|null>(null)
-const auditMemo=ref('');const auditQtyMap=ref<Record<number,number>>({})
+const auditMemo=ref('')
 async function openAudit(row:ProcRecord){
-  auditTarget.value=row;auditMemo.value='';auditQtyMap.value={}
+  auditTarget.value=row;auditMemo.value=''
   if(auditTarget.value?.details){
-    for(const d of auditTarget.value.details as any[]){auditQtyMap.value[d.lineno]=d.rgsqty||0}
+    for(const d of auditTarget.value.details as any[]){d._auditQty=d.rgsqty||0}
   }
   auditing.value=true
 }
@@ -102,7 +102,7 @@ async function doSubmit(row:ProcRecord){
 async function doAudit(flg:string){
   auditLoading.value=true
   try{
-    const details=Object.entries(auditQtyMap.value).map(([lineno,auditqty])=>({lineno:Number(lineno),auditqty}))
+    const details=(auditTarget.value?.details as any[]||[]).map((d:any)=>({lineno:d.lineno,auditqty:d._auditQty||0}))
     await request.post('/procurement/orders/'+auditTarget.value!.rgstbillid+'/audit',{auditflg:flg,checkmemo:auditMemo.value,details})
     ElMessage.success(flg==='2'?'审核通过':'已退回');auditing.value=false;load()
   }catch(e:any){ElMessage.error(e?.response?.data?.message||'审核失败')}finally{auditLoading.value=false}
