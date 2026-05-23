@@ -19,8 +19,8 @@
         <el-table-column label="采购类型" width="80"><template #default="{row}">{{ puLabel(row.pctyp) }}</template></el-table-column>
         <el-table-column prop="slbillid" label="销售单号" width="110"/>
         <el-table-column label="审批状态" width="80"><template #default="{row}"><el-tag :type="row.auditflg==='2'?'success':row.auditflg==='1'?'warning':'info'" size="small">{{ afLabel(row.auditflg) }}</el-tag></template></el-table-column>
-        <el-table-column label="生成时间" width="160"><template #default="{row}">{{ formatDateTime(row.gendate) }}</template></el-table-column>
-        <el-table-column label="计划日期" width="160"><template #default="{row}">{{ formatDateTime(row.plandate) || '-' }}</template></el-table-column>
+        <el-table-column label="生成时间" width="100"><template #default="{row}">{{ row.gendate || '-' }}</template></el-table-column>
+        <el-table-column label="计划日期" width="100"><template #default="{row}">{{ row.plandate || '-' }}</template></el-table-column>
         <el-table-column label="操作员" width="80"><template #default="{row}">{{ userName(row.opercd) }}</template></el-table-column>
         <el-table-column prop="memo" label="备注" min-width="120" show-overflow-tooltip/>
       </el-table>
@@ -33,12 +33,12 @@
           <el-descriptions-item label="计划号">{{ detail.pcplanid }}</el-descriptions-item>
           <el-descriptions-item label="采购类型">{{ puLabel(detail.pctyp) }}</el-descriptions-item>
           <el-descriptions-item label="销售单号">{{ detail.slbillid || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="计划日期">{{ formatDateTime(detail.plandate) || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="计划日期">{{ detail.plandate || '-' }}</el-descriptions-item>
           <el-descriptions-item label="审批状态"><el-tag :type="detail.auditflg==='2'?'success':detail.auditflg==='1'?'warning':'info'" size="small">{{ afLabel(detail.auditflg) }}</el-tag></el-descriptions-item>
-          <el-descriptions-item label="生成时间">{{ formatDateTime(detail.gendate) }}</el-descriptions-item>
+          <el-descriptions-item label="生成时间">{{ detail.gendate || '-' }}</el-descriptions-item>
           <el-descriptions-item label="操作员">{{ userName(detail.opercd) }}</el-descriptions-item>
           <el-descriptions-item label="审批人">{{ detail.auditman || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="审批日期">{{ formatDateTime(detail.auditdate) }}</el-descriptions-item>
+          <el-descriptions-item label="审批日期">{{ detail.auditdate || '-' }}</el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ detail.memo || detail.checkmemo || '-' }}</el-descriptions-item>
         </el-descriptions>
         <h4 style="margin:16px 0 8px">采购明细</h4>
@@ -53,18 +53,34 @@
       </template>
     </el-dialog>
 
-    <el-dialog title="新建采购需求" v-model="creating" width="500px" @closed="resetForm">
+    <el-dialog title="新建采购需求" v-model="creating" width="650px" @closed="resetForm">
       <el-form :model="form" label-width="80px" size="small">
         <el-form-item label="采购类型"><el-select v-model="form.pctyp" style="width:100%"><el-option v-for="(nm,cd) in puMap" :key="cd" :label="nm" :value="cd"/></el-select></el-form-item>
         <el-form-item label="销售单号"><el-input v-model="form.slbillid"/></el-form-item>
         <el-form-item label="计划日期"><el-date-picker v-model="form.plandate" type="date" style="width:100%" value-format="YYYY-MM-DD"/></el-form-item>
         <el-form-item label="备注"><el-input v-model="form.memo" type="textarea" :rows="2"/></el-form-item>
+        <el-form-item label="采购明细">
+          <div style="width:100%">
+            <div style="margin-bottom:8px;display:flex;gap:8px">
+              <el-input v-model="itemSearch" size="small" placeholder="搜索配件..." style="width:200px" clearable @input="filterTree"/>
+              <el-button size="small" @click="addSelectedItems">添加选中配件</el-button>
+            </div>
+            <el-tree ref="treeRef" :data="partTree" node-key="class_cd" show-checkbox check-strictly :filter-node-method="filterNode" :props="{label:'class_nm',children:'children'}" style="max-height:200px;overflow:auto;border:1px solid #dcdfe6;border-radius:4px;padding:8px"/>
+            <el-table v-if="formDetails.length>0" :data="formDetails" size="small" style="margin-top:8px">
+              <el-table-column prop="itemcd" label="物料编码" width="100"/>
+              <el-table-column prop="itemnm" label="物料名称" min-width="120"/>
+              <el-table-column label="数量" width="120"><template #default="{row,$index}"><el-input-number v-model="formDetails[$index].rgstqty" :min="1" size="small" style="width:100px"/></template></el-table-column>
+              <el-table-column prop="units" label="单位" width="60"/>
+              <el-table-column label="操作" width="60"><template #default="{$index}"><el-button link type="danger" size="small" @click="formDetails.splice($index,1)">删除</el-button></template></el-table-column>
+            </el-table>
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer><el-button @click="creating=false">取消</el-button><el-button type="primary" @click="doCreate" :loading="saving">创建</el-button></template>
     </el-dialog>
   </div>
 </template>
-<script setup lang="ts">import {ref,reactive} from 'vue';import {ElMessage} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchRequisitions,fetchRequisitionDetail,createRequisition,type ProcRecord} from '@/api/procurement'
+<script setup lang="ts">import {ref,reactive,onMounted} from 'vue';import {ElMessage,ElTree} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchRequisitions,fetchRequisitionDetail,createRequisition,type ProcRecord} from '@/api/procurement';import {fetchBomClassTree} from '@/api/master';import type {ItemClassNode} from '@/api/master'
 
 const{userName}=useUserNames()
 const{dictMap:afMap,dictLabel:afLabel}=useDict('AF')
@@ -72,44 +88,48 @@ const{dictMap:puMap,dictLabel:puLabel}=useDict('PU')
 
 const{items,loading,page,perPage,total,onSearch}=useListPage<ProcRecord>(fetchRequisitions)
 
-// 格式化日期时间
-function formatDateTime(dateStr:any){
-  if(!dateStr)return'-'
-  return String(dateStr).replace('T',' ')
-}
-
 // 筛选条件
-const searchPctyp=ref('')
-const searchAuditflg=ref('')
-const searchStartDate=ref('')
-const searchEndDate=ref('')
-
-function doSearch(){
-  const p:Record<string,string>={}
-  if(searchPctyp.value)p.pctyp=searchPctyp.value
-  if(searchAuditflg.value)p.auditflg=searchAuditflg.value
-  if(searchStartDate.value)p.start_date=searchStartDate.value
-  if(searchEndDate.value)p.end_date=searchEndDate.value
-  onSearch(p)
-}
-function doReset(){
-  searchPctyp.value=''
-  searchAuditflg.value=''
-  searchStartDate.value=''
-  searchEndDate.value=''
-  onSearch({})
-}
+const searchPctyp=ref('');const searchAuditflg=ref('');const searchStartDate=ref('');const searchEndDate=ref('')
+function doSearch(){const p:Record<string,string>={};if(searchPctyp.value)p.pctyp=searchPctyp.value;if(searchAuditflg.value)p.auditflg=searchAuditflg.value;if(searchStartDate.value)p.start_date=searchStartDate.value;if(searchEndDate.value)p.end_date=searchEndDate.value;onSearch(p)}
+function doReset(){searchPctyp.value='';searchAuditflg.value='';searchStartDate.value='';searchEndDate.value='';onSearch({})}
 
 // 详情
 const drawer=ref(false);const detail=ref<ProcRecord|null>(null)
 async function openDetail(row:ProcRecord){drawer.value=true;try{const r=await fetchRequisitionDetail(row.pcplanid as string);detail.value=r.data}catch{detail.value=row}}
 
-// 新建
+// 新建 — 配件树（typflg='0' = 仅配件）
 const creating=ref(false);const saving=ref(false)
 const form=reactive({pctyp:'10',slbillid:'',plandate:'',memo:''})
+const formDetails=reactive<{itemcd:string;itemnm:string;rgstqty:number;units:string}[]>([])
+const partTree=ref<ItemClassNode[]>([])
+const treeRef=ref<InstanceType<typeof ElTree>>()
+const itemSearch=ref('')
+
+onMounted(async()=>{try{const r=await fetchBomClassTree('0');partTree.value=r.data||[]}catch{}})
+
+function filterNode(value:string,data:ItemClassNode){if(!value)return true;return (data.class_nm||'').toLowerCase().includes(value.toLowerCase())}
+function filterTree(){if(treeRef.value)(treeRef.value as any).filter(itemSearch.value)}
+
+function addSelectedItems(){
+  const nodes=(treeRef.value as any)?.getCheckedNodes(false)||[]
+  for(const node of nodes){
+    if(!node.children||node.children.length===0){
+      if(!formDetails.find(d=>d.itemcd===node.class_cd)){
+        formDetails.push({itemcd:node.class_cd,itemnm:node.class_nm,rgstqty:1,units:''})
+      }
+    }
+  }
+}
+
 function openCreate(){creating.value=true}
-function resetForm(){form.pctyp='10';form.slbillid='';form.plandate='';form.memo=''}
-async function doCreate(){saving.value=true;try{await createRequisition({...form});ElMessage.success('创建成功');creating.value=false;doSearch()}catch(e:any){ElMessage.error(e?.response?.data?.message||'创建失败')}finally{saving.value=false}}
+function resetForm(){form.pctyp='10';form.slbillid='';form.plandate='';form.memo='';formDetails.length=0}
+async function doCreate(){
+  saving.value=true
+  try{
+    await createRequisition({...form,details:formDetails.map(d=>({itemcd:d.itemcd,rgstqty:d.rgstqty,units:d.units}))})
+    ElMessage.success('创建成功');creating.value=false;doSearch()
+  }catch(e:any){ElMessage.error(e?.response?.data?.message||'创建失败')}finally{saving.value=false}
+}
 </script>
 <style scoped>
 .page{padding:0}.page-header{display:flex;justify-content:space-between;margin-bottom:16px}.page-header h2{font-size:18px;font-weight:600;margin:0}
