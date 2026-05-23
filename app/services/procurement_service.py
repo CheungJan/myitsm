@@ -76,7 +76,7 @@ class PurchasePlanService:
         record = PurchasePlanRepository.get_by_id(pcplanid)
         if record is None:
             return {"success": False, "error": "采购需求不存在"}
-        if record.auditflg not in ("0", "1"):
+        if record.auditflg not in ("0", "1", "9"):
             return {"success": False, "error": "已审核，不可重复操作"}
         PurchasePlanRepository.audit(record, auditor, auditflg, checkmemo)
         if auditflg == "2" and details:
@@ -167,7 +167,7 @@ class PurchaseRegisterService:
         record = PurchaseRegisterRepository.get_by_id(rgstbillid)
         if record is None:
             return {"success": False, "error": "采购订单不存在"}
-        if record.auditflg not in ("0", "1"):
+        if record.auditflg not in ("0", "1", "9"):
             return {"success": False, "error": "已审核，不可重复操作"}
         PurchaseRegisterRepository.audit(record, auditor, auditflg, checkmemo)
         if auditflg == "2" and details:
