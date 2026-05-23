@@ -12,6 +12,11 @@ tags:
 创建日期: 2026-05-23
 作者: CJ
 版本: v1.0
+笔记位置: myitsm
+笔记绝对路径: /Users/cheungjan/Desktop/obsidian_cj/CJdocs/myitsm/未命名.md
+---
+
+
 ---
 
 # 采购管理模块重构设计规格文档
@@ -91,12 +96,28 @@ CREATE INDEX idx_registerdt_ref ON tpc13_registerdt(ref_pcplanid, ref_pclineno);
 
 ### 3.3 调整：TPC16/TPC17 退货表
 
+**已有表增强**，添加关联字段和审核字段：
+
 ```sql
+-- 关联原采购订单（精确追溯退货来源）
 ALTER TABLE tpc16_rpcbill ADD COLUMN ref_rgstbillid VARCHAR(8);
 ALTER TABLE tpc17_rpcbilldt ADD COLUMN ref_rgstlineno INTEGER;
+
+-- 审核控制字段（原表缺失，需补充）
+ALTER TABLE tpc16_rpcbill ADD COLUMN auditflg CHAR(1) DEFAULT '0';   -- 0=未审批, 1=送审中, 2=已审批, 9=作废
+ALTER TABLE tpc16_rpcbill ADD COLUMN auditman CHAR(6);              -- 审核人
+ALTER TABLE tpc16_rpcbill ADD COLUMN auditdate TIMESTAMP;            -- 审核日期
 ```
 
-退货必须关联原采购订单行，精确追溯退货来源。
+**字段说明**：
+- `ref_rgstbillid` / `ref_rgstlineno`：关联原采购订单行，精确追溯退货来源
+- `auditflg`：审核状态控制，审批通过后方可出库退货
+- `auditman` / `auditdate`：记录审批责任人及时间，满足审计要求
+
+**业务流程**：
+```
+创建退货单(auditflg='0') → 提交审核 → 审批通过(auditflg='2') → 仓库出库 → 供应商收货
+```
 
 ### 3.4 新增视图：v_requisition_execution
 
@@ -173,6 +194,138 @@ HAVING SUM(dt.auditqty) - COALESCE(SUM(link_stats.ordered_qty), 0) > 0;
 - 即刻起冻结 TPC03，不再写入
 - 前端"采购计划执行看板"改为查询 `v_requisition_execution` 视图
 - TPC03 表保留不删，标注 `@deprecated`，后续归档
+
+### 3.7 触发器设计（后续参考）
+
+> ⚠️ **暂不做，阶段2后评估**。以下设计草稿供后续参考，用于自动维护数据一致性。
+
+#### 3.7.1 入库后自动更新关联状态
+
+```sql
+-- 触发器：采购入库完成后，自动更新 TPC20 关联表状态
+CREATE OR REPLACE FUNCTION update_link_status_on_in()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_inqty DECIMAL(12,2);
+    v_rgsqty DECIMAL(12,2);
+    v_ratio DECIMAL(5,4);
+BEGIN
+    v_inqty := NEW.inqty;
+    v_rgsqty := NEW.rgsqty;
+    
+    IF v_rgsqty > 0 THEN
+        v_ratio := v_inqty / v_rgsqty;
+        
+        UPDATE tpc20_requisition_order_link
+        SET 
+            linkstatus = CASE 
+                WHEN v_ratio >= 1 THEN 'completed'
+                WHEN v_ratio > 0 THEN 'partial_in'
+                ELSE 'ordered'
+            END,
+            upddate = CURRENT_TIMESTAMP
+        WHERE rgstbillid = NEW.rgstbillid
+          AND rgstlineno = NEW.lineno;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_update_link_status_on_in
+    AFTER UPDATE OF inqty ON tpc13_registerdt
+    FOR EACH ROW
+    WHEN (OLD.inqty IS DISTINCT FROM NEW.inqty)
+    EXECUTE FUNCTION update_link_status_on_in();
+```
+
+**作用**：入库完成后自动更新 TPC20 的 `linkstatus`，避免应用层遗漏。
+
+#### 3.7.2 订单创建时校验余额（数据库层兜底）
+
+```sql
+-- 触发器：插入 TPC20 时校验采购数量不超过需求余额
+CREATE OR REPLACE FUNCTION check_available_qty()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_audit_qty DECIMAL(12,2);
+    v_ordered_qty DECIMAL(12,2);
+    v_available DECIMAL(12,2);
+BEGIN
+    -- 查询需求单的审批数量
+    SELECT auditqty INTO v_audit_qty
+    FROM tpc02_pcplandt
+    WHERE pcplanid = NEW.pcplanid AND lineno = NEW.pclineno;
+    
+    -- 查询已关联的订单数量
+    SELECT COALESCE(SUM(linkqty), 0) INTO v_ordered_qty
+    FROM tpc20_requisition_order_link
+    WHERE pcplanid = NEW.pcplanid 
+      AND pclineno = NEW.pclineno
+      AND id <> NEW.id;  -- 排除当前记录
+    
+    v_available := v_audit_qty - v_ordered_qty;
+    
+    IF NEW.linkqty > v_available THEN
+        RAISE EXCEPTION '采购数量(%)超过需求余额(%)', NEW.linkqty, v_available;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_available_qty
+    BEFORE INSERT OR UPDATE ON tpc20_requisition_order_link
+    FOR EACH ROW
+    EXECUTE FUNCTION check_available_qty();
+```
+
+**作用**：数据库层强制校验，防止超量采购（应用层校验+数据库层兜底）。
+
+#### 3.7.3 退货时校验退货数量
+
+```sql
+-- 触发器：校验退货数量不超过已入库数量
+CREATE OR REPLACE FUNCTION check_return_qty()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_inqty DECIMAL(12,2);
+    v_returned_qty DECIMAL(12,2);
+    v_available DECIMAL(12,2);
+BEGIN
+    -- 查询原订单的入库数量
+    SELECT inqty INTO v_inqty
+    FROM tpc13_registerdt
+    WHERE rgstbillid = NEW.ref_rgstbillid 
+      AND lineno = NEW.ref_rgstlineno;
+    
+    -- 查询已退货数量
+    SELECT COALESCE(SUM(rpcqty), 0) INTO v_returned_qty
+    FROM tpc17_rpcbilldt
+    WHERE ref_rgstbillid = NEW.ref_rgstbillid
+      AND ref_rgstlineno = NEW.ref_rgstlineno;
+    
+    v_available := v_inqty - v_returned_qty;
+    
+    IF NEW.rpcqty > v_available THEN
+        RAISE EXCEPTION '退货数量(%)超过可退余额(%)', NEW.rpcqty, v_available;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 阶段2后评估是否需要
+-- CREATE TRIGGER trg_check_return_qty
+--     BEFORE INSERT OR UPDATE ON tpc17_rpcbilldt
+--     FOR EACH ROW
+--     WHEN (NEW.ref_rgstbillid IS NOT NULL)
+--     EXECUTE FUNCTION check_return_qty();
+```
+
+**实施建议**：
+- **阶段2**：应用层维护关联状态，便于调试和回滚
+- **阶段3稳定后**：评估加入触发器，减少应用层负担，强制数据一致性
 
 ## 四、API 路由设计
 
@@ -274,3 +427,7 @@ HAVING SUM(dt.auditqty) - COALESCE(SUM(link_stats.ordered_qty), 0) > 0;
 
 - [ ] 技术评审
 - [ ] 业务评审
+
+
+
+%%  %%
