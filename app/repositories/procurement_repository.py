@@ -125,12 +125,27 @@ class PurchasePlanRepository:
         top_items = [
             dict(row._mapping)
             for row in db.session.execute(sa.text("""
-                SELECT itemcd, itemnm, SUM(plan_qty)::int AS total_plan,
-                    SUM(ordered_qty)::numeric AS total_ordered,
-                    SUM(received_qty)::numeric AS total_received,
-                    ROUND(AVG(execution_rate), 1) AS execution_rate
-                FROM v_requisition_execution
-                GROUP BY itemcd, itemnm
+                SELECT
+                    v.itemcd, v.itemnm,
+                    SUM(v.plan_qty)::int AS total_plan,
+                    SUM(v.ordered_qty)::numeric AS total_ordered,
+                    SUM(v.received_qty)::numeric AS total_received,
+                    COALESCE(ret.total_returned, 0)::numeric AS total_returned,
+                    (SUM(v.received_qty) - COALESCE(ret.total_returned, 0))::numeric AS net_received,
+                    CASE WHEN SUM(v.received_qty) > 0
+                        THEN ROUND(COALESCE(ret.total_returned, 0) / SUM(v.received_qty) * 100, 1)
+                        ELSE 0
+                    END AS return_rate,
+                    ROUND(AVG(v.execution_rate), 1) AS execution_rate
+                FROM v_requisition_execution v
+                LEFT JOIN (
+                    SELECT rdt.itemcd, SUM(rdt.returnqty)::numeric AS total_returned
+                    FROM tpc17_rpcbilldt rdt
+                    JOIN tpc16_rpcbill r ON rdt.pcbillid = r.pcbillid
+                    WHERE r.useflg = '1'
+                    GROUP BY rdt.itemcd
+                ) ret ON v.itemcd = ret.itemcd
+                GROUP BY v.itemcd, v.itemnm, ret.total_returned
                 ORDER BY total_plan DESC LIMIT 10
             """)).fetchall()
         ]

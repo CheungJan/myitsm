@@ -13,11 +13,13 @@
       <template #header><span style="font-weight:600">Top 10 物料执行</span></template>
       <el-table :data="topItems" size="small" stripe>
         <el-table-column prop="itemcd" label="物料编码" width="100"/>
-        <el-table-column prop="itemnm" label="物料名称" min-width="140"/>
-        <el-table-column prop="total_plan" label="计划量" width="80"/>
-        <el-table-column prop="total_ordered" label="已下单" width="80"/>
-        <el-table-column prop="total_received" label="已入库" width="80"/>
-        <el-table-column label="完成率" width="120"><template #default="{row}"><el-progress :percentage="row.execution_rate||0" :status="row.execution_rate>=100?'success':''"/></template></el-table-column>
+        <el-table-column label="物料名称" min-width="120"><template #default="{row}">{{ row.itemnm||row.itemcd }}</template></el-table-column>
+        <el-table-column prop="total_plan" label="计划量" width="70"/>
+        <el-table-column prop="total_ordered" label="已下单" width="70"/>
+        <el-table-column prop="total_received" label="已入库" width="70"/>
+        <el-table-column label="已退货" width="70"><template #default="{row}"><span :style="{color:row.return_rate>10?'#f56c6c':''}">{{ row.total_returned||0 }}</span></template></el-table-column>
+        <el-table-column label="退货率" width="80"><template #default="{row}"><span :style="{color:row.return_rate>10?'#f56c6c':''}">{{ (row.return_rate||0)+'%' }}</span></template></el-table-column>
+        <el-table-column label="完成率" width="100"><template #default="{row}"><el-progress :percentage="row.execution_rate||0" :status="row.execution_rate>=100?'success':''"/></template></el-table-column>
       </el-table>
     </el-card>
 
@@ -26,7 +28,7 @@
       <el-table :data="overdue" size="small" stripe>
         <el-table-column prop="pcplanid" label="需求单号" width="110"/>
         <el-table-column prop="itemcd" label="物料编码" width="100"/>
-        <el-table-column prop="itemnm" label="物料名称" min-width="140"/>
+        <el-table-column label="物料名称" min-width="120"><template #default="{row}">{{ row.itemnm||row.itemcd }}</template></el-table-column>
         <el-table-column prop="plandate" label="计划日期" width="100"/>
         <el-table-column prop="plan_qty" label="计划量" width="70"/>
         <el-table-column prop="ordered_qty" label="已下单" width="70"/>
