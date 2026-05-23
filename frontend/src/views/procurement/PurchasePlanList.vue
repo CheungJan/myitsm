@@ -23,7 +23,7 @@
         <el-table-column label="计划日期" width="100"><template #default="{row}">{{ row.plandate || '-' }}</template></el-table-column>
         <el-table-column label="操作员" width="80"><template #default="{row}">{{ userName(row.opercd) }}</template></el-table-column>
         <el-table-column prop="memo" label="备注" min-width="120" show-overflow-tooltip/>
-        <el-table-column label="操作" width="100" fixed="right"><template #default="{row}"><el-button v-if="row.auditflg==='0'" link type="primary" size="small" @click.stop="doSubmit(row)">送审</el-button><el-button v-if="row.auditflg==='1'" link type="warning" size="small" @click.stop="openAudit(row)">审核</el-button></template></el-table-column>
+        <el-table-column label="操作" width="100" fixed="right"><template #default="{row}"><el-button v-if="row.auditflg==='0'" link type="primary" size="small" @click.stop="doSubmit(row)">送审</el-button><el-button v-if="row.auditflg==='1'" link type="warning" size="small" @click.stop="openAudit(row)">审核</el-button><el-button v-if="row.auditflg==='9'" link type="primary" size="small" @click.stop="doSubmit(row)">重新送审</el-button></template></el-table-column>
       </el-table>
       <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:12px;justify-content:flex-end"/>
     </el-card>
@@ -63,7 +63,7 @@
           <el-table-column prop="itemcd" label="物料编码" width="100"/>
           <el-table-column prop="item_nm" label="物料名称" min-width="120"/>
           <el-table-column prop="rgstqty" label="申请数量" width="80"/>
-          <el-table-column label="审核数量" width="120"><template #default="{row}"><el-input-number v-model="row._auditQty" :min="0" :max="row.rgstqty||0" size="small" style="width:100px"/></template></el-table-column>
+          <el-table-column label="审核数量" width="120"><template #default="{row}"><el-input-number v-model="auditQtyMap[row.lineno]" :min="0" :max="row.rgstqty||0" size="small" style="width:100px"/></template></el-table-column>
         </el-table>
         <el-input v-model="auditMemo" type="textarea" :rows="2" placeholder="审核备注" style="margin-top:12px"/>
       </template>
@@ -112,11 +112,16 @@ const{items,loading,page,perPage,total,onSearch}=useListPage<ProcRecord>(fetchRe
 // 审核
 const auditing=ref(false);const auditLoading=ref(false);const auditTarget=ref<ProcRecord|null>(null)
 const auditMemo=ref('')
+const auditQtyMap=reactive<Record<number,number>>({})
 async function openAudit(row:ProcRecord){
   auditTarget.value=row;auditMemo.value=''
+  // 清空旧的审核数量
+  for(const k of Object.keys(auditQtyMap))delete auditQtyMap[k as any]
   try{const r=await fetchRequisitionDetail(row.pcplanid as string);auditTarget.value=r.data}catch{/* use row data */}
   if(auditTarget.value?.details){
-    for(const d of auditTarget.value.details as any[]){d._auditQty=d.rgstqty||0}
+    for(const d of auditTarget.value.details as any[]){
+      auditQtyMap[d.lineno]=d.rgstqty||0
+    }
   }
   auditing.value=true
 }
@@ -126,7 +131,7 @@ async function doSubmit(row:ProcRecord){
 async function doAudit(flg:string){
   auditLoading.value=true
   try{
-    const details=(auditTarget.value?.details as any[]||[]).map((d:any)=>({lineno:d.lineno,auditqty:d._auditQty||0}))
+    const details=Object.entries(auditQtyMap).map(([lineno,auditqty])=>({lineno:Number(lineno),auditqty}))
     await request.post('/procurement/requisitions/'+auditTarget.value!.pcplanid+'/audit',{auditflg:flg,checkmemo:auditMemo.value,details})
     ElMessage.success(flg==='2'?'审核通过':'已退回');auditing.value=false;doSearch()
   }catch(e:any){ElMessage.error(e?.response?.data?.message||'审核失败')}finally{auditLoading.value=false}

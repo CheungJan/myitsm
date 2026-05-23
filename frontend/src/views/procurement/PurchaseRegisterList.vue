@@ -11,7 +11,7 @@
         <el-table-column prop="gendate" label="日期" width="100"/>
         <el-table-column prop="memo" label="备注" min-width="120" show-overflow-tooltip/>
         <el-table-column label="操作员" width="80"><template #default="{row}">{{ userName(row.opercd) }}</template></el-table-column>
-        <el-table-column label="操作" width="100" fixed="right"><template #default="{row}"><el-button v-if="row.auditflg==='0'" link type="primary" size="small" @click.stop="doSubmit(row)">送审</el-button><el-button v-if="row.auditflg==='1'" link type="warning" size="small" @click.stop="openAudit(row)">审核</el-button></template></el-table-column>
+        <el-table-column label="操作" width="100" fixed="right"><template #default="{row}"><el-button v-if="row.auditflg==='0'" link type="primary" size="small" @click.stop="doSubmit(row)">送审</el-button><el-button v-if="row.auditflg==='1'" link type="warning" size="small" @click.stop="openAudit(row)">审核</el-button><el-button v-if="row.auditflg==='9'" link type="primary" size="small" @click.stop="doSubmit(row)">重新送审</el-button></template></el-table-column>
       </el-table>
       <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:12px;justify-content:flex-end"/>
     </el-card>
@@ -38,7 +38,7 @@
           <el-table-column prop="itemcd" label="物料编码" width="100"/>
           <el-table-column prop="item_nm" label="物料名称" min-width="120"/>
           <el-table-column prop="rgsqty" label="采购数量" width="80"/>
-          <el-table-column label="审核数量" width="120"><template #default="{row}"><el-input-number v-model="row._auditQty" :min="0" :max="row.rgsqty||0" size="small" style="width:100px"/></template></el-table-column>
+          <el-table-column label="审核数量" width="120"><template #default="{row}"><el-input-number v-model="auditQtyMap[row.lineno]" :min="0" :max="row.rgsqty||0" size="small" style="width:100px"/></template></el-table-column>
         </el-table>
         <el-input v-model="auditMemo" type="textarea" :rows="2" placeholder="审核备注" style="margin-top:12px"/>
       </template>
@@ -89,10 +89,14 @@ function quickFilter(flg:string){onSearch({auditflg:flg})}
 // 审核
 const auditing=ref(false);const auditLoading=ref(false);const auditTarget=ref<ProcRecord|null>(null)
 const auditMemo=ref('')
+const auditQtyMap=reactive<Record<number,number>>({})
 async function openAudit(row:ProcRecord){
   auditTarget.value=row;auditMemo.value=''
+  for(const k of Object.keys(auditQtyMap))delete auditQtyMap[k as any]
   if(auditTarget.value?.details){
-    for(const d of auditTarget.value.details as any[]){d._auditQty=d.rgsqty||0}
+    for(const d of auditTarget.value.details as any[]){
+      auditQtyMap[d.lineno]=d.rgsqty||0
+    }
   }
   auditing.value=true
 }
@@ -102,7 +106,7 @@ async function doSubmit(row:ProcRecord){
 async function doAudit(flg:string){
   auditLoading.value=true
   try{
-    const details=(auditTarget.value?.details as any[]||[]).map((d:any)=>({lineno:d.lineno,auditqty:d._auditQty||0}))
+    const details=Object.entries(auditQtyMap).map(([lineno,auditqty])=>({lineno:Number(lineno),auditqty}))
     await request.post('/procurement/orders/'+auditTarget.value!.rgstbillid+'/audit',{auditflg:flg,checkmemo:auditMemo.value,details})
     ElMessage.success(flg==='2'?'审核通过':'已退回');auditing.value=false;load()
   }catch(e:any){ElMessage.error(e?.response?.data?.message||'审核失败')}finally{auditLoading.value=false}
