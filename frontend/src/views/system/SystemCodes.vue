@@ -149,10 +149,12 @@ async function loadTree() {
             const typ = r.code_typ as string
             if (typ && typ !== 'SY' && !typeSet.has(typ)) typeSet.set(typ, r.code_nm as string || '')
         }
-        // 补充 SY 中的中文名
+        // 补充 SY 中的中文名 + 提取 _id 用于删除
         const syList = all.filter(r => r.code_typ === 'SY')
+        const syIdMap = new Map<string, number>()
         for (const sy of syList) {
             const cd = sy.code_cd as string
+            syIdMap.set(cd, sy.id as number)
             if (typeSet.has(cd)) typeSet.set(cd, (sy.code_nm as string) || typeSet.get(cd) || '')
             else typeSet.set(cd, sy.code_nm as string || '')
         }
@@ -162,6 +164,7 @@ async function loadTree() {
                 code_cd: cd,
                 label: nm ? `${nm}（${cd}）` : cd,
                 sort_no: 0,
+                _id: syIdMap.get(cd),
             }))
     } catch { /* */ }
 }

@@ -419,6 +419,7 @@ class OverLostService:
         if record is None:
             return None
         result = record.to_dict()
+        _enrich_warehouse_names([result])
         result["details"] = [d.to_dict() for d in record.details]  # type: ignore[attr-defined]
         result["details_eid"] = [d.to_dict() for d in record.details_eid]  # type: ignore[attr-defined]
         return result
@@ -434,8 +435,10 @@ class OverLostService:
         items, total = OverLostRepository.list_by_filters(
             whcd=whcd, oltyp=oltyp, auditflg=auditflg, page=page, per_page=per_page
         )
+        data = [item.to_dict() for item in items]
+        _enrich_warehouse_names(data)
         return {
-            "items": [item.to_dict() for item in items],
+            "items": data,
             "total": total,
             "page": page,
             "per_page": per_page,

@@ -5,11 +5,41 @@ from __future__ import annotations
 from typing import Any
 
 from app.extensions import db
+from app.models.master import CustClass
 from app.repositories.sales_repository import (
     PlanCustRepository,
     SalesBillRepository,
     SalesExtendRepository,
 )
+
+
+def _normalize_class_cd(custcd: str) -> str:
+    """将销售单据中的 custcd 转为 tmm21_custclass.class_cd 格式（2位编号）。"""
+    if not custcd:
+        return ""
+    s = custcd.strip()
+    try:
+        return str(int(s)).zfill(2)
+    except ValueError:
+        return s
+
+
+def _enrich_class_nm(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """为销售记录补充 class_nm（从 tmm21_custclass 关联查询）。"""
+    cds = {_normalize_class_cd(r.get("custcd", "")) for r in items if r.get("custcd")}
+    cds.discard("")
+    if not cds:
+        return items
+    names = dict(
+        db.session.query(CustClass.class_cd, CustClass.class_nm)
+        .filter(CustClass.class_cd.in_(cds))
+        .all()
+    )
+    for r in items:
+        cd = _normalize_class_cd(r.get("custcd", ""))
+        if cd and cd in names:
+            r["class_nm"] = names[cd]
+    return items
 
 
 class PlanCustService:
@@ -81,8 +111,9 @@ class SalesBillService:
         items, total = SalesBillRepository.list_by_filters(
             sltyp=sltyp, custcd=custcd, auditflg=auditflg, page=page, per_page=per_page
         )
+        enriched = _enrich_class_nm([item.to_dict() for item in items])
         return {
-            "items": [item.to_dict() for item in items],
+            "items": enriched,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -128,8 +159,9 @@ class SalesExtendService:
         items, total = SalesExtendRepository.list_by_filters(
             custcd=custcd, auditflg=auditflg, page=page, per_page=per_page
         )
+        enriched = _enrich_class_nm([item.to_dict() for item in items])
         return {
-            "items": [item.to_dict() for item in items],
+            "items": enriched,
             "total": total,
             "page": page,
             "per_page": per_page,

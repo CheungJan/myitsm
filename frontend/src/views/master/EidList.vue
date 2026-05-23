@@ -51,7 +51,7 @@
                         <template #default="{ row }">{{ codeMaps.ET?.[row.etyp] || row.etyp }}</template>
                     </el-table-column>
                     <el-table-column prop="sflg" label="状态" width="80">
-                        <template #default="{ row }">{{ codeMaps.ES?.[row.sflg] || row.sflg }}</template>
+                        <template #default="{ row }">{{ stLabel(row.sflg) }}</template>
                     </el-table-column>
                     <el-table-column prop="qcflg" label="质检" width="80">
                         <template #default="{ row }">{{ codeMaps.QS?.[row.qcflg] || row.qcflg }}</template>
@@ -127,8 +127,8 @@
                 </el-table-column>
                 <el-table-column label="状态" width="120">
                     <template #default="{ row }">
-                        <template v-if="row.type === 'i'">{{ codeMaps.ES?.[row.sflg] || row.sflg }}</template>
-                        <template v-else>{{ codeMaps.ES?.[row.sflg] || row.sflg }}→{{ codeMaps.ES?.[row.n_sflg] || row.n_sflg }}</template>
+                        <template v-if="row.type === 'i'">{{ stLabel(row.sflg) }}</template>
+                        <template v-else>{{ stLabel(row.sflg) }}→{{ stLabel(row.n_sflg) }}</template>
                     </template>
                 </el-table-column>
                 <el-table-column label="质检" width="100">
@@ -164,6 +164,7 @@ import { watch } from 'vue'
 import type { ElTree } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useDict } from '@/composables/useDict'
 import { fetchEidList, createEid, updateEid, deleteEid, fetchEidTree, fetchSyscodes, fetchWarehouses, fetchEidTracks } from '@/api/master'
 import type { ItemClassNode, EidRecord, EidPage } from '@/api/master'
 
@@ -194,6 +195,7 @@ const etypOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const sflgOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const qcflgOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const codeMaps = ref<Record<string, Record<string, string>>>({})
+const { dictLabel: stLabel } = useDict('ST')
 
 watch(page, () => loadData())
 watch(perPage, () => { page.value = 1; loadData() })

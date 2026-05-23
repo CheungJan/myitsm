@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.extensions import db
+from app.models.master import Customer
 from app.repositories.itsm_repository import (
     AccessoriesUpdateRepository,
     CloseBillRepository,
@@ -33,6 +34,23 @@ from app.repositories.itsm_repository import (
     TimepointAreaRepository,
 )
 from app.services.state_machine import StateMachine
+
+
+def _enrich_store_card(items: list[dict[str, Any]], key: str = "store_id") -> list[dict[str, Any]]:
+    """为维护单记录补充 store_cust_card（从 tmm22_customers 关联查询）。"""
+    ids = {r.get(key) for r in items if r.get(key)}
+    if not ids:
+        return items
+    cards = dict(
+        db.session.query(Customer.cust_cd, Customer.cust_card)
+        .filter(Customer.cust_cd.in_(ids))
+        .all()
+    )
+    for r in items:
+        sid = r.get(key)
+        if sid and sid in cards:
+            r["store_cust_card"] = cards[sid]
+    return items
 
 
 class _BaseMaintenanceService:
@@ -95,8 +113,9 @@ class MaintenanceDailyService(_BaseMaintenanceService):
         items, total = MaintenanceDailyRepository.list_by_filters(
             status=status, store_id=store_id, page=page, per_page=per_page
         )
+        enriched = _enrich_store_card([item.to_dict() for item in items])
         return {
-            "items": [item.to_dict() for item in items],
+            "items": enriched,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -559,8 +578,9 @@ class MaintenanceT17Service(_BaseMaintenanceService):
         items, total = MaintenanceT17Repository.list_by_filters(
             status=status, store_id=store_id, page=page, per_page=per_page
         )
+        enriched = _enrich_store_card([item.to_dict() for item in items])
         return {
-            "items": [item.to_dict() for item in items],
+            "items": enriched,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -606,8 +626,9 @@ class FreeReplaceService(_BaseMaintenanceService):
         items, total = FreeReplaceRepository.list_by_filters(
             status=status, store_id=store_id, page=page, per_page=per_page
         )
+        enriched = _enrich_store_card([item.to_dict() for item in items])
         return {
-            "items": [item.to_dict() for item in items],
+            "items": enriched,
             "total": total,
             "page": page,
             "per_page": per_page,

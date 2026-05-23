@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class PurchasePlanCreate(BaseModel):
     """创建采购计划。"""
 
-    pctyp: str | None = Field(None, max_length=1, description="采购类型")
+    pctyp: str | None = Field(None, max_length=2, description="采购类型")
     slbillid: str | None = Field(None, max_length=8, description="关联销售单号")
     plandate: datetime | None = Field(None, description="计划日期")
     memo: str | None = Field(None, max_length=255, description="备注")
@@ -121,5 +121,7 @@ class ProcurementQuery(BaseModel):
     suppliercd: str | None = Field(None, max_length=8)
     pctyp: str | None = Field(None, max_length=2)
     whcd: str | None = Field(None, max_length=2)
+    start_date: datetime | None = Field(None, description="计划日期起始")
+    end_date: datetime | None = Field(None, description="计划日期截止")
     page: int = Field(1, ge=1)
     per_page: int = Field(20, ge=1, le=100)

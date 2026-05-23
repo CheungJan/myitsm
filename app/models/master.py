@@ -304,7 +304,7 @@ class Item(BaseModel):
     oldperiod = db.Column(db.Integer, comment="旧品周期(天)")
     backup = db.Column(db.String(200), comment="备注")
     typflg = db.Column(db.String(1), comment="物料类型标志")
-    purchasetyp = db.Column(db.String(1), comment="采购类型")
+    purchasetyp = db.Column(db.String(2), comment="采购类型")
     consume = db.Column(db.String(1), comment="消耗标志")
 
 

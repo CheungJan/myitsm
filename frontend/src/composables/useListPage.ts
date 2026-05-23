@@ -38,8 +38,11 @@ export function useListPage<T>(
 
   function onSearch(params?: Record<string, string>) {
     if (params) searchParams.value = { ...params }
-    page.value = 1
-    load()
+    if (page.value === 1) {
+      load()
+    } else {
+      page.value = 1
+    }
   }
 
   onMounted(() => load())

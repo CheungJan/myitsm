@@ -1802,7 +1802,7 @@
 |---|------|------|------|------|
 | 1 | pcplanid | VARCHAR(8) | PK NOT NULL | 采购计划号 |
 | 2 | slbillid | VARCHAR(8) |  | 关联销售单号 |
-| 3 | pctyp | VARCHAR(1) |  | 采购类型 |
+| 3 | pctyp | VARCHAR(2 |  | 采购类型 |
 | 4 | ptimes | INTEGER |  | 打印次数 |
 | 5 | opercd | VARCHAR(6) |  | 操作员 |
 | 6 | memo | VARCHAR(255) |  | 备注 |

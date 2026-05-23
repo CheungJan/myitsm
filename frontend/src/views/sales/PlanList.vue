@@ -21,17 +21,17 @@
         <el-table-column prop="contactor" label="联系人" width="80" />
         <el-table-column prop="phoneno" label="电话" width="120" />
         <el-table-column prop="jl_contactor" label="经理" width="80" />
-        <el-table-column label="计划类型" width="80"><template #default="{row}">{{ row.plantyp || '-' }}</template></el-table-column>
-        <el-table-column label="业务类型" width="80"><template #default="{row}">{{ row.busityp || '-' }}</template></el-table-column>
+        <el-table-column label="计划类型" width="80"><template #default="{row}">{{ plLabel(row.plantyp) }}</template></el-table-column>
+        <el-table-column label="业务类型" width="80"><template #default="{row}">{{ bsLabel(row.busityp) }}</template></el-table-column>
         <el-table-column label="租赁/购买" width="70"><template #default="{row}"><el-tag :type="row.is_rent==='Y'?'success':'info'" size="small">{{ row.is_rent==='Y'?'租赁':'购买' }}</el-tag></template></el-table-column>
         <el-table-column label="机型" width="80"><template #default="{row}">{{ row.pos_item || '-' }}</template></el-table-column>
         <el-table-column label="状态" width="80" align="center">
-          <template #default="{row}"><el-tag :type="statusTag(row.plan_status)" size="small">{{ statusLabel(row.plan_status) }}</el-tag></template>
+          <template #default="{row}"><el-tag :type="statusTag(row.plan_status)" size="small">{{ tsLabel(row.plan_status) }}</el-tag></template>
         </el-table-column>
         <el-table-column label="合同" width="60"><template #default="{row}"><el-tag :type="row.is_contract==='1'?'success':'info'" size="small">{{ row.is_contract==='1'?'是':'否' }}</el-tag></template></el-table-column>
         <el-table-column prop="deposit" label="押金" width="100" align="right"><template #default="{row}">{{ row.deposit ? '¥'+Number(row.deposit).toLocaleString() : '-' }}</template></el-table-column>
         <el-table-column prop="gendate" label="日期" width="90" />
-        <el-table-column prop="opercd" label="操作员" width="80" />
+        <el-table-column label="操作员" width="80"><template #default="{row}">{{ userName(row.opercd) }}</template></el-table-column>
         <el-table-column label="操作" width="120" fixed="right"><template #default="{row}"><el-button link type="primary" size="small" @click.stop="openDetail(row)">详情</el-button><el-button link type="primary" size="small" @click.stop="openEdit(row)">编辑</el-button></template></el-table-column>
       </el-table>
       <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:12px;justify-content:flex-end" />
@@ -63,15 +63,20 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
+import { useUserNames } from '@/composables/useUserNames'
+import { useDict } from '@/composables/useDict'
 import { fetchPlans, createPlan, updatePlan } from '@/api/sales'
 import type { PlanRecord } from '@/api/sales'
 
+const{userName}=useUserNames()
+const { dictLabel: plLabel } = useDict('PL')
+const { dictLabel: bsLabel } = useDict('BT')
+const { dictLabel: tsLabel } = useDict('TS')
 const plans = ref<PlanRecord[]>([]); const loading = ref(false)
 const page = ref(1); const perPage = ref(20); const total = ref(0)
 const searchPlanno = ref(''); const searchCustNm = ref(''); const searchStatus = ref('')
 
 function statusTag(s: string) { const m: Record<string,string> = {'0':'warning','1':'success','2':'info'}; return m[s] || 'info' }
-function statusLabel(s: string) { const m: Record<string,string> = {'0':'待确认','1':'已确认','2':'已完成'}; return m[s] || s }
 
 watch(page, () => loadData()); watch(perPage, () => { page.value = 1; loadData() })
 onMounted(() => loadData())

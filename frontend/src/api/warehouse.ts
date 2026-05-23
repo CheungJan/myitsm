@@ -1,8 +1,8 @@
 import request from './request'
 
 export interface WarehouseRecord {
-    wh_cd: string
-    wh_nm: string
+    whcd: string
+    whnm: string
     address: string
     phone: string
     leader: string

@@ -11,13 +11,13 @@
     <el-card shadow="never">
       <el-table :data="items" v-loading="loading" stripe size="small" highlight-current-row @row-click="open">
         <el-table-column prop="maintenance_id" label="工单号" width="120"/>
-        <el-table-column prop="store_id" label="门店" width="80"/>
+        <el-table-column label="门店" width="80"><template #default="{row}">{{ row.store_cust_card || custCard(row.store_id) }}</template></el-table-column>
         <el-table-column prop="short_description" label="故障简述" min-width="120" show-overflow-tooltip/>
         <el-table-column label="状态" width="70" align="center"><template #default="{row}"><el-tag :type="statusTag(row.current_status)" size="small">{{ statusLabel(row.current_status) }}</el-tag></template></el-table-column>
-        <el-table-column label="严重程度" width="75"><template #default="{row}">{{ row.servrity || '-' }}</template></el-table-column>
-        <el-table-column label="紧急程度" width="75"><template #default="{row}">{{ row.emergency_level || '-' }}</template></el-table-column>
-        <el-table-column label="故障类型" width="80"><template #default="{row}">{{ row.fault_type || '-' }}</template></el-table-column>
-        <el-table-column prop="firstor" label="维修员" width="75"/>
+        <el-table-column label="严重程度" width="75"><template #default="{row}">{{ svLabel(row.servrity) }}</template></el-table-column>
+        <el-table-column label="紧急程度" width="75"><template #default="{row}">{{ elLabel(row.emergency_level) }}</template></el-table-column>
+        <el-table-column label="故障类型" width="80"><template #default="{row}">{{ flLabel(row.fault_type) }}</template></el-table-column>
+        <el-table-column label="维修员" width="75"><template #default="{row}">{{ userName(row.firstor) }}</template></el-table-column>
         <el-table-column label="考核时间" width="100"><template #default="{row}">{{ row.expected_completion_time || '-' }}</template></el-table-column>
         <el-table-column label="创建时间" width="100"><template #default="{row}">{{ row.create_time || '-' }}</template></el-table-column>
         <el-table-column label="补单" width="55"><template #default="{row}"><el-tag :type="row.is_old=='Y'?'warning':'info'" size="small">{{ row.is_old=='Y'?'补':'正' }}</el-tag></template></el-table-column>
@@ -29,16 +29,16 @@
       <template v-if="detail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="工单号">{{ detail.maintenance_id }}</el-descriptions-item>
-          <el-descriptions-item label="门店">{{ detail.store_id || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="公司">{{ detail.company_id || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="门店">{{ detail.store_cust_card || custCard(detail.store_id) }}</el-descriptions-item>
+          <el-descriptions-item label="公司">{{ className(detail.company_id) }}</el-descriptions-item>
           <el-descriptions-item label="设备编号">{{ detail.device_id || '-' }}</el-descriptions-item>
           <el-descriptions-item label="故障简述" :span="2">{{ detail.short_description || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="故障类型">{{ detail.fault_type || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="故障类型">{{ flLabel(detail.fault_type) }}</el-descriptions-item>
           <el-descriptions-item label="状态"><el-tag :type="statusTag(detail.current_status)" size="small">{{ statusLabel(detail.current_status) }}</el-tag></el-descriptions-item>
-          <el-descriptions-item label="严重程度">{{ detail.servrity || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="紧急程度">{{ detail.emergency_level || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="维修员">{{ detail.firstor || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="创建人">{{ detail.creator || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="严重程度">{{ svLabel(detail.servrity) }}</el-descriptions-item>
+          <el-descriptions-item label="紧急程度">{{ elLabel(detail.emergency_level) }}</el-descriptions-item>
+          <el-descriptions-item label="维修员">{{ userName(detail.firstor) }}</el-descriptions-item>
+          <el-descriptions-item label="创建人">{{ userName(detail.creator) }}</el-descriptions-item>
           <el-descriptions-item label="请求日期">{{ detail.request_time || '-' }}</el-descriptions-item>
           <el-descriptions-item label="考核时间">{{ detail.expected_completion_time || '-' }}</el-descriptions-item>
           <el-descriptions-item label="完成日期">{{ detail.close_time || '-' }}</el-descriptions-item>
@@ -54,9 +54,11 @@
     </el-dialog>
   </div>
 </template>
-<script setup lang="ts">import {reactive,ref,onMounted} from 'vue';import {fetchSyscodes} from '@/api/master';import {ElMessage} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {fetchMaintenanceDaily} from '@/api/itsm';import type {MntRecord} from '@/api/itsm';import request from '@/api/request'
+<script setup lang="ts">import {reactive,ref,onMounted} from 'vue';import {fetchSyscodes} from '@/api/master';import {ElMessage} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {useUserNames} from '@/composables/useUserNames';import {useCustomerCards} from '@/composables/useCustomerCards';import {fetchMaintenanceDaily} from '@/api/itsm';import type {MntRecord} from '@/api/itsm';import request from '@/api/request';import {useCustClass} from '@/composables/useCustClass';import {useDict} from '@/composables/useDict'
 const{items,loading,page,perPage,total,onSearch}=useListPage<MntRecord>(fetchMaintenanceDaily)
 const{drawer,detail,open}=useDetailDrawer<MntRecord>()
+const{userName}=useUserNames();const{custCard}=useCustomerCards();const{className}=useCustClass()
+const{dictLabel:svLabel}=useDict('SV');const{dictLabel:elLabel}=useDict('EL');const{dictLabel:flLabel}=useDict('FL')
 const search=reactive({id:'',status:'',fault_type:''});const faultTypes=ref<{code_cd:string;code_nm:string}[]>([])
 onMounted(async()=>{try{const r=await fetchSyscodes('FL');faultTypes.value=r.data||[]}catch{}})
 function statusTag(s:unknown){const m:Record<string,string>={'1':'info','2':'primary','3':'success','4':'warning','5':'primary','9':'danger'};return m[s as string]||'info'}
