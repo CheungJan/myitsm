@@ -234,6 +234,7 @@ class SystemService:
     def list_all_suppliers(self) -> list[dict[str, Any]]:
         return self._repo.list_all_suppliers()
 
+
     def create_item_class(self, data: dict[str, Any]) -> dict[str, Any]:
         """新增物料分类。"""
         parent = (data.get("parent_cd") or "").strip()
@@ -638,3 +639,32 @@ class SystemService:
 
     def get_towns(self, city_cd: str | None = None) -> list[dict[str, Any]]:
         return [t.to_dict() for t in self._repo.get_towns(city_cd)]
+
+    # ========== SupplierClass CRUD ==========
+
+    def get_supplier_classes(self) -> list[dict[str, Any]]:
+        return self._repo.get_supplier_classes()
+
+    def create_supplier_class(self, data: dict[str, Any]) -> dict[str, Any]:
+        existing = self._repo.get_supplier_class(data["class_cd"])
+        if existing:
+            raise ValueError(f"分类编码 {data['class_cd']} 已存在")
+        return self._repo.create_supplier_class(data).to_dict()
+
+    def update_supplier_class(self, class_cd: str, data: dict[str, Any]) -> dict[str, Any]:
+        obj = self._repo.get_supplier_class(class_cd)
+        if not obj:
+            raise ValueError(f"分类 {class_cd} 不存在")
+        return self._repo.update_supplier_class(obj, data).to_dict()
+
+    def delete_supplier_class(self, class_cd: str) -> None:
+        obj = self._repo.get_supplier_class(class_cd)
+        if not obj:
+            raise ValueError(f"分类 {class_cd} 不存在")
+        child_count = self._repo.count_child_classes(class_cd)
+        if child_count > 0:
+            raise ValueError(f"分类 {class_cd} 下存在 {child_count} 个子分类，无法删除")
+        supplier_count = self._repo.count_suppliers_by_class(class_cd)
+        if supplier_count > 0:
+            raise ValueError(f"分类 {class_cd} 下存在 {supplier_count} 个供应商，无法删除")
+        self._repo.delete_supplier_class(obj)

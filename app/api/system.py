@@ -436,6 +436,7 @@ def list_all_suppliers():  # type: ignore[no-untyped-def]
     return success_response(data=_service.list_all_suppliers())
 
 
+
 @system_bp.get("/items/<item_cd>/related-boms")
 @login_required
 def get_related_boms(item_cd: str):  # type: ignore[no-untyped-def]
@@ -506,6 +507,54 @@ def update_item_supplier(item_cd: str, cust_cd: str):  # type: ignore[no-untyped
 def delete_item_supplier(item_cd: str, cust_cd: str):  # type: ignore[no-untyped-def]
     """删除物料供应商关联。"""
     return success_response() if _service.delete_item_supplier(item_cd, cust_cd) else error_response("不存在", 404)
+
+
+# ---- 供应商分类 ----
+
+
+@system_bp.get("/supplierclasses")
+@login_required
+def list_supplier_classes():  # type: ignore[no-untyped-def]
+    """供应商分类列表。"""
+    return success_response(data=_service.get_supplier_classes())
+
+
+@system_bp.post("/supplierclasses")
+@login_required
+def create_supplier_class():  # type: ignore[no-untyped-def]
+    """新增供应商分类。"""
+    json_data = request.get_json(silent=True) or {}
+    if not json_data.get("class_cd") or not json_data.get("class_nm"):
+        return error_response("分类编码和名称不能为空", 400)
+    try:
+        return success_response(data=_service.create_supplier_class(json_data), code=201)
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+
+@system_bp.put("/supplierclasses/<class_cd>")
+@login_required
+def update_supplier_class(class_cd: str):  # type: ignore[no-untyped-def]
+    """编辑供应商分类。"""
+    json_data = request.get_json(silent=True) or {}
+    try:
+        return success_response(data=_service.update_supplier_class(class_cd, json_data))
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+
+@system_bp.delete("/supplierclasses/<class_cd>")
+@login_required
+def delete_supplier_class(class_cd: str):  # type: ignore[no-untyped-def]
+    """删除供应商分类。"""
+    try:
+        _service.delete_supplier_class(class_cd)
+        return success_response(message="删除成功")
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            return error_response(msg, 404)
+        return error_response(msg, 409)
 
 
 # ---- 客户分类 ----

@@ -19,6 +19,8 @@ from app.models.master import (
     ItemClass,
     PosREid,
     Province,
+    Supplier,
+    SupplierClass,
     SysCode,
     Town,
 )
@@ -519,6 +521,7 @@ class SystemRepository:
         from app.models.master import Supplier
         rows = db.session.query(Supplier.supp_cd, Supplier.supp_nm).order_by(Supplier.supp_cd).all()
         return [{"supp_cd": r[0], "supp_nm": r[1]} for r in rows]
+
 
     @staticmethod
     def create_item_class(data: dict[str, Any]) -> ItemClass:
@@ -1064,3 +1067,49 @@ class SystemRepository:
         if city_cd:
             q = q.filter(Town.city_cd == city_cd)
         return list(q.order_by(Town.town_cd).all())
+
+    # ========== SupplierClass CRUD ==========
+
+    @staticmethod
+    def get_supplier_classes() -> list[dict[str, Any]]:
+        """获取供应商分类列表（用于树形结构）。"""
+        rows = db.session.query(SupplierClass).order_by(SupplierClass.class_cd).all()
+        return [r.to_dict() for r in rows]
+
+    @staticmethod
+    def get_supplier_class(class_cd: str):
+        """获取单个供应商分类。"""
+        return db.session.get(SupplierClass, class_cd)
+
+    @staticmethod
+    def create_supplier_class(data: dict[str, Any]) -> SupplierClass:
+        """新增供应商分类。"""
+        obj = SupplierClass(**data)
+        db.session.add(obj)
+        db.session.flush()
+        return obj
+
+    @staticmethod
+    def update_supplier_class(obj: SupplierClass, data: dict[str, Any]) -> SupplierClass:
+        """更新供应商分类。"""
+        for k, v in data.items():
+            if hasattr(obj, k):
+                setattr(obj, k, v)
+        db.session.flush()
+        return obj
+
+    @staticmethod
+    def delete_supplier_class(obj: SupplierClass) -> None:
+        """删除供应商分类。"""
+        db.session.delete(obj)
+        db.session.flush()
+
+    @staticmethod
+    def count_suppliers_by_class(class_cd: str) -> int:
+        """统计某分类下的供应商数量。"""
+        return db.session.query(Supplier).filter(Supplier.class_cd == class_cd, Supplier.useflg == "1").count()
+
+    @staticmethod
+    def count_child_classes(class_cd: str) -> int:
+        """统计某分类下的子分类数量。"""
+        return db.session.query(SupplierClass).filter(SupplierClass.parent == class_cd).count()
