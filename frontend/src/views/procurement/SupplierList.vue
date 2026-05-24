@@ -129,28 +129,92 @@
       </template>
     </el-dialog>
 
-    <!-- 详情弹窗 -->
-    <el-dialog :title="'供应商详情 — ' + (detailData?.supp_nm || '')" v-model="detailVisible" width="550px">
-      <el-descriptions v-if="detailData" :column="2" border size="small">
-        <el-descriptions-item label="编码">{{ detailData.supp_cd }}</el-descriptions-item>
-        <el-descriptions-item label="名称">{{ detailData.supp_nm }}</el-descriptions-item>
-        <el-descriptions-item label="简称">{{ detailData.custanm || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="简码">{{ detailData.custbrcd || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="分类">{{ classMap[detailData.class_cd as string] || detailData.class_cd }}</el-descriptions-item>
-        <el-descriptions-item label="联系人">{{ detailData.contactor || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="电话">{{ detailData.phoneno || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="传真">{{ detailData.faxno || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="状态">
-          <el-tag :type="detailData.useflg==='0'?'info':'success'" size="small">{{ detailData.useflg==='0'?'停用':'启用' }}</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="地址" :span="2">{{ detailData.address || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="邮编">{{ detailData.zipcd || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="等级">{{ detailData.scale || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="税号" :span="2">{{ detailData.taxno || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="开户银行">{{ detailData.banknm || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="银行账号">{{ detailData.bankaccno || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="采购代表">{{ detailData.pcrep || '-' }}</el-descriptions-item>
-      </el-descriptions>
+    <!-- 详情 Tab 弹窗 -->
+    <el-dialog :title="'供应商 — ' + (detailData?.supp_nm || '')" v-model="detailVisible" width="750px">
+      <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+        <el-tab-pane label="基本信息" name="info">
+          <el-descriptions v-if="detailData" :column="2" border size="small">
+            <el-descriptions-item label="编码">{{ detailData.supp_cd }}</el-descriptions-item>
+            <el-descriptions-item label="名称">{{ detailData.supp_nm }}</el-descriptions-item>
+            <el-descriptions-item label="简称">{{ detailData.custanm || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="简码">{{ detailData.custbrcd || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="分类">{{ classMap[detailData.class_cd as string] || detailData.class_cd }}</el-descriptions-item>
+            <el-descriptions-item label="联系人">{{ detailData.contactor || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="电话">{{ detailData.phoneno || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="传真">{{ detailData.faxno || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="状态">
+              <el-tag :type="detailData.useflg==='0'?'info':'success'" size="small">{{ detailData.useflg==='0'?'停用':'启用' }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="地址" :span="2">{{ detailData.address || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </el-tab-pane>
+
+        <el-tab-pane label="供应商品" name="items">
+          <div style="margin-bottom:8px;"><el-button type="primary" size="small" @click="openAddItem">+ 新增供应商品</el-button></div>
+          <el-table :data="suppItems" v-loading="suppItemsLoading" size="small" stripe>
+            <el-table-column prop="itemcd" label="物料编码" width="90" />
+            <el-table-column prop="item_nm" label="名称" min-width="140" show-overflow-tooltip />
+            <el-table-column label="默认" width="60"><template #default="{row}">
+              <el-tag :type="row.dfltflg==='Y'?'success':'info'" size="small">{{ row.dfltflg==='Y'?'是':'否' }}</el-tag>
+            </template></el-table-column>
+            <el-table-column prop="delivercycle" label="配送周期(天)" width="100" />
+            <el-table-column prop="servicecycle" label="服务周期(天)" width="100" />
+            <el-table-column prop="guaranteeperiod" label="保修期(天)" width="100" />
+            <el-table-column label="操作" width="120"><template #default="{row}">
+              <el-button link type="primary" size="small" @click="openEditItem(row)">编辑</el-button>
+              <el-button link type="danger" size="small" @click="handleDeleteItem(row)">删除</el-button>
+            </template></el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane label="价格报价" name="prices">
+          <div style="margin-bottom:8px;"><el-button type="primary" size="small" @click="openAddPrice">+ 新增报价</el-button></div>
+          <el-table :data="suppPrices" v-loading="suppPricesLoading" size="small" stripe>
+            <el-table-column prop="itemcd" label="物料编码" width="90" />
+            <el-table-column prop="item_nm" label="名称" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="min_qty" label="最小起订" width="80" />
+            <el-table-column prop="itemprice" label="单价" width="100" />
+            <el-table-column prop="effective_date" label="生效" width="100" />
+            <el-table-column prop="expire_date" label="失效" width="100" />
+            <el-table-column label="操作" width="120"><template #default="{row}">
+              <el-button link type="primary" size="small" @click="openEditPrice(row)">编辑</el-button>
+              <el-button link type="danger" size="small" @click="handleDeletePrice(row)">删除</el-button>
+            </template></el-table-column>
+          </el-table>
+        </el-tab-pane>
+      </el-tabs>
+    </el-dialog>
+
+    <!-- 供应商品新增/编辑弹窗 -->
+    <el-dialog :title="itemIsEdit?'编辑供应商品':'新增供应商品'" v-model="itemDialogVisible" width="400px">
+      <el-form :model="itemForm" label-width="80px" size="small">
+        <el-form-item label="物料" required>
+          <el-select v-model="itemForm.itemcd" :disabled="itemIsEdit" style="width:100%" filterable placeholder="搜索物料编码/名称">
+            <el-option v-for="it in allItems" :key="it.item_cd as string" :label="`${it.item_cd} ${it.item_nm}`" :value="it.item_cd" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="默认"><el-switch v-model="itemForm.dfltflg" active-value="Y" inactive-value="N" /></el-form-item>
+        <el-form-item label="配送周期(天)"><el-input-number v-model="itemForm.delivercycle" :min="0" controls-position="right" style="width:100%" /></el-form-item>
+        <el-form-item label="服务周期(天)"><el-input-number v-model="itemForm.servicecycle" :min="0" controls-position="right" style="width:100%" /></el-form-item>
+        <el-form-item label="保修期(天)"><el-input-number v-model="itemForm.guaranteeperiod" :min="0" controls-position="right" style="width:100%" /></el-form-item>
+      </el-form>
+      <template #footer><el-button size="small" @click="itemDialogVisible=false">取消</el-button><el-button type="primary" size="small" @click="handleSaveItem">保存</el-button></template>
+    </el-dialog>
+
+    <!-- 价格新增/编辑弹窗 -->
+    <el-dialog :title="priceIsEdit?'编辑报价':'新增报价'" v-model="priceDialogVisible" width="400px">
+      <el-form :model="priceForm" label-width="80px" size="small">
+        <el-form-item label="物料" required>
+          <el-select v-model="priceForm.itemcd" :disabled="priceIsEdit" style="width:100%">
+            <el-option v-for="it in suppItems" :key="it.itemcd as string" :label="`${it.itemcd} ${it.item_nm}`" :value="it.itemcd" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="最小起订"><el-input-number v-model="priceForm.min_qty" :min="0" controls-position="right" style="width:100%" /></el-form-item>
+        <el-form-item label="单价" required><el-input-number v-model="priceForm.itemprice" :min="0" :precision="2" controls-position="right" style="width:100%" /></el-form-item>
+        <el-form-item label="生效日期"><el-date-picker v-model="priceForm.effective_date" type="date" style="width:100%" /></el-form-item>
+        <el-form-item label="失效日期"><el-date-picker v-model="priceForm.expire_date" type="date" style="width:100%" /></el-form-item>
+      </el-form>
+      <template #footer><el-button size="small" @click="priceDialogVisible=false">取消</el-button><el-button type="primary" size="small" @click="handleSavePrice">保存</el-button></template>
     </el-dialog>
 
     <!-- 分类管理弹窗 -->
@@ -179,7 +243,10 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   fetchSuppliersPaginated, createSupplier, updateSupplier, deleteSupplier,
-  fetchSupplierClasses, createSupplierClass, updateSupplierClass, deleteSupplierClass
+  fetchSupplierClasses, createSupplierClass, updateSupplierClass, deleteSupplierClass,
+  fetchSupplierItems, addSupplierItem, updateSupplierItem, deleteSupplierItem,
+  fetchSupplierPrices, createSupplierPrice, updateSupplierPrice, deleteSupplierPrice,
+  fetchItems,
 } from '@/api/master'
 
 const searchKeyword = ref('')
@@ -217,6 +284,117 @@ const classIsEdit = ref(false)
 const classForm = reactive({ class_cd: '', class_nm: '', parent: '', classtyp: '' })
 const classDialogTitle = computed(() => classIsEdit.value ? '编辑分类' : '新增分类')
 
+// Tab state
+const activeTab = ref('info')
+
+// Supply items
+const suppItems = ref<Record<string,unknown>[]>([])
+const suppItemsLoading = ref(false)
+const itemDialogVisible = ref(false)
+const itemIsEdit = ref(false)
+const currentItemCd = ref('')
+const itemForm = reactive({ itemcd: '', dfltflg: 'N', delivercycle: 0, servicecycle: 0, guaranteeperiod: 0 })
+const allItems = ref<Record<string,unknown>[]>([])
+
+// Prices
+const suppPrices = ref<Record<string,unknown>[]>([])
+const suppPricesLoading = ref(false)
+const priceDialogVisible = ref(false)
+const priceIsEdit = ref(false)
+const currentPriceId = ref(0)
+const priceForm = reactive({ itemcd: '', min_qty: 0, itemprice: 0, effective_date: '', expire_date: '' })
+
+async function handleTabChange(tab: string) {
+  if (tab === 'items' && suppItems.value.length === 0) {
+    suppItemsLoading.value = true
+    try {
+      const r = await fetchSupplierItems(detailData.value?.supp_cd as string)
+      suppItems.value = (r.data as any[]) || []
+    } catch { ElMessage.error('加载失败') }
+    finally { suppItemsLoading.value = false }
+  }
+  if (tab === 'prices' && suppPrices.value.length === 0) {
+    suppPricesLoading.value = true
+    try {
+      const r = await fetchSupplierPrices(detailData.value?.supp_cd as string)
+      suppPrices.value = (r.data as any[]) || []
+    } catch { ElMessage.error('加载失败') }
+    finally { suppPricesLoading.value = false }
+  }
+}
+
+// Item CRUD
+function openAddItem() {
+  itemIsEdit.value = false; currentItemCd.value = ''
+  itemForm.itemcd = ''; itemForm.dfltflg = 'N'; itemForm.delivercycle = 0; itemForm.servicecycle = 0; itemForm.guaranteeperiod = 0
+  itemDialogVisible.value = true
+}
+function openEditItem(row: any) {
+  itemIsEdit.value = true; currentItemCd.value = row.itemcd as string
+  itemForm.itemcd = row.itemcd; itemForm.dfltflg = row.dfltflg || 'N'
+  itemForm.delivercycle = Number(row.delivercycle) || 0; itemForm.servicecycle = Number(row.servicecycle) || 0
+  itemForm.guaranteeperiod = Number(row.guaranteeperiod) || 0
+  itemDialogVisible.value = true
+}
+async function handleSaveItem() {
+  if (!itemForm.itemcd) { ElMessage.warning('请选择物料'); return }
+  try {
+    if (itemIsEdit.value) {
+      await updateSupplierItem(detailData.value?.supp_cd as string, currentItemCd.value, { ...itemForm, itemcd: undefined })
+    } else {
+      await addSupplierItem(detailData.value?.supp_cd as string, { ...itemForm })
+    }
+    itemDialogVisible.value = false
+    suppItems.value = []; await handleTabChange('items')
+  } catch (e: any) { ElMessage.error(e?.response?.data?.message || '保存失败') }
+}
+async function handleDeleteItem(row: any) {
+  try { await ElMessageBox.confirm(`确定移除商品 ${row.item_nm}？`, '确认', { type: 'warning' }) } catch { return }
+  try {
+    await deleteSupplierItem(detailData.value?.supp_cd as string, row.itemcd as string)
+    suppItems.value = suppItems.value.filter(i => i.itemcd !== row.itemcd)
+    ElMessage.success('删除成功')
+  } catch (e: any) { ElMessage.error(e?.response?.data?.message || '删除失败') }
+}
+
+// Price CRUD
+function openAddPrice() {
+  priceIsEdit.value = false; currentPriceId.value = 0
+  priceForm.itemcd = ''; priceForm.min_qty = 0; priceForm.itemprice = 0; priceForm.effective_date = ''; priceForm.expire_date = ''
+  priceDialogVisible.value = true
+}
+function openEditPrice(row: any) {
+  priceIsEdit.value = true; currentPriceId.value = row.id as number
+  priceForm.itemcd = row.itemcd; priceForm.min_qty = Number(row.min_qty) || 0; priceForm.itemprice = Number(row.itemprice) || 0
+  priceForm.effective_date = row.effective_date || ''; priceForm.expire_date = row.expire_date || ''
+  priceDialogVisible.value = true
+}
+async function handleSavePrice() {
+  if (!priceForm.itemcd) { ElMessage.warning('请选择物料'); return }
+  try {
+    const data = { ...priceForm, itemcd: priceForm.itemcd }
+    if (priceIsEdit.value) {
+      await updateSupplierPrice(detailData.value?.supp_cd as string, currentPriceId.value, data)
+    } else {
+      await createSupplierPrice(detailData.value?.supp_cd as string, data)
+    }
+    priceDialogVisible.value = false
+    suppPrices.value = []; await handleTabChange('prices')
+  } catch (e: any) { ElMessage.error(e?.response?.data?.message || '保存失败') }
+}
+async function handleDeletePrice(row: any) {
+  try { await ElMessageBox.confirm('确定删除此报价？', '确认', { type: 'warning' }) } catch { return }
+  try {
+    await deleteSupplierPrice(detailData.value?.supp_cd as string, row.id as number)
+    suppPrices.value = suppPrices.value.filter(p => p.id !== row.id)
+    ElMessage.success('删除成功')
+  } catch (e: any) { ElMessage.error(e?.response?.data?.message || '删除失败') }
+}
+
+async function loadAllItems() {
+  try { const r = await fetchItems({ per_page: 9999 } as any); allItems.value = (r.data as any)?.items || [] } catch { /* */ }
+}
+
 async function load() {
   loading.value = true
   try {
@@ -250,6 +428,9 @@ function openEdit(row: any) {
 
 function openDetail(row: any) {
   detailData.value = row
+  activeTab.value = 'info'
+  suppItems.value = []
+  suppPrices.value = []
   detailVisible.value = true
 }
 
@@ -321,7 +502,7 @@ async function handleDeleteClass() {
   } catch (e: any) { ElMessage.error(e?.response?.data?.message || '删除失败') }
 }
 
-onMounted(() => { loadClasses(); load() })
+onMounted(() => { loadClasses(); load(); loadAllItems() })
 </script>
 
 <style scoped>

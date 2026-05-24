@@ -440,3 +440,39 @@ export function updateSupplierClass(classCd: string, data: Record<string, unknow
 export function deleteSupplierClass(classCd: string) {
     return request.delete(`/supplierclasses/${classCd}`)
 }
+
+// ---- 供应商商品关联 ----
+
+export function fetchSupplierItems(suppCd: string) {
+    return request.get(`/suppliers/${suppCd}/items`)
+}
+
+export function addSupplierItem(suppCd: string, data: Record<string, unknown>) {
+    return request.post(`/suppliers/${suppCd}/items`, data)
+}
+
+export function updateSupplierItem(suppCd: string, itemCd: string, data: Record<string, unknown>) {
+    return request.put(`/suppliers/${suppCd}/items/${itemCd}`, data)
+}
+
+export function deleteSupplierItem(suppCd: string, itemCd: string) {
+    return request.delete(`/suppliers/${suppCd}/items/${itemCd}`)
+}
+
+// ---- 供应商价格 ----
+
+export function fetchSupplierPrices(suppCd: string, params?: { item_cd?: string; current_only?: boolean }) {
+    return request.get(`/suppliers/${suppCd}/prices`, { params })
+}
+
+export function createSupplierPrice(suppCd: string, data: Record<string, unknown>) {
+    return request.post(`/suppliers/${suppCd}/prices`, data)
+}
+
+export function updateSupplierPrice(suppCd: string, priceId: number, data: Record<string, unknown>) {
+    return request.put(`/suppliers/${suppCd}/prices/${priceId}`, data)
+}
+
+export function deleteSupplierPrice(suppCd: string, priceId: number) {
+    return request.delete(`/suppliers/${suppCd}/prices/${priceId}`)
+}
