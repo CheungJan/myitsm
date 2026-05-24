@@ -13,8 +13,12 @@
           <template #header><span style="font-size:14px;font-weight:600;">供应商分类</span></template>
           <el-menu :default-active="activeClass" @select="handleClassSelect" style="border-right:none;">
             <el-menu-item index=""><span style="color:#909399;">全部</span></el-menu-item>
-            <el-menu-item v-for="c in classList" :key="c.class_cd" :index="c.class_cd">
-              {{ c.class_nm }}
+            <el-menu-item v-for="c in classList" :key="c.class_cd" :index="c.class_cd" style="display:flex;justify-content:space-between;align-items:center;">
+              <span>{{ c.class_nm }}</span>
+              <span style="display:flex;gap:2px;margin-left:4px;" @click.stop>
+                <el-button link size="small" @click="openClassDialog(c)"><el-icon><EditPen /></el-icon></el-button>
+                <el-button link size="small" @click="handleDeleteClass(c)"><el-icon><Delete /></el-icon></el-button>
+              </span>
             </el-menu-item>
           </el-menu>
           <div style="padding:8px;border-top:1px solid #ebeef5;margin-top:8px;">
@@ -241,6 +245,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { EditPen, Delete } from '@element-plus/icons-vue'
 import {
   fetchSuppliersPaginated, createSupplier, updateSupplier, deleteSupplier,
   fetchSupplierClasses, createSupplierClass, updateSupplierClass, deleteSupplierClass,
@@ -492,13 +497,13 @@ async function handleSaveClass() {
   } catch (e: any) { ElMessage.error(e?.response?.data?.message || '保存失败') }
 }
 
-async function handleDeleteClass() {
-  try { await ElMessageBox.confirm(`确定删除分类 ${classForm.class_nm}？`, '确认', { type: 'warning' }) } catch { return }
+async function handleDeleteClass(row?: any) {
+  const target = row || classForm
+  try { await ElMessageBox.confirm(`确定删除分类 ${target.class_nm}？`, '确认', { type: 'warning' }) } catch { return }
   try {
-    await deleteSupplierClass(classForm.class_cd)
+    await deleteSupplierClass(target.class_cd)
     ElMessage.success('删除成功')
-    classDialogVisible.value = false
-    await loadClasses()
+    if (row) { await loadClasses() } else { classDialogVisible.value = false; await loadClasses() }
   } catch (e: any) { ElMessage.error(e?.response?.data?.message || '删除失败') }
 }
 
