@@ -12,6 +12,7 @@ from app.models.master import (
     Country,
     CustClass,
     Customer,
+    CustItems,
     CustPosRl,
     Eid,
     EidTrack,
@@ -522,6 +523,81 @@ class SystemRepository:
         rows = db.session.query(Supplier.supp_cd, Supplier.supp_nm).order_by(Supplier.supp_cd).all()
         return [{"supp_cd": r[0], "supp_nm": r[1]} for r in rows]
 
+    # ========== Supplier CRUD ==========
+
+    @staticmethod
+    def get_supplier(supp_cd: str):
+        """获取单个供应商。"""
+        return db.session.get(Supplier, supp_cd)
+
+    @staticmethod
+    def list_suppliers_paginated(keyword: str = "", class_cd: str = "", page: int = 1, per_page: int = 20):
+        """分页查询供应商列表，支持搜索和分类筛选。"""
+        q = db.session.query(Supplier)
+        if keyword:
+            like = f"%{keyword}%"
+            q = q.filter(db.or_(Supplier.supp_nm.ilike(like), Supplier.supp_cd.ilike(like)))
+        if class_cd:
+            q = q.filter(Supplier.class_cd == class_cd)
+        q = q.order_by(Supplier.supp_cd)
+        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+        return {
+            "items": [r.to_dict() for r in pagination.items],
+            "total": pagination.total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def get_max_supp_cd() -> str | None:
+        """获取当前最大供应商编码（用于自动编号）。"""
+        row = db.session.query(db.func.max(Supplier.supp_cd)).filter(
+            Supplier.supp_cd.op("~")(r"^\d{8}$")
+        ).scalar()
+        return row
+
+    @staticmethod
+    def create_supplier(data: dict[str, Any]) -> Supplier:
+        """新增供应商。"""
+        obj = Supplier(**data)
+        db.session.add(obj)
+        db.session.flush()
+        return obj
+
+    @staticmethod
+    def update_supplier(obj: Supplier, data: dict[str, Any]) -> Supplier:
+        """更新供应商。"""
+        readonly = {"supp_cd", "custcd", "custnm", "opercd", "gendate", "upddate"}
+        for k, v in data.items():
+            if hasattr(obj, k) and k not in readonly:
+                setattr(obj, k, v)
+        db.session.flush()
+        return obj
+
+    @staticmethod
+    def delete_supplier(obj: Supplier) -> None:
+        """逻辑删除供应商（useflg='0'）。"""
+        obj.useflg = "0"
+        db.session.flush()
+
+    @staticmethod
+    def count_orders_by_supplier(supp_cd: str) -> int:
+        from app.models.procurement import PurchaseRegister
+        return db.session.query(PurchaseRegister).filter(PurchaseRegister.suppliercd == supp_cd).count()
+
+    @staticmethod
+    def count_prices_by_supplier(supp_cd: str) -> int:
+        from app.models.inventory import SupplierPrice
+        return db.session.query(SupplierPrice).filter(SupplierPrice.supp_cd == supp_cd).count()
+
+    @staticmethod
+    def count_custitems_by_supplier(supp_cd: str) -> int:
+        return db.session.query(CustItems).filter(CustItems.custcd == supp_cd).count()
+
+    @staticmethod
+    def count_appraisals_by_supplier(supp_cd: str) -> int:
+        from app.models.procurement import SupplierAppraisalDt
+        return db.session.query(SupplierAppraisalDt).filter(SupplierAppraisalDt.supplierid == supp_cd).count()
 
     @staticmethod
     def create_item_class(data: dict[str, Any]) -> ItemClass:

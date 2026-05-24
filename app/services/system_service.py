@@ -234,6 +234,57 @@ class SystemService:
     def list_all_suppliers(self) -> list[dict[str, Any]]:
         return self._repo.list_all_suppliers()
 
+    # ========== Supplier CRUD ==========
+
+    def get_supplier(self, supp_cd: str) -> dict[str, Any] | None:
+        obj = self._repo.get_supplier(supp_cd)
+        return obj.to_dict() if obj else None
+
+    def list_suppliers(self, keyword: str = "", class_cd: str = "", page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        return self._repo.list_suppliers_paginated(keyword, class_cd, page, per_page)
+
+    def create_supplier(self, data: dict[str, Any]) -> dict[str, Any]:
+        supp_cd = data.get("supp_cd", "").strip()
+        if supp_cd:
+            existing = self._repo.get_supplier(supp_cd)
+            if existing:
+                raise ValueError(f"供应商编码 {supp_cd} 已存在")
+        else:
+            max_cd = self._repo.get_max_supp_cd()
+            next_num = int(max_cd) + 1 if max_cd else 1
+            supp_cd = str(next_num).zfill(8)
+            data["supp_cd"] = supp_cd
+        if not data.get("supp_nm"):
+            raise ValueError("供应商名称不能为空")
+        return self._repo.create_supplier(data).to_dict()
+
+    def update_supplier(self, supp_cd: str, data: dict[str, Any]) -> dict[str, Any]:
+        obj = self._repo.get_supplier(supp_cd)
+        if not obj:
+            raise ValueError(f"供应商 {supp_cd} 不存在")
+        return self._repo.update_supplier(obj, data).to_dict()
+
+    def delete_supplier(self, supp_cd: str) -> dict[str, Any]:
+        obj = self._repo.get_supplier(supp_cd)
+        if not obj:
+            raise ValueError(f"供应商 {supp_cd} 不存在")
+        conflicts = self._check_supplier_delete_conflicts(supp_cd)
+        if conflicts:
+            raise ValueError(f"该供应商存在以下关联：{'; '.join(conflicts)}，无法删除")
+        self._repo.delete_supplier(obj)
+        return {"supp_cd": supp_cd, "conflicts": []}
+
+    def _check_supplier_delete_conflicts(self, supp_cd: str) -> list[str]:
+        conflicts = []
+        if self._repo.count_orders_by_supplier(supp_cd) > 0:
+            conflicts.append("采购订单关联")
+        if self._repo.count_prices_by_supplier(supp_cd) > 0:
+            conflicts.append("供应商价格记录")
+        if self._repo.count_custitems_by_supplier(supp_cd) > 0:
+            conflicts.append("供应商商品关联")
+        if self._repo.count_appraisals_by_supplier(supp_cd) > 0:
+            conflicts.append("供应商评价记录")
+        return conflicts
 
     def create_item_class(self, data: dict[str, Any]) -> dict[str, Any]:
         """新增物料分类。"""

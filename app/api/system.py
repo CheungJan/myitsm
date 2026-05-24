@@ -431,9 +431,59 @@ def delete_item(item_cd: str):  # type: ignore[no-untyped-def]
 
 @system_bp.get("/suppliers")
 @login_required
-def list_all_suppliers():  # type: ignore[no-untyped-def]
-    """全部供应商列表（用于下拉选择）。"""
-    return success_response(data=_service.list_all_suppliers())
+def list_suppliers():  # type: ignore[no-untyped-def]
+    """供应商列表（分页 + 搜索 + 分类筛选）。"""
+    keyword = request.args.get("keyword", "").strip()
+    class_cd = request.args.get("class_cd", "").strip()
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    return success_response(data=_service.list_suppliers(keyword, class_cd, page, per_page))
+
+
+@system_bp.get("/suppliers/<supp_cd>")
+@login_required
+def get_supplier(supp_cd: str):  # type: ignore[no-untyped-def]
+    """供应商详情。"""
+    data = _service.get_supplier(supp_cd)
+    if not data:
+        return error_response("供应商不存在", 404)
+    return success_response(data=data)
+
+
+@system_bp.post("/suppliers")
+@login_required
+def create_supplier():  # type: ignore[no-untyped-def]
+    """新增供应商。"""
+    json_data = request.get_json(silent=True) or {}
+    try:
+        return success_response(data=_service.create_supplier(json_data), code=201)
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+
+@system_bp.put("/suppliers/<supp_cd>")
+@login_required
+def update_supplier(supp_cd: str):  # type: ignore[no-untyped-def]
+    """编辑供应商。"""
+    json_data = request.get_json(silent=True) or {}
+    try:
+        return success_response(data=_service.update_supplier(supp_cd, json_data))
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+
+@system_bp.delete("/suppliers/<supp_cd>")
+@login_required
+def delete_supplier(supp_cd: str):  # type: ignore[no-untyped-def]
+    """删除供应商（逻辑删除）。"""
+    try:
+        result = _service.delete_supplier(supp_cd)
+        return success_response(data=result, message="删除成功")
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            return error_response(msg, 404)
+        return error_response(msg, 409)
 
 
 
