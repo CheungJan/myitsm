@@ -486,6 +486,51 @@ def delete_supplier(supp_cd: str):  # type: ignore[no-untyped-def]
         return error_response(msg, 409)
 
 
+# ---- 供应商商品关联 ----
+
+
+@system_bp.get("/suppliers/<supp_cd>/items")
+@login_required
+def list_supplier_items(supp_cd: str):  # type: ignore[no-untyped-def]
+    """查询供应商关联的商品列表。"""
+    return success_response(data=_service.get_supplier_items(supp_cd))
+
+
+@system_bp.post("/suppliers/<supp_cd>/items")
+@login_required
+def add_supplier_item(supp_cd: str):  # type: ignore[no-untyped-def]
+    """为供应商新增商品关联。"""
+    json_data = request.get_json(silent=True) or {}
+    try:
+        return success_response(data=_service.add_supplier_item(supp_cd, json_data), code=201)
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+
+@system_bp.put("/suppliers/<supp_cd>/items/<item_cd>")
+@login_required
+def update_supplier_item(supp_cd: str, item_cd: str):  # type: ignore[no-untyped-def]
+    """修改供应商-商品关联。"""
+    json_data = request.get_json(silent=True) or {}
+    try:
+        return success_response(data=_service.update_supplier_item(supp_cd, item_cd, json_data))
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+
+@system_bp.delete("/suppliers/<supp_cd>/items/<item_cd>")
+@login_required
+def delete_supplier_item(supp_cd: str, item_cd: str):  # type: ignore[no-untyped-def]
+    """删除供应商-商品关联。"""
+    try:
+        _service.delete_supplier_item(supp_cd, item_cd)
+        return success_response(message="删除成功")
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            return error_response(msg, 404)
+        return error_response(msg, 409)
+
 
 @system_bp.get("/items/<item_cd>/related-boms")
 @login_required

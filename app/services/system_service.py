@@ -286,6 +286,47 @@ class SystemService:
             conflicts.append("供应商评价记录")
         return conflicts
 
+    # ========== Supplier Items ==========
+
+    def get_supplier_items(self, supp_cd: str) -> list[dict[str, Any]]:
+        """查询供应商关联的商品列表。"""
+        return self._repo.get_supplier_items(supp_cd)
+
+    def add_supplier_item(self, supp_cd: str, data: dict[str, Any]) -> dict[str, Any]:
+        """新增供应商-商品关联。"""
+        item_cd = data.get("itemcd", "")
+        if not item_cd:
+            raise ValueError("物料编码不能为空")
+        existing = self._repo.get_supplier_item(supp_cd, item_cd)
+        if existing:
+            raise ValueError(f"物料 {item_cd} 已关联")
+        if data.get("dfltflg") == "Y":
+            self._repo.set_item_default_supplier(item_cd, supp_cd)
+        return self._repo.add_supplier_item(supp_cd, data).to_dict()
+
+    def update_supplier_item(self, supp_cd: str, item_cd: str, data: dict[str, Any]) -> dict[str, Any]:
+        """更新供应商-商品关联。"""
+        obj = self._repo.get_supplier_item(supp_cd, item_cd)
+        if not obj:
+            raise ValueError("关联不存在")
+        if data.get("dfltflg") == "Y":
+            self._repo.set_item_default_supplier(item_cd, supp_cd)
+        updatable = {"dfltflg", "delivercycle", "servicecycle", "guaranteeperiod", "backup", "useflg"}
+        for k, v in data.items():
+            if k in updatable and hasattr(obj, k):
+                setattr(obj, k, v)
+        db.session.flush()
+        return obj.to_dict()
+
+    def delete_supplier_item(self, supp_cd: str, item_cd: str) -> None:
+        """删除供应商-商品关联。"""
+        obj = self._repo.get_supplier_item(supp_cd, item_cd)
+        if not obj:
+            raise ValueError("关联不存在")
+        if self._repo.check_supplier_item_has_orders(supp_cd, item_cd):
+            raise ValueError("该商品关联存在采购订单，无法删除")
+        self._repo.delete_supplier_item(obj)
+
     def create_item_class(self, data: dict[str, Any]) -> dict[str, Any]:
         """新增物料分类。"""
         parent = (data.get("parent_cd") or "").strip()

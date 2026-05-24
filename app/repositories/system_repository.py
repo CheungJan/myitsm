@@ -1189,3 +1189,74 @@ class SystemRepository:
     def count_child_classes(class_cd: str) -> int:
         """统计某分类下的子分类数量。"""
         return db.session.query(SupplierClass).filter(SupplierClass.parent == class_cd).count()
+
+    # ========== Supplier Items (tmm24) ==========
+
+    @staticmethod
+    def get_supplier_items(supp_cd: str) -> list[dict[str, Any]]:
+        """查询供应商关联的商品列表，含物料名称、单位、分类。"""
+        rows = (
+            db.session.query(CustItems, Item.item_nm, Item.item_unit, Item.class_cd)
+            .join(Item, CustItems.itemcd == Item.item_cd)
+            .filter(CustItems.custcd == supp_cd)
+            .all()
+        )
+        result = []
+        for ci, item_nm, item_unit, class_cd in rows:
+            d = ci.to_dict()
+            d["item_nm"] = item_nm
+            d["item_unit"] = item_unit
+            d["class_cd"] = class_cd
+            result.append(d)
+        return result
+
+    @staticmethod
+    def get_supplier_item(supp_cd: str, item_cd: str):
+        """获取单个供应商-商品关联。"""
+        return db.session.query(CustItems).filter(
+            CustItems.custcd == supp_cd,
+            CustItems.itemcd == item_cd,
+        ).first()
+
+    @staticmethod
+    def add_supplier_item(supp_cd: str, data: dict[str, Any]) -> CustItems:
+        """新增供应商-商品关联。"""
+        obj = CustItems(
+            custcd=supp_cd,
+            itemcd=data["itemcd"],
+            **{k: v for k, v in data.items() if k != "itemcd"},
+        )
+        db.session.add(obj)
+        db.session.flush()
+        return obj
+
+    @staticmethod
+    def set_item_default_supplier(item_cd: str, cust_cd: str) -> None:
+        """将该物料其他供应商的默认标志清除。"""
+        db.session.query(CustItems).filter(
+            CustItems.itemcd == item_cd,
+            CustItems.custcd != cust_cd,
+            CustItems.dfltflg == "Y",
+        ).update({"dfltflg": "N"})
+
+    @staticmethod
+    def delete_supplier_item(obj: CustItems) -> None:
+        """删除供应商-商品关联。"""
+        db.session.delete(obj)
+        db.session.flush()
+
+    @staticmethod
+    def check_supplier_item_has_orders(supp_cd: str, item_cd: str) -> bool:
+        """检查供应商-商品关联是否有对应的采购订单。"""
+        from app.models.procurement import PurchaseRegister, RequisitionOrderLink
+
+        count = (
+            db.session.query(RequisitionOrderLink)
+            .join(PurchaseRegister, RequisitionOrderLink.rgstbillid == PurchaseRegister.rgstbillid)
+            .filter(
+                PurchaseRegister.suppliercd == supp_cd,
+                RequisitionOrderLink.pcplanid.isnot(None),
+            )
+            .count()
+        )
+        return count > 0
