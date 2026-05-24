@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 from datetime import datetime as dt
@@ -11,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy import desc
 
 from app.extensions import db
+from app.models.master import IdMaster
 from app.models.procurement import (
     PurchaseBill,
     PurchasePlan,
@@ -26,9 +28,28 @@ from app.models.procurement import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def _gen_id(prefix: str = "") -> str:
     """生成8位唯一ID。"""
     return (prefix + uuid.uuid4().hex[:8].upper())[:8]
+
+
+def _gen_pp_id() -> str:
+    """生成采购需求单号，沿用PP前缀自增规则。"""
+    id_master = db.session.get(IdMaster, "PP")
+    if id_master is None:
+        id_master = IdMaster(id_type="PP", prefix="PP", current_no=0, step=1, idtyp="PP", idtypnm="采购需求单号", curbillid="0", useflg="1")
+        db.session.add(id_master)
+        db.session.flush()
+    step = id_master.step or 1
+    current_no = id_master.current_no or 0
+    next_no = current_no + step
+    id_master.current_no = next_no
+    id_master.curbillid = str(next_no)
+    prefix = id_master.prefix or "PP"
+    return f"{prefix}{next_no:06d}"[:8]
 
 
 class PurchasePlanRepository:
@@ -65,7 +86,7 @@ class PurchasePlanRepository:
     def create(data: dict[str, Any], creator: str) -> PurchasePlan:
         now = datetime.now(UTC)
         record = PurchasePlan(
-            pcplanid=_gen_id(),
+            pcplanid=_gen_pp_id(),
             opercd=creator,
             gendate=now,
             auditflg="0",
@@ -94,7 +115,16 @@ class PurchasePlanRepository:
         return record
 
     @staticmethod
+    def void(record: PurchasePlan, memo_suffix: str) -> PurchasePlan:
+        """作废采购需求。"""
+        record.auditflg = "9"
+        record.useflg = "9"
+        record.memo = (record.memo or "") + memo_suffix
+        return record
+
+    @staticmethod
     def update_audit_qty(pcplanid: str, lineno: int, auditqty: int) -> None:
+        logger.info("更新采购需求审核数量: pcplanid=%s lineno=%s auditqty=%s", pcplanid, lineno, auditqty)
         db.session.query(PurchasePlanDt).filter(
             PurchasePlanDt.pcplanid == pcplanid,
             PurchasePlanDt.lineno == lineno,
@@ -216,6 +246,22 @@ class PurchaseRegisterRepository:
         return record
 
     @staticmethod
+    def create_from_batch(order_data: dict[str, Any], creator: str) -> PurchaseRegister:
+        """从批量数据创建订单主表记录。"""
+        now = datetime.now(UTC)
+        record = PurchaseRegister(
+            rgstbillid=_gen_id(),
+            suppliercd=order_data.get("suppliercd", ""),
+            memo=order_data.get("memo", ""),
+            opercd=creator,
+            gendate=now,
+            auditflg="0",
+        )
+        db.session.add(record)
+        db.session.flush()
+        return record
+
+    @staticmethod
     def add_detail(rgstbillid: str, lineno: int, data: dict[str, Any]) -> PurchaseRegisterDt:
         record = PurchaseRegisterDt(
             rgstbillid=rgstbillid,
@@ -224,6 +270,23 @@ class PurchaseRegisterRepository:
         )
         db.session.add(record)
         return record
+
+    @staticmethod
+    def add_detail_from_batch(rgstbillid: str, lineno: int, detail: dict[str, Any]) -> PurchaseRegisterDt:
+        """从批量数据创建订单明细。"""
+        dt_record = PurchaseRegisterDt(
+            rgstbillid=rgstbillid,
+            lineno=lineno,
+            itemcd=detail.get("itemcd", ""),
+            rgsqty=float(detail.get("rgsqty", 0)),
+            units=detail.get("units", "PCS"),
+            unitprice=float(detail.get("unitprice", 0)) if detail.get("unitprice") else None,
+            ref_pcplanid=detail.get("ref_pcplanid"),
+            ref_pclineno=detail.get("ref_pclineno"),
+        )
+        db.session.add(dt_record)
+        db.session.flush()
+        return dt_record
 
     @staticmethod
     def audit(record: PurchaseRegister, auditor: str, auditflg: str = "2", checkmemo: str = "") -> PurchaseRegister:
@@ -352,6 +415,13 @@ class RequisitionOrderLinkRepository:
         params = {"supp_cd": suppliercd} if suppliercd else {}
         result = db.session.execute(sql, params)
         return [dict(row._mapping) for row in result]
+
+    @staticmethod
+    def count_by_pcplanid(pcplanid: str) -> int:
+        """统计指定需求单的关联订单数量。"""
+        return db.session.query(RequisitionOrderLink).filter(
+            RequisitionOrderLink.pcplanid == pcplanid
+        ).count()
 
 
 class SupplierAppraisalRepository:

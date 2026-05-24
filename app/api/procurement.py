@@ -10,6 +10,7 @@ from __future__ import annotations
 from flask import Blueprint, g, request
 
 from app.api.auth import login_required
+from app.extensions import db
 from app.repositories.procurement_repository import (
     RequisitionOrderLinkRepository,
 )
@@ -101,6 +102,19 @@ def audit_requisition(pcplanid: str):  # type: ignore[no-untyped-def]
     return success_response(data=result)
 
 
+@procurement_bp.post("/requisitions/<pcplanid>/void")
+@login_required
+def void_requisition(pcplanid: str):  # type: ignore[no-untyped-def]
+    """作废采购需求（仅未审批/送审中可作废，已审批需检查关联订单）。"""
+    user_cd: str = g.current_user
+    json_data = request.get_json(silent=True) or {}
+    reason = json_data.get("reason", "")
+    result = PurchasePlanService.void(pcplanid, user_cd, reason)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result, message="作废成功")
+
+
 # ---- 采购订单 ----
 
 
@@ -139,6 +153,33 @@ def create_order():  # type: ignore[no-untyped-def]
     user_cd: str = g.current_user
     data = PurchaseRegisterService.create(body.model_dump(exclude_none=True), details, user_cd)
     return success_response(data=data, message="创建成功", code=201)
+
+
+@procurement_bp.post("/orders/batch")
+@login_required
+def create_batch_orders():  # type: ignore[no-untyped-def]
+    """批量创建采购订单（拆单 + 并单统一入口）。"""
+    json_data = request.get_json(silent=True) or {}
+
+    if "orders" not in json_data or not isinstance(json_data["orders"], list):
+        return error_response(message="请求格式错误：缺少 orders 数组", code=400)
+
+    orders = json_data["orders"]
+    if len(orders) == 0:
+        return error_response(message="orders 不能为空", code=400)
+    if len(orders) > 10:
+        return error_response(message="单次最多创建 10 个订单", code=400)
+
+    user_cd: str = g.current_user
+
+    try:
+        result = PurchaseRegisterService.batch_create(orders, user_cd)
+        return success_response(data=result, message=f"成功创建{result['count']}个采购订单", code=201)
+    except ValueError as e:
+        return error_response(message=str(e), code=400)
+    except Exception:
+        db.session.rollback()
+        raise
 
 
 @procurement_bp.post("/orders/<rgstbillid>/audit")
