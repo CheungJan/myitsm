@@ -84,6 +84,10 @@ export function fetchSuppliers() {
     return request.get<never, { data: { supp_cd: string; supp_nm: string }[] }>('/suppliers')
 }
 
+export function fetchSuppliersByRequisition(pcplanid: string) {
+    return request.get<never, { data: { supp_cd: string; supp_nm: string }[] }>('/suppliers/by-requisition', { params: { pcplanid } })
+}
+
 export function fetchBomClassTree(typflg?: string) {
     return request.get<never, { data: ItemClassNode[] }>('/itemclasses/bom-tree', { params: typflg ? { typflg } : {} })
 }
@@ -395,4 +399,44 @@ export function deleteBomDetail(bomcd: string, itemcd: string) {
 
 export function fetchAssets(params?: Record<string, string>) {
     return request.get('/assets', { params })
+}
+
+// ---- 供应商 CRUD ----
+
+export function fetchSuppliersPaginated(params: { keyword?: string; class_cd?: string; page?: number; per_page?: number }) {
+    return request.get('/suppliers', { params })
+}
+
+export function fetchSupplierDetail(suppCd: string) {
+    return request.get(`/suppliers/${suppCd}`)
+}
+
+export function createSupplier(data: Record<string, unknown>) {
+    return request.post('/suppliers', data)
+}
+
+export function updateSupplier(suppCd: string, data: Record<string, unknown>) {
+    return request.put(`/suppliers/${suppCd}`, data)
+}
+
+export function deleteSupplier(suppCd: string) {
+    return request.delete(`/suppliers/${suppCd}`)
+}
+
+// ---- 供应商分类 ----
+
+export function fetchSupplierClasses() {
+    return request.get('/supplierclasses')
+}
+
+export function createSupplierClass(data: Record<string, unknown>) {
+    return request.post('/supplierclasses', data)
+}
+
+export function updateSupplierClass(classCd: string, data: Record<string, unknown>) {
+    return request.put(`/supplierclasses/${classCd}`, data)
+}
+
+export function deleteSupplierClass(classCd: string) {
+    return request.delete(`/supplierclasses/${classCd}`)
 }
