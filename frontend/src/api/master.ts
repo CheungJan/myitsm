@@ -476,3 +476,11 @@ export function updateSupplierPrice(suppCd: string, priceId: number, data: Recor
 export function deleteSupplierPrice(suppCd: string, priceId: number) {
     return request.delete(`/suppliers/${suppCd}/prices/${priceId}`)
 }
+
+// ---- 批量订单（拆单/并单） ----
+
+export const batchCreateOrders = (data: { orders: Array<{ suppliercd: string; memo?: string; details: Array<{ itemcd: string; rgsqty: number; units?: string; ref_pcplanid: string; ref_pclineno: number; unitprice?: number }> }> }) =>
+    request.post('/procurement/orders/batch', data)
+
+export const validateBatchOrders = (data: { orders: Array<Record<string, unknown>> }) =>
+    request.post('/procurement/orders/batch/validate', data)
