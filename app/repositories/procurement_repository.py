@@ -142,6 +142,34 @@ class PurchasePlanRepository:
         return float(row.available_qty) if row else 0.0
 
     @staticmethod
+    def get_mergeable_details() -> list[dict[str, Any]]:
+        """查询可合并的需求明细：已审核 + 有可用余额。"""
+        rows = db.session.execute(
+            sa.text("""
+                SELECT v.pcplanid, v.lineno AS pclineno, v.itemcd, v.itemnm,
+                       v.available_qty, v.deptnm
+                FROM v_requisition_execution v
+                JOIN tpc02_pcplandt d ON v.pcplanid = d.pcplanid AND v.lineno = d.lineno
+                JOIN tpc01_pcplan p ON v.pcplanid = p.pcplanid
+                WHERE p.auditflg = '2'
+                  AND v.available_qty > 0
+                  AND d.useflg = '1'
+                ORDER BY v.itemcd, v.pcplanid, v.lineno
+            """)
+        ).fetchall()
+        return [
+            {
+                "pcplanid": r.pcplanid,
+                "pclineno": r.pclineno,
+                "itemcd": r.itemcd,
+                "itemnm": r.itemnm,
+                "available_qty": float(r.available_qty),
+                "deptnm": r.deptnm,
+            }
+            for r in rows
+        ]
+
+    @staticmethod
     def get_execution_by_plan(pcplanid: str) -> list[dict[str, Any]]:
         rows = db.session.execute(sa.text(
             "SELECT lineno, ordered_qty, received_qty, available_qty, execution_status, execution_rate "

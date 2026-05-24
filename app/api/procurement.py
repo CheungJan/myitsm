@@ -30,6 +30,7 @@ from app.schemas.procurement import (
 )
 from app.services.procurement_service import (
     PurchaseBillService,
+    PurchasePlanMergeService,
     PurchasePlanService,
     PurchasePlanStatusService,
     PurchaseRegisterService,
@@ -179,6 +180,32 @@ def create_batch_orders():  # type: ignore[no-untyped-def]
         return error_response(message=str(e), code=400)
     except Exception:
         db.session.rollback()
+        raise
+
+
+@procurement_bp.post("/orders/batch/validate")
+@login_required
+def validate_batch_orders():  # type: ignore[no-untyped-def]
+    """批量订单预校验。"""
+    json_data = request.get_json(silent=True) or {}
+    orders = json_data.get("orders", [])
+    if not orders:
+        return error_response(message="orders 不能为空", code=400)
+    try:
+        result = PurchaseRegisterService.batch_validate(orders)
+        return success_response(data=result)
+    except Exception:
+        raise
+
+
+@procurement_bp.post("/requisitions/merge-preview")
+@login_required
+def merge_preview():  # type: ignore[no-untyped-def]
+    """智能合并预览 — 自动扫描可合并需求行并推荐供应商。"""
+    try:
+        result = PurchasePlanMergeService.merge_preview()
+        return success_response(data=result)
+    except Exception:
         raise
 
 

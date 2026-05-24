@@ -293,6 +293,34 @@ class PurchaseRegisterService:
         return {"created_orders": created_orders, "count": len(created_orders)}
 
     @staticmethod
+    def batch_validate(orders_data: list[dict[str, Any]]) -> dict[str, Any]:
+        """批量订单预校验，返回每个需求行的可用数量。"""
+        from collections import defaultdict
+
+        req_line_qty: dict[tuple[str, int], float] = defaultdict(float)
+        for order in orders_data:
+            for d in order.get("details", []):
+                ref_pid = d.get("ref_pcplanid")
+                ref_lno = d.get("ref_pclineno")
+                if ref_pid and ref_lno is not None:
+                    req_line_qty[(str(ref_pid), int(ref_lno))] += float(d.get("rgsqty", 0))
+
+        checks = []
+        valid = True
+        for (pid, lno), total_qty in req_line_qty.items():
+            available = PurchasePlanRepository.get_available_qty(pid, lno)
+            ok = total_qty <= available
+            if not ok:
+                valid = False
+            checks.append({
+                "pcplanid": pid, "pclineno": lno,
+                "available_qty": available, "requested_qty": total_qty,
+                "valid": ok,
+            })
+
+        return {"valid": valid, "checks": checks}
+
+    @staticmethod
     def audit(
         rgstbillid: str, auditor: str,
         auditflg: str = "2", checkmemo: str = "",
@@ -464,3 +492,91 @@ class PurchasePlanStatusService:
         PurchasePlanStatusRepository.update(record, data)
         db.session.commit()
         return record.to_dict()
+
+
+class PurchasePlanMergeService:
+    """智能合并服务。"""
+
+    @staticmethod
+    def merge_preview() -> dict[str, Any]:
+        """扫描可合并的需求行，按 itemcd 分组，推荐供应商。"""
+        details = PurchasePlanRepository.get_mergeable_details()
+        if not details:
+            return {
+                "mergeable": [],
+                "unmergeable": [],
+                "summary": {
+                    "mergeable_groups": 0,
+                    "unmergeable_items": 0,
+                    "estimated_orders": 0,
+                },
+            }
+
+        from collections import defaultdict
+
+        groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for d in details:
+            groups[d["itemcd"]].append(d)
+
+        mergeable = []
+        unmergeable = []
+        for itemcd, lines in groups.items():
+            total_qty = sum(float(l["available_qty"]) for l in lines)
+            suppliers = PurchasePlanMergeService._get_suggested_suppliers(itemcd)
+            group_data = {
+                "itemcd": itemcd,
+                "itemnm": lines[0].get("itemnm", ""),
+                "total_qty": total_qty,
+                "source_count": len(lines),
+                "source_lines": [
+                    {
+                        "pcplanid": l["pcplanid"],
+                        "pclineno": l["pclineno"],
+                        "qty": l["available_qty"],
+                        "dept": l.get("deptnm", ""),
+                    }
+                    for l in lines
+                ],
+                "suggested_suppliers": suppliers,
+            }
+            if len(lines) >= 2:
+                mergeable.append(group_data)
+            else:
+                unmergeable.append(group_data)
+
+        return {
+            "mergeable": mergeable,
+            "unmergeable": unmergeable,
+            "summary": {
+                "mergeable_groups": len(mergeable),
+                "unmergeable_items": len(unmergeable),
+                "estimated_orders": len(mergeable),
+            },
+        }
+
+    @staticmethod
+    def _get_suggested_suppliers(itemcd: str) -> list[dict[str, Any]]:
+        """根据供应商价格推荐供应商（价格升序，最多5个）。"""
+        from app.models.inventory import SupplierPrice
+        from app.models.master import Supplier
+
+        rows = (
+            db.session.query(SupplierPrice, Supplier.supp_nm)
+            .join(Supplier, SupplierPrice.supp_cd == Supplier.supp_cd)
+            .filter(
+                SupplierPrice.itemcd == itemcd,
+                Supplier.useflg == "1",
+            )
+            .order_by(SupplierPrice.itemprice)
+            .limit(5)
+            .all()
+        )
+        return [
+            {
+                "supp_cd": sp.supp_cd,
+                "supp_nm": supp_nm,
+                "min_qty": float(sp.min_qty) if sp.min_qty else 0,
+                "itemprice": float(sp.itemprice) if sp.itemprice else 0,
+            }
+            for sp, supp_nm in rows
+        ]
