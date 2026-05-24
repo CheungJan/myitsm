@@ -482,5 +482,9 @@ export function deleteSupplierPrice(suppCd: string, priceId: number) {
 export const batchCreateOrders = (data: { orders: Array<{ suppliercd: string; memo?: string; details: Array<{ itemcd: string; rgsqty: number; units?: string; ref_pcplanid: string; ref_pclineno: number; unitprice?: number }> }> }) =>
     request.post('/procurement/orders/batch', data)
 
+// 智能合并
+export const getMergePreview = () =>
+    request.post('/procurement/requisitions/merge-preview')
+
 export const validateBatchOrders = (data: { orders: Array<Record<string, unknown>> }) =>
     request.post('/procurement/orders/batch/validate', data)
