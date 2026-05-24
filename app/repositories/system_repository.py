@@ -1260,3 +1260,63 @@ class SystemRepository:
             .count()
         )
         return count > 0
+
+    # ========== Supplier Prices (tip02) ==========
+
+    @staticmethod
+    def check_custitems_exists(supp_cd: str, item_cd: str) -> bool:
+        """检查供应商-商品关联是否存在。"""
+        return db.session.query(CustItems).filter(
+            CustItems.custcd == supp_cd,
+            CustItems.itemcd == item_cd,
+        ).first() is not None
+
+    @staticmethod
+    def get_supplier_prices(supp_cd: str, item_cd: str = "", current_only: bool = False) -> list[dict[str, Any]]:
+        """查询供应商报价，支持物料筛选和当前有效筛选。"""
+        from app.models.inventory import SupplierPrice
+        q = (
+            db.session.query(SupplierPrice, Item.item_nm)
+            .join(Item, SupplierPrice.itemcd == Item.item_cd)
+            .filter(SupplierPrice.supp_cd == supp_cd)
+        )
+        if item_cd:
+            q = q.filter(SupplierPrice.itemcd == item_cd)
+        if current_only:
+            from datetime import date
+            today = date.today()
+            q = q.filter(SupplierPrice.effective_date <= today, SupplierPrice.expire_date >= today)
+        rows = q.order_by(SupplierPrice.itemcd, SupplierPrice.effective_date).all()
+        result = []
+        for sp, item_nm in rows:
+            d = sp.to_dict()
+            d["item_nm"] = item_nm
+            result.append(d)
+        return result
+
+    @staticmethod
+    def get_supplier_price(price_id: int):
+        from app.models.inventory import SupplierPrice
+        return db.session.get(SupplierPrice, price_id)
+
+    @staticmethod
+    def create_supplier_price(data: dict[str, Any]):
+        from app.models.inventory import SupplierPrice
+        obj = SupplierPrice(**data)
+        db.session.add(obj)
+        db.session.flush()
+        return obj
+
+    @staticmethod
+    def update_supplier_price(obj: Any, data: dict[str, Any]) -> Any:
+        skip = {"id", "opercd", "gendate", "upddate"}
+        for k, v in data.items():
+            if hasattr(obj, k) and k not in skip:
+                setattr(obj, k, v)
+        db.session.flush()
+        return obj
+
+    @staticmethod
+    def delete_supplier_price(obj: Any) -> None:
+        db.session.delete(obj)
+        db.session.flush()

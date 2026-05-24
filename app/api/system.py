@@ -532,6 +532,53 @@ def delete_supplier_item(supp_cd: str, item_cd: str):  # type: ignore[no-untyped
         return error_response(msg, 409)
 
 
+# ---- 供应商价格 ----
+
+@system_bp.get("/suppliers/<supp_cd>/prices")
+@login_required
+def list_supplier_prices(supp_cd: str):  # type: ignore[no-untyped-def]
+    """查询供应商报价，支持 ?item_cd=xxx&current_only=true。"""
+    item_cd = request.args.get("item_cd", "").strip()
+    current_only = request.args.get("current_only", "false").lower() == "true"
+    return success_response(data=_service.get_supplier_prices(supp_cd, item_cd, current_only))
+
+
+@system_bp.post("/suppliers/<supp_cd>/prices")
+@login_required
+def create_supplier_price(supp_cd: str):  # type: ignore[no-untyped-def]
+    """新增供应商报价。"""
+    json_data = request.get_json(silent=True) or {}
+    try:
+        return success_response(data=_service.create_supplier_price(supp_cd, json_data), code=201)
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+
+@system_bp.put("/suppliers/<supp_cd>/prices/<int:price_id>")
+@login_required
+def update_supplier_price(supp_cd: str, price_id: int):  # type: ignore[no-untyped-def]
+    """修改供应商报价（按主键 id）。"""
+    json_data = request.get_json(silent=True) or {}
+    try:
+        return success_response(data=_service.update_supplier_price(price_id, json_data))
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+
+@system_bp.delete("/suppliers/<supp_cd>/prices/<int:price_id>")
+@login_required
+def delete_supplier_price(supp_cd: str, price_id: int):  # type: ignore[no-untyped-def]
+    """删除供应商报价（按主键 id）。"""
+    try:
+        _service.delete_supplier_price(price_id)
+        return success_response(message="删除成功")
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            return error_response(msg, 404)
+        return error_response(msg, 400)
+
+
 @system_bp.get("/items/<item_cd>/related-boms")
 @login_required
 def get_related_boms(item_cd: str):  # type: ignore[no-untyped-def]

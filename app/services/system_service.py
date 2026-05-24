@@ -327,6 +327,32 @@ class SystemService:
             raise ValueError("该商品关联存在采购订单，无法删除")
         self._repo.delete_supplier_item(obj)
 
+    # ========== Supplier Prices ==========
+
+    def get_supplier_prices(self, supp_cd: str, item_cd: str = "", current_only: bool = False) -> list[dict[str, Any]]:
+        return self._repo.get_supplier_prices(supp_cd, item_cd, current_only)
+
+    def create_supplier_price(self, supp_cd: str, data: dict[str, Any]) -> dict[str, Any]:
+        item_cd = data.get("itemcd", "")
+        if not item_cd:
+            raise ValueError("物料编码不能为空")
+        if not self._repo.check_custitems_exists(supp_cd, item_cd):
+            raise ValueError("该供应商未关联此商品，请先维护供应商品关系")
+        data["supp_cd"] = supp_cd
+        return self._repo.create_supplier_price(data).to_dict()
+
+    def update_supplier_price(self, price_id: int, data: dict[str, Any]) -> dict[str, Any]:
+        obj = self._repo.get_supplier_price(price_id)
+        if not obj:
+            raise ValueError("报价记录不存在")
+        return self._repo.update_supplier_price(obj, data).to_dict()
+
+    def delete_supplier_price(self, price_id: int) -> None:
+        obj = self._repo.get_supplier_price(price_id)
+        if not obj:
+            raise ValueError("报价记录不存在")
+        self._repo.delete_supplier_price(obj)
+
     def create_item_class(self, data: dict[str, Any]) -> dict[str, Any]:
         """新增物料分类。"""
         parent = (data.get("parent_cd") or "").strip()
