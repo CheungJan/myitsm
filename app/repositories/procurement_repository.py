@@ -147,13 +147,15 @@ class PurchasePlanRepository:
         rows = db.session.execute(
             sa.text("""
                 SELECT v.pcplanid, v.lineno AS pclineno, v.itemcd, v.itemnm,
-                       v.available_qty, v.deptnm
+                       v.available_qty,
+                       COALESCE(dep.dept_nm, '') AS deptnm
                 FROM v_requisition_execution v
                 JOIN tpc02_pcplandt d ON v.pcplanid = d.pcplanid AND v.lineno = d.lineno
                 JOIN tpc01_pcplan p ON v.pcplanid = p.pcplanid
+                LEFT JOIN tmc13_users u ON p.opercd = u.user_cd
+                LEFT JOIN tmc11_departments dep ON u.dept_cd = dep.dept_cd
                 WHERE p.auditflg = '2'
                   AND v.available_qty > 0
-                  AND d.useflg = '1'
                 ORDER BY v.itemcd, v.pcplanid, v.lineno
             """)
         ).fetchall()
@@ -308,7 +310,7 @@ class PurchaseRegisterRepository:
             itemcd=detail.get("itemcd", ""),
             rgsqty=float(detail.get("rgsqty", 0)),
             units=detail.get("units", "PCS"),
-            unitprice=float(detail.get("unitprice", 0)) if detail.get("unitprice") else None,
+            rgstprice=float(detail.get("unitprice", 0)) if detail.get("unitprice") else None,
             ref_pcplanid=detail.get("ref_pcplanid"),
             ref_pclineno=detail.get("ref_pclineno"),
         )
