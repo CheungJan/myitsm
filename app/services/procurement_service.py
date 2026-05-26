@@ -613,8 +613,8 @@ class PurchaseBillService:
         record = PurchaseBillRepository.get_by_id(pcbillid)
         if record is None:
             return {"success": False, "error": "结算单不存在"}
-        if record.auditflg not in ("0", "9"):
-            return {"success": False, "error": "已审核，不可编辑"}
+        if record.auditflg != "0":
+            return {"success": False, "error": "仅未审核单据可编辑"}
 
         details = data.pop("details", None)
         if details is not None:
@@ -671,6 +671,8 @@ class PurchaseBillService:
         record = PurchaseBillRepository.get_by_id(pcbillid)
         if record is None:
             return {"success": False, "error": "结算单不存在"}
+        if record.useflg == "9":
+            return {"success": False, "error": "已作废单据不可审核"}
         if record.auditflg not in ("0", "1"):
             return {"success": False, "error": "不可重复审核"}
         record.auditflg = auditflg
@@ -698,12 +700,12 @@ class PurchaseBillService:
         if order is None:
             raise ValueError("订单不存在")
         items = []
-        for dt in order.details:  # type: ignore[attr-defined]
-            d = dt.to_dict()
-            order_qty = float(dt.rgsqty or 0)
-            received_qty = float(dt.inqty or 0)
-            settled = PurchaseBillRepository.get_settled_total(rgstbillid, dt.lineno)
-            returned = ReturnPurchaseRepository.get_returned_total(rgstbillid, dt.lineno)
+        for detail_line in order.details:  # type: ignore[attr-defined]
+            d = detail_line.to_dict()
+            order_qty = float(detail_line.rgsqty or 0)
+            received_qty = float(detail_line.inqty or 0)
+            settled = PurchaseBillRepository.get_settled_total(rgstbillid, detail_line.lineno)
+            returned = ReturnPurchaseRepository.get_returned_total(rgstbillid, detail_line.lineno)
             d["order_qty"] = order_qty
             d["received_qty"] = received_qty
             d["already_settled"] = settled
@@ -798,8 +800,8 @@ class ReturnPurchaseService:
         record = ReturnPurchaseRepository.get_by_id(pcbillid)
         if record is None:
             return {"success": False, "error": "退货单不存在"}
-        if record.auditflg not in ("0", "9"):
-            return {"success": False, "error": "已审核，不可编辑"}
+        if record.auditflg != "0":
+            return {"success": False, "error": "仅未审核单据可编辑"}
 
         details = data.pop("details", None)
         if details is not None:
@@ -842,6 +844,8 @@ class ReturnPurchaseService:
         record = ReturnPurchaseRepository.get_by_id(pcbillid)
         if record is None:
             return {"success": False, "error": "退货单不存在"}
+        if record.useflg == "9":
+            return {"success": False, "error": "已作废单据不可审核"}
         if record.auditflg not in ("0", "1"):
             return {"success": False, "error": "不可重复审核"}
         record.auditflg = auditflg
@@ -869,12 +873,12 @@ class ReturnPurchaseService:
         if order is None:
             raise ValueError("订单不存在")
         items = []
-        for dt in order.details:  # type: ignore[attr-defined]
-            d = dt.to_dict()
-            received_qty = int(dt.inqty or 0)
+        for detail_line in order.details:  # type: ignore[attr-defined]
+            d = detail_line.to_dict()
+            received_qty = int(detail_line.inqty or 0)
             if received_qty <= 0:
                 continue
-            returned = ReturnPurchaseRepository.get_returned_total(rgstbillid, dt.lineno)
+            returned = ReturnPurchaseRepository.get_returned_total(rgstbillid, detail_line.lineno)
             d["received_qty"] = received_qty
             d["already_returned"] = int(returned)
             d["returnable_qty"] = max(0, received_qty - int(returned))

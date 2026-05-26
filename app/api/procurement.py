@@ -311,8 +311,11 @@ def create_settlement():  # type: ignore[no-untyped-def]
     """创建采购结算单。"""
     body = PurchaseBillCreate.model_validate(request.get_json(silent=True) or {})
     user_cd: str = g.current_user
-    data = PurchaseBillService.create(body.model_dump(exclude_none=True), user_cd)
-    return success_response(data=data, message="创建成功", code=201)
+    try:
+        data = PurchaseBillService.create(body.model_dump(exclude_none=True), user_cd)
+        return success_response(data=data, message="创建成功", code=201)
+    except ValueError as e:
+        return error_response(message=str(e), code=400)
 
 
 @procurement_bp.put("/settlements/<pcbillid>")
@@ -395,13 +398,12 @@ def create_return():  # type: ignore[no-untyped-def]
     """创建采购退货单。"""
     json_data = request.get_json(silent=True) or {}
     body = ReturnPurchaseBillCreate.model_validate(json_data)
-    raw_details = json_data.get("details", [])
-    details = [ReturnPurchaseBillDetailCreate.model_validate(d).model_dump() for d in raw_details]
     user_cd: str = g.current_user
-    create_data = body.model_dump(exclude_none=True)
-    create_data["details"] = details
-    data = ReturnPurchaseService.create(create_data, user_cd)
-    return success_response(data=data, message="创建成功", code=201)
+    try:
+        data = ReturnPurchaseService.create(body.model_dump(exclude_none=True), user_cd)
+        return success_response(data=data, message="创建成功", code=201)
+    except ValueError as e:
+        return error_response(message=str(e), code=400)
 
 
 @procurement_bp.put("/returns/<pcbillid>")
