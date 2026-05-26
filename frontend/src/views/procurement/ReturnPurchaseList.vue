@@ -534,6 +534,7 @@ const reasonMap: Record<string, string> = {
 }
 const auditMap: Record<string, string> = {
     '0': '未审核',
+    '1': '待审核',
     '2': '已审核',
     '9': '已作废',
 }
