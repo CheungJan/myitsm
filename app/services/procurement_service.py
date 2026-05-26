@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime as dt
+from datetime import UTC, datetime as dt
 from typing import Any
 
 import sqlalchemy as sa
 
 from app.extensions import db
+from app.models.procurement import (
+    PurchaseBillDt,
+    PurchasePlanDt,
+    PurchaseRegisterDt,
+    RequisitionOrderLink,
+)
+
 from app.repositories.procurement_repository import (
     PurchaseBillRepository,
     PurchasePlanRepository,
@@ -69,14 +76,27 @@ class PurchasePlanService:
         pctyp: str | None = None,
         start_date: dt | None = None,
         end_date: dt | None = None,
+        execution_status: str | None = None,
+        overdue_only: bool = False,
+        hide_unavailable: bool = False,
         page: int = 1,
         per_page: int = 20,
+        exclude_completed: bool = False,
     ) -> dict[str, Any]:
         items, total = PurchasePlanRepository.list_by_filters(
-            auditflg=auditflg, pctyp=pctyp, start_date=start_date, end_date=end_date, page=page, per_page=per_page
+            auditflg=auditflg, pctyp=pctyp, start_date=start_date, end_date=end_date,
+            execution_status=execution_status, overdue_only=overdue_only, hide_unavailable=hide_unavailable, page=page, per_page=per_page
         )
+        result_items = []
+        for item in items:
+            d = item.to_dict()
+            d["execution_status"] = PurchasePlanRepository.get_plan_execution_status(item.pcplanid)
+            if exclude_completed and d["execution_status"] in ("已完成", "已下单"):
+                total -= 1
+                continue
+            result_items.append(d)
         return {
-            "items": [item.to_dict() for item in items],
+            "items": result_items,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -95,6 +115,32 @@ class PurchasePlanService:
             )
         db.session.commit()
         return record.to_dict()
+
+    @staticmethod
+    def update(pcplanid: str, data: dict[str, Any]) -> dict[str, object]:
+        """编辑采购需求（仅限已退回的）。"""
+        record = PurchasePlanRepository.get_by_id(pcplanid)
+        if record is None:
+            return {"success": False, "error": "采购需求不存在"}
+        if record.auditflg != '9':
+            return {"success": False, "error": "仅已退回的需求单可编辑"}
+        # 更新主表
+        for k in ('pctyp', 'slbillid', 'plandate', 'memo'):
+            if k in data:
+                setattr(record, k, data[k] if data[k] != "" else None)
+        # 更新明细
+        details = data.get('details', [])
+        if details:
+            from app.models.procurement import PurchasePlanDt
+            # 删除旧明细，重新插入
+            db.session.query(PurchasePlanDt).filter(
+                PurchasePlanDt.pcplanid == pcplanid
+            ).delete()
+            for idx, d in enumerate(details, start=1):
+                PurchasePlanRepository.add_detail(pcplanid, idx, d)
+        record.auditflg = '0'
+        db.session.commit()
+        return {"success": True, "pcplanid": pcplanid}
 
     @staticmethod
     def audit(
@@ -159,25 +205,50 @@ class PurchaseRegisterService:
 
     @staticmethod
     def get(rgstbillid: str) -> dict[str, Any] | None:
+        from app.models.master import Item
+        from app.models.master import Supplier
+
         record = PurchaseRegisterRepository.get_by_id(rgstbillid)
         if record is None:
             return None
         result = record.to_dict()
-        result["details"] = [d.to_dict() for d in record.details]  # type: ignore[attr-defined]
+        details = [d.to_dict() for d in record.details]  # type: ignore[attr-defined]
+        # 补充物料名称
+        item_cds = [d["itemcd"] for d in details if d.get("itemcd")]
+        if item_cds:
+            items = db.session.query(Item.item_cd, Item.item_nm).filter(Item.item_cd.in_(item_cds)).all()
+            item_nm_map = {row.item_cd: row.item_nm for row in items}
+            for d in details:
+                d["item_nm"] = item_nm_map.get(d.get("itemcd", ""), "")
+        result["details"] = details
+        # 补充供应商名称
+        if record.suppliercd:
+            supp = db.session.query(Supplier.supp_nm).filter(Supplier.supp_cd == record.suppliercd).first()
+            result["supp_nm"] = supp.supp_nm if supp else record.suppliercd
+        else:
+            result["supp_nm"] = ""
         return result
 
     @staticmethod
     def list_records(
         suppliercd: str | None = None,
         auditflg: str | None = None,
+        execution_status: str | None = None,
         page: int = 1,
         per_page: int = 20,
+        show_voided: bool = False,
     ) -> dict[str, Any]:
         items, total = PurchaseRegisterRepository.list_by_filters(
-            suppliercd=suppliercd, auditflg=auditflg, page=page, per_page=per_page
+            suppliercd=suppliercd, auditflg=auditflg, execution_status=execution_status,
+            page=page, per_page=per_page, show_voided=show_voided
         )
+        result_items = []
+        for item in items:
+            d = item.to_dict()
+            d["execution_status"] = PurchaseRegisterRepository.get_order_execution_status(item.rgstbillid)
+            result_items.append(d)
         return {
-            "items": [item.to_dict() for item in items],
+            "items": result_items,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -225,9 +296,64 @@ class PurchaseRegisterService:
         return record.to_dict()
 
     @staticmethod
+    def update(rgstbillid: str, data: dict[str, Any]) -> dict[str, object]:
+        """编辑采购订单（仅限未审核或已退回的订单）。"""
+        record = PurchaseRegisterRepository.get_by_id(rgstbillid)
+        if record is None:
+            return {"success": False, "error": "采购订单不存在"}
+        if record.auditflg not in ('0', '9'):
+            return {"success": False, "error": "仅未送审或已退回的订单可编辑"}
+        # 更新主表（空字符串转为None，避免timestamp类型报错）
+        for k, v in data.items():
+            if k == 'details':
+                continue
+            if hasattr(record, k) and k not in ('rgstbillid', 'auditflg', 'opercd', 'gendate'):
+                setattr(record, k, v if v != "" else None)
+        # 更新明细数量并同步TPC20链接
+        details = data.get('details', [])
+        if details:
+            for d in details:
+                qty = int(d.get('rgsqty', 0))
+                price = float(d.get('rgstprice') or 0)
+                if qty <= 0:
+                    return {"success": False, "error": f"第{d.get('lineno','?')}行数量不能为0或负数"}
+                if price <= 0:
+                    return {"success": False, "error": f"第{d.get('lineno','?')}行（{d.get('itemcd','')}）单价不能为0，请填写有效价格"}
+            dt_map = {d.lineno: d for d in record.details}  # type: ignore[attr-defined]
+            for d in details:
+                lineno = int(d.get('lineno', 0))
+                new_qty = int(d.get('rgsqty', 0))
+                dt = dt_map.get(lineno)
+                if dt and new_qty > 0:
+                    old_qty = int(dt.rgsqty or 0)
+                    dt.rgsqty = new_qty
+                    if 'rgstprice' in d:
+                        dt.rgstprice = float(d['rgstprice']) if d['rgstprice'] else None
+                    # 同步TPC20 linkqty
+                    db.session.query(RequisitionOrderLink).filter(
+                        RequisitionOrderLink.rgstbillid == rgstbillid,
+                        RequisitionOrderLink.rgstlineno == lineno,
+                    ).update({'linkqty': new_qty})
+                    # 调减需求审核量（释放的数量不再保留为可用余额）
+                    diff = old_qty - new_qty
+                    if diff > 0 and dt.ref_pcplanid and dt.ref_pclineno:
+                        db.session.query(PurchasePlanDt).filter(
+                            PurchasePlanDt.pcplanid == dt.ref_pcplanid,
+                            PurchasePlanDt.lineno == int(dt.ref_pclineno),
+                        ).update({
+                            'auditqty': PurchasePlanDt.auditqty - diff
+                        }, synchronize_session=False)
+        # 重置为未送审状态
+        record.auditflg = '0'
+        db.session.commit()
+        return {"success": True, "rgstbillid": rgstbillid}
+
+    @staticmethod
     def _lock_requisition_line(pcplanid: str, pclineno: int) -> None:
         """获取需求行的 advisory lock，防止并发超量。"""
-        key = int(hashlib.md5(f"{pcplanid}:{pclineno}".encode()).hexdigest()[:16], 16)
+        raw = int(hashlib.md5(f"{pcplanid}:{pclineno}".encode()).hexdigest()[:16], 16)
+        # PostgreSQL pg_advisory_xact_lock 只接受 bigint（有符号64位），需转换
+        key = raw - (1 << 64) if raw >= (1 << 63) else raw
         db.session.execute(sa.text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
 
     @staticmethod
@@ -246,6 +372,15 @@ class PurchaseRegisterService:
             raise ValueError("orders 不能为空")
         if len(orders_data) > 10:
             raise ValueError("单次最多创建 10 个订单")
+        # 校验明细：数量和单价
+        for i, order in enumerate(orders_data):
+            for j, d in enumerate(order.get("details", [])):
+                qty = float(d.get("rgsqty", 0))
+                price = float(d.get("unitprice") or 0)
+                if qty <= 0:
+                    raise ValueError(f"第{i+1}个订单第{j+1}行采购数量不能为0或负数")
+                if price <= 0:
+                    raise ValueError(f"第{i+1}个订单第{j+1}行（{d.get('itemcd','')}）单价不能为0，请填写有效价格")
 
         # 1. 收集需求行 + 汇总数量
         req_line_qty: dict[tuple[str, int], float] = defaultdict(float)
@@ -260,12 +395,16 @@ class PurchaseRegisterService:
         for (pid, lno) in sorted(req_line_qty.keys()):
             PurchaseRegisterService._lock_requisition_line(pid, lno)
 
-        # 3. 校验数量
+        # 3. 校验数量（含重复合并检测）
         for (pid, lno), total_qty in req_line_qty.items():
             available = PurchasePlanRepository.get_available_qty(pid, lno)
+            if available <= 0:
+                raise ValueError(
+                    f"需求单 {pid} 行 {lno} 已被其他订单占用（可用余额为0），请刷新页面后重新操作"
+                )
             if total_qty > available:
                 raise ValueError(
-                    f"需求 {pid} 行 {lno} 总采购数量({total_qty})超过可用余额({available})"
+                    f"需求单 {pid} 行 {lno} 采购数量({total_qty})超过可用余额({available})，请刷新页面后重新操作"
                 )
 
         # 4. 逐个创建订单
@@ -275,8 +414,15 @@ class PurchaseRegisterService:
             record = PurchaseRegisterRepository.create_from_batch(order_data, creator)
             rgstbillid = record.rgstbillid
 
+            total_amt = 0.0
             for i, d in enumerate(details, start=1):
                 PurchaseRegisterRepository.add_detail_from_batch(rgstbillid, i, d)
+                qty = float(d.get("rgsqty", 0))
+                price = float(d.get("unitprice") or 0)
+                total_amt += qty * price
+            # 回填主表金额
+            if total_amt > 0:
+                record.rgstamt = total_amt
 
             # 写入 TPC20 关联表（沿用现有 create_links 的键名约定）
             link_details = [
@@ -332,46 +478,240 @@ class PurchaseRegisterService:
         if record.auditflg not in ("0", "1", "9"):
             return {"success": False, "error": "已审核，不可重复操作"}
         PurchaseRegisterRepository.audit(record, auditor, auditflg, checkmemo)
-        if auditflg == "2" and details:
-            for d in details:
-                PurchaseRegisterRepository.update_audit_qty(
-                    rgstbillid, int(d.get("lineno", 0)), int(d.get("auditqty", 0))
-                )
+        if auditflg == "2":
+            if details:
+                dt_map = {d.lineno: d for d in record.details}  # type: ignore[attr-defined]
+                for d in details:
+                    lineno = int(d.get("lineno", 0))
+                    auditqty = int(d.get("auditqty", 0))
+                    dt = dt_map.get(lineno)
+                    if dt and auditqty > int(dt.rgsqty or 0):
+                        return {
+                            "success": False,
+                            "error": f"行{lineno}审核数量({auditqty})超过采购数量({dt.rgsqty})",
+                        }
+                    PurchaseRegisterRepository.update_audit_qty(rgstbillid, lineno, auditqty)
+            else:
+                # 未传明细时，审核数量自动等于采购数量
+                for dt in record.details:  # type: ignore[attr-defined]
+                    PurchaseRegisterRepository.update_audit_qty(
+                        rgstbillid, dt.lineno, int(dt.rgsqty or 0))
         db.session.commit()
         return {"success": True, "rgstbillid": record.rgstbillid}
 
+    @staticmethod
+    def void(rgstbillid: str) -> dict[str, object]:
+        """作废采购订单，释放占用的需求余额。"""
+        record = PurchaseRegisterRepository.get_by_id(rgstbillid)
+        if record is None:
+            return {"success": False, "error": "采购订单不存在"}
+        if record.auditflg == '2':
+            return {"success": False, "error": "已审核通过的订单不能作废"}
+        # 删除TPC20关联（释放需求余额）
+        db.session.query(RequisitionOrderLink).filter(
+            RequisitionOrderLink.rgstbillid == rgstbillid
+        ).delete()
+        # 逻辑删除订单
+        record.useflg = '9'
+        db.session.commit()
+        return {"success": True, "rgstbillid": rgstbillid}
+
 
 class PurchaseBillService:
-    """采购结算单服务 (原采购单据，TPC14)。"""
+    """采购结算单服务 (TPC14 + TPC14_DT)。"""
 
     @staticmethod
     def get(pcbillid: str) -> dict[str, Any] | None:
         record = PurchaseBillRepository.get_by_id(pcbillid)
         if record is None:
             return None
-        return record.to_dict()
+        result = record.to_dict()
+        details = [d.to_dict() for d in PurchaseBillRepository.list_details(pcbillid)]
+        for d in details:
+            d.pop("bill", None)
+        result["details"] = details
+        return result
 
     @staticmethod
     def list_records(
-        whcd: str | None = None,
+        suppliercd: str | None = None,
+        auditflg: str | None = None,
+        pay_type: str | None = None,
+        start_date: dt | None = None,
+        end_date: dt | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> dict[str, Any]:
         items, total = PurchaseBillRepository.list_by_filters(
-            whcd=whcd, page=page, per_page=per_page
+            suppliercd=suppliercd, auditflg=auditflg, pay_type=pay_type,
+            start_date=start_date, end_date=end_date, page=page, per_page=per_page,
         )
         return {
             "items": [item.to_dict() for item in items],
-            "total": total,
-            "page": page,
-            "per_page": per_page,
+            "total": total, "page": page, "per_page": per_page,
         }
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        details = data.pop("details", [])
+        total_amt = 0.0
+        validated_details = []
+        for d in details:
+            ref_bill = d["ref_rgstbillid"]
+            ref_line = d["ref_rgstlineno"]
+            settle_qty = float(d["settle_qty"])
+            settle_price = float(d["settle_price"])
+
+            # PurchaseRegisterDt 主键是 id，用 rgstbillid + lineno 查询
+            order_dt = (
+                db.session.query(PurchaseRegisterDt)
+                .filter(
+                    PurchaseRegisterDt.rgstbillid == ref_bill,
+                    PurchaseRegisterDt.lineno == ref_line,
+                )
+                .first()
+            )
+            if order_dt is None:
+                raise ValueError(f"订单行 {ref_bill}:{ref_line} 不存在")
+
+            order_qty = float(order_dt.rgsqty or 0)
+            received_qty = float(order_dt.inqty or 0)
+            already = PurchaseBillRepository.get_settled_total(ref_bill, ref_line)
+
+            pay_type = data.get("pay_type", "COD")
+            if pay_type in ("COD", "MON"):
+                max_settle = received_qty - already
+            else:
+                max_settle = order_qty - already
+
+            if settle_qty > max_settle:
+                raise ValueError(
+                    f"订单 {ref_bill} 行 {ref_line} 结算数量({settle_qty})"
+                    f"超过可结算余量({max_settle})"
+                )
+
+            settle_amt = settle_qty * settle_price
+            total_amt += settle_amt
+            validated_details.append({
+                **d,
+                "order_qty": order_qty,
+                "received_qty": received_qty,
+                "already_settled": already,
+                "settle_amt": settle_amt,
+            })
+
+        data["total_settle_amt"] = total_amt
+        data["auditflg"] = "0"
         record = PurchaseBillRepository.create(data, creator)
+        for i, d in enumerate(validated_details, start=1):
+            PurchaseBillRepository.add_detail(record.pcbillid, i, d)
         db.session.commit()
-        return record.to_dict()
+        return PurchaseBillService.get(record.pcbillid)  # type: ignore[return-value]
+
+    @staticmethod
+    def update(pcbillid: str, data: dict[str, Any]) -> dict[str, object]:
+        record = PurchaseBillRepository.get_by_id(pcbillid)
+        if record is None:
+            return {"success": False, "error": "结算单不存在"}
+        if record.auditflg not in ("0", "9"):
+            return {"success": False, "error": "已审核，不可编辑"}
+
+        details = data.pop("details", None)
+        if details is not None:
+            total_amt = 0.0
+            validated_details = []
+            for d in details:
+                ref_bill = d["ref_rgstbillid"]
+                ref_line = d["ref_rgstlineno"]
+                settle_qty = float(d["settle_qty"])
+                settle_price = float(d["settle_price"])
+
+                order_dt = (
+                    db.session.query(PurchaseRegisterDt)
+                    .filter(
+                        PurchaseRegisterDt.rgstbillid == ref_bill,
+                        PurchaseRegisterDt.lineno == ref_line,
+                    )
+                    .first()
+                )
+                if order_dt is None:
+                    raise ValueError(f"订单行 {ref_bill}:{ref_line} 不存在")
+
+                order_qty = float(order_dt.rgsqty or 0)
+                received_qty = float(order_dt.inqty or 0)
+                already = PurchaseBillRepository.get_settled_total(ref_bill, ref_line, pcbillid)
+
+                pay_type = data.get("pay_type", record.pay_type or "COD")
+                max_settle = (received_qty if pay_type in ("COD", "MON") else order_qty) - already
+                if settle_qty > max_settle:
+                    raise ValueError(
+                        f"订单 {ref_bill} 行 {ref_line} 结算数量({settle_qty})"
+                        f"超过可结算余量({max_settle})"
+                    )
+
+                settle_amt = settle_qty * settle_price
+                total_amt += settle_amt
+                validated_details.append({
+                    **d, "order_qty": order_qty, "received_qty": received_qty,
+                    "already_settled": already, "settle_amt": settle_amt,
+                })
+
+            data["total_settle_amt"] = total_amt
+            PurchaseBillRepository.clear_details(pcbillid)
+            for i, d in enumerate(validated_details, start=1):
+                PurchaseBillRepository.add_detail(pcbillid, i, d)
+
+        PurchaseBillRepository.update(record, data)
+        record.auditflg = "0"
+        db.session.commit()
+        return {"success": True, "pcbillid": pcbillid}
+
+    @staticmethod
+    def audit(pcbillid: str, auditor: str, auditflg: str) -> dict[str, object]:
+        record = PurchaseBillRepository.get_by_id(pcbillid)
+        if record is None:
+            return {"success": False, "error": "结算单不存在"}
+        if record.auditflg not in ("0", "1"):
+            return {"success": False, "error": "不可重复审核"}
+        record.auditflg = auditflg
+        record.auditman = auditor
+        record.auditdate = dt.now(UTC)
+        db.session.commit()
+        return {"success": True, "pcbillid": pcbillid}
+
+    @staticmethod
+    def void(pcbillid: str) -> dict[str, object]:
+        record = PurchaseBillRepository.get_by_id(pcbillid)
+        if record is None:
+            return {"success": False, "error": "结算单不存在"}
+        if record.auditflg == "2":
+            return {"success": False, "error": "已审核通过的结算单不能作废"}
+        record.useflg = "9"
+        record.auditflg = "9"
+        db.session.commit()
+        return {"success": True, "pcbillid": pcbillid}
+
+    @staticmethod
+    def get_settleable_items(rgstbillid: str) -> list[dict[str, Any]]:
+        """查询订单的可结算商品行。"""
+        order = PurchaseRegisterRepository.get_by_id(rgstbillid)
+        if order is None:
+            raise ValueError("订单不存在")
+        items = []
+        for dt in order.details:  # type: ignore[attr-defined]
+            d = dt.to_dict()
+            order_qty = float(dt.rgsqty or 0)
+            received_qty = float(dt.inqty or 0)
+            settled = PurchaseBillRepository.get_settled_total(rgstbillid, dt.lineno)
+            returned = ReturnPurchaseRepository.get_returned_total(rgstbillid, dt.lineno)
+            d["order_qty"] = order_qty
+            d["received_qty"] = received_qty
+            d["already_settled"] = settled
+            d["already_returned"] = returned
+            d["settleable_qty_cod"] = max(0, received_qty - settled)
+            d["settleable_qty_pia"] = max(0, order_qty - settled)
+            items.append(d)
+        return items
 
 
 class ReturnPurchaseService:
@@ -383,38 +723,163 @@ class ReturnPurchaseService:
         if record is None:
             return None
         result = record.to_dict()
-        result["details"] = [d.to_dict() for d in record.details]  # type: ignore[attr-defined]
+        details = [d.to_dict() for d in ReturnPurchaseRepository.list_details(pcbillid)]
+        for d in details:
+            d.pop("bill", None)
+        result["details"] = details
         return result
 
     @staticmethod
     def list_records(
-        whcd: str | None = None,
+        suppliercd: str | None = None,
+        auditflg: str | None = None,
+        start_date: dt | None = None,
+        end_date: dt | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> dict[str, Any]:
         items, total = ReturnPurchaseRepository.list_by_filters(
-            whcd=whcd, page=page, per_page=per_page
+            suppliercd=suppliercd, auditflg=auditflg,
+            start_date=start_date, end_date=end_date, page=page, per_page=per_page,
         )
         return {
             "items": [item.to_dict() for item in items],
-            "total": total,
-            "page": page,
-            "per_page": per_page,
+            "total": total, "page": page, "per_page": per_page,
         }
 
     @staticmethod
-    def create(
-        data: dict[str, Any],
-        details: list[dict[str, Any]],
-        creator: str,
-    ) -> dict[str, Any]:
+    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        details = data.pop("details", [])
+        ref_rgstbillid = data.get("ref_rgstbillid", "")
+        total_amt = 0
+        for d in details:
+            rpcqty = int(d.get("rpcqty", 0))
+            ref_line = int(d.get("ref_rgstlineno", 0))
+            if rpcqty <= 0:
+                raise ValueError(f"行 {ref_line} 退货数量必须大于0")
+
+            # PurchaseRegisterDt 主键是 id，用 rgstbillid + lineno 查询
+            order_dt = (
+                db.session.query(PurchaseRegisterDt)
+                .filter(
+                    PurchaseRegisterDt.rgstbillid == ref_rgstbillid,
+                    PurchaseRegisterDt.lineno == ref_line,
+                )
+                .first()
+            )
+            if order_dt is None:
+                raise ValueError(f"订单行 {ref_rgstbillid}:{ref_line} 不存在")
+            received_qty = int(order_dt.inqty or 0)
+            if received_qty <= 0:
+                raise ValueError(f"订单行 {ref_rgstbillid}:{ref_line} 尚未入库，无法退货")
+
+            already_returned = ReturnPurchaseRepository.get_returned_total(ref_rgstbillid, ref_line)
+            max_return = received_qty - int(already_returned)
+            if rpcqty > max_return:
+                raise ValueError(
+                    f"行 {ref_line} 退货数量({rpcqty})超过可退余量({max_return})"
+                )
+
+            return_price = float(d.get("return_price") or 0)
+            return_amt = rpcqty * return_price
+            total_amt += int(return_amt)
+            d["return_amt"] = return_amt
+
+        data["pcamt"] = total_amt
+        data["auditflg"] = "0"
         record = ReturnPurchaseRepository.create(data, creator)
         for idx, detail_data in enumerate(details, start=1):
-            ReturnPurchaseRepository.add_detail(
-                pcbillid=record.pcbillid, lineno=idx, data=detail_data
-            )
+            ReturnPurchaseRepository.add_detail(record.pcbillid, idx, detail_data)
         db.session.commit()
-        return record.to_dict()
+        return ReturnPurchaseService.get(record.pcbillid)  # type: ignore[return-value]
+
+    @staticmethod
+    def update(pcbillid: str, data: dict[str, Any]) -> dict[str, object]:
+        record = ReturnPurchaseRepository.get_by_id(pcbillid)
+        if record is None:
+            return {"success": False, "error": "退货单不存在"}
+        if record.auditflg not in ("0", "9"):
+            return {"success": False, "error": "已审核，不可编辑"}
+
+        details = data.pop("details", None)
+        if details is not None:
+            ref_rgstbillid = record.ref_rgstbillid or ""
+            total_amt = 0
+            for d in details:
+                rpcqty = int(d.get("rpcqty", 0))
+                ref_line = int(d.get("ref_rgstlineno", 0))
+                if rpcqty <= 0:
+                    raise ValueError(f"行 {ref_line} 退货数量必须大于0")
+                order_dt = (
+                    db.session.query(PurchaseRegisterDt)
+                    .filter(
+                        PurchaseRegisterDt.rgstbillid == ref_rgstbillid,
+                        PurchaseRegisterDt.lineno == ref_line,
+                    )
+                    .first()
+                )
+                received_qty = int(order_dt.inqty or 0) if order_dt else 0
+                already_returned = ReturnPurchaseRepository.get_returned_total(ref_rgstbillid, ref_line)
+                max_return = received_qty - int(already_returned)
+                if rpcqty > max_return:
+                    raise ValueError(f"行 {ref_line} 退货数量({rpcqty})超过可退余量({max_return})")
+                return_price = float(d.get("return_price") or 0)
+                return_amt = rpcqty * return_price
+                total_amt += int(return_amt)
+                d["return_amt"] = return_amt
+            data["pcamt"] = total_amt
+            ReturnPurchaseRepository.clear_details(pcbillid)
+            for idx, d in enumerate(details, start=1):
+                ReturnPurchaseRepository.add_detail(pcbillid, idx, d)
+
+        ReturnPurchaseRepository.update(record, data)
+        record.auditflg = "0"
+        db.session.commit()
+        return {"success": True, "pcbillid": pcbillid}
+
+    @staticmethod
+    def audit(pcbillid: str, auditor: str, auditflg: str) -> dict[str, object]:
+        record = ReturnPurchaseRepository.get_by_id(pcbillid)
+        if record is None:
+            return {"success": False, "error": "退货单不存在"}
+        if record.auditflg not in ("0", "1"):
+            return {"success": False, "error": "不可重复审核"}
+        record.auditflg = auditflg
+        record.auditman = auditor
+        record.auditdate = dt.now(UTC)
+        db.session.commit()
+        return {"success": True, "pcbillid": pcbillid}
+
+    @staticmethod
+    def void(pcbillid: str) -> dict[str, object]:
+        record = ReturnPurchaseRepository.get_by_id(pcbillid)
+        if record is None:
+            return {"success": False, "error": "退货单不存在"}
+        if record.auditflg == "2":
+            return {"success": False, "error": "已审核通过的退货单不能作废"}
+        record.useflg = "9"
+        record.auditflg = "9"
+        db.session.commit()
+        return {"success": True, "pcbillid": pcbillid}
+
+    @staticmethod
+    def get_returnable_items(rgstbillid: str) -> list[dict[str, Any]]:
+        """查询订单的可退货商品行。"""
+        order = PurchaseRegisterRepository.get_by_id(rgstbillid)
+        if order is None:
+            raise ValueError("订单不存在")
+        items = []
+        for dt in order.details:  # type: ignore[attr-defined]
+            d = dt.to_dict()
+            received_qty = int(dt.inqty or 0)
+            if received_qty <= 0:
+                continue
+            returned = ReturnPurchaseRepository.get_returned_total(rgstbillid, dt.lineno)
+            d["received_qty"] = received_qty
+            d["already_returned"] = int(returned)
+            d["returnable_qty"] = max(0, received_qty - int(returned))
+            items.append(d)
+        return items
 
 
 class SupplierAppraisalService:
@@ -556,27 +1021,44 @@ class PurchasePlanMergeService:
 
     @staticmethod
     def _get_suggested_suppliers(itemcd: str) -> list[dict[str, Any]]:
-        """根据供应商价格推荐供应商（价格升序，最多5个）。"""
+        """推荐供应商：已关联该物料的供应商，优先有报价的（价格升序）。"""
         from app.models.inventory import SupplierPrice
-        from app.models.master import Supplier
+        from app.models.master import CustItems, Supplier
 
-        rows = (
-            db.session.query(SupplierPrice, Supplier.supp_nm)
-            .join(Supplier, SupplierPrice.supp_cd == Supplier.supp_cd)
-            .filter(
-                SupplierPrice.itemcd == itemcd,
-                Supplier.useflg == "1",
-            )
-            .order_by(SupplierPrice.itemprice)
-            .limit(5)
+        # 1. 查已关联该物料的供应商（CustItems）
+        cust_rows = (
+            db.session.query(CustItems.custcd, Supplier.supp_nm)
+            .join(Supplier, CustItems.custcd == Supplier.supp_cd)
+            .filter(CustItems.itemcd == itemcd, Supplier.useflg == "1")
             .all()
         )
-        return [
-            {
-                "supp_cd": sp.supp_cd,
+        if not cust_rows:
+            return []
+
+        # 2. 查供应商报价，用于排序和补充价格
+        price_rows = (
+            db.session.query(SupplierPrice)
+            .filter(SupplierPrice.itemcd == itemcd)
+            .all()
+        )
+        price_map: dict[str, dict[str, Any]] = {}
+        for sp in price_rows:
+            if sp.supp_cd not in price_map or float(sp.itemprice or 0) < float(price_map[sp.supp_cd]["itemprice"] or 0):
+                price_map[sp.supp_cd] = {
+                    "min_qty": float(sp.min_qty) if sp.min_qty else 0,
+                    "itemprice": float(sp.itemprice) if sp.itemprice else 0,
+                }
+
+        # 3. 组装结果：有报价的排前面
+        result = []
+        for custcd, supp_nm in cust_rows:
+            price_info = price_map.get(custcd)
+            result.append({
+                "supp_cd": custcd,
                 "supp_nm": supp_nm,
-                "min_qty": float(sp.min_qty) if sp.min_qty else 0,
-                "itemprice": float(sp.itemprice) if sp.itemprice else 0,
-            }
-            for sp, supp_nm in rows
-        ]
+                "min_qty": price_info["min_qty"] if price_info else 0,
+                "itemprice": price_info["itemprice"] if price_info else 0,
+            })
+
+        result.sort(key=lambda x: (x["itemprice"] == 0, x["itemprice"]))
+        return result[:5]

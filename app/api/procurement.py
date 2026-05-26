@@ -7,11 +7,13 @@
 
 from __future__ import annotations
 
+import sqlalchemy as sa
 from flask import Blueprint, g, request
 
 from app.api.auth import login_required
 from app.extensions import db
 from app.repositories.procurement_repository import (
+    PurchaseRegisterRepository,
     RequisitionOrderLinkRepository,
 )
 from app.schemas.procurement import (
@@ -57,8 +59,12 @@ def list_requisitions():  # type: ignore[no-untyped-def]
         pctyp=params.pctyp,
         start_date=params.start_date,
         end_date=params.end_date,
+        execution_status=params.execution_status,
+        overdue_only=params.overdue_only,
         page=params.page,
         per_page=params.per_page,
+        exclude_completed=params.exclude_completed,
+        hide_unavailable=params.hide_unavailable,
     )
     return success_response(data=data)
 
@@ -84,6 +90,17 @@ def create_requisition():  # type: ignore[no-untyped-def]
     user_cd: str = g.current_user
     data = PurchasePlanService.create(body.model_dump(exclude_none=True), details, user_cd)
     return success_response(data=data, message="创建成功", code=201)
+
+
+@procurement_bp.put("/requisitions/<pcplanid>")
+@login_required
+def update_requisition(pcplanid: str):  # type: ignore[no-untyped-def]
+    """编辑采购需求（驳回后修改）。"""
+    json_data = request.get_json(silent=True) or {}
+    result = PurchasePlanService.update(pcplanid, json_data)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result)
 
 
 @procurement_bp.post("/requisitions/<pcplanid>/audit")
@@ -124,11 +141,14 @@ def void_requisition(pcplanid: str):  # type: ignore[no-untyped-def]
 def list_orders():  # type: ignore[no-untyped-def]
     """采购订单列表。"""
     params = ProcurementQuery.model_validate(request.args.to_dict())
+    show_voided: bool = request.args.get("show_voided", "false").lower() == "true"
     data = PurchaseRegisterService.list_records(
         suppliercd=params.suppliercd,
         auditflg=params.auditflg,
+        execution_status=params.execution_status,
         page=params.page,
         per_page=params.per_page,
+        show_voided=show_voided,
     )
     return success_response(data=data)
 
@@ -226,6 +246,27 @@ def audit_order(rgstbillid: str):  # type: ignore[no-untyped-def]
     return success_response(data=result)
 
 
+@procurement_bp.post("/orders/<rgstbillid>/void")
+@login_required
+def void_order(rgstbillid: str):  # type: ignore[no-untyped-def]
+    """作废采购订单。"""
+    result = PurchaseRegisterService.void(rgstbillid)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result)
+
+
+@procurement_bp.put("/orders/<rgstbillid>")
+@login_required
+def update_order(rgstbillid: str):  # type: ignore[no-untyped-def]
+    """编辑采购订单（驳回后修改）。"""
+    json_data = request.get_json(silent=True) or {}
+    result = PurchaseRegisterService.update(rgstbillid, json_data)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result)
+
+
 @procurement_bp.get("/available-items")
 @login_required
 def list_available_items():  # type: ignore[no-untyped-def]
@@ -243,8 +284,11 @@ def list_available_items():  # type: ignore[no-untyped-def]
 def list_settlements():  # type: ignore[no-untyped-def]
     """采购结算单列表。"""
     params = ProcurementQuery.model_validate(request.args.to_dict())
+    pay_type = request.args.get("pay_type") or None
     data = PurchaseBillService.list_records(
-        whcd=params.whcd, page=params.page, per_page=params.per_page
+        suppliercd=params.suppliercd, auditflg=params.auditflg,
+        pay_type=pay_type, start_date=params.start_date, end_date=params.end_date,
+        page=params.page, per_page=params.per_page
     )
     return success_response(data=data)
 
@@ -278,7 +322,9 @@ def list_returns():  # type: ignore[no-untyped-def]
     """采购退货列表。"""
     params = ProcurementQuery.model_validate(request.args.to_dict())
     data = ReturnPurchaseService.list_records(
-        whcd=params.whcd, page=params.page, per_page=params.per_page
+        suppliercd=params.suppliercd, auditflg=params.auditflg,
+        start_date=params.start_date, end_date=params.end_date,
+        page=params.page, per_page=params.per_page
     )
     return success_response(data=data)
 
@@ -302,7 +348,9 @@ def create_return():  # type: ignore[no-untyped-def]
     raw_details = json_data.get("details", [])
     details = [ReturnPurchaseBillDetailCreate.model_validate(d).model_dump() for d in raw_details]
     user_cd: str = g.current_user
-    data = ReturnPurchaseService.create(body.model_dump(exclude_none=True), details, user_cd)
+    create_data = body.model_dump(exclude_none=True)
+    create_data["details"] = details
+    data = ReturnPurchaseService.create(create_data, user_cd)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -351,6 +399,110 @@ def dashboard_requisition():  # type: ignore[no-untyped-def]
     """采购需求执行看板数据（查询 v_requisition_execution 视图）。"""
     data = PurchasePlanService.dashboard_stats()
     return success_response(data=data)
+
+
+@procurement_bp.get("/dashboard/order")
+@login_required
+def dashboard_order():  # type: ignore[no-untyped-def]
+    """采购订单执行看板数据。"""
+    data = PurchaseRegisterRepository.order_dashboard_stats()
+    return success_response(data=data)
+
+
+@procurement_bp.get("/dashboard/order-overdue")
+@login_required
+def dashboard_order_overdue():  # type: ignore[no-untyped-def]
+    """采购订单逾期预警（审批滞留 + 交付逾期）。"""
+    data = PurchaseRegisterRepository.order_overdue()
+    return success_response(data=data)
+
+
+@procurement_bp.get("/dashboard/item-detail")
+@login_required
+def dashboard_item_detail():  # type: ignore[no-untyped-def]
+    """看板物料执行明细（按 itemcd 查询各需求单的执行情况）。"""
+    itemcd = request.args.get("itemcd", "").strip()
+    if not itemcd:
+        return error_response("itemcd 不能为空", 400)
+    rows = db.session.execute(
+        sa.text("""
+            SELECT pcplanid, lineno, plan_qty, ordered_qty, received_qty,
+                   execution_status, execution_rate
+            FROM v_requisition_execution
+            WHERE itemcd = :itemcd
+            ORDER BY pcplanid, lineno
+        """),
+        {"itemcd": itemcd},
+    ).fetchall()
+    return success_response(data=[dict(r._mapping) for r in rows])
+
+
+@procurement_bp.get("/dashboard/requisition-drill")
+@login_required
+def dashboard_requisition_drill():  # type: ignore[no-untyped-def]
+    """看板需求下钻：按状态查看需求单列表。"""
+    status = request.args.get("status", "").strip()
+    if not status:
+        return error_response("status 不能为空", 400)
+    if status == "voided":
+        rows = db.session.execute(
+            sa.text("SELECT pcplanid, plandate::text, auditflg, memo, '已作废' AS execution_status FROM tpc01_pcplan WHERE useflg='9' ORDER BY pcplanid")
+        ).fetchall()
+        return success_response(data=[dict(r._mapping) for r in rows])
+    rows = db.session.execute(
+        sa.text("""
+            WITH plan_status AS (
+                SELECT pcplanid,
+                    CASE
+                        WHEN COUNT(*) = SUM(CASE WHEN execution_status = '已完成' THEN 1 ELSE 0 END) THEN '已完成'
+                        WHEN SUM(CASE WHEN execution_status != '未开始' THEN 1 ELSE 0 END) = 0 THEN '未开始'
+                        WHEN SUM(CASE WHEN execution_status = '已下单' THEN 1 ELSE 0 END) > 0
+                             AND SUM(CASE WHEN execution_status NOT IN ('已下单','已完成') THEN 1 ELSE 0 END) = 0 THEN '已下单'
+                        ELSE '执行中'
+                    END AS agg_status
+                FROM v_requisition_execution
+                GROUP BY pcplanid
+            )
+            SELECT ps.pcplanid, p.plandate::text, p.auditflg, p.memo, ps.agg_status AS execution_status
+            FROM plan_status ps
+            JOIN tpc01_pcplan p ON ps.pcplanid = p.pcplanid
+            WHERE ps.agg_status = :status
+            ORDER BY ps.pcplanid
+        """),
+        {"status": status},
+    ).fetchall()
+    return success_response(data=[dict(r._mapping) for r in rows])
+
+
+@procurement_bp.get("/dashboard/order-drill")
+@login_required
+def dashboard_order_drill():  # type: ignore[no-untyped-def]
+    """看板订单下钻：按执行状态或审批状态查看订单列表。"""
+    status = request.args.get("status", "").strip()
+    auditflg = request.args.get("auditflg", "").strip()
+    if not status and not auditflg:
+        return error_response("status 或 auditflg 不能为空", 400)
+    query = """
+        SELECT r.rgstbillid, r.suppliercd, r.auditflg, r.gendate::text, r.memo, r.useflg,
+               CASE WHEN COALESCE(SUM(dt.inqty),0)=0 THEN '未入库'
+                    WHEN SUM(COALESCE(dt.inqty,0))>=SUM(dt.rgsqty) THEN '已完成'
+                    ELSE '部分入库' END AS execution_status
+        FROM tpc12_register r
+        JOIN tpc13_registerdt dt ON r.rgstbillid = dt.rgstbillid
+        WHERE r.useflg != '9'
+        GROUP BY r.rgstbillid
+    """
+    if status:
+        query += " HAVING CASE WHEN COALESCE(SUM(dt.inqty),0)=0 THEN '未入库' WHEN SUM(COALESCE(dt.inqty,0))>=SUM(dt.rgsqty) THEN '已完成' ELSE '部分入库' END = :status"
+    if auditflg:
+        query = """
+            SELECT r.rgstbillid, r.suppliercd, r.auditflg, r.gendate::text, r.memo, r.useflg
+            FROM tpc12_register r
+            WHERE r.useflg != '9' AND r.auditflg = :auditflg
+            ORDER BY r.gendate DESC
+        """
+    rows = db.session.execute(sa.text(query), {"status": status, "auditflg": auditflg}).fetchall()
+    return success_response(data=[dict(r._mapping) for r in rows])
 
 
 # ---- 采购需求执行看板 (原 TPC03，已冻结) ----
