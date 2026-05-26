@@ -124,6 +124,15 @@
               <el-button
                 v-if="row.auditflg === '0'"
                 link
+                type="success"
+                size="small"
+                @click.stop="openEdit(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="row.auditflg === '0'"
+                link
                 type="primary"
                 size="small"
                 @click.stop="doSubmit(row)"
@@ -289,6 +298,46 @@
       </template>
     </el-dialog>
 
+    <!-- 编辑结算单弹窗 -->
+    <el-dialog title="编辑结算单" v-model="editing" width="700px" @closed="resetEditForm">
+      <el-form :model="editForm" label-width="90px" size="small" v-if="editDetail">
+        <el-form-item label="供应商">{{ editDetail.suppliercd }}</el-form-item>
+        <el-form-item label="付款方式">
+          <el-select v-model="editForm.pay_type" style="width:200px">
+            <el-option v-for="(nm,k) in payTypeMap" :key="k" :label="nm" :value="k"/>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="发票号"><el-input v-model="editForm.invoice_no"/></el-form-item>
+        <el-form-item label="发票日期"><el-date-picker v-model="editForm.invoice_date" type="date" value-format="YYYY-MM-DD" style="width:200px"/></el-form-item>
+        <el-form-item label="结算日期"><el-date-picker v-model="editForm.pcdate" type="date" value-format="YYYY-MM-DD" style="width:200px"/></el-form-item>
+        <el-form-item label="仓库"><el-input v-model="editForm.whcd" style="width:120px"/></el-form-item>
+        <el-form-item label="备注"><el-input v-model="editForm.memo" type="textarea" :rows="2"/></el-form-item>
+
+        <el-divider content-position="left">结算明细</el-divider>
+        <el-table :data="editDetails" size="small" stripe>
+          <el-table-column prop="ref_rgstbillid" label="来源订单" width="90"/>
+          <el-table-column prop="itemcd" label="物料" width="80"/>
+          <el-table-column label="结算数量" width="130">
+            <template #default="{ row, $index }">
+              <el-input-number v-model="editDetails[$index].settle_qty" :min="1" size="small" style="width:110px" controls-position="right"/>
+            </template>
+          </el-table-column>
+          <el-table-column label="结算单价" width="130">
+            <template #default="{ row, $index }">
+              <el-input-number v-model="editDetails[$index].settle_price" :min="0" :precision="2" size="small" style="width:110px" controls-position="right"/>
+            </template>
+          </el-table-column>
+          <el-table-column label="金额" width="100">
+            <template #default="{ $index }">{{ ((editDetails[$index].settle_qty||0) * (editDetails[$index].settle_price||0)).toFixed(2) }}</template>
+          </el-table-column>
+        </el-table>
+      </el-form>
+      <template #footer>
+        <el-button @click="editing=false">取消</el-button>
+        <el-button type="primary" @click="doEdit" :loading="editLoading">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 新建结算单 -->
     <el-dialog
       title="新建采购结算单"
@@ -449,6 +498,7 @@ import {
     fetchSettlements,
     fetchSettlementDetail,
     createSettlement,
+    updateSettlement,
     auditSettlement,
     voidSettlement,
     fetchSettleableItems,
@@ -598,6 +648,67 @@ async function doVoid() {
     } finally {
         voidLoading.value = false
     }
+}
+
+// ---- 编辑结算单 ----
+const editing = ref(false)
+const editLoading = ref(false)
+const editDetail = ref<SettlementRecord | null>(null)
+const editForm = reactive({ pay_type: 'COD', invoice_no: '', invoice_date: '', pcdate: '', whcd: '', memo: '' })
+const editDetails = reactive<{ ref_rgstbillid: string; ref_rgstlineno: number; itemcd: string; settle_qty: number; settle_price: number }[]>([])
+
+async function openEdit(row: SettlementRecord) {
+    try {
+        const r = await fetchSettlementDetail(row.pcbillid)
+        editDetail.value = r.data as SettlementRecord
+        const d = editDetail.value
+        editForm.pay_type = (d.pay_type as string) || 'COD'
+        editForm.invoice_no = (d.invoice_no as string) || ''
+        editForm.invoice_date = (d.invoice_date as string) || ''
+        editForm.pcdate = (d.pcdate as string) || ''
+        editForm.whcd = (d.whcd as string) || ''
+        editForm.memo = (d.memo as string) || ''
+        editDetails.length = 0
+        const lines = (d.details || []) as SettlementDetail[]
+        for (const l of lines) {
+            editDetails.push({
+                ref_rgstbillid: l.ref_rgstbillid,
+                ref_rgstlineno: l.ref_rgstlineno,
+                itemcd: l.itemcd,
+                settle_qty: l.settle_qty,
+                settle_price: l.settle_price,
+            })
+        }
+        editing.value = true
+    } catch { ElMessage.error('加载结算单详情失败') }
+}
+
+async function doEdit() {
+    if (!editDetail.value) return
+    const details = editDetails.filter(d => (d.settle_qty || 0) > 0)
+    if (details.length === 0) { ElMessage.warning('请至少保留一行结算明细'); return }
+    editLoading.value = true
+    try {
+        await updateSettlement(editDetail.value.pcbillid, {
+            ...editForm,
+            details: details.map(d => ({
+                ref_rgstbillid: d.ref_rgstbillid,
+                ref_rgstlineno: d.ref_rgstlineno,
+                itemcd: d.itemcd,
+                settle_qty: d.settle_qty,
+                settle_price: d.settle_price,
+            })),
+        })
+        ElMessage.success('保存成功')
+        editing.value = false
+        load()
+    } catch (e: any) { ElMessage.error(e?.response?.data?.message || '保存失败') }
+    finally { editLoading.value = false }
+}
+
+function resetEditForm() {
+    editDetail.value = null
+    editDetails.length = 0
 }
 
 // ---- 新建结算单 ----

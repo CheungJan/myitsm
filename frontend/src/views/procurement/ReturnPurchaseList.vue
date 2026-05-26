@@ -121,6 +121,15 @@
               <el-button
                 v-if="row.auditflg === '0'"
                 link
+                type="success"
+                size="small"
+                @click.stop="openEdit(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="row.auditflg === '0'"
+                link
                 type="primary"
                 size="small"
                 @click.stop="doSubmit(row)"
@@ -285,6 +294,48 @@
         <el-button type="danger" @click="doVoid" :loading="voidLoading">
           确认作废
         </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑退货单弹窗 -->
+    <el-dialog title="编辑退货单" v-model="editing" width="700px" @closed="resetEditForm">
+      <el-form :model="editForm" label-width="90px" size="small" v-if="editDetail">
+        <el-form-item label="退货单号">{{ editDetail.pcbillid }}</el-form-item>
+        <el-form-item label="退货原因">
+          <el-select v-model="editForm.return_reason" style="width:200px">
+            <el-option v-for="(nm,k) in reasonMap" :key="k" :label="nm" :value="k"/>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="退货日期"><el-date-picker v-model="editForm.pcdate" type="date" value-format="YYYY-MM-DD" style="width:200px"/></el-form-item>
+        <el-form-item label="仓库"><el-input v-model="editForm.whcd" style="width:120px"/></el-form-item>
+        <el-form-item label="备注"><el-input v-model="editForm.memo" type="textarea" :rows="2"/></el-form-item>
+
+        <el-divider content-position="left">退货明细</el-divider>
+        <el-table :data="editDetails" size="small" stripe>
+          <el-table-column prop="itemcd" label="物料" width="80"/>
+          <el-table-column label="退货数量" width="130">
+            <template #default="{ row, $index }">
+              <el-input-number v-model="editDetails[$index].rpcqty" :min="1" size="small" style="width:110px" controls-position="right"/>
+            </template>
+          </el-table-column>
+          <el-table-column label="退货单价" width="130">
+            <template #default="{ row, $index }">
+              <el-input-number v-model="editDetails[$index].return_price" :min="0" :precision="2" size="small" style="width:110px" controls-position="right"/>
+            </template>
+          </el-table-column>
+          <el-table-column label="金额" width="100">
+            <template #default="{ $index }">{{ ((editDetails[$index].rpcqty||0) * (editDetails[$index].return_price||0)).toFixed(2) }}</template>
+          </el-table-column>
+          <el-table-column label="行级原因" width="140">
+            <template #default="{ row, $index }">
+              <el-input v-model="editDetails[$index].line_reason" size="small" placeholder="可选" maxlength="100"/>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-form>
+      <template #footer>
+        <el-button @click="editing=false">取消</el-button>
+        <el-button type="primary" @click="doEdit" :loading="editLoading">保存</el-button>
       </template>
     </el-dialog>
 
@@ -466,6 +517,7 @@ import {
     fetchReturns,
     fetchReturnDetail,
     createReturn,
+    updateReturn,
     auditReturn,
     voidReturn,
     fetchReturnableItems,
@@ -618,6 +670,65 @@ async function doVoid() {
     } finally {
         voidLoading.value = false
     }
+}
+
+// ---- 编辑退货单 ----
+const editing = ref(false)
+const editLoading = ref(false)
+const editDetail = ref<ReturnPurchaseRecord | null>(null)
+const editForm = reactive({ return_reason: 'quality', pcdate: '', whcd: '', memo: '' })
+const editDetails = reactive<{ itemcd: string; ref_rgstlineno: number; rpcqty: number; return_price: number; line_reason: string }[]>([])
+
+async function openEdit(row: ReturnPurchaseRecord) {
+    try {
+        const r = await fetchReturnDetail(row.pcbillid)
+        editDetail.value = r.data as ReturnPurchaseRecord
+        const d = editDetail.value
+        editForm.return_reason = (d.return_reason as string) || 'quality'
+        editForm.pcdate = (d.pcdate as string) || ''
+        editForm.whcd = (d.whcd as string) || ''
+        editForm.memo = (d.memo as string) || ''
+        editDetails.length = 0
+        const lines = (d.details || []) as ReturnPurchaseDetail[]
+        for (const l of lines) {
+            editDetails.push({
+                itemcd: l.itemcd,
+                ref_rgstlineno: l.ref_rgstlineno || 0,
+                rpcqty: l.rpcqty,
+                return_price: l.return_price || 0,
+                line_reason: l.line_reason || '',
+            })
+        }
+        editing.value = true
+    } catch { ElMessage.error('加载退货单详情失败') }
+}
+
+async function doEdit() {
+    if (!editDetail.value) return
+    const details = editDetails.filter(d => (d.rpcqty || 0) > 0)
+    if (details.length === 0) { ElMessage.warning('请至少保留一行退货明细'); return }
+    editLoading.value = true
+    try {
+        await updateReturn(editDetail.value.pcbillid, {
+            ...editForm,
+            details: details.map(d => ({
+                itemcd: d.itemcd,
+                ref_rgstlineno: d.ref_rgstlineno,
+                rpcqty: d.rpcqty,
+                return_price: d.return_price,
+                line_reason: d.line_reason || undefined,
+            })),
+        })
+        ElMessage.success('保存成功')
+        editing.value = false
+        load()
+    } catch (e: any) { ElMessage.error(e?.response?.data?.message || '保存失败') }
+    finally { editLoading.value = false }
+}
+
+function resetEditForm() {
+    editDetail.value = null
+    editDetails.length = 0
 }
 
 // ---- 新建退货单 ----
