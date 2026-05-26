@@ -15,6 +15,7 @@ from app.extensions import db
 from app.models.master import IdMaster
 from app.models.procurement import (
     PurchaseBill,
+    PurchaseBillDt,
     PurchasePlan,
     PurchasePlanDt,
     PurchasePlanStatus,
@@ -38,9 +39,19 @@ def _gen_id(prefix: str = "") -> str:
 
 def _gen_pp_id() -> str:
     """生成采购需求单号，沿用PP前缀自增规则。"""
-    id_master = db.session.get(IdMaster, "PP")
+    return _gen_master_id("PP", "采购需求单号")
+
+
+def _gen_pr_id() -> str:
+    """生成采购订单号，沿用PR前缀自增规则。"""
+    return _gen_master_id("PR", "采购订单号")
+
+
+def _gen_master_id(id_type: str, id_type_name: str) -> str:
+    """从 IdMaster 表取号并自增。"""
+    id_master = db.session.get(IdMaster, id_type)
     if id_master is None:
-        id_master = IdMaster(id_type="PP", prefix="PP", current_no=0, step=1, idtyp="PP", idtypnm="采购需求单号", curbillid="0", useflg="1")
+        id_master = IdMaster(id_type=id_type, prefix=id_type, current_no=0, step=1, idtyp=id_type, idtypnm=id_type_name, curbillid="0", useflg="1")
         db.session.add(id_master)
         db.session.flush()
     step = id_master.step or 1
@@ -48,7 +59,7 @@ def _gen_pp_id() -> str:
     next_no = current_no + step
     id_master.current_no = next_no
     id_master.curbillid = str(next_no)
-    prefix = id_master.prefix or "PP"
+    prefix = id_master.prefix or id_type
     return f"{prefix}{next_no:06d}"[:8]
 
 
@@ -65,10 +76,13 @@ class PurchasePlanRepository:
         pctyp: str | None = None,
         start_date: dt | None = None,
         end_date: dt | None = None,
+        execution_status: str | None = None,
+        overdue_only: bool = False,
+        hide_unavailable: bool = False,
         page: int = 1,
         per_page: int = 20,
     ) -> tuple[list[PurchasePlan], int]:
-        query = db.session.query(PurchasePlan)
+        query = db.session.query(PurchasePlan).filter(PurchasePlan.useflg != "9")
         if auditflg:
             query = query.filter(PurchasePlan.auditflg == auditflg)
         if pctyp:
@@ -77,6 +91,47 @@ class PurchasePlanRepository:
             query = query.filter(PurchasePlan.plandate >= start_date)
         if end_date:
             query = query.filter(PurchasePlan.plandate <= end_date)
+        if execution_status:
+            # 通过原生子查询过滤：汇总各需求单执行状态后与筛选值比对
+            matched_ids_raw = db.session.execute(
+                sa.text(
+                    """
+                    SELECT pcplanid FROM (
+                        SELECT pcplanid,
+                            CASE
+                                WHEN COUNT(*) = SUM(CASE WHEN execution_status = '已完成' THEN 1 ELSE 0 END) THEN '已完成'
+                                WHEN SUM(CASE WHEN execution_status != '未开始' THEN 1 ELSE 0 END) = 0 THEN '未开始'
+                                WHEN SUM(CASE WHEN execution_status = '已下单' THEN 1 ELSE 0 END) > 0
+                                     AND SUM(CASE WHEN execution_status NOT IN ('已下单','已完成') THEN 1 ELSE 0 END) = 0 THEN '已下单'
+                                ELSE '执行中'
+                            END AS agg_status
+                        FROM v_requisition_execution
+                        GROUP BY pcplanid
+                    ) t WHERE agg_status = :status
+                    """
+                ),
+                {"status": execution_status},
+            ).fetchall()
+            matched_ids = [r[0] for r in matched_ids_raw]
+            if not matched_ids:
+                return [], 0
+            query = query.filter(PurchasePlan.pcplanid.in_(matched_ids))
+        if hide_unavailable:
+            query = query.filter(
+                PurchasePlan.pcplanid.in_(
+                    sa.text("SELECT DISTINCT pcplanid FROM v_requisition_execution WHERE available_qty > 0")
+                )
+            )
+        if overdue_only:
+            query = query.filter(
+                PurchasePlan.pcplanid.in_(
+                    sa.text("""
+                        SELECT DISTINCT pcplanid FROM v_requisition_execution
+                        WHERE execution_status != '已完成'
+                          AND plandate < CURRENT_DATE - INTERVAL '7 days'
+                    """)
+                )
+            )
         query = query.order_by(desc(PurchasePlan.gendate))
         total: int = query.count()
         items: list[PurchasePlan] = query.offset((page - 1) * per_page).limit(per_page).all()
@@ -180,14 +235,46 @@ class PurchasePlanRepository:
         return [dict(r._mapping) for r in rows]
 
     @staticmethod
+    def get_plan_execution_status(pcplanid: str) -> str:
+        """获取需求单计划级别的执行状态汇总。"""
+        sql = sa.text("""
+            SELECT
+                CASE
+                    WHEN COUNT(*) = 0 THEN '未开始'
+                    WHEN COUNT(*) = SUM(CASE WHEN execution_status = '已完成' THEN 1 ELSE 0 END) THEN '已完成'
+                    WHEN SUM(CASE WHEN execution_status != '未开始' THEN 1 ELSE 0 END) = 0 THEN '未开始'
+                    WHEN SUM(CASE WHEN execution_status = '已下单' THEN 1 ELSE 0 END) > 0
+                         AND SUM(CASE WHEN execution_status NOT IN ('已下单','已完成') THEN 1 ELSE 0 END) = 0 THEN '已下单'
+                    ELSE '执行中'
+                END AS plan_status
+            FROM v_requisition_execution
+            WHERE pcplanid = :pid
+        """)
+        result = db.session.execute(sql, {"pid": pcplanid}).scalar()
+        return result or "未开始"
+
+    @staticmethod
     def dashboard_stats() -> dict[str, Any]:
         stats = db.session.execute(sa.text("""
+            WITH plan_status AS (
+                SELECT pcplanid,
+                    CASE
+                        WHEN COUNT(*) = SUM(CASE WHEN execution_status = '已完成' THEN 1 ELSE 0 END) THEN '已完成'
+                        WHEN SUM(CASE WHEN execution_status != '未开始' THEN 1 ELSE 0 END) = 0 THEN '未开始'
+                        WHEN SUM(CASE WHEN execution_status = '已下单' THEN 1 ELSE 0 END) > 0
+                             AND SUM(CASE WHEN execution_status NOT IN ('已下单','已完成') THEN 1 ELSE 0 END) = 0 THEN '已下单'
+                        ELSE '执行中'
+                    END AS agg_status
+                FROM v_requisition_execution
+                GROUP BY pcplanid
+            )
             SELECT
-                COUNT(DISTINCT pcplanid) AS total,
-                COUNT(DISTINCT CASE WHEN execution_status = '已完成' THEN pcplanid END) AS completed,
-                COUNT(DISTINCT CASE WHEN execution_status IN ('已下单','执行中') THEN pcplanid END) AS in_progress,
-                COUNT(DISTINCT CASE WHEN execution_status = '未开始' THEN pcplanid END) AS not_started
-            FROM v_requisition_execution
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE agg_status = '已完成') AS completed,
+                COUNT(*) FILTER (WHERE agg_status = '已下单') AS ordered,
+                COUNT(*) FILTER (WHERE agg_status = '执行中') AS executing,
+                COUNT(*) FILTER (WHERE agg_status = '未开始') AS not_started
+            FROM plan_status
         """)).fetchone()
 
         top_items = [
@@ -221,18 +308,37 @@ class PurchasePlanRepository:
         overdue = [
             dict(row._mapping)
             for row in db.session.execute(sa.text("""
-                SELECT pcplanid, itemcd, itemnm, plandate::text,
-                    plan_qty, ordered_qty::numeric, received_qty::numeric,
-                    execution_status
-                FROM v_requisition_execution
-                WHERE execution_status != '已完成'
-                    AND plandate < CURRENT_DATE - INTERVAL '7 days'
-                ORDER BY plandate LIMIT 10
+                WITH plan_status AS (
+                    SELECT pcplanid,
+                        CASE
+                            WHEN COUNT(*) = SUM(CASE WHEN execution_status = '已完成' THEN 1 ELSE 0 END) THEN '已完成'
+                            WHEN SUM(CASE WHEN execution_status != '未开始' THEN 1 ELSE 0 END) = 0 THEN '未开始'
+                            WHEN SUM(CASE WHEN execution_status = '已下单' THEN 1 ELSE 0 END) > 0
+                                 AND SUM(CASE WHEN execution_status NOT IN ('已下单','已完成') THEN 1 ELSE 0 END) = 0 THEN '已下单'
+                            ELSE '执行中'
+                        END AS agg_status
+                    FROM v_requisition_execution
+                    GROUP BY pcplanid
+                )
+                SELECT p.pcplanid, p.plandate::date::text AS plandate,
+                       CURRENT_DATE::text AS today,
+                       (CURRENT_DATE - p.plandate::date) AS overdue_days,
+                       ps.agg_status AS execution_status, p.memo, p.auditflg, p.pctyp
+                FROM tpc01_pcplan p
+                JOIN plan_status ps ON p.pcplanid = ps.pcplanid
+                WHERE ps.agg_status != '已完成'
+                  AND p.plandate < CURRENT_DATE - INTERVAL '7 days'
+                ORDER BY p.plandate
             """)).fetchall()
         ]
 
+        voided = db.session.execute(sa.text(
+            "SELECT COUNT(*) AS cnt FROM tpc01_pcplan WHERE useflg = '9'"
+        )).scalar()
+
         return {
             "stats": dict(stats._mapping) if stats else {},
+            "voided": int(voided or 0),
             "top_items": top_items,
             "overdue": overdue,
         }
@@ -249,24 +355,134 @@ class PurchaseRegisterRepository:
     def list_by_filters(
         suppliercd: str | None = None,
         auditflg: str | None = None,
+        execution_status: str | None = None,
         page: int = 1,
         per_page: int = 20,
+        show_voided: bool = False,
     ) -> tuple[list[PurchaseRegister], int]:
         query = db.session.query(PurchaseRegister)
         if suppliercd:
             query = query.filter(PurchaseRegister.suppliercd == suppliercd)
-        if auditflg:
-            query = query.filter(PurchaseRegister.auditflg == auditflg)
+        if show_voided:
+            # 只显示作废单据，忽略审批状态筛选
+            query = query.filter(PurchaseRegister.useflg == "9")
+        else:
+            query = query.filter(PurchaseRegister.useflg != "9")
+            if auditflg:
+                query = query.filter(PurchaseRegister.auditflg == auditflg)
+        if execution_status:
+            matched_ids = db.session.execute(
+                sa.text("""
+                    SELECT rgstbillid FROM (
+                        SELECT rgstbillid,
+                            CASE
+                                WHEN COALESCE(SUM(inqty), 0) = 0 THEN '未入库'
+                                WHEN SUM(COALESCE(inqty,0)) >= SUM(rgsqty) THEN '已完成'
+                                ELSE '部分入库'
+                            END AS agg_status
+                        FROM tpc13_registerdt
+                        GROUP BY rgstbillid
+                    ) t WHERE agg_status = :status
+                """),
+                {"status": execution_status},
+            ).fetchall()
+            matched_ids_list = [r[0] for r in matched_ids]
+            if not matched_ids_list:
+                return [], 0
+            query = query.filter(PurchaseRegister.rgstbillid.in_(matched_ids_list))
         query = query.order_by(desc(PurchaseRegister.gendate))
         total: int = query.count()
         items: list[PurchaseRegister] = query.offset((page - 1) * per_page).limit(per_page).all()
         return items, total
 
     @staticmethod
+    def get_order_execution_status(rgstbillid: str) -> str:
+        """获取采购订单的执行状态。"""
+        sql = sa.text("""
+            SELECT
+                CASE
+                    WHEN COALESCE(SUM(inqty), 0) = 0 THEN '未入库'
+                    WHEN SUM(COALESCE(inqty,0)) >= SUM(rgsqty) THEN '已完成'
+                    ELSE '部分入库'
+                END AS exec_status
+            FROM tpc13_registerdt
+            WHERE rgstbillid = :bid
+        """)
+        result = db.session.execute(sql, {"bid": rgstbillid}).scalar()
+        return result or "未入库"
+
+    @staticmethod
+    def order_dashboard_stats() -> dict[str, Any]:
+        """采购订单看板统计。"""
+        stats = db.session.execute(sa.text("""
+            WITH order_status AS (
+                SELECT r.rgstbillid,
+                    CASE
+                        WHEN COALESCE(SUM(dt.inqty), 0) = 0 THEN '未入库'
+                        WHEN SUM(COALESCE(dt.inqty,0)) >= SUM(dt.rgsqty) THEN '已完成'
+                        ELSE '部分入库'
+                    END AS exec_status
+                FROM tpc12_register r
+                JOIN tpc13_registerdt dt ON r.rgstbillid = dt.rgstbillid
+                WHERE r.useflg != '9'
+                GROUP BY r.rgstbillid
+            )
+            SELECT
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE exec_status = '已完成') AS completed,
+                COUNT(*) FILTER (WHERE exec_status = '部分入库') AS partial,
+                COUNT(*) FILTER (WHERE exec_status = '未入库') AS not_received
+            FROM order_status
+        """)).fetchone()
+
+        audit_stats = db.session.execute(sa.text("""
+            SELECT
+                COUNT(*) FILTER (WHERE auditflg = '0') AS draft,
+                COUNT(*) FILTER (WHERE auditflg = '1') AS pending,
+                COUNT(*) FILTER (WHERE auditflg = '2') AS approved,
+                COUNT(*) FILTER (WHERE auditflg = '9') AS rejected,
+                COUNT(*) FILTER (WHERE useflg = '9') AS voided
+            FROM tpc12_register
+        """)).fetchone()
+
+        return {
+            "stats": dict(stats._mapping) if stats else {},
+            "audit_stats": dict(audit_stats._mapping) if audit_stats else {},
+        }
+
+    @staticmethod
+    def order_overdue() -> list[dict[str, Any]]:
+        """采购订单逾期预警：审批滞留 + 交付逾期。"""
+        rows = db.session.execute(sa.text("""
+            SELECT rgstbillid, suppliercd, auditflg, gendate::date::text,
+                   '审批滞留' AS type, (CURRENT_DATE - gendate::date)::int AS overdue_days
+            FROM tpc12_register
+            WHERE useflg != '9' AND auditflg = '1'
+              AND gendate < CURRENT_DATE - INTERVAL '3 days'
+            UNION ALL
+            SELECT r.rgstbillid, r.suppliercd, r.auditflg, MIN(dt.deliverdate)::date::text,
+                   '交付逾期' AS type,
+                   (CURRENT_DATE - MIN(dt.deliverdate)::date)::int AS overdue_days
+            FROM tpc12_register r
+            JOIN tpc13_registerdt dt ON r.rgstbillid = dt.rgstbillid
+            WHERE r.useflg != '9' AND r.auditflg = '2'
+              AND dt.deliverdate IS NOT NULL AND dt.deliverdate < CURRENT_DATE
+              AND COALESCE(dt.inqty, 0) < dt.rgsqty
+            GROUP BY r.rgstbillid, r.suppliercd, r.auditflg
+            ORDER BY overdue_days DESC
+        """)).fetchall()
+        return [dict(r._mapping) for r in rows]
+
+    @staticmethod
     def create(data: dict[str, Any], creator: str) -> PurchaseRegister:
         now = datetime.now(UTC)
+        # 采购员默认取当前用户，下单日期默认当天
+        if not data.get("pcrep"):
+            data["pcrep"] = creator
+        if not data.get("rgstdate"):
+            data["rgstdate"] = now
         record = PurchaseRegister(
-            rgstbillid=_gen_id(),
+            rgstbillid=_gen_pr_id(),
             opercd=creator,
             gendate=now,
             auditflg="0",
@@ -280,8 +496,10 @@ class PurchaseRegisterRepository:
         """从批量数据创建订单主表记录。"""
         now = datetime.now(UTC)
         record = PurchaseRegister(
-            rgstbillid=_gen_id(),
+            rgstbillid=_gen_pr_id(),
             suppliercd=order_data.get("suppliercd", ""),
+            pcrep=order_data.get("pcrep") or creator,
+            rgstdate=order_data.get("rgstdate") or now,
             memo=order_data.get("memo", ""),
             opercd=creator,
             gendate=now,
@@ -344,13 +562,25 @@ class PurchaseBillRepository:
 
     @staticmethod
     def list_by_filters(
-        whcd: str | None = None,
+        suppliercd: str | None = None,
+        auditflg: str | None = None,
+        pay_type: str | None = None,
+        start_date: dt | None = None,
+        end_date: dt | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> tuple[list[PurchaseBill], int]:
-        query = db.session.query(PurchaseBill)
-        if whcd:
-            query = query.filter(PurchaseBill.whcd == whcd)
+        query = db.session.query(PurchaseBill).filter(PurchaseBill.useflg != "9")
+        if suppliercd:
+            query = query.filter(PurchaseBill.suppliercd == suppliercd)
+        if auditflg:
+            query = query.filter(PurchaseBill.auditflg == auditflg)
+        if pay_type:
+            query = query.filter(PurchaseBill.pay_type == pay_type)
+        if start_date:
+            query = query.filter(PurchaseBill.gendate >= start_date)
+        if end_date:
+            query = query.filter(PurchaseBill.gendate <= end_date)
         query = query.order_by(desc(PurchaseBill.gendate))
         total: int = query.count()
         items: list[PurchaseBill] = query.offset((page - 1) * per_page).limit(per_page).all()
@@ -360,13 +590,54 @@ class PurchaseBillRepository:
     def create(data: dict[str, Any], creator: str) -> PurchaseBill:
         now = datetime.now(UTC)
         record = PurchaseBill(
-            pcbillid=_gen_id(),
+            pcbillid=_gen_master_id("SB", "采购结算单号"),
             opercd=creator,
             gendate=now,
             **data,
         )
         db.session.add(record)
         return record
+
+    @staticmethod
+    def update(record: PurchaseBill, data: dict[str, Any]) -> PurchaseBill:
+        skip = {"pcbillid", "details", "opercd", "gendate", "auditflg", "auditman", "auditdate"}
+        for k, v in data.items():
+            if k in skip:
+                continue
+            setattr(record, k, v)
+        return record
+
+    @staticmethod
+    def add_detail(pcbillid: str, lineno: int, data: dict[str, Any]) -> PurchaseBillDt:
+        record = PurchaseBillDt(pcbillid=pcbillid, lineno=lineno, **data)
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def clear_details(pcbillid: str) -> None:
+        db.session.query(PurchaseBillDt).filter(
+            PurchaseBillDt.pcbillid == pcbillid
+        ).delete()
+
+    @staticmethod
+    def list_details(pcbillid: str) -> list[PurchaseBillDt]:
+        return db.session.query(PurchaseBillDt).filter(
+            PurchaseBillDt.pcbillid == pcbillid
+        ).order_by(PurchaseBillDt.lineno).all()
+
+    @staticmethod
+    def get_settled_total(ref_rgstbillid: str, ref_rgstlineno: int, exclude_pcbillid: str | None = None) -> float:
+        """获取某订单行已结算累计（排除指定结算单）。"""
+        from sqlalchemy import func
+        q = db.session.query(func.coalesce(func.sum(PurchaseBillDt.settle_qty), 0)).filter(
+            PurchaseBillDt.ref_rgstbillid == ref_rgstbillid,
+            PurchaseBillDt.ref_rgstlineno == ref_rgstlineno,
+        ).join(PurchaseBill, PurchaseBill.pcbillid == PurchaseBillDt.pcbillid).filter(
+            PurchaseBill.useflg != "9"
+        )
+        if exclude_pcbillid:
+            q = q.filter(PurchaseBillDt.pcbillid != exclude_pcbillid)
+        return float(q.scalar() or 0)
 
 
 class ReturnPurchaseRepository:
@@ -378,13 +649,22 @@ class ReturnPurchaseRepository:
 
     @staticmethod
     def list_by_filters(
-        whcd: str | None = None,
+        suppliercd: str | None = None,
+        auditflg: str | None = None,
+        start_date: dt | None = None,
+        end_date: dt | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> tuple[list[ReturnPurchaseBill], int]:
-        query = db.session.query(ReturnPurchaseBill)
-        if whcd:
-            query = query.filter(ReturnPurchaseBill.whcd == whcd)
+        query = db.session.query(ReturnPurchaseBill).filter(ReturnPurchaseBill.useflg != "9")
+        if suppliercd:
+            query = query.filter(ReturnPurchaseBill.suppliercd == suppliercd)
+        if auditflg:
+            query = query.filter(ReturnPurchaseBill.auditflg == auditflg)
+        if start_date:
+            query = query.filter(ReturnPurchaseBill.gendate >= start_date)
+        if end_date:
+            query = query.filter(ReturnPurchaseBill.gendate <= end_date)
         query = query.order_by(desc(ReturnPurchaseBill.gendate))
         total: int = query.count()
         items: list[ReturnPurchaseBill] = query.offset((page - 1) * per_page).limit(per_page).all()
@@ -394,7 +674,7 @@ class ReturnPurchaseRepository:
     def create(data: dict[str, Any], creator: str) -> ReturnPurchaseBill:
         now = datetime.now(UTC)
         record = ReturnPurchaseBill(
-            pcbillid=_gen_id(),
+            pcbillid=_gen_master_id("RT", "采购退货单号"),
             opercd=creator,
             gendate=now,
             **data,
@@ -411,6 +691,40 @@ class ReturnPurchaseRepository:
         )
         db.session.add(record)
         return record
+
+    @staticmethod
+    def update(record: ReturnPurchaseBill, data: dict[str, Any]) -> ReturnPurchaseBill:
+        skip = {"pcbillid", "details", "opercd", "gendate", "auditflg", "auditman", "auditdate"}
+        for k, v in data.items():
+            if k in skip:
+                continue
+            setattr(record, k, v)
+        return record
+
+    @staticmethod
+    def clear_details(pcbillid: str) -> None:
+        db.session.query(ReturnPurchaseBillDt).filter(
+            ReturnPurchaseBillDt.pcbillid == pcbillid
+        ).delete()
+
+    @staticmethod
+    def list_details(pcbillid: str) -> list[ReturnPurchaseBillDt]:
+        return db.session.query(ReturnPurchaseBillDt).filter(
+            ReturnPurchaseBillDt.pcbillid == pcbillid
+        ).order_by(ReturnPurchaseBillDt.lineno).all()
+
+    @staticmethod
+    def get_returned_total(ref_rgstbillid: str, ref_rgstlineno: int) -> float:
+        """获取某订单行已退货累计。"""
+        from sqlalchemy import func
+        return float(
+            db.session.query(func.coalesce(func.sum(ReturnPurchaseBillDt.rpcqty), 0)).filter(
+                ReturnPurchaseBillDt.ref_rgstlineno == ref_rgstlineno,
+            ).join(ReturnPurchaseBill, ReturnPurchaseBill.pcbillid == ReturnPurchaseBillDt.pcbillid).filter(
+                ReturnPurchaseBill.ref_rgstbillid == ref_rgstbillid,
+                ReturnPurchaseBill.useflg != "9",
+            ).scalar() or 0
+        )
 
 
 class RequisitionOrderLinkRepository:
@@ -437,6 +751,8 @@ class RequisitionOrderLinkRepository:
             + (
                 " WHERE itemcd IN ("
                 "SELECT itemcd FROM tip02_supplier_price WHERE supp_cd = :supp_cd"
+                " UNION "
+                "SELECT itemcd FROM tmm24_custitems WHERE custcd = :supp_cd"
                 ")"
                 if suppliercd
                 else ""
