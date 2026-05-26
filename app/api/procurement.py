@@ -19,6 +19,7 @@ from app.repositories.procurement_repository import (
 from app.schemas.procurement import (
     ProcurementQuery,
     PurchaseBillCreate,
+    PurchaseBillUpdate,
     PurchasePlanCreate,
     PurchasePlanDetailCreate,
     PurchasePlanStatusCreate,
@@ -27,6 +28,7 @@ from app.schemas.procurement import (
     PurchaseRegisterDetailCreate,
     ReturnPurchaseBillCreate,
     ReturnPurchaseBillDetailCreate,
+    ReturnPurchaseBillUpdate,
     SupplierAppraisalCreate,
     SupplierAppraisalDetailCreate,
 )
@@ -313,6 +315,54 @@ def create_settlement():  # type: ignore[no-untyped-def]
     return success_response(data=data, message="创建成功", code=201)
 
 
+@procurement_bp.put("/settlements/<pcbillid>")
+@login_required
+def update_settlement(pcbillid: str):  # type: ignore[no-untyped-def]
+    """编辑采购结算单。"""
+    json_data = request.get_json(silent=True) or {}
+    body = PurchaseBillUpdate.model_validate(json_data)
+    try:
+        result = PurchaseBillService.update(pcbillid, body.model_dump(exclude_none=True))
+        if result.get("error"):
+            return error_response(message=str(result["error"]), code=400)
+        return success_response(data=result)
+    except ValueError as e:
+        return error_response(message=str(e), code=400)
+
+
+@procurement_bp.post("/settlements/<pcbillid>/audit")
+@login_required
+def audit_settlement(pcbillid: str):  # type: ignore[no-untyped-def]
+    """审核采购结算单。"""
+    json_data = request.get_json(silent=True) or {}
+    auditflg = json_data.get("auditflg", "2")
+    user_cd: str = g.current_user
+    result = PurchaseBillService.audit(pcbillid, user_cd, auditflg)
+    if result.get("error"):
+        return error_response(message=str(result["error"]), code=400)
+    return success_response(data=result, message="审核成功")
+
+
+@procurement_bp.post("/settlements/<pcbillid>/void")
+@login_required
+def void_settlement(pcbillid: str):  # type: ignore[no-untyped-def]
+    """作废采购结算单。"""
+    result = PurchaseBillService.void(pcbillid)
+    if result.get("error"):
+        return error_response(message=str(result["error"]), code=400)
+    return success_response(data=result, message="已作废")
+
+
+@procurement_bp.get("/orders/<rgstbillid>/settleable-items")
+@login_required
+def get_settleable_items(rgstbillid: str):  # type: ignore[no-untyped-def]
+    """查询订单的可结算商品行。"""
+    try:
+        return success_response(data=PurchaseBillService.get_settleable_items(rgstbillid))
+    except ValueError as e:
+        return error_response(message=str(e), code=404)
+
+
 # ---- 采购退货 ----
 
 
@@ -352,6 +402,54 @@ def create_return():  # type: ignore[no-untyped-def]
     create_data["details"] = details
     data = ReturnPurchaseService.create(create_data, user_cd)
     return success_response(data=data, message="创建成功", code=201)
+
+
+@procurement_bp.put("/returns/<pcbillid>")
+@login_required
+def update_return(pcbillid: str):  # type: ignore[no-untyped-def]
+    """编辑采购退货单。"""
+    json_data = request.get_json(silent=True) or {}
+    body = ReturnPurchaseBillUpdate.model_validate(json_data)
+    try:
+        result = ReturnPurchaseService.update(pcbillid, body.model_dump(exclude_none=True))
+        if result.get("error"):
+            return error_response(message=str(result["error"]), code=400)
+        return success_response(data=result)
+    except ValueError as e:
+        return error_response(message=str(e), code=400)
+
+
+@procurement_bp.post("/returns/<pcbillid>/audit")
+@login_required
+def audit_return(pcbillid: str):  # type: ignore[no-untyped-def]
+    """审核采购退货单。"""
+    json_data = request.get_json(silent=True) or {}
+    auditflg = json_data.get("auditflg", "2")
+    user_cd: str = g.current_user
+    result = ReturnPurchaseService.audit(pcbillid, user_cd, auditflg)
+    if result.get("error"):
+        return error_response(message=str(result["error"]), code=400)
+    return success_response(data=result, message="审核成功")
+
+
+@procurement_bp.post("/returns/<pcbillid>/void")
+@login_required
+def void_return(pcbillid: str):  # type: ignore[no-untyped-def]
+    """作废采购退货单。"""
+    result = ReturnPurchaseService.void(pcbillid)
+    if result.get("error"):
+        return error_response(message=str(result["error"]), code=400)
+    return success_response(data=result, message="已作废")
+
+
+@procurement_bp.get("/orders/<rgstbillid>/returnable-items")
+@login_required
+def get_returnable_items(rgstbillid: str):  # type: ignore[no-untyped-def]
+    """查询订单的可退货商品行。"""
+    try:
+        return success_response(data=ReturnPurchaseService.get_returnable_items(rgstbillid))
+    except ValueError as e:
+        return error_response(message=str(e), code=404)
 
 
 # ---- 供应商评价 ----
