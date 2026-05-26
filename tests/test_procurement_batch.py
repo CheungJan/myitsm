@@ -231,11 +231,11 @@ class TestBatchCreate:
                     "suppliercd": "SUP001",
                     "details": [
                         {"ref_pcplanid": plan_id, "ref_pclineno": 1,
-                         "itemcd": "IT0004", "rgsqty": 9999}
+                         "itemcd": "IT0004", "rgsqty": 9999, "unitprice": 1}
                     ],
                 }
             ]
-            with pytest.raises(ValueError, match="超过可用余额"):
+            with pytest.raises(ValueError, match="采购数量.*超过可用余额"):
                 PurchaseRegisterService.batch_create(orders, "TEST")
 
     def test_batch_create_with_valid_data(self, app: Flask) -> None:
