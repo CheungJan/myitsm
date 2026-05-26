@@ -119,6 +119,7 @@ from app.models.portal import (
 )
 from app.models.procurement import (
     PurchaseBill,
+    PurchaseBillDt,
     PurchaseCheckInDt,
     PurchasePlan,
     PurchasePlanDt,
@@ -284,6 +285,7 @@ __all__ = [
     "PurchaseRegister",
     "PurchaseRegisterDt",
     "PurchaseBill",
+    "PurchaseBillDt",
     "ReturnPurchaseBill",
     "ReturnPurchaseBillDt",
     "SupplierAppraisal",

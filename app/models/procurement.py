@@ -147,16 +147,19 @@ class PurchaseRegisterDt(BaseModel):
 
 
 class PurchaseBill(BaseModel):
-    """采购单据（TPC14_PCBILL）。"""
+    """采购结算单（TPC14_PCBILL）。"""
 
     __tablename__ = "tpc14_pcbill"
 
-    pcbillid = db.Column(db.String(8), primary_key=True, comment="采购单号")
+    pcbillid = db.Column(db.String(8), primary_key=True, comment="结算单号")
+    ref_rgstbillid = db.Column(db.String(8), comment="来源采购订单（月结置空）")
+    suppliercd = db.Column(db.String(8), comment="供应商编码")
     pctyp = db.Column(db.String(2), comment="采购类型")
-    custcd = db.Column(db.String(8), comment="客户编码")
-    refbillid = db.Column(db.String(8), comment="关联单号")
-    pcdate = db.Column(db.DateTime, comment="采购日期")
-    pcamt = db.Column(db.Numeric(16, 4), comment="采购金额")
+    pay_type = db.Column(db.String(3), default="COD", comment="付款方式")
+    invoice_no = db.Column(db.String(50), comment="发票号码")
+    invoice_date = db.Column(db.Date, comment="发票日期")
+    pcdate = db.Column(db.DateTime, comment="结算日期")
+    total_settle_amt = db.Column(db.Numeric(16, 4), default=0, comment="结算总额")
     whcd = db.Column(db.String(2), comment="入库仓库")
     invoiceflg = db.Column(db.String(1), comment="发票标志")
     ptimes = db.Column(db.Integer, comment="打印次数")
@@ -164,6 +167,37 @@ class PurchaseBill(BaseModel):
     memo = db.Column(db.String(255), comment="备注")
     gendate = db.Column(db.DateTime, comment="创建日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    auditflg = db.Column(db.String(1), default="0", comment="审核标志")
+    auditman = db.Column(db.String(6), comment="审核人")
+    auditdate = db.Column(db.DateTime, comment="审核日期")
+
+    details = db.relationship("PurchaseBillDt", back_populates="bill", lazy="dynamic")
+
+
+class PurchaseBillDt(BaseModel):
+    """采购结算明细（TPC14_PCBILLDT）。"""
+
+    __tablename__ = "tpc14_pcbilldt"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    pcbillid = db.Column(
+        db.String(8),
+        db.ForeignKey("tpc14_pcbill.pcbillid", ondelete="CASCADE"),
+        nullable=False,
+        comment="结算单号",
+    )
+    lineno = db.Column(db.Integer, nullable=False, comment="行号")
+    ref_rgstbillid = db.Column(db.String(8), nullable=False, comment="来源采购订单号")
+    ref_rgstlineno = db.Column(db.Integer, nullable=False, comment="来源订单行号")
+    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    order_qty = db.Column(db.Numeric(12, 2), default=0, comment="订购数量(快照)")
+    received_qty = db.Column(db.Numeric(12, 2), default=0, comment="已入库数量(快照)")
+    already_settled = db.Column(db.Numeric(12, 2), default=0, comment="该行已结算累计(不含本次)")
+    settle_qty = db.Column(db.Numeric(12, 2), nullable=False, comment="本次结算数量")
+    settle_price = db.Column(db.Numeric(16, 4), nullable=False, comment="结算单价")
+    settle_amt = db.Column(db.Numeric(16, 4), nullable=False, comment="结算金额")
+
+    bill = db.relationship("PurchaseBill", back_populates="details")
 
 
 # ---------------------------------------------------------------------------
@@ -177,7 +211,7 @@ class ReturnPurchaseBill(BaseModel):
     __tablename__ = "tpc16_rpcbill"
 
     pcbillid = db.Column(db.String(8), primary_key=True, comment="退货单号")
-    custcd = db.Column(db.String(8), comment="客户编码")
+    suppliercd = db.Column(db.String(8), comment="供应商编码")
     pcdate = db.Column(db.DateTime, comment="退货日期")
     pcamt = db.Column(db.Integer, comment="退货金额")
     whcd = db.Column(db.String(2), comment="仓库编码")
@@ -188,6 +222,7 @@ class ReturnPurchaseBill(BaseModel):
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     gendate = db.Column(db.DateTime, comment="创建日期")
     ref_rgstbillid = db.Column(db.String(8), comment="来源采购订单号")
+    return_reason = db.Column(db.String(20), comment="退货原因")
     auditflg = db.Column(db.String(1), default="0", comment="审核标志")
     auditman = db.Column(db.String(6), comment="审核人")
     auditdate = db.Column(db.DateTime, comment="审核日期")
@@ -213,9 +248,12 @@ class ReturnPurchaseBillDt(BaseModel):
     eid = db.Column(db.String(13), comment="设备EID")
     seid = db.Column(db.String(30), comment="序列号")
     rpcqty = db.Column(db.Integer, default=0, comment="退货数量")
+    return_price = db.Column(db.Numeric(16, 4), comment="退货单价")
+    return_amt = db.Column(db.Numeric(16, 4), comment="退货金额")
     invoiceqty = db.Column(db.Integer, default=0, comment="发票数量")
     units = db.Column(db.String(4), comment="单位")
     ref_rgstlineno = db.Column(db.Integer, comment="来源订单行号")
+    line_reason = db.Column(db.String(100), comment="行级退货原因说明")
 
     bill = db.relationship("ReturnPurchaseBill", back_populates="details")
 
