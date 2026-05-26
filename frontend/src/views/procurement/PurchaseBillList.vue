@@ -690,7 +690,7 @@ watch(
             const ordersRes = await fetchOrders({
                 suppliercd: val,
                 auditflg: '2',
-                per_page: '200',
+                per_page: '100',
             })
             const orders = (ordersRes.data?.items ||
                 []) as Record<string, unknown>[]

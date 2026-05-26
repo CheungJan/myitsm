@@ -502,13 +502,13 @@ const auditedOrderOptions = ref<OrderOption[]>([])
 onMounted(async () => {
     try {
         // 加载全部订单用于筛选下拉
-        const allRes = await fetchOrders({ per_page: '200' })
+        const allRes = await fetchOrders({ per_page: '100' })
         const allList = (allRes.data?.items || []) as Record<string, unknown>[]
         orderOptions.value = allList.map((o) => ({
             rgstbillid: o.rgstbillid as string,
         }))
         // 加载已审核订单用于新建下拉
-        const auditedRes = await fetchOrders({ auditflg: '2', per_page: '200' })
+        const auditedRes = await fetchOrders({ auditflg: '2', per_page: '100' })
         const auditedList = (auditedRes.data?.items || []) as Record<string, unknown>[]
         auditedOrderOptions.value = auditedList.map((o) => ({
             rgstbillid: o.rgstbillid as string,
