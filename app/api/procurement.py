@@ -391,49 +391,12 @@ def get_monthly_receiving():  # type: ignore[no-untyped-def]
     period = request.args.get("period", "")  # YYYY-MM
     if not suppliercd or not period:
         return error_response(message="suppliercd 和 period 必填", code=400)
+    try:
+        rows = PurchaseBillService.get_monthly_receiving(suppliercd, period)
+    except ValueError as e:
+        return error_response(message=str(e), code=400)
 
-    year, month = period.split("-")
-    start_date = f"{year}-{month}-01"
-    end_month = int(month) + 1
-    end_year = int(year)
-    if end_month > 12:
-        end_month = 1
-        end_year += 1
-    end_date = f"{end_year}-{end_month:02d}-01"
-
-    from app.models.warehouse import StockIn
-
-    rows = (
-        db.session.query(
-            StockIn.refbillid,
-            StockIn.whcd,
-            StockIn.indate,
-        )
-        .filter(
-            StockIn.refbillid.in_(
-                db.session.query(PurchaseRegister.rgstbillid).filter(
-                    PurchaseRegister.suppliercd == suppliercd,
-                    PurchaseRegister.auditflg == "2",
-                )
-            ),
-            StockIn.invtyp == "1",
-            StockIn.auditflg != "9",
-            StockIn.indate >= start_date,
-            StockIn.indate < end_date,
-        )
-        .all()
-    )
-
-    return success_response(
-        data=[
-            {
-                "rgstbillid": r.refbillid,
-                "whcd": r.whcd,
-                "indate": r.indate.isoformat() if r.indate else None,
-            }
-            for r in rows
-        ]
-    )
+    return success_response(data=rows)
 
 
 # ---- 采购退货 ----

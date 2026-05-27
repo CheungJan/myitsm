@@ -593,6 +593,7 @@ class PurchaseBillService:
                 raise ValueError(f"订单行 {ref_bill}:{ref_line} 不存在")
 
             order_qty = float(order_dt.rgsqty or 0)
+            order_price = float(order_dt.rgstprice or 0)
             received_qty = float(order_dt.inqty or 0)
             already = PurchaseBillRepository.get_settled_total(ref_bill, ref_line)
 
@@ -613,15 +614,16 @@ class PurchaseBillService:
             validated_details.append({
                 **d,
                 "order_qty": order_qty,
+                "order_price": order_price,
                 "received_qty": received_qty,
                 "already_settled": already,
                 "settle_amt": settle_amt,
             })
 
-        # DEP 尾款校验：累计结算金额不能超过订单金额
+        # DEP 尾款校验：使用订单原始单价，非本次结算单价
         if data.get("settle_stage") == "final":
             for d in validated_details:
-                order_total = float(d["order_qty"]) * float(d["settle_price"])
+                order_total = float(d["order_qty"]) * float(d["order_price"])
                 total_settled = float(d["already_settled"]) + float(d["settle_amt"])
                 if total_settled > order_total + 0.01:
                     raise ValueError(
@@ -692,6 +694,7 @@ class PurchaseBillService:
                     raise ValueError(f"订单行 {ref_bill}:{ref_line} 不存在")
 
                 order_qty = float(order_dt.rgsqty or 0)
+                order_price = float(order_dt.rgstprice or 0)
                 received_qty = float(order_dt.inqty or 0)
                 already = PurchaseBillRepository.get_settled_total(ref_bill, ref_line, pcbillid)
 
@@ -706,20 +709,45 @@ class PurchaseBillService:
                 settle_amt = settle_qty * settle_price
                 total_amt += settle_amt
                 validated_details.append({
-                    **d, "order_qty": order_qty, "received_qty": received_qty,
+                    **d, "order_qty": order_qty, "order_price": order_price,
+                    "received_qty": received_qty,
                     "already_settled": already, "settle_amt": settle_amt,
                 })
 
-            # DEP 尾款校验：累计结算金额不能超过订单金额
+            # DEP 尾款校验：使用订单原始单价，非本次结算单价
             if data.get("settle_stage", record.settle_stage) == "final":
                 for d in validated_details:
-                    order_total = float(d["order_qty"]) * float(d["settle_price"])
+                    order_total = float(d["order_qty"]) * float(d["order_price"])
                     total_settled = float(d["already_settled"]) + float(d["settle_amt"])
                     if total_settled > order_total + 0.01:
                         raise ValueError(
                             f"尾款结算：订单 {d['ref_rgstbillid']} 行 {d['ref_rgstlineno']} "
                             f"累计结算金额({total_settled:.2f})超过订单金额({order_total:.2f})"
                         )
+
+            # INS 分期校验（编辑时同样去重）
+            if data.get("pay_type", record.pay_type) == "INS":
+                inst_no = data.get("installment_no", record.installment_no)
+                if inst_no:
+                    for d in validated_details:
+                        existing = (
+                            db.session.query(PurchaseBill)
+                            .join(PurchaseBillDt)
+                            .filter(
+                                PurchaseBill.pay_type == "INS",
+                                PurchaseBill.useflg != "9",
+                                PurchaseBill.pcbillid != pcbillid,
+                                PurchaseBillDt.ref_rgstbillid == d["ref_rgstbillid"],
+                                PurchaseBillDt.ref_rgstlineno == d["ref_rgstlineno"],
+                                PurchaseBill.installment_no == inst_no,
+                            )
+                            .first()
+                        )
+                        if existing:
+                            raise ValueError(
+                                f"订单 {d['ref_rgstbillid']} 行 {d['ref_rgstlineno']} "
+                                f"第 {inst_no} 期已存在（结算单号 {existing.pcbillid}）"
+                            )
 
             data["total_settle_amt"] = total_amt
             PurchaseBillRepository.clear_details(pcbillid)
@@ -845,6 +873,52 @@ class PurchaseBillService:
             d["receiving_whcd"] = receiving_whcd
             items.append(d)
         return items
+
+    @staticmethod
+    def get_monthly_receiving(suppliercd: str, period: str) -> list[dict[str, Any]]:
+        """查询某供应商某月已审核订单的入库记录（月结汇总用）。"""
+        from app.models.procurement import PurchaseRegister
+        from datetime import datetime as dt_parse, timedelta
+
+        try:
+            period_date = dt_parse.strptime(period, "%Y-%m")
+        except ValueError:
+            raise ValueError(f"period 格式错误: {period}，应为 YYYY-MM")
+
+        start_date = period_date
+        if period_date.month == 12:
+            end_date = period_date.replace(year=period_date.year + 1, month=1)
+        else:
+            end_date = period_date.replace(month=period_date.month + 1)
+
+        order_ids = (
+            db.session.query(PurchaseRegister.rgstbillid)
+            .filter(
+                PurchaseRegister.suppliercd == suppliercd,
+                PurchaseRegister.auditflg == "2",
+            )
+            .subquery()
+        )
+
+        rows = (
+            db.session.query(StockIn.refbillid, StockIn.whcd, StockIn.indate)
+            .filter(
+                StockIn.refbillid.in_(order_ids),
+                StockIn.invtyp == "1",
+                StockIn.auditflg != "9",
+                StockIn.indate >= start_date,
+                StockIn.indate < end_date,
+            )
+            .all()
+        )
+        return [
+            {
+                "rgstbillid": r.refbillid,
+                "whcd": r.whcd,
+                "indate": r.indate.isoformat() if r.indate else None,
+            }
+            for r in rows
+        ]
 
 
 class ReturnPurchaseService:
