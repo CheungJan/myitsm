@@ -417,6 +417,7 @@ def list_returns():  # type: ignore[no-untyped-def]
     show_voided_rt = request.args.get("show_voided", "false").lower() == "true"
     data = ReturnPurchaseService.list_records(
         suppliercd=params.suppliercd, auditflg=params.auditflg,
+        ref_rgstbillid=params.ref_rgstbillid,
         start_date=params.start_date, end_date=params.end_date,
         page=params.page, per_page=params.per_page, show_voided=show_voided_rt
     )

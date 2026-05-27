@@ -1025,6 +1025,7 @@ class ReturnPurchaseService:
     def list_records(
         suppliercd: str | None = None,
         auditflg: str | None = None,
+        ref_rgstbillid: str | None = None,
         start_date: dt | None = None,
         end_date: dt | None = None,
         page: int = 1,
@@ -1032,7 +1033,7 @@ class ReturnPurchaseService:
         show_voided: bool = False,
     ) -> dict[str, Any]:
         items, total = ReturnPurchaseRepository.list_by_filters(
-            suppliercd=suppliercd, auditflg=auditflg,
+            suppliercd=suppliercd, auditflg=auditflg, ref_rgstbillid=ref_rgstbillid,
             start_date=start_date, end_date=end_date, page=page, per_page=per_page,
             show_voided=show_voided,
         )

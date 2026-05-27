@@ -87,7 +87,8 @@ class PurchasePlanRepository:
         if auditflg:
             query = query.filter(PurchasePlan.auditflg == auditflg)
         if pcplanid:
-            query = query.filter(PurchasePlan.pcplanid.ilike(f"%{pcplanid}%"))
+            keyword = pcplanid.strip()
+            query = query.filter(sa.func.trim(PurchasePlan.pcplanid).ilike(f"%{keyword}%"))
         if pctyp:
             query = query.filter(PurchasePlan.pctyp == pctyp)
         if start_date:
@@ -358,6 +359,7 @@ class PurchaseRegisterRepository:
     def list_by_filters(
         suppliercd: str | None = None,
         rgstbillid: str | None = None,
+        ref_pcplanid: str | None = None,
         auditflg: str | None = None,
         execution_status: str | None = None,
         page: int = 1,
@@ -368,7 +370,20 @@ class PurchaseRegisterRepository:
         if suppliercd:
             query = query.filter(PurchaseRegister.suppliercd == suppliercd)
         if rgstbillid:
-            query = query.filter(PurchaseRegister.rgstbillid.ilike(f"%{rgstbillid}%"))
+            keyword = rgstbillid.strip()
+            query = query.filter(sa.func.trim(PurchaseRegister.rgstbillid).ilike(f"%{keyword}%"))
+        if ref_pcplanid:
+            keyword = ref_pcplanid.strip()
+            matched_ids = (
+                db.session.query(PurchaseRegisterDt.rgstbillid)
+                .filter(sa.func.trim(PurchaseRegisterDt.ref_pcplanid).ilike(f"%{keyword}%"))
+                .distinct()
+                .all()
+            )
+            matched_ids_list = [r[0] for r in matched_ids]
+            if not matched_ids_list:
+                return [], 0
+            query = query.filter(PurchaseRegister.rgstbillid.in_(matched_ids_list))
         if show_voided:
             # 只显示作废单据，忽略审批状态筛选
             query = query.filter(PurchaseRegister.useflg == "9")
@@ -400,6 +415,22 @@ class PurchaseRegisterRepository:
         total: int = query.count()
         items: list[PurchaseRegister] = query.offset((page - 1) * per_page).limit(per_page).all()
         return items, total
+
+    @staticmethod
+    def get_order_ref_pcplanids(rgstbillid: str) -> str:
+        """获取采购订单关联的需求单号列表。"""
+        rows = (
+            db.session.query(PurchaseRegisterDt.ref_pcplanid)
+            .filter(
+                PurchaseRegisterDt.rgstbillid == rgstbillid,
+                PurchaseRegisterDt.ref_pcplanid.isnot(None),
+                PurchaseRegisterDt.ref_pcplanid != "",
+            )
+            .distinct()
+            .order_by(PurchaseRegisterDt.ref_pcplanid)
+            .all()
+        )
+        return ",".join([r[0] for r in rows if r[0]])
 
     @staticmethod
     def get_order_execution_status(rgstbillid: str) -> str:
@@ -667,6 +698,7 @@ class ReturnPurchaseRepository:
         page: int = 1,
         per_page: int = 20,
         show_voided: bool = False,
+        ref_rgstbillid: str | None = None,
     ) -> tuple[list[ReturnPurchaseBill], int]:
         query = db.session.query(ReturnPurchaseBill)
         if show_voided:
@@ -675,6 +707,8 @@ class ReturnPurchaseRepository:
             query = query.filter(ReturnPurchaseBill.useflg != "9")
         if suppliercd:
             query = query.filter(ReturnPurchaseBill.suppliercd == suppliercd)
+        if ref_rgstbillid:
+            query = query.filter(ReturnPurchaseBill.ref_rgstbillid.ilike(f"%{ref_rgstbillid}%"))
         if auditflg:
             query = query.filter(ReturnPurchaseBill.auditflg == auditflg)
         if start_date:

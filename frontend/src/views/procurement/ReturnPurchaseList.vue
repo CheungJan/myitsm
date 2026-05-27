@@ -13,23 +13,15 @@
       <div class="search-bar">
         <div class="field">
           <label>来源订单</label>
-          <el-select
+          <el-input
             v-model="searchOrder"
             size="small"
             style="width:180px"
             clearable
-            filterable
-            placeholder="选择订单"
-            @change="doSearch"
+            placeholder="输入单号搜索"
+            @keyup.enter="doSearch"
             @clear="doSearch"
-          >
-            <el-option
-              v-for="o in orderOptions"
-              :key="o.rgstbillid"
-              :label="o.rgstbillid"
-              :value="o.rgstbillid"
-            />
-          </el-select>
+          />
         </div>
         <div class="field">
           <label>退货原因</label>
