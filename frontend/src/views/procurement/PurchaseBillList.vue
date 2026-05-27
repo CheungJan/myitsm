@@ -616,6 +616,15 @@
               <el-button size="small" @click="applyGlobalRatio">应用</el-button>
               <span style="font-size:12px;color:#909399">勾选行按比例自动计算结算数量</span>
             </div>
+            <!-- 按订单快速勾选 -->
+            <div v-if="settleableItems.length > 0" style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
+              <span style="font-size:13px;white-space:nowrap">按订单选择</span>
+              <el-select v-model="quickOrderSelect" size="small" style="width:140px" placeholder="选择来源订单" clearable @change="onQuickOrderSelect">
+                <el-option v-for="oid in uniqueOrderIds" :key="oid" :label="oid" :value="oid"/>
+              </el-select>
+              <el-button size="small" @click="checkAll">全选</el-button>
+              <el-button size="small" @click="uncheckAll">取消全选</el-button>
+            </div>
             <el-alert
               v-if="!createForm.suppliercd"
               title="请先选择供应商"
@@ -718,7 +727,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { useListPage } from '@/composables/useListPage'
@@ -1076,6 +1085,24 @@ function applyGlobalRatio() {
         createDetails[i].settle_qty = qty
         createDetails[i].settle_price = row.unit_price
     }
+}
+
+// 按订单快速选择
+const quickOrderSelect = ref('')
+const uniqueOrderIds = computed(() => [...new Set(settleableItems.value.map(l => l.ref_rgstbillid).filter(Boolean))])
+
+function onQuickOrderSelect(oid: string) {
+    if (!oid) { uncheckAll(); return }
+    for (let i = 0; i < settleableItems.value.length; i++) {
+        const row = settleableItems.value[i]
+        row._selected = (row.ref_rgstbillid === oid)
+    }
+}
+function checkAll() {
+    for (const row of settleableItems.value) row._selected = true
+}
+function uncheckAll() {
+    for (const row of settleableItems.value) { row._selected = false; quickOrderSelect.value = '' }
 }
 
 // 用户填写的结算明细（与 settleableItems 一一对应，通过 checkbox 选中）
