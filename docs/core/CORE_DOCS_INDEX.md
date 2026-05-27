@@ -78,6 +78,12 @@
 18. **采购-仓库-质检跨模块流程衔接设计**（2026-05-27，技术设计文档）
     - `docs/core/采购-仓库-质检跨模块流程衔接设计.md`
 
+19. **仓库模块重构方案**（2026-05-27，技术设计 spec）
+    - `docs/superpowers/specs/2026-05-27-warehouse-module-plan.md`
+
+20. **仓库模块实施计划**（2026-05-27，代码改动 + 迁移脚本 + 执行顺序）
+    - `docs/superpowers/plans/2026-05-27-warehouse-module-impl.md`
+
 ---
 
 ## C 类：数据迁移与治理文档（历史基线）
