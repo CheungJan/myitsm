@@ -100,7 +100,7 @@
         <el-table-column label="审批" width="80">
           <template #default="{ row }">
             <el-tag
-              :type="row.auditflg === '2' ? 'success' : (row.auditflg === '9' || row.auditflg === 'V') ? 'danger' : 'warning'"
+              :type="row.auditflg === '2' ? 'success' : row.auditflg === 'V' ? 'danger' : 'warning'"
               size="small"
             >
               {{ auditMap[row.auditflg as string] || '未审核' }}
@@ -120,9 +120,9 @@
         </el-table-column>
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <template v-if="row.auditflg !== '9' && row.auditflg !== 'V'">
+            <template v-if="row.auditflg !== 'V'">
               <el-button
-                v-if="row.auditflg === '0'"
+                v-if="row.auditflg === '0' || row.auditflg === '9'"
                 link
                 type="success"
                 size="small"
@@ -131,7 +131,7 @@
                 编辑
               </el-button>
               <el-button
-                v-if="row.auditflg === '0'"
+                v-if="row.auditflg === '0' || row.auditflg === '9'"
                 link
                 type="primary"
                 size="small"
@@ -272,7 +272,7 @@
       <template #footer>
         <el-button @click="auditing = false">取消</el-button>
         <el-button type="danger" @click="doAudit('9')" :loading="auditLoading">
-          退回
+          驳回（退回修改）
         </el-button>
         <el-button type="success" @click="doAudit('2')" :loading="auditLoading">
           审核通过
@@ -380,6 +380,24 @@
             style="width:100%"
             value-format="YYYY-MM-DD"
           />
+        </el-form-item>
+
+        <el-form-item label="发票号">
+          <el-input v-model="createForm.invoice_no" placeholder="选填" style="width:100%" />
+        </el-form-item>
+
+        <el-form-item label="发票日期">
+          <el-date-picker
+            v-model="createForm.invoice_date"
+            type="date"
+            style="width:100%"
+            value-format="YYYY-MM-DD"
+            placeholder="选填"
+          />
+        </el-form-item>
+
+        <el-form-item label="入库仓库">
+          <el-input v-model="createForm.whcd" placeholder="选填，仓库编码" style="width:200px" />
         </el-form-item>
 
         <el-form-item label="备注">
@@ -711,6 +729,9 @@ const createForm = reactive({
     suppliercd: '',
     pay_type: 'COD',
     pcdate: today(),
+    invoice_no: '',
+    invoice_date: '',
+    whcd: '',
     memo: '',
 })
 
@@ -755,13 +776,15 @@ function onSettleQtyChange(index: number, qty: number) {
             ref_rgstbillid: row.ref_rgstbillid,
             ref_rgstlineno: row.ref_rgstlineno,
             itemcd: row.itemcd,
-            settle_qty: 0,
-            settle_price: 0,
+            settle_qty: row.remain_qty,
+            settle_price: row.unit_price,
         }
     }
     createDetails[index].settle_qty = qty
-    // 自动计算金额
-    createDetails[index].settle_price = createDetails[index].settle_price || 0
+    // 单价兜底：仍为 0 时用订单单价
+    if (!createDetails[index].settle_price) {
+        createDetails[index].settle_price = row.unit_price
+    }
 }
 
 function onSettlePriceChange(index: number, price: number) {
@@ -830,13 +853,13 @@ watch(
                 }
             }
             settleableItems.value = allLines
-            // 初始化 createDetails，结算单价默认来自订单单价
+            // 初始化 createDetails，结算数量默认=可结算数量，单价默认来自订单单价
             for (let i = 0; i < allLines.length; i++) {
                 createDetails.push({
                     ref_rgstbillid: allLines[i].ref_rgstbillid,
                     ref_rgstlineno: allLines[i].ref_rgstlineno,
                     itemcd: allLines[i].itemcd,
-                    settle_qty: 0,
+                    settle_qty: allLines[i].remain_qty,
                     settle_price: allLines[i].unit_price,
                 })
             }
@@ -856,6 +879,9 @@ function resetCreateForm() {
     createForm.suppliercd = ''
     createForm.pay_type = 'COD'
     createForm.pcdate = today()
+    createForm.invoice_no = ''
+    createForm.invoice_date = ''
+    createForm.whcd = ''
     createForm.memo = ''
     settleableItems.value = []
     createDetails.length = 0
@@ -936,6 +962,9 @@ async function handleCreate() {
             suppliercd: createForm.suppliercd,
             pay_type: createForm.pay_type,
             pcdate: createForm.pcdate,
+            invoice_no: createForm.invoice_no,
+            invoice_date: createForm.invoice_date,
+            whcd: createForm.whcd,
             memo: createForm.memo,
             details: detailsToSubmit,
         })

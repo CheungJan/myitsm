@@ -612,8 +612,8 @@ class PurchaseBillService:
         record = PurchaseBillRepository.get_by_id(pcbillid)
         if record is None:
             return {"success": False, "error": "结算单不存在"}
-        if record.auditflg != "0":
-            return {"success": False, "error": "仅未审核单据可编辑"}
+        if record.auditflg not in ("0", "9"):
+            return {"success": False, "error": "仅未审核或已退回单据可编辑"}
 
         details = data.pop("details", None)
         if details is not None:
@@ -674,7 +674,8 @@ class PurchaseBillService:
             return {"success": False, "error": "已作废单据不可审核"}
         if record.auditflg not in ("0", "1"):
             return {"success": False, "error": "不可重复审核"}
-        record.auditflg = auditflg
+        # 驳回时退回未审核状态，允许用户修改后重新送审
+        record.auditflg = "0" if auditflg == "9" else auditflg
         record.auditman = auditor
         record.auditdate = dt.now(UTC)
         db.session.commit()
@@ -799,8 +800,8 @@ class ReturnPurchaseService:
         record = ReturnPurchaseRepository.get_by_id(pcbillid)
         if record is None:
             return {"success": False, "error": "退货单不存在"}
-        if record.auditflg != "0":
-            return {"success": False, "error": "仅未审核单据可编辑"}
+        if record.auditflg not in ("0", "9"):
+            return {"success": False, "error": "仅未审核或已退回单据可编辑"}
 
         details = data.pop("details", None)
         if details is not None:
