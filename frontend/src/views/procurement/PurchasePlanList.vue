@@ -4,7 +4,7 @@
 
     <el-card shadow="never" style="margin-bottom:16px">
       <div class="search-bar">
-        <div class="field"><label>需求单号</label><el-input v-model="searchPcplanid" size="small" style="width:130px" clearable placeholder="模糊搜索" @change="doSearch"/></div>
+        <div class="field"><label>需求单号</label><el-input v-model="searchPcplanid" size="small" style="width:130px" clearable placeholder="模糊搜索" @keyup.enter="doSearch" @clear="doSearch"/></div>
         <div class="field"><label>采购类型</label><el-select v-model="searchPctyp" size="small" style="width:130px" clearable><el-option v-for="(nm,cd) in puMap" :key="cd" :label="nm" :value="cd"/></el-select></div>
         <div class="field"><label>审批标记</label><el-select v-model="searchAuditflg" size="small" style="width:130px" clearable><el-option v-for="(nm,cd) in afMap" :key="cd" :label="nm" :value="cd"/></el-select></div>
         <div class="field"><label>执行状态</label><el-select v-model="searchExecStatus" size="small" style="width:110px" clearable><el-option label="未开始" value="未开始"/><el-option label="已下单" value="已下单"/><el-option label="执行中" value="执行中"/><el-option label="已完成" value="已完成"/></el-select></div>

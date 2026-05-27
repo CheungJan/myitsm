@@ -796,6 +796,7 @@ interface SettleableLine {
     already_settled: number
     remain_qty: number
     unit_price: number
+    receiving_whcd: string
     [key: string]: unknown
 }
 
@@ -896,6 +897,7 @@ watch(
                                         (Number(line.already_settled) || 0)
                                 ),
                             unit_price: Number(line.rgstprice) || 0,
+                            receiving_whcd: (line as any).receiving_whcd as string || '',
                         })
                     }
                 } catch {
@@ -906,8 +908,7 @@ watch(
             // 自动关联入库仓库
             const whSet = new Set<string>()
             for (const l of allLines) {
-                const w = (l as any).receiving_whcd as string
-                if (w) whSet.add(w)
+                if (l.receiving_whcd) whSet.add(l.receiving_whcd)
             }
             if (whSet.size >= 1) {
                 createForm.whcd = [...whSet] // 自动全选所有关联仓库

@@ -4,7 +4,7 @@
 
     <el-card shadow="never" style="margin-bottom:16px">
       <div class="search-bar">
-        <div class="field"><label>订单号</label><el-input v-model="searchRgstbillid" size="small" style="width:130px" clearable placeholder="模糊搜索" @change="doSearch"/></div>
+        <div class="field"><label>订单号</label><el-input v-model="searchRgstbillid" size="small" style="width:130px" clearable placeholder="模糊搜索" @keyup.enter="doSearch" @clear="doSearch"/></div>
         <div class="field"><label>审批状态</label><el-select v-model="searchAuditflg" size="small" style="width:130px" clearable @change="doSearch"><el-option v-for="(nm,cd) in afMap" :key="cd" :label="nm" :value="cd"/></el-select></div>
         <div class="field"><label>执行状态</label><el-select v-model="searchExecStatus" size="small" style="width:130px" clearable @change="doSearch"><el-option label="未入库" value="未入库"/><el-option label="部分入库" value="部分入库"/><el-option label="已完成" value="已完成"/></el-select></div>
         <el-button size="small" @click="searchShowVoided = !searchShowVoided; doSearch()" :type="searchShowVoided ? 'danger' : ''">{{ searchShowVoided ? '返回正常单据' : '作废单据' }}</el-button>
