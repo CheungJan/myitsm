@@ -705,6 +705,7 @@ import {
     fetchSettleableItems,
     fetchOrders,
     fetchSettlementPayable,
+    fetchMonthlyReceiving,
 } from '@/api/procurement'
 import type { SettlementRecord, SettlementDetail, PayableRecord } from '@/api/procurement'
 import { useDict } from '@/composables/useDict'
@@ -795,7 +796,7 @@ function handleRowClick(row: SettlementRecord) {
         .then((r) => { detail.value = r.data })
         .catch(() => { /* keep row data */ })
     fetchSettlementPayable(row.pcbillid)
-        .then((r) => { payableInfo.value = (r as any).data?.data ?? null })
+        .then((r) => { payableInfo.value = r.data ?? null })
         .catch(() => { payableInfo.value = null })
 }
 
@@ -1122,6 +1123,96 @@ watch(
             ElMessage.error(e?.response?.data?.message || '加载可结算明细失败')
         } finally {
             settleableLoading.value = false
+        }
+    }
+)
+
+// MON 月结：选择月份后过滤仅该月入库的订单
+watch(
+    () => [createForm.pay_type, createForm.settlement_period, createForm.suppliercd] as const,
+    async ([payType, period, suppCd]) => {
+        if (payType !== 'MON' || !period || !suppCd) return
+        // 重新加载可结算明细，只包含该月入库的订单
+        settleableLoading.value = true
+        try {
+            const monthlyRes = await fetchMonthlyReceiving(suppCd, period)
+            const monthlyOrders = new Set(
+                (monthlyRes.data || []).map((r: { rgstbillid: string }) => r.rgstbillid)
+            )
+            if (monthlyOrders.size === 0) {
+                settleableItems.value = []
+                createDetails.length = 0
+                ElMessage.info(`供应商 ${suppCd} 在 ${period} 无入库记录`)
+                return
+            }
+            // 只加载本月有入库的订单
+            const allLines: SettleableLine[] = []
+            for (const rgstbillid of monthlyOrders) {
+                try {
+                    const r = await fetchSettleableItems(rgstbillid)
+                    const lines = (r.data || []) as Record<string, unknown>[]
+                    for (const line of lines) {
+                        allLines.push({
+                            ref_rgstbillid: rgstbillid,
+                            ref_rgstlineno: Number(line.lineno) || 0,
+                            itemcd: (line.itemcd as string) || '',
+                            item_nm: (line.item_nm as string) || (line.itemcd as string) || '',
+                            order_qty: Number(line.rgsqty) || 0,
+                            received_qty: Number(line.received_qty) || 0,
+                            already_settled: Number(line.already_settled) || 0,
+                            remain_qty:
+                                Number(line.remain_qty) ||
+                                Math.max(
+                                    0,
+                                    (Number(line.received_qty) || 0) -
+                                        (Number(line.already_settled) || 0)
+                                ),
+                            unit_price: Number(line.rgstprice) || 0,
+                            receiving_whcd: (line as any).receiving_whcd as string || '',
+                        })
+                    }
+                } catch {
+                    /* skip */
+                }
+            }
+            const validLines = allLines.filter(l => l.remain_qty > 0)
+            settleableItems.value = validLines
+            createForm.whcd = []
+            selectedSettleableRows.value = []
+            createDetails.length = 0
+            for (let i = 0; i < validLines.length; i++) {
+                createDetails.push({
+                    ref_rgstbillid: validLines[i].ref_rgstbillid,
+                    ref_rgstlineno: validLines[i].ref_rgstlineno,
+                    itemcd: validLines[i].itemcd,
+                    settle_qty: validLines[i].remain_qty,
+                    settle_price: validLines[i].unit_price,
+                })
+            }
+        } catch (e: any) {
+            ElMessage.error(e?.response?.data?.message || '加载月结明细失败')
+        } finally {
+            settleableLoading.value = false
+        }
+    }
+)
+
+// INS 分期：自动计算结算阶段（最后一期=尾款）—— 创建表单
+watch(
+    () => [createForm.pay_type, createForm.installment_no, createForm.total_installments] as const,
+    ([payType, instNo, totalInst]) => {
+        if (payType === 'INS' && instNo != null && totalInst != null && instNo > 0 && totalInst > 0) {
+            createForm.settle_stage = instNo === totalInst ? 'final' : 'deposit'
+        }
+    }
+)
+
+// INS 分期：自动计算结算阶段（最后一期=尾款）—— 编辑表单
+watch(
+    () => [editForm.pay_type, editForm.installment_no, editForm.total_installments] as const,
+    ([payType, instNo, totalInst]) => {
+        if (payType === 'INS' && instNo != null && totalInst != null && instNo > 0 && totalInst > 0) {
+            editForm.settle_stage = instNo === totalInst ? 'final' : 'deposit'
         }
     }
 )

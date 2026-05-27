@@ -13,6 +13,8 @@ import sqlalchemy as sa
 from app.extensions import db
 from app.models.finance import Payable
 from app.models.procurement import (
+    PurchaseBill,
+    PurchaseBillDt,
     PurchasePlanDt,
     PurchaseRegisterDt,
     RequisitionOrderLink,
@@ -616,6 +618,41 @@ class PurchaseBillService:
                 "settle_amt": settle_amt,
             })
 
+        # DEP 尾款校验：累计结算金额不能超过订单金额
+        if data.get("settle_stage") == "final":
+            for d in validated_details:
+                order_total = float(d["order_qty"]) * float(d["settle_price"])
+                total_settled = float(d["already_settled"]) + float(d["settle_amt"])
+                if total_settled > order_total + 0.01:
+                    raise ValueError(
+                        f"尾款结算：订单 {d['ref_rgstbillid']} 行 {d['ref_rgstlineno']} "
+                        f"累计结算金额({total_settled:.2f})超过订单金额({order_total:.2f})"
+                    )
+
+        # INS 分期校验：检查分期序号不重复
+        if data.get("pay_type") == "INS":
+            installment_no = data.get("installment_no")
+            if not installment_no:
+                raise ValueError("分期付款必须填写分期序号")
+            for d in validated_details:
+                existing = (
+                    db.session.query(PurchaseBill)
+                    .join(PurchaseBillDt, PurchaseBillDt.pcbillid == PurchaseBill.pcbillid)
+                    .filter(
+                        PurchaseBill.pay_type == "INS",
+                        PurchaseBill.useflg != "9",
+                        PurchaseBillDt.ref_rgstbillid == d["ref_rgstbillid"],
+                        PurchaseBillDt.ref_rgstlineno == d["ref_rgstlineno"],
+                        PurchaseBill.installment_no == installment_no,
+                    )
+                    .first()
+                )
+                if existing:
+                    raise ValueError(
+                        f"订单 {d['ref_rgstbillid']} 行 {d['ref_rgstlineno']} "
+                        f"第 {installment_no} 期已存在（结算单号 {existing.pcbillid}）"
+                    )
+
         data["total_settle_amt"] = total_amt
         data["auditflg"] = "0"
         PurchaseBillService._sync_invoice_flag(data)
@@ -673,6 +710,17 @@ class PurchaseBillService:
                     "already_settled": already, "settle_amt": settle_amt,
                 })
 
+            # DEP 尾款校验：累计结算金额不能超过订单金额
+            if data.get("settle_stage", record.settle_stage) == "final":
+                for d in validated_details:
+                    order_total = float(d["order_qty"]) * float(d["settle_price"])
+                    total_settled = float(d["already_settled"]) + float(d["settle_amt"])
+                    if total_settled > order_total + 0.01:
+                        raise ValueError(
+                            f"尾款结算：订单 {d['ref_rgstbillid']} 行 {d['ref_rgstlineno']} "
+                            f"累计结算金额({total_settled:.2f})超过订单金额({order_total:.2f})"
+                        )
+
             data["total_settle_amt"] = total_amt
             PurchaseBillRepository.clear_details(pcbillid)
             for i, d in enumerate(validated_details, start=1):
@@ -700,6 +748,7 @@ class PurchaseBillService:
 
         # 审核通过后自动生成应付记录
         if auditflg == "2":
+            existing_payable = db.session.query(Payable).filter(Payable.po_id == record.pcbillid).first()
             # 结算日期：优先用结算单日期，否则当前日期
             settle_date = (
                 record.pcdate.date()
@@ -711,21 +760,41 @@ class PurchaseBillService:
             if (record.pay_type or "").upper() == "MON" and not record.due_date:
                 due_date_val = settle_date + timedelta(days=30)
 
-            ap_id = f"AP{uuid.uuid4().hex[:6].upper()}"
-            payable = Payable(
-                ap_id=ap_id,
-                supp_cd=record.suppliercd or "",
-                po_id=record.pcbillid,
-                ap_date=settle_date,
-                due_date=due_date_val,
-                amount=float(record.total_settle_amt or 0),
-                paid_amount=0,
-                balance=float(record.total_settle_amt or 0),
-                status="PENDING",
-                remark=f"采购结算单 {record.pcbillid}",
-                opercd=auditor,
-            )
-            db.session.add(payable)
+            amount = float(record.total_settle_amt or 0)
+            if existing_payable is None:
+                payable = Payable(
+                    ap_id=f"AP{uuid.uuid4().hex[:6].upper()}",
+                    supp_cd=record.suppliercd or "",
+                    po_id=record.pcbillid,
+                    ap_date=settle_date,
+                    due_date=due_date_val,
+                    amount=amount,
+                    paid_amount=0,
+                    balance=amount,
+                    status="PENDING",
+                    remark=f"采购结算单 {record.pcbillid}",
+                    opercd=auditor,
+                )
+                db.session.add(payable)
+            else:
+                paid_amount = float(existing_payable.paid_amount or 0)
+                existing_payable.supp_cd = record.suppliercd or ""
+                existing_payable.ap_date = settle_date
+                existing_payable.due_date = due_date_val
+                existing_payable.amount = amount
+                existing_payable.balance = amount - paid_amount
+                existing_payable.status = (
+                    "PAID" if existing_payable.balance <= 0
+                    else "PARTIAL" if paid_amount > 0
+                    else "PENDING"
+                )
+                existing_payable.remark = f"采购结算单 {record.pcbillid}"
+                existing_payable.opercd = auditor
+
+            # PIA 款到发货：标记应付状态为"已结算待入库"
+            if (record.pay_type or "").upper() == "PIA":
+                target = existing_payable if existing_payable else payable
+                target.status = "PAID_PENDING_DELIVERY"
 
         db.session.commit()
         return {"success": True, "pcbillid": pcbillid}

@@ -68,8 +68,22 @@ export function auditSettlement(pcbillid:string, auditflg:string='2'){
 export function voidSettlement(pcbillid:string){
     return request.post<never,{data:{success:boolean}}>('/procurement/settlements/'+pcbillid+'/void')
 }
+export function fetchSettlementPayable(pcbillid:string){
+    return request.get<never,{data:PayableRecord | null}>('/procurement/settlements/'+pcbillid+'/payable')
+}
+export interface PayableRecord {
+    ap_id: string; supp_cd: string; po_id: string; ap_date: string;
+    due_date: string; amount: number; paid_amount: number; balance: number;
+    status: string; remark: string;
+    [key:string]: unknown
+}
 export function fetchSettleableItems(rgstbillid:string){
     return request.get<never,{data:ProcRecord[]}>('/procurement/orders/'+rgstbillid+'/settleable-items')
+}
+
+/** 查询某供应商某月的入库订单汇总（月结用） */
+export function fetchMonthlyReceiving(suppliercd:string,period:string){
+    return request.get<never,{data:{rgstbillid:string;whcd:string;indate:string}[]}>('/procurement/orders/monthly-receiving',{params:{suppliercd,period}})
 }
 
 // ---- 采购退货 ----

@@ -12,6 +12,7 @@ from flask import Blueprint, g, request
 
 from app.api.auth import login_required
 from app.extensions import db
+from app.models.procurement import PurchaseRegister
 from app.repositories.procurement_repository import (
     PurchaseRegisterRepository,
     RequisitionOrderLinkRepository,
@@ -147,6 +148,7 @@ def list_orders():  # type: ignore[no-untyped-def]
     data = PurchaseRegisterService.list_records(
         suppliercd=params.suppliercd,
         rgstbillid=params.rgstbillid,
+        ref_pcplanid=params.ref_pcplanid,
         auditflg=params.auditflg,
         execution_status=params.execution_status,
         page=params.page,
@@ -307,6 +309,19 @@ def get_settlement(pcbillid: str):  # type: ignore[no-untyped-def]
     return success_response(data=data)
 
 
+@procurement_bp.get("/settlements/<pcbillid>/payable")
+@login_required
+def get_settlement_payable(pcbillid: str):  # type: ignore[no-untyped-def]
+    """查询结算单的应付记录。"""
+    from app.models.finance import Payable
+    payable = db.session.query(Payable).filter(
+        Payable.po_id == pcbillid
+    ).first()
+    if payable is None:
+        return success_response(data=None)
+    return success_response(data=payable.to_dict())
+
+
 @procurement_bp.post("/settlements")
 @login_required
 def create_settlement():  # type: ignore[no-untyped-def]
@@ -366,6 +381,59 @@ def get_settleable_items(rgstbillid: str):  # type: ignore[no-untyped-def]
         return success_response(data=PurchaseBillService.get_settleable_items(rgstbillid))
     except ValueError as e:
         return error_response(message=str(e), code=404)
+
+
+@procurement_bp.get("/orders/monthly-receiving")
+@login_required
+def get_monthly_receiving():  # type: ignore[no-untyped-def]
+    """查询某供应商某月的入库订单汇总（月结用）。"""
+    suppliercd = request.args.get("suppliercd", "")
+    period = request.args.get("period", "")  # YYYY-MM
+    if not suppliercd or not period:
+        return error_response(message="suppliercd 和 period 必填", code=400)
+
+    year, month = period.split("-")
+    start_date = f"{year}-{month}-01"
+    end_month = int(month) + 1
+    end_year = int(year)
+    if end_month > 12:
+        end_month = 1
+        end_year += 1
+    end_date = f"{end_year}-{end_month:02d}-01"
+
+    from app.models.warehouse import StockIn
+
+    rows = (
+        db.session.query(
+            StockIn.refbillid,
+            StockIn.whcd,
+            StockIn.indate,
+        )
+        .filter(
+            StockIn.refbillid.in_(
+                db.session.query(PurchaseRegister.rgstbillid).filter(
+                    PurchaseRegister.suppliercd == suppliercd,
+                    PurchaseRegister.auditflg == "2",
+                )
+            ),
+            StockIn.invtyp == "1",
+            StockIn.auditflg != "9",
+            StockIn.indate >= start_date,
+            StockIn.indate < end_date,
+        )
+        .all()
+    )
+
+    return success_response(
+        data=[
+            {
+                "rgstbillid": r.refbillid,
+                "whcd": r.whcd,
+                "indate": r.indate.isoformat() if r.indate else None,
+            }
+            for r in rows
+        ]
+    )
 
 
 # ---- 采购退货 ----
