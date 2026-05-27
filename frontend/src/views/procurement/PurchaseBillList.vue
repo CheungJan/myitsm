@@ -510,12 +510,7 @@ import { fetchSuppliersSimple } from '@/api/master'
 
 // ---- 字典映射 ----
 const { dictMap: payTypeMap } = useDict('PYMT')
-const auditMap: Record<string, string> = {
-    '0': '未审核',
-    '1': '待审核',
-    '2': '已审核',
-    '9': '已作废',
-}
+const { dictMap: auditMap } = useDict('AST')
 
 // ---- composables ----
 const { userName } = useUserNames()

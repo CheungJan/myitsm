@@ -528,12 +528,7 @@ import type { ReturnPurchaseRecord, ReturnPurchaseDetail } from '@/api/procureme
 
 // ---- 字典映射 ----
 const { dictMap: reasonMap } = useDict('RT')
-const auditMap: Record<string, string> = {
-    '0': '未审核',
-    '1': '待审核',
-    '2': '已审核',
-    '9': '已作废',
-}
+const { dictMap: auditMap } = useDict('AST')
 
 // ---- composables ----
 const { userName } = useUserNames()
