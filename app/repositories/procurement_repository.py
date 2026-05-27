@@ -73,6 +73,7 @@ class PurchasePlanRepository:
     @staticmethod
     def list_by_filters(
         auditflg: str | None = None,
+        pcplanid: str | None = None,
         pctyp: str | None = None,
         start_date: dt | None = None,
         end_date: dt | None = None,
@@ -85,6 +86,8 @@ class PurchasePlanRepository:
         query = db.session.query(PurchasePlan).filter(PurchasePlan.useflg != "9")
         if auditflg:
             query = query.filter(PurchasePlan.auditflg == auditflg)
+        if pcplanid:
+            query = query.filter(PurchasePlan.pcplanid.ilike(f"%{pcplanid}%"))
         if pctyp:
             query = query.filter(PurchasePlan.pctyp == pctyp)
         if start_date:
@@ -354,6 +357,7 @@ class PurchaseRegisterRepository:
     @staticmethod
     def list_by_filters(
         suppliercd: str | None = None,
+        rgstbillid: str | None = None,
         auditflg: str | None = None,
         execution_status: str | None = None,
         page: int = 1,
@@ -363,6 +367,8 @@ class PurchaseRegisterRepository:
         query = db.session.query(PurchaseRegister)
         if suppliercd:
             query = query.filter(PurchaseRegister.suppliercd == suppliercd)
+        if rgstbillid:
+            query = query.filter(PurchaseRegister.rgstbillid.ilike(f"%{rgstbillid}%"))
         if show_voided:
             # 只显示作废单据，忽略审批状态筛选
             query = query.filter(PurchaseRegister.useflg == "9")

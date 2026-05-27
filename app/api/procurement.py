@@ -27,7 +27,6 @@ from app.schemas.procurement import (
     PurchaseRegisterCreate,
     PurchaseRegisterDetailCreate,
     ReturnPurchaseBillCreate,
-    ReturnPurchaseBillDetailCreate,
     ReturnPurchaseBillUpdate,
     SupplierAppraisalCreate,
     SupplierAppraisalDetailCreate,
@@ -58,6 +57,7 @@ def list_requisitions():  # type: ignore[no-untyped-def]
     params = ProcurementQuery.model_validate(request.args.to_dict())
     data = PurchasePlanService.list_records(
         auditflg=params.auditflg,
+        pcplanid=params.pcplanid,
         pctyp=params.pctyp,
         start_date=params.start_date,
         end_date=params.end_date,
@@ -146,6 +146,7 @@ def list_orders():  # type: ignore[no-untyped-def]
     show_voided: bool = request.args.get("show_voided", "false").lower() == "true"
     data = PurchaseRegisterService.list_records(
         suppliercd=params.suppliercd,
+        rgstbillid=params.rgstbillid,
         auditflg=params.auditflg,
         execution_status=params.execution_status,
         page=params.page,

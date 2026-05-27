@@ -73,6 +73,7 @@ class PurchasePlanService:
     @staticmethod
     def list_records(
         auditflg: str | None = None,
+        pcplanid: str | None = None,
         pctyp: str | None = None,
         start_date: dt | None = None,
         end_date: dt | None = None,
@@ -84,7 +85,7 @@ class PurchasePlanService:
         exclude_completed: bool = False,
     ) -> dict[str, Any]:
         items, total = PurchasePlanRepository.list_by_filters(
-            auditflg=auditflg, pctyp=pctyp, start_date=start_date, end_date=end_date,
+            auditflg=auditflg, pcplanid=pcplanid, pctyp=pctyp, start_date=start_date, end_date=end_date,
             execution_status=execution_status, overdue_only=overdue_only, hide_unavailable=hide_unavailable, page=page, per_page=per_page
         )
         result_items = []
@@ -232,6 +233,7 @@ class PurchaseRegisterService:
     @staticmethod
     def list_records(
         suppliercd: str | None = None,
+        rgstbillid: str | None = None,
         auditflg: str | None = None,
         execution_status: str | None = None,
         page: int = 1,
@@ -239,7 +241,7 @@ class PurchaseRegisterService:
         show_voided: bool = False,
     ) -> dict[str, Any]:
         items, total = PurchaseRegisterRepository.list_by_filters(
-            suppliercd=suppliercd, auditflg=auditflg, execution_status=execution_status,
+            suppliercd=suppliercd, rgstbillid=rgstbillid, auditflg=auditflg, execution_status=execution_status,
             page=page, per_page=per_page, show_voided=show_voided
         )
         result_items = []

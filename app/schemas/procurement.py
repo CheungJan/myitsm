@@ -155,6 +155,8 @@ class ProcurementQuery(BaseModel):
 
     auditflg: str | None = Field(None, max_length=1)
     suppliercd: str | None = Field(None, max_length=8)
+    pcplanid: str | None = Field(None, max_length=20, description="需求单号模糊搜索")
+    rgstbillid: str | None = Field(None, max_length=8, description="订单号模糊搜索")
     pctyp: str | None = Field(None, max_length=2)
     whcd: str | None = Field(None, max_length=2)
     start_date: datetime | None = Field(None, description="计划日期起始")
