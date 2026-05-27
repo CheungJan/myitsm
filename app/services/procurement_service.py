@@ -570,7 +570,7 @@ class PurchaseBillService:
         }
 
     @staticmethod
-    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+    def create(data: dict[str, Any], creator: str, force: bool = False) -> dict[str, Any]:
         details = data.pop("details", [])
         total_amt = 0.0
         validated_details = []
@@ -620,6 +620,38 @@ class PurchaseBillService:
                 "settle_amt": settle_amt,
             })
 
+        # 付款方式一致性校验（force=True 时跳过校验，直接写入留痕）
+        current_pay = data.get("pay_type", "COD")
+        ref_bill_ids = {d["ref_rgstbillid"] for d in validated_details}
+        conflict_prev_types: set[str] = set()
+        for bill_id in ref_bill_ids:
+            prev_rows = (
+                db.session.query(PurchaseBill.pay_type)
+                .join(PurchaseBillDt, PurchaseBillDt.pcbillid == PurchaseBill.pcbillid)
+                .filter(
+                    PurchaseBill.useflg != "9",
+                    PurchaseBillDt.ref_rgstbillid == bill_id,
+                )
+                .distinct()
+                .all()
+            )
+            for (pt,) in prev_rows:
+                if pt and pt != current_pay:
+                    conflict_prev_types.add(pt)
+        if conflict_prev_types and not force:
+            return {
+                "success": False,
+                "conflict": True,
+                "prev_types": list(conflict_prev_types),
+                "error": f"订单历史结算使用 {list(conflict_prev_types)}，当前选择 {current_pay}，付款方式不一致",
+            }
+        if conflict_prev_types and force:
+            # 强制绕过：记录留痕标记，说明追加至 memo
+            data["pay_type_override"] = "Y"
+            override_note = f"[付款方式冲突确认] 历史使用 {','.join(sorted(conflict_prev_types))}，本次强制选择 {current_pay}"
+            existing_memo = data.get("memo") or ""
+            data["memo"] = f"{existing_memo} {override_note}".strip()
+
         # DEP 尾款校验：使用订单原始单价，非本次结算单价
         if data.get("settle_stage") == "final":
             for d in validated_details:
@@ -666,7 +698,7 @@ class PurchaseBillService:
         return PurchaseBillService.get(record.pcbillid)  # type: ignore[return-value]
 
     @staticmethod
-    def update(pcbillid: str, data: dict[str, Any]) -> dict[str, object]:
+    def update(pcbillid: str, data: dict[str, Any], force: bool = False) -> dict[str, object]:
         record = PurchaseBillRepository.get_by_id(pcbillid)
         if record is None:
             return {"success": False, "error": "结算单不存在"}
@@ -714,6 +746,38 @@ class PurchaseBillService:
                     "received_qty": received_qty,
                     "already_settled": already, "settle_amt": settle_amt,
                 })
+
+            # 付款方式一致性校验（force=True 时跳过）
+            current_pay_u = data.get("pay_type", record.pay_type or "COD")
+            ref_bill_ids_u = {d["ref_rgstbillid"] for d in validated_details}
+            conflict_prev_types_u: set[str] = set()
+            for bill_id in ref_bill_ids_u:
+                prev_rows_u = (
+                    db.session.query(PurchaseBill.pay_type)
+                    .join(PurchaseBillDt, PurchaseBillDt.pcbillid == PurchaseBill.pcbillid)
+                    .filter(
+                        PurchaseBill.useflg != "9",
+                        PurchaseBill.pcbillid != pcbillid,
+                        PurchaseBillDt.ref_rgstbillid == bill_id,
+                    )
+                    .distinct()
+                    .all()
+                )
+                for (pt,) in prev_rows_u:
+                    if pt and pt != current_pay_u:
+                        conflict_prev_types_u.add(pt)
+            if conflict_prev_types_u and not force:
+                return {
+                    "success": False,
+                    "conflict": True,
+                    "prev_types": list(conflict_prev_types_u),
+                    "error": f"订单历史结算使用 {list(conflict_prev_types_u)}，当前选择 {current_pay_u}，付款方式不一致",
+                }
+            if conflict_prev_types_u and force:
+                data["pay_type_override"] = "Y"
+                override_note_u = f"[付款方式冲突确认] 历史使用 {','.join(sorted(conflict_prev_types_u))}，本次强制选择 {current_pay_u}"
+                existing_memo_u = data.get("memo") or record.memo or ""
+                data["memo"] = f"{existing_memo_u} {override_note_u}".strip()
 
             # DEP 尾款校验：使用订单原始单价，非本次结算单价
             if data.get("settle_stage", record.settle_stage) == "final":
@@ -848,9 +912,9 @@ class PurchaseBillService:
         if order is None:
             raise ValueError("订单不存在")
         items = []
-        # 查入库仓库（用于结算单自动带出）
+        # 查入库仓库及最近入库日期（用于结算单自动带出和月份显示）
         receiving_wh = (
-            db.session.query(StockIn.whcd)
+            db.session.query(StockIn.whcd, StockIn.indate)
             .filter(
                 StockIn.refbillid == rgstbillid,
                 StockIn.invtyp == "1",    # 仅采购入库
@@ -860,6 +924,7 @@ class PurchaseBillService:
             .first()
         )
         receiving_whcd = receiving_wh[0] if receiving_wh else None
+        receiving_date = receiving_wh[1].strftime("%Y-%m-%d") if receiving_wh and receiving_wh[1] else None
         # 查询该订单的历史结算付款方式（用于冲突检测）
         prev_settle_types = (
             db.session.query(PurchaseBill.pay_type, PurchaseBill.installment_no, PurchaseBill.total_installments)
@@ -888,6 +953,7 @@ class PurchaseBillService:
             d["settleable_qty_cod"] = max(0, received_qty - settled)
             d["settleable_qty_pia"] = max(0, order_qty - settled)
             d["receiving_whcd"] = receiving_whcd
+            d["receiving_date"] = receiving_date
             d["prev_pay_types"] = prev_types
             d["ins_next_no"] = ins_next_no
             d["ins_total"] = ins_total
@@ -1112,6 +1178,24 @@ class ReturnPurchaseService:
             d["returnable_qty"] = max(0, received_qty - int(returned))
             items.append(d)
         return items
+
+    @staticmethod
+    def list_returnable_orders() -> list[dict[str, Any]]:
+        """列出所有有可退货商品行的已审核订单。"""
+        from app.models.procurement import PurchaseRegister
+        rows = (
+            db.session.query(PurchaseRegister.rgstbillid, PurchaseRegister.suppliercd)
+            .join(PurchaseRegisterDt, PurchaseRegister.rgstbillid == PurchaseRegisterDt.rgstbillid)
+            .filter(
+                PurchaseRegister.auditflg == "2",
+                PurchaseRegister.useflg != "9",
+                PurchaseRegisterDt.inqty > 0,
+            )
+            .distinct()
+            .order_by(PurchaseRegister.rgstbillid)
+            .all()
+        )
+        return [{"rgstbillid": r.rgstbillid, "suppliercd": r.suppliercd} for r in rows]
 
 
 class SupplierAppraisalService:

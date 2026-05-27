@@ -325,11 +325,15 @@ def get_settlement_payable(pcbillid: str):  # type: ignore[no-untyped-def]
 @procurement_bp.post("/settlements")
 @login_required
 def create_settlement():  # type: ignore[no-untyped-def]
-    """创建采购结算单。"""
-    body = PurchaseBillCreate.model_validate(request.get_json(silent=True) or {})
+    """创建采购结算单。force=true 时强制绕过付款方式冲突校验并留痕。"""
+    json_data = request.get_json(silent=True) or {}
+    force: bool = bool(json_data.pop("force", False))
+    body = PurchaseBillCreate.model_validate(json_data)
     user_cd: str = g.current_user
     try:
-        data = PurchaseBillService.create(body.model_dump(exclude_none=True), user_cd)
+        data = PurchaseBillService.create(body.model_dump(exclude_none=True), user_cd, force=force)
+        if isinstance(data, dict) and data.get("conflict"):
+            return error_response(message=str(data.get("error", "付款方式冲突")), code=409, data={"conflict": True, "prev_types": data.get("prev_types", [])})
         return success_response(data=data, message="创建成功", code=201)
     except ValueError as e:
         return error_response(message=str(e), code=400)
@@ -338,11 +342,14 @@ def create_settlement():  # type: ignore[no-untyped-def]
 @procurement_bp.put("/settlements/<pcbillid>")
 @login_required
 def update_settlement(pcbillid: str):  # type: ignore[no-untyped-def]
-    """编辑采购结算单。"""
+    """编辑采购结算单。force=true 时强制绕过付款方式冲突校验并留痕。"""
     json_data = request.get_json(silent=True) or {}
+    force: bool = bool(json_data.pop("force", False))
     body = PurchaseBillUpdate.model_validate(json_data)
     try:
-        result = PurchaseBillService.update(pcbillid, body.model_dump(exclude_none=True))
+        result = PurchaseBillService.update(pcbillid, body.model_dump(exclude_none=True), force=force)
+        if result.get("conflict"):
+            return error_response(message=str(result.get("error", "付款方式冲突")), code=409, data={"conflict": True, "prev_types": result.get("prev_types", [])})
         if result.get("error"):
             return error_response(message=str(result["error"]), code=400)
         return success_response(data=result)
@@ -476,6 +483,13 @@ def void_return(pcbillid: str):  # type: ignore[no-untyped-def]
     if result.get("error"):
         return error_response(message=str(result["error"]), code=400)
     return success_response(data=result, message="已作废")
+
+
+@procurement_bp.get("/orders/returnable")
+@login_required
+def list_returnable_orders():  # type: ignore[no-untyped-def]
+    """列出所有有可退货商品行的已审核订单（退货新建下拉用）。"""
+    return success_response(data=ReturnPurchaseService.list_returnable_orders())
 
 
 @procurement_bp.get("/orders/<rgstbillid>/returnable-items")

@@ -521,6 +521,7 @@ import {
     updateReturn,
     auditReturn,
     voidReturn,
+    fetchReturnableOrders,
     fetchReturnableItems,
     fetchOrders,
 } from '@/api/procurement'
@@ -552,11 +553,10 @@ onMounted(async () => {
         orderOptions.value = allList.map((o) => ({
             rgstbillid: o.rgstbillid as string,
         }))
-        // 加载已审核订单用于新建下拉
-        const auditedRes = await fetchOrders({ auditflg: '2', per_page: '100' })
-        const auditedList = (auditedRes.data?.items || []) as Record<string, unknown>[]
-        auditedOrderOptions.value = auditedList.map((o) => ({
-            rgstbillid: o.rgstbillid as string,
+        // 加载有可退货余量的订单用于新建下拉
+        const returnableRes = await fetchReturnableOrders()
+        auditedOrderOptions.value = ((returnableRes.data || []) as {rgstbillid:string}[]).map(o => ({
+            rgstbillid: o.rgstbillid,
         }))
     } catch {
         /* ignore */

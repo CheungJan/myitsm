@@ -122,6 +122,9 @@ export function auditReturn(pcbillid:string, auditflg:string='2'){
 export function voidReturn(pcbillid:string){
     return request.post<never,{data:{success:boolean}}>('/procurement/returns/'+pcbillid+'/void')
 }
+export function fetchReturnableOrders(){
+    return request.get<never,{data:{rgstbillid:string;suppliercd:string}[]}>('/procurement/orders/returnable')
+}
 export function fetchReturnableItems(rgstbillid:string){
     return request.get<never,{data:ProcRecord[]}>('/procurement/orders/'+rgstbillid+'/returnable-items')
 }
