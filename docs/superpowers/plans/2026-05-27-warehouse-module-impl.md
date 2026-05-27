@@ -24,6 +24,10 @@
 
 **改动位置**：`app/services/warehouse_service.py` → `StockInService.audit`
 
+**已确认语义**：`TPC13.inqty` = **历史累计入库总量**（只增不减，退货出库不回减）。
+
+**已确认类型**：`TPC13.inqty` 和 `TWH14.inqty` 均为 `INTEGER`，无需类型转换。
+
 **逻辑**：
 ```
 审核通过 + invtyp = '1'（采购入库）时：
@@ -33,6 +37,7 @@
     SET inqty = inqty + detail.inqty
     WHERE rgstbillid = TWH13.refbillid AND lineno = detail.reflineno
 ```
+**注意**：`tpc13_registerdt` 已有 `UNIQUE(rgstbillid, lineno)` 约束，UPDATE 不会产生重复行。
 
 **影响范围**：仅在 `invtyp='1'` 时执行，其他入库类型不触发。
 
@@ -43,7 +48,7 @@
 **问题**：`twh15_out` 表没有 `refbillid`，退货出库无法关联来源退货单号。
 
 **需要**：
-1. Alembic 迁移：`ALTER TABLE twh15_out ADD COLUMN refbillid VARCHAR(10)`
+1. Alembic 迁移：`ALTER TABLE twh15_out ADD COLUMN refbillid VARCHAR(8)`
 2. `StockOut` 模型 (`app/models/warehouse.py`) 增加 `refbillid` 字段
 3. `StockOutRepository.create` 传入 `refbillid`
 4. `StockOutSchema` 增加 `refbillid` 字段
@@ -65,12 +70,13 @@
   读取 TPC16 退货单（refbillid=退货订单号, whcd, details）
   调用 StockOutService.create({
     invtyp = '6',
-    whcd = 退货单的 whcd,
-    refbillid = pcbillid（退货单号）,
-    suppcd = 退货单的 suppliercd,
+    whcd = TPC16.whcd,         ← 已确认：退货物品当前存放仓（出货仓）
+    refbillid = pcbillid,      ← 退货单号
+    suppcd = TPC16.suppliercd,
     details_prd = [{itemcd, outqty=rpcqty, reflineno}]
   })
   → 生成草稿出库单（auditflg='0'），等待仓库确认后再审核
+  → 退货出库审核时：只扣 TWH11/12 库存，**不回减 TPC13.inqty**
 ```
 
 **注意**：只生成草稿，不自动审核，避免库存被自动扣减而仓库未实际出货。
@@ -84,7 +90,7 @@
 **目的**：让入库明细自身携带来源订单信息，免去每次追溯都要 JOIN TWH13。
 
 **改动**：
-1. Alembic 迁移：`ALTER TABLE twh14_checkindt ADD COLUMN ref_rgstbillid VARCHAR(10), ADD COLUMN ref_rgstlineno SMALLINT`
+1. Alembic 迁移：`ALTER TABLE twh14_checkindt ADD COLUMN ref_rgstbillid VARCHAR(8), ADD COLUMN ref_rgstlineno SMALLINT`
 2. `StockInDetail` 模型增加两个字段
 3. `StockInRepository.add_detail` 在 `invtyp='1'` 时从 TWH13.refbillid 填充这两个字段
 
@@ -120,8 +126,8 @@
 
 | 迁移 | DDL | 依赖 |
 |------|-----|------|
-| M1 | `ALTER TABLE twh15_out ADD COLUMN refbillid VARCHAR(10)` | P0-2 前必须执行 |
-| M2 | `ALTER TABLE twh14_checkindt ADD COLUMN ref_rgstbillid VARCHAR(10), ADD COLUMN ref_rgstlineno SMALLINT` | P1-1 |
+| M1 | `ALTER TABLE twh15_out ADD COLUMN refbillid VARCHAR(8)` | P0-2 前必须执行 |
+| M2 | `ALTER TABLE twh14_checkindt ADD COLUMN ref_rgstbillid VARCHAR(8), ADD COLUMN ref_rgstlineno SMALLINT` | P1-1 |
 
 ---
 
@@ -141,6 +147,9 @@ P1-2 自动草稿
 
 ## 待确认问题
 
-1. **P0-3 退货出库草稿的 whcd**：退货单 `TPC16` 的 `whcd` 是退货发货仓库（物品当前所在仓），请确认这个字段含义是否正确？
-2. **P0-1 inqty 类型**：`TPC13.inqty` 为 `Numeric(12,0)`，`TWH14.inqty` 为 `Integer`，累加时需类型对齐，确认用 `int()` 转换即可？
-3. **P1-2 自动草稿的 whcd**：采购订单 `TPC12` 无固定 `whcd`（由仓库操作员选择），自动生成草稿时 whcd 留空还是有默认值？
+| # | 状态 | 问题 |
+|---|------|------|
+| 1 | ✅ 已确认 | P0-3 `whcd` = TPC16.whcd（退货物品当前存放仓/出货仓）|
+| 2 | ✅ 已确认 | `TPC13.inqty` = 历史累计入库量，退货不减；两端均为 INTEGER，无需转换 |
+| 3 | ✅ 已确认 | P1-2 自动草稿 `whcd` **留空**，仓库操作员选择实际入库仓库后补填 |
+| 4 | ✅ 已确认 | 质检入库 `invtyp` 暂用 `'8'`（其他入库），质检模块开发时可视需要新增 `'9'` |
