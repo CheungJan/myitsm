@@ -196,7 +196,7 @@
           <el-descriptions-item label="审批日期">
             {{ formatDate(detail.auditdate) }}
           </el-descriptions-item>
-          <el-descriptions-item label="仓库">{{ detail.whcd || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="仓库">{{ getWarehouseNames(detail.whcd as string) }}</el-descriptions-item>
           <el-descriptions-item label="发票">
             <el-tag
               :type="detail.invoiceflg === '1' ? 'success' : 'info'"
@@ -249,7 +249,7 @@
             {{ payTypeMap[auditTarget.pay_type as string] || auditTarget.pay_type || '-' }}
           </el-descriptions-item>
           <el-descriptions-item label="入库仓库">
-            {{ auditTarget.whcd || '-' }}
+            {{ getWarehouseNames(auditTarget.whcd as string) }}
           </el-descriptions-item>
           <el-descriptions-item label="发票号">
             {{ auditTarget.invoice_no || '-' }}
@@ -555,6 +555,12 @@ const { drawer, detail } = useDetailDrawer<SettlementRecord>()
 const supplierOptions = ref<{ supp_cd: string; supp_nm: string }[]>([])
 const supplierNameMap = ref<Record<string, string>>({})
 const warehouseOptions = ref<{ whcd: string; whnm: string }[]>([])
+const warehouseNameMap = ref<Record<string, string>>({})
+
+function getWarehouseNames(whcd: string | undefined | null): string {
+    if (!whcd) return '-'
+    return whcd.split(',').map(c => warehouseNameMap.value[c] ? `${c} ${warehouseNameMap.value[c]}` : c).join(', ')
+}
 
 onMounted(async () => {
     try {
@@ -569,7 +575,11 @@ onMounted(async () => {
     }
     try {
         const r = await fetchWarehouses()
-        warehouseOptions.value = (r.data as { whcd: string; whnm: string }[]) || []
+        const list = (r.data as { whcd: string; whnm: string }[]) || []
+        warehouseOptions.value = list
+        for (const w of list) {
+            warehouseNameMap.value[w.whcd] = w.whnm
+        }
     } catch {
         /* ignore */
     }
