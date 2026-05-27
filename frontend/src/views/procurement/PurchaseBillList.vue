@@ -1131,17 +1131,28 @@ function onSettleableSelectionChange(rows: SettleableLine[]) {
         if (row.receiving_whcd) whSet.add(row.receiving_whcd)
     }
     createForm.whcd = [...whSet]
-    // 勾选后检查所选订单的付款方式历史
+    // 勾选后检查付款方式冲突
     if (rows.length > 0) {
-        const insRows = rows.filter(r => (r as any).ins_total > 0)
-        if (insRows.length > 0) {
-            const first = insRows[0] as any
-            if (createForm.pay_type === 'INS') {
-                createForm.total_installments = first.ins_total
-                createForm.installment_no = first.ins_next_no
-            } else {
-                ElMessage.warning(`所选订单存在分期结算记录（总${first.ins_total}期/已完成${first.ins_next_no - 1}期），当前付款方式不匹配，建议切换为分期付款`)
+        const currentPay = createForm.pay_type
+        const conflicts: string[] = []
+        for (const row of rows) {
+            const prevTypes = ((row as any).prev_pay_types || []) as string[]
+            for (const pt of prevTypes) {
+                if (pt !== currentPay && !conflicts.includes(pt)) {
+                    conflicts.push(pt)
+                }
             }
+        }
+        if (conflicts.length > 0) {
+            const prevStr = conflicts.map(p => payTypeMap[p] || p).join('、')
+            ElMessage.warning(`所选订单曾使用 [${prevStr}] 结算，当前选择 [${payTypeMap[currentPay] || currentPay}]，请注意付款方式一致性`)
+        }
+        // INS 分期自动填充
+        const insRows = rows.filter(r => (r as any).ins_total > 0)
+        if (insRows.length > 0 && currentPay === 'INS') {
+            const first = insRows[0] as any
+            createForm.total_installments = first.ins_total
+            createForm.installment_no = first.ins_next_no
         }
     }
 }
@@ -1225,6 +1236,7 @@ watch(
                                 ),
                             unit_price: Number(line.rgstprice) || 0,
                             receiving_whcd: (line as any).receiving_whcd as string || '',
+                            prev_pay_types: (line as any).prev_pay_types as string[] || [],
                             ins_next_no: (line as any).ins_next_no as number || 0,
                             ins_total: (line as any).ins_total as number || 0,
                         })
@@ -1297,6 +1309,9 @@ watch(
                                 ),
                             unit_price: Number(line.rgstprice) || 0,
                             receiving_whcd: (line as any).receiving_whcd as string || '',
+                            prev_pay_types: (line as any).prev_pay_types as string[] || [],
+                            ins_next_no: (line as any).ins_next_no as number || 0,
+                            ins_total: (line as any).ins_total as number || 0,
                         })
                     }
                 } catch {

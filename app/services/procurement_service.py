@@ -860,20 +860,21 @@ class PurchaseBillService:
             .first()
         )
         receiving_whcd = receiving_wh[0] if receiving_wh else None
-        # 查询该订单的分期历史（通过明细表关联）
-        latest_ins = (
-            db.session.query(PurchaseBill.installment_no, PurchaseBill.total_installments)
+        # 查询该订单的历史结算付款方式（用于冲突检测）
+        prev_settle_types = (
+            db.session.query(PurchaseBill.pay_type, PurchaseBill.installment_no, PurchaseBill.total_installments)
             .join(PurchaseBillDt, PurchaseBill.pcbillid == PurchaseBillDt.pcbillid)
             .filter(
-                PurchaseBill.pay_type == "INS",
                 PurchaseBill.useflg != "9",
                 PurchaseBillDt.ref_rgstbillid == rgstbillid,
             )
-            .order_by(PurchaseBill.installment_no.desc())
-            .first()
+            .distinct()
+            .all()
         )
-        ins_next_no = (latest_ins[0] or 0) + 1 if latest_ins else None
-        ins_total = latest_ins[1] if latest_ins else None
+        prev_types = list({r[0] for r in prev_settle_types if r[0]})
+        ins_info = next((r for r in prev_settle_types if r[0] == "INS"), None)
+        ins_next_no = (ins_info[1] or 0) + 1 if ins_info else None
+        ins_total = ins_info[2] if ins_info else None
         for detail_line in order.details:  # type: ignore[attr-defined]
             d = detail_line.to_dict()
             order_qty = float(detail_line.rgsqty or 0)
@@ -887,6 +888,7 @@ class PurchaseBillService:
             d["settleable_qty_cod"] = max(0, received_qty - settled)
             d["settleable_qty_pia"] = max(0, order_qty - settled)
             d["receiving_whcd"] = receiving_whcd
+            d["prev_pay_types"] = prev_types
             d["ins_next_no"] = ins_next_no
             d["ins_total"] = ins_total
             items.append(d)
