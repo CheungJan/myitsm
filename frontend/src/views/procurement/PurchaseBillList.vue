@@ -279,7 +279,7 @@
               :type="payableInfo.status === 'PAID' ? 'success' : payableInfo.status === 'PARTIAL' ? 'warning' : payableInfo.status === 'OVERDUE' ? 'danger' : 'info'"
               size="small"
             >
-              {{ payableInfo.status === 'PAID' ? '已付清' : payableInfo.status === 'PARTIAL' ? '部分付款' : payableInfo.status === 'OVERDUE' ? '已逾期' : payableInfo.status === 'CANCELLED' ? '已取消' : '未付' }}
+              {{ payableInfo.status === 'PAID' ? '已付清' : payableInfo.status === 'PARTIAL' ? '部分付款' : payableInfo.status === 'OVERDUE' ? '已逾期' : payableInfo.status === 'CANCELLED' ? '已取消' : '待付款' }}
             </el-tag>
           </el-descriptions-item>
         </el-descriptions>
