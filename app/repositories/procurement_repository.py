@@ -693,6 +693,7 @@ class ReturnPurchaseRepository:
     def list_by_filters(
         suppliercd: str | None = None,
         auditflg: str | None = None,
+        return_reason: str | None = None,
         start_date: dt | None = None,
         end_date: dt | None = None,
         page: int = 1,
@@ -711,6 +712,8 @@ class ReturnPurchaseRepository:
             query = query.filter(ReturnPurchaseBill.ref_rgstbillid.ilike(f"%{ref_rgstbillid}%"))
         if auditflg:
             query = query.filter(ReturnPurchaseBill.auditflg == auditflg)
+        if return_reason:
+            query = query.filter(ReturnPurchaseBill.return_reason == return_reason)
         if start_date:
             query = query.filter(ReturnPurchaseBill.gendate >= start_date)
         if end_date:

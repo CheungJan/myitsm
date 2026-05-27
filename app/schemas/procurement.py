@@ -182,6 +182,7 @@ class ProcurementQuery(BaseModel):
     pcplanid: str | None = Field(None, max_length=20, description="需求单号模糊搜索")
     rgstbillid: str | None = Field(None, max_length=8, description="订单号模糊搜索")
     ref_rgstbillid: str | None = Field(None, max_length=8, description="退货来源订单号模糊搜索")
+    return_reason: str | None = Field(None, max_length=20, description="退货原因筛选")
     ref_pcplanid: str | None = Field(None, max_length=20, description="关联需求单号模糊搜索")
     pctyp: str | None = Field(None, max_length=2)
     whcd: str | None = Field(None, max_length=2)
