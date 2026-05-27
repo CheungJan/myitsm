@@ -187,7 +187,7 @@
           <el-descriptions-item label="退货日期">
             {{ formatDate(detail.pcdate || detail.gendate) }}
           </el-descriptions-item>
-          <el-descriptions-item label="仓库">{{ detail.whcd || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="仓库">{{ getWarehouseNames(detail.whcd as string) }}</el-descriptions-item>
           <el-descriptions-item label="审批人">{{ detail.auditman || '-' }}</el-descriptions-item>
           <el-descriptions-item label="审批日期">
             {{ formatDate(detail.auditdate) }}
@@ -548,11 +548,19 @@ interface OrderOption {
 const orderOptions = ref<OrderOption[]>([])
 const auditedOrderOptions = ref<OrderOption[]>([])
 const warehouseOptions = ref<{ whcd: string; whnm: string }[]>([])
+const warehouseNameMap = ref<Record<string, string>>({})
+
+function getWarehouseNames(whcd: string | undefined | null): string {
+    if (!whcd) return '-'
+    return whcd.split(',').map(c => warehouseNameMap.value[c] ? `${c} ${warehouseNameMap.value[c]}` : c).join(', ')
+}
 
 onMounted(async () => {
     try {
         const r = await fetchWarehouses()
-        warehouseOptions.value = (r.data as { whcd: string; whnm: string }[]) || []
+        const list = (r.data as { whcd: string; whnm: string }[]) || []
+        warehouseOptions.value = list
+        for (const w of list) warehouseNameMap.value[w.whcd] = w.whnm
     } catch { /* ignore */ }
     try {
         // 加载全部订单用于筛选下拉
