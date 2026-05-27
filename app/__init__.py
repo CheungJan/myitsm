@@ -144,7 +144,16 @@ def _register_error_handlers(app: Flask) -> None:
         return jsonify(_make_error_body(400, msg)), 400
 
     @app.errorhandler(Exception)
-    def handle_exception(exc: Exception) -> tuple[Any, int]:
+    def handle_validation_error(exc: Exception) -> tuple[Any, int]:
+        """Pydantic 校验错误，返回中文消息。"""
+        from pydantic import ValidationError
+        if isinstance(exc, ValidationError):
+            msgs = []
+            for e in exc.errors():
+                loc = " → ".join(str(l) for l in e["loc"])
+                msgs.append(f"{loc}: {e['msg']}")
+            return jsonify(_make_error_body(400, "；".join(msgs))), 400
+        # 非 ValidationError 走通用处理
         request_id = getattr(g, "request_id", "")
         logger.exception("请求处理异常，request_id=%s", request_id)
         if app.debug:
