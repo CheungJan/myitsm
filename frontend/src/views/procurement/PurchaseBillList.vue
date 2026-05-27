@@ -1212,10 +1212,23 @@ watch(
                                 ),
                             unit_price: Number(line.rgstprice) || 0,
                             receiving_whcd: (line as any).receiving_whcd as string || '',
+                            ins_next_no: (line as any).ins_next_no as number || 0,
+                            ins_total: (line as any).ins_total as number || 0,
                         })
                     }
                 } catch {
                     /* skip orders that fail */
+                }
+            }
+            // 分期智能填充
+            const insOrders = allLines.filter(l => (l as any).ins_total > 0)
+            if (insOrders.length > 0) {
+                const first = insOrders[0] as any
+                if (createForm.pay_type === 'INS') {
+                    createForm.total_installments = first.ins_total
+                    createForm.installment_no = first.ins_next_no
+                } else {
+                    ElMessage.warning(`所选订单存在分期结算记录（总${first.ins_total}期/已完成${first.ins_next_no - 1}期），建议使用分期付款方式`)
                 }
             }
             const validLines = allLines.filter(l => l.remain_qty > 0)
@@ -1287,6 +1300,11 @@ watch(
                 } catch {
                     /* skip */
                 }
+            }
+            const insOrdersM = allLines.filter(l => (l as any).ins_total > 0)
+            if (insOrdersM.length > 0 && createForm.pay_type !== 'INS') {
+                const first = insOrdersM[0] as any
+                ElMessage.warning(`所选订单存在分期结算记录（总${first.ins_total}期/已完成${first.ins_next_no - 1}期），建议使用分期付款方式`)
             }
             const validLines = allLines.filter(l => l.remain_qty > 0)
             settleableItems.value = validLines

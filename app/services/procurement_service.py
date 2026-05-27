@@ -860,6 +860,19 @@ class PurchaseBillService:
             .first()
         )
         receiving_whcd = receiving_wh[0] if receiving_wh else None
+        # 查询该订单的分期历史
+        latest_ins = (
+            db.session.query(PurchaseBill.installment_no, PurchaseBill.total_installments)
+            .filter(
+                PurchaseBill.pay_type == "INS",
+                PurchaseBill.useflg != "9",
+                PurchaseBill.ref_rgstbillid == rgstbillid,
+            )
+            .order_by(PurchaseBill.installment_no.desc())
+            .first()
+        )
+        ins_next_no = (latest_ins[0] or 0) + 1 if latest_ins else None
+        ins_total = latest_ins[1] if latest_ins else None
         for detail_line in order.details:  # type: ignore[attr-defined]
             d = detail_line.to_dict()
             order_qty = float(detail_line.rgsqty or 0)
@@ -873,6 +886,8 @@ class PurchaseBillService:
             d["settleable_qty_cod"] = max(0, received_qty - settled)
             d["settleable_qty_pia"] = max(0, order_qty - settled)
             d["receiving_whcd"] = receiving_whcd
+            d["ins_next_no"] = ins_next_no
+            d["ins_total"] = ins_total
             items.append(d)
         return items
 
