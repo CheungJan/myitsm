@@ -1131,6 +1131,19 @@ function onSettleableSelectionChange(rows: SettleableLine[]) {
         if (row.receiving_whcd) whSet.add(row.receiving_whcd)
     }
     createForm.whcd = [...whSet]
+    // 勾选后检查所选订单的付款方式历史
+    if (rows.length > 0) {
+        const insRows = rows.filter(r => (r as any).ins_total > 0)
+        if (insRows.length > 0) {
+            const first = insRows[0] as any
+            if (createForm.pay_type === 'INS') {
+                createForm.total_installments = first.ins_total
+                createForm.installment_no = first.ins_next_no
+            } else {
+                ElMessage.warning(`所选订单存在分期结算记录（总${first.ins_total}期/已完成${first.ins_next_no - 1}期），当前付款方式不匹配，建议切换为分期付款`)
+            }
+        }
+    }
 }
 
 function onSettleQtyChange(index: number, qty: number) {
@@ -1220,17 +1233,6 @@ watch(
                     /* skip orders that fail */
                 }
             }
-            // 分期智能填充
-            const insOrders = allLines.filter(l => (l as any).ins_total > 0)
-            if (insOrders.length > 0) {
-                const first = insOrders[0] as any
-                if (createForm.pay_type === 'INS') {
-                    createForm.total_installments = first.ins_total
-                    createForm.installment_no = first.ins_next_no
-                } else {
-                    ElMessage.warning(`所选订单存在分期结算记录（总${first.ins_total}期/已完成${first.ins_next_no - 1}期），建议使用分期付款方式`)
-                }
-            }
             const validLines = allLines.filter(l => l.remain_qty > 0)
             settleableItems.value = validLines
             createForm.whcd = []
@@ -1300,11 +1302,6 @@ watch(
                 } catch {
                     /* skip */
                 }
-            }
-            const insOrdersM = allLines.filter(l => (l as any).ins_total > 0)
-            if (insOrdersM.length > 0 && createForm.pay_type !== 'INS') {
-                const first = insOrdersM[0] as any
-                ElMessage.warning(`所选订单存在分期结算记录（总${first.ins_total}期/已完成${first.ins_next_no - 1}期），建议使用分期付款方式`)
             }
             const validLines = allLines.filter(l => l.remain_qty > 0)
             settleableItems.value = validLines
