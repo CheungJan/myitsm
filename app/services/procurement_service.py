@@ -11,7 +11,6 @@ import sqlalchemy as sa
 
 from app.extensions import db
 from app.models.procurement import (
-    PurchaseBillDt,
     PurchasePlanDt,
     PurchaseRegisterDt,
     RequisitionOrderLink,
@@ -689,7 +688,7 @@ class PurchaseBillService:
         if record.auditflg == "2":
             return {"success": False, "error": "已审核通过的结算单不能作废"}
         record.useflg = "9"
-        record.auditflg = "9"
+        record.auditflg = "V"
         db.session.commit()
         return {"success": True, "pcbillid": pcbillid}
 
@@ -821,7 +820,9 @@ class ReturnPurchaseService:
                     .first()
                 )
                 received_qty = int(order_dt.inqty or 0) if order_dt else 0
-                already_returned = ReturnPurchaseRepository.get_returned_total(ref_rgstbillid, ref_line)
+                already_returned = ReturnPurchaseRepository.get_returned_total(
+                    ref_rgstbillid, ref_line
+                )
                 max_return = received_qty - int(already_returned)
                 if rpcqty > max_return:
                     raise ValueError(f"行 {ref_line} 退货数量({rpcqty})超过可退余量({max_return})")
@@ -862,7 +863,7 @@ class ReturnPurchaseService:
         if record.auditflg == "2":
             return {"success": False, "error": "已审核通过的退货单不能作废"}
         record.useflg = "9"
-        record.auditflg = "9"
+        record.auditflg = "V"
         db.session.commit()
         return {"success": True, "pcbillid": pcbillid}
 

@@ -96,7 +96,7 @@
         <el-table-column label="审批" width="80">
           <template #default="{ row }">
             <el-tag
-              :type="row.auditflg === '2' ? 'success' : row.auditflg === '9' ? 'danger' : 'warning'"
+              :type="row.auditflg === '2' ? 'success' : (row.auditflg === '9' || row.auditflg === 'V') ? 'danger' : 'warning'"
               size="small"
             >
               {{ auditMap[row.auditflg as string] || '未审核' }}
@@ -117,7 +117,7 @@
         </el-table-column>
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <template v-if="row.auditflg !== '9'">
+            <template v-if="row.auditflg !== '9' && row.auditflg !== 'V'">
               <el-button
                 v-if="row.auditflg === '0'"
                 link
