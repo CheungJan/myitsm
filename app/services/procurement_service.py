@@ -15,6 +15,7 @@ from app.models.procurement import (
     PurchaseRegisterDt,
     RequisitionOrderLink,
 )
+from app.models.warehouse import StockIn
 
 from app.repositories.procurement_repository import (
     PurchaseBillRepository,
@@ -700,6 +701,14 @@ class PurchaseBillService:
         if order is None:
             raise ValueError("订单不存在")
         items = []
+        # 查入库仓库（用于结算单自动带出）
+        receiving_wh = (
+            db.session.query(StockIn.whcd)
+            .filter(StockIn.refbillid == rgstbillid, StockIn.auditflg != "9")
+            .order_by(StockIn.indate.desc())
+            .first()
+        )
+        receiving_whcd = receiving_wh[0] if receiving_wh else None
         for detail_line in order.details:  # type: ignore[attr-defined]
             d = detail_line.to_dict()
             order_qty = float(detail_line.rgsqty or 0)
@@ -712,6 +721,7 @@ class PurchaseBillService:
             d["already_returned"] = returned
             d["settleable_qty_cod"] = max(0, received_qty - settled)
             d["settleable_qty_pia"] = max(0, order_qty - settled)
+            d["receiving_whcd"] = receiving_whcd
             items.append(d)
         return items
 

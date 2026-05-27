@@ -865,6 +865,17 @@ watch(
                 }
             }
             settleableItems.value = allLines
+            // 自动关联入库仓库
+            const whSet = new Set<string>()
+            for (const l of allLines) {
+                const w = (l as any).receiving_whcd as string
+                if (w) whSet.add(w)
+            }
+            if (whSet.size === 1) {
+                createForm.whcd = [...whSet][0]
+            } else if (whSet.size > 1) {
+                createForm.whcd = '' // 多个仓库，留空让用户选择
+            }
             // 初始化 createDetails，结算数量默认=可结算数量，单价默认来自订单单价
             for (let i = 0; i < allLines.length; i++) {
                 createDetails.push({
