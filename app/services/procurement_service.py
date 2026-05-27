@@ -1166,6 +1166,18 @@ class ReturnPurchaseService:
         order = PurchaseRegisterRepository.get_by_id(rgstbillid)
         if order is None:
             raise ValueError("订单不存在")
+        # 查入库仓库（用于退货单自动带出）
+        receiving_wh = (
+            db.session.query(StockIn.whcd)
+            .filter(
+                StockIn.refbillid == rgstbillid,
+                StockIn.invtyp == "1",
+                StockIn.auditflg != "9",
+            )
+            .order_by(StockIn.indate.desc())
+            .first()
+        )
+        receiving_whcd = receiving_wh[0] if receiving_wh else None
         items = []
         for detail_line in order.details:  # type: ignore[attr-defined]
             d = detail_line.to_dict()
@@ -1176,6 +1188,7 @@ class ReturnPurchaseService:
             d["received_qty"] = received_qty
             d["already_returned"] = int(returned)
             d["returnable_qty"] = max(0, received_qty - int(returned))
+            d["receiving_whcd"] = receiving_whcd
             items.append(d)
         return items
 

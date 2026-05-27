@@ -308,7 +308,11 @@
           </el-select>
         </el-form-item>
         <el-form-item label="退货日期"><el-date-picker v-model="editForm.pcdate" type="date" value-format="YYYY-MM-DD" style="width:200px"/></el-form-item>
-        <el-form-item label="仓库"><el-input v-model="editForm.whcd" style="width:120px"/></el-form-item>
+        <el-form-item label="仓库">
+          <el-select v-model="editForm.whcd" clearable filterable placeholder="选择仓库" style="width:200px">
+            <el-option v-for="w in warehouseOptions" :key="w.whcd" :label="`${w.whcd} ${w.whnm}`" :value="w.whcd"/>
+          </el-select>
+        </el-form-item>
         <el-form-item label="备注"><el-input v-model="editForm.memo" type="textarea" :rows="2"/></el-form-item>
 
         <el-divider content-position="left">退货明细</el-divider>
@@ -385,11 +389,9 @@
         </el-form-item>
 
         <el-form-item label="仓库">
-          <el-input
-            v-model="createForm.whcd"
-            placeholder="仓库编码"
-            maxlength="2"
-          />
+          <el-select v-model="createForm.whcd" clearable filterable placeholder="自动关联，可手动选择" style="width:100%">
+            <el-option v-for="w in warehouseOptions" :key="w.whcd" :label="`${w.whcd} ${w.whnm}`" :value="w.whcd"/>
+          </el-select>
         </el-form-item>
 
         <el-form-item label="备注">
@@ -525,6 +527,7 @@ import {
     fetchReturnableItems,
     fetchOrders,
 } from '@/api/procurement'
+import { fetchWarehouses } from '@/api/master'
 import { useDict } from '@/composables/useDict'
 import type { ReturnPurchaseRecord, ReturnPurchaseDetail } from '@/api/procurement'
 
@@ -544,8 +547,13 @@ interface OrderOption {
 }
 const orderOptions = ref<OrderOption[]>([])
 const auditedOrderOptions = ref<OrderOption[]>([])
+const warehouseOptions = ref<{ whcd: string; whnm: string }[]>([])
 
 onMounted(async () => {
+    try {
+        const r = await fetchWarehouses()
+        warehouseOptions.value = (r.data as { whcd: string; whnm: string }[]) || []
+    } catch { /* ignore */ }
     try {
         // 加载全部订单用于筛选下拉
         const allRes = await fetchOrders({ per_page: '100' })
@@ -833,6 +841,17 @@ watch(
                 units: (line.units as string) || '',
             }))
 
+            // 自动关联入库仓库
+            const whSet = new Set<string>()
+            for (const l of lines) {
+                const w = (l as any).receiving_whcd as string
+                if (w) whSet.add(w)
+            }
+            if (whSet.size === 1) {
+                createForm.whcd = [...whSet][0]
+            } else if (whSet.size > 1) {
+                createForm.whcd = '' // 多仓库留空
+            }
             // 初始化 createDetails，默认单价取 rgstprice
             for (let i = 0; i < returnableItems.value.length; i++) {
                 const item = returnableItems.value[i]
