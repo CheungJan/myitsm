@@ -288,10 +288,11 @@ def list_settlements():  # type: ignore[no-untyped-def]
     """采购结算单列表。"""
     params = ProcurementQuery.model_validate(request.args.to_dict())
     pay_type = request.args.get("pay_type") or None
+    show_voided_st = request.args.get("show_voided", "false").lower() == "true"
     data = PurchaseBillService.list_records(
         suppliercd=params.suppliercd, auditflg=params.auditflg,
         pay_type=pay_type, start_date=params.start_date, end_date=params.end_date,
-        page=params.page, per_page=params.per_page
+        page=params.page, per_page=params.per_page, show_voided=show_voided_st
     )
     return success_response(data=data)
 
@@ -375,10 +376,11 @@ def get_settleable_items(rgstbillid: str):  # type: ignore[no-untyped-def]
 def list_returns():  # type: ignore[no-untyped-def]
     """采购退货列表。"""
     params = ProcurementQuery.model_validate(request.args.to_dict())
+    show_voided_rt = request.args.get("show_voided", "false").lower() == "true"
     data = ReturnPurchaseService.list_records(
         suppliercd=params.suppliercd, auditflg=params.auditflg,
         start_date=params.start_date, end_date=params.end_date,
-        page=params.page, per_page=params.per_page
+        page=params.page, per_page=params.per_page, show_voided=show_voided_rt
     )
     return success_response(data=data)
 

@@ -64,6 +64,7 @@
             />
           </el-select>
         </div>
+        <el-button size="small" @click="searchShowVoided = !searchShowVoided; doSearch()" :type="searchShowVoided ? 'danger' : ''">{{ searchShowVoided ? '返回正常单据' : '作废单据' }}</el-button>
         <el-button size="small" type="primary" @click="doSearch" style="margin-left:auto">
           查询
         </el-button>
@@ -593,12 +594,14 @@ function getSupplierName(cd: string): string {
 const searchSuppliercd = ref('')
 const searchAuditflg = ref('')
 const searchPayType = ref('')
+const searchShowVoided = ref(false)
 
 function doSearch() {
     const p: Record<string, string> = {}
     if (searchSuppliercd.value) p.suppliercd = searchSuppliercd.value
     if (searchAuditflg.value) p.auditflg = searchAuditflg.value
     if (searchPayType.value) p.pay_type = searchPayType.value
+    if (searchShowVoided.value) p.show_voided = 'true'
     onSearch(p)
 }
 

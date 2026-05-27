@@ -543,10 +543,12 @@ class PurchaseBillService:
         end_date: dt | None = None,
         page: int = 1,
         per_page: int = 20,
+        show_voided: bool = False,
     ) -> dict[str, Any]:
         items, total = PurchaseBillRepository.list_by_filters(
             suppliercd=suppliercd, auditflg=auditflg, pay_type=pay_type,
             start_date=start_date, end_date=end_date, page=page, per_page=per_page,
+            show_voided=show_voided,
         )
         return {
             "items": [item.to_dict() for item in items],
@@ -755,10 +757,12 @@ class ReturnPurchaseService:
         end_date: dt | None = None,
         page: int = 1,
         per_page: int = 20,
+        show_voided: bool = False,
     ) -> dict[str, Any]:
         items, total = ReturnPurchaseRepository.list_by_filters(
             suppliercd=suppliercd, auditflg=auditflg,
             start_date=start_date, end_date=end_date, page=page, per_page=per_page,
+            show_voided=show_voided,
         )
         return {
             "items": [item.to_dict() for item in items],

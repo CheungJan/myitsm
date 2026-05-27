@@ -575,8 +575,13 @@ class PurchaseBillRepository:
         end_date: dt | None = None,
         page: int = 1,
         per_page: int = 20,
+        show_voided: bool = False,
     ) -> tuple[list[PurchaseBill], int]:
-        query = db.session.query(PurchaseBill).filter(PurchaseBill.useflg != "9")
+        query = db.session.query(PurchaseBill)
+        if show_voided:
+            query = query.filter(PurchaseBill.useflg == "9")
+        else:
+            query = query.filter(PurchaseBill.useflg != "9")
         if suppliercd:
             query = query.filter(PurchaseBill.suppliercd == suppliercd)
         if auditflg:
@@ -661,8 +666,13 @@ class ReturnPurchaseRepository:
         end_date: dt | None = None,
         page: int = 1,
         per_page: int = 20,
+        show_voided: bool = False,
     ) -> tuple[list[ReturnPurchaseBill], int]:
-        query = db.session.query(ReturnPurchaseBill).filter(ReturnPurchaseBill.useflg != "9")
+        query = db.session.query(ReturnPurchaseBill)
+        if show_voided:
+            query = query.filter(ReturnPurchaseBill.useflg == "9")
+        else:
+            query = query.filter(ReturnPurchaseBill.useflg != "9")
         if suppliercd:
             query = query.filter(ReturnPurchaseBill.suppliercd == suppliercd)
         if auditflg:
