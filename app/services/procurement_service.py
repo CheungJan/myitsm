@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import UTC, datetime as dt
+import uuid
+from datetime import UTC, datetime as dt, timedelta
 from typing import Any
 
 import sqlalchemy as sa
 
 from app.extensions import db
+from app.models.finance import Payable
 from app.models.procurement import (
     PurchasePlanDt,
     PurchaseRegisterDt,
@@ -234,6 +236,7 @@ class PurchaseRegisterService:
     def list_records(
         suppliercd: str | None = None,
         rgstbillid: str | None = None,
+        ref_pcplanid: str | None = None,
         auditflg: str | None = None,
         execution_status: str | None = None,
         page: int = 1,
@@ -241,13 +244,14 @@ class PurchaseRegisterService:
         show_voided: bool = False,
     ) -> dict[str, Any]:
         items, total = PurchaseRegisterRepository.list_by_filters(
-            suppliercd=suppliercd, rgstbillid=rgstbillid, auditflg=auditflg, execution_status=execution_status,
+            suppliercd=suppliercd, rgstbillid=rgstbillid, ref_pcplanid=ref_pcplanid, auditflg=auditflg, execution_status=execution_status,
             page=page, per_page=per_page, show_voided=show_voided
         )
         result_items = []
         for item in items:
             d = item.to_dict()
             d["execution_status"] = PurchaseRegisterRepository.get_order_execution_status(item.rgstbillid)
+            d["ref_pcplanids"] = PurchaseRegisterRepository.get_order_ref_pcplanids(item.rgstbillid)
             result_items.append(d)
         return {
             "items": result_items,
@@ -523,11 +527,19 @@ class PurchaseBillService:
     """采购结算单服务 (TPC14 + TPC14_DT)。"""
 
     @staticmethod
+    def _sync_invoice_flag(data: dict[str, Any]) -> None:
+        invoice_no = str(data.get("invoice_no") or "").strip()
+        invoice_date = data.get("invoice_date")
+        data["invoiceflg"] = "1" if invoice_no or invoice_date else "0"
+
+    @staticmethod
     def get(pcbillid: str) -> dict[str, Any] | None:
         record = PurchaseBillRepository.get_by_id(pcbillid)
         if record is None:
             return None
         result = record.to_dict()
+        if result.get("invoiceflg") != "1" and (result.get("invoice_no") or result.get("invoice_date")):
+            result["invoiceflg"] = "1"
         details = [d.to_dict() for d in PurchaseBillRepository.list_details(pcbillid)]
         for d in details:
             d.pop("bill", None)
@@ -606,6 +618,7 @@ class PurchaseBillService:
 
         data["total_settle_amt"] = total_amt
         data["auditflg"] = "0"
+        PurchaseBillService._sync_invoice_flag(data)
         record = PurchaseBillRepository.create(data, creator)
         for i, d in enumerate(validated_details, start=1):
             PurchaseBillRepository.add_detail(record.pcbillid, i, d)
@@ -665,6 +678,7 @@ class PurchaseBillService:
             for i, d in enumerate(validated_details, start=1):
                 PurchaseBillRepository.add_detail(pcbillid, i, d)
 
+        PurchaseBillService._sync_invoice_flag(data)
         PurchaseBillRepository.update(record, data)
         record.auditflg = "0"
         db.session.commit()
@@ -683,6 +697,36 @@ class PurchaseBillService:
         record.auditflg = "0" if auditflg == "9" else auditflg
         record.auditman = auditor
         record.auditdate = dt.now(UTC)
+
+        # 审核通过后自动生成应付记录
+        if auditflg == "2":
+            # 结算日期：优先用结算单日期，否则当前日期
+            settle_date = (
+                record.pcdate.date()
+                if record.pcdate and hasattr(record.pcdate, "date")
+                else dt.now(UTC).date()
+            )
+            # 到期日：优先用记录中的 due_date，月结且无 due_date 时默认 30 天后
+            due_date_val = record.due_date if record.due_date else settle_date
+            if (record.pay_type or "").upper() == "MON" and not record.due_date:
+                due_date_val = settle_date + timedelta(days=30)
+
+            ap_id = f"AP{uuid.uuid4().hex[:6].upper()}"
+            payable = Payable(
+                ap_id=ap_id,
+                supp_cd=record.suppliercd or "",
+                po_id=record.pcbillid,
+                ap_date=settle_date,
+                due_date=due_date_val,
+                amount=float(record.total_settle_amt or 0),
+                paid_amount=0,
+                balance=float(record.total_settle_amt or 0),
+                status="PENDING",
+                remark=f"采购结算单 {record.pcbillid}",
+                opercd=auditor,
+            )
+            db.session.add(payable)
+
         db.session.commit()
         return {"success": True, "pcbillid": pcbillid}
 

@@ -209,6 +209,30 @@
           <el-descriptions-item label="备注" :span="2">
             {{ detail.memo || '-' }}
           </el-descriptions-item>
+          <el-descriptions-item
+            v-if="(detail as any).settlement_period"
+            label="结算月份"
+          >
+            {{ (detail as any).settlement_period || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item
+            v-if="['DEP', 'INS'].includes(detail.pay_type as string) && (detail as any).settle_stage"
+            label="结算阶段"
+          >
+            {{ (detail as any).settle_stage === 'deposit' ? '预付款' : (detail as any).settle_stage === 'final' ? '尾款' : (detail as any).settle_stage || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item
+            v-if="(detail as any).installment_no"
+            label="分期信息"
+          >
+            第{{ (detail as any).installment_no }}期 / 共{{ (detail as any).total_installments || '-' }}期
+          </el-descriptions-item>
+          <el-descriptions-item
+            v-if="['MON', 'INS', 'DEP'].includes(detail.pay_type as string)"
+            label="付款到期日"
+          >
+            {{ (detail as any).due_date ? formatDate((detail as any).due_date) : '-' }}
+          </el-descriptions-item>
         </el-descriptions>
         <h4 style="margin:16px 0 8px">结算明细</h4>
         <el-table
@@ -231,6 +255,22 @@
           <span>本次结算: <strong>¥{{ calcDetailCurrent() }}</strong></span>
           <span>剩余: <strong>¥{{ calcDetailRemaining() }}</strong></span>
         </div>
+        <h4 style="margin:16px 0 8px">应付信息</h4>
+        <el-descriptions v-if="payableInfo" :column="3" border size="small">
+          <el-descriptions-item label="应付金额">{{ Number(payableInfo.amount).toFixed(2) }}</el-descriptions-item>
+          <el-descriptions-item label="已付金额">{{ Number(payableInfo.paid_amount).toFixed(2) }}</el-descriptions-item>
+          <el-descriptions-item label="余额">{{ Number(payableInfo.balance).toFixed(2) }}</el-descriptions-item>
+          <el-descriptions-item label="到期日">{{ payableInfo.due_date || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="状态">
+            <el-tag
+              :type="payableInfo.status === 'PAID' ? 'success' : payableInfo.status === 'PARTIAL' ? 'warning' : payableInfo.status === 'OVERDUE' ? 'danger' : 'info'"
+              size="small"
+            >
+              {{ payableInfo.status === 'PAID' ? '已付清' : payableInfo.status === 'PARTIAL' ? '部分付款' : payableInfo.status === 'OVERDUE' ? '已逾期' : payableInfo.status === 'CANCELLED' ? '已取消' : '未付' }}
+            </el-tag>
+          </el-descriptions-item>
+        </el-descriptions>
+        <el-alert v-else title="暂无应付记录（审核通过后自动生成）" type="info" :closable="false" show-icon />
       </template>
     </el-dialog>
 
@@ -323,6 +363,61 @@
             <el-option v-for="(nm,k) in payTypeMap" :key="k" :label="nm" :value="k"/>
           </el-select>
         </el-form-item>
+
+        <!-- 月结周期 (only when pay_type=MON) -->
+        <el-form-item v-if="editForm.pay_type === 'MON'" label="结算月份">
+          <el-date-picker
+            v-model="editForm.settlement_period"
+            type="month"
+            value-format="YYYY-MM"
+            placeholder="选择月份"
+            style="width:200px"
+          />
+        </el-form-item>
+
+        <!-- 预付/尾款 (only when pay_type=DEP) -->
+        <el-form-item v-if="editForm.pay_type === 'DEP'" label="结算阶段">
+          <el-select v-model="editForm.settle_stage" style="width:200px">
+            <el-option label="预付款" value="deposit" />
+            <el-option label="尾款" value="final" />
+          </el-select>
+        </el-form-item>
+
+        <!-- 分期信息 (only when pay_type=INS) -->
+        <el-form-item v-if="editForm.pay_type === 'INS'" label="分期信息">
+          <span style="display:flex;gap:8px;align-items:center">
+            第
+            <el-input-number
+              v-model="editForm.installment_no"
+              :min="1"
+              size="small"
+              style="width:80px"
+            />
+            期 / 共
+            <el-input-number
+              v-model="editForm.total_installments"
+              :min="1"
+              size="small"
+              style="width:80px"
+            />
+            期
+          </span>
+        </el-form-item>
+
+        <!-- 付款到期日 (for MON/INS/DEP) -->
+        <el-form-item
+          v-if="['MON', 'INS', 'DEP'].includes(editForm.pay_type)"
+          label="付款到期日"
+        >
+          <el-date-picker
+            v-model="editForm.due_date"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择到期日"
+            style="width:200px"
+          />
+        </el-form-item>
+
         <el-form-item label="发票号"><el-input v-model="editForm.invoice_no"/></el-form-item>
         <el-form-item label="发票日期"><el-date-picker v-model="editForm.invoice_date" type="date" value-format="YYYY-MM-DD" style="width:200px"/></el-form-item>
         <el-form-item label="结算日期"><el-date-picker v-model="editForm.pcdate" type="date" value-format="YYYY-MM-DD" style="width:200px"/></el-form-item>
@@ -397,6 +492,60 @@
               :value="cd"
             />
           </el-select>
+        </el-form-item>
+
+        <!-- 月结周期 (only when pay_type=MON) -->
+        <el-form-item v-if="createForm.pay_type === 'MON'" label="结算月份">
+          <el-date-picker
+            v-model="createForm.settlement_period"
+            type="month"
+            value-format="YYYY-MM"
+            placeholder="选择月份"
+            style="width:100%"
+          />
+        </el-form-item>
+
+        <!-- 预付/尾款 (only when pay_type=DEP) -->
+        <el-form-item v-if="createForm.pay_type === 'DEP'" label="结算阶段">
+          <el-select v-model="createForm.settle_stage" style="width:100%">
+            <el-option label="预付款" value="deposit" />
+            <el-option label="尾款" value="final" />
+          </el-select>
+        </el-form-item>
+
+        <!-- 分期信息 (only when pay_type=INS) -->
+        <el-form-item v-if="createForm.pay_type === 'INS'" label="分期信息">
+          <span style="display:flex;gap:8px;align-items:center">
+            第
+            <el-input-number
+              v-model="createForm.installment_no"
+              :min="1"
+              size="small"
+              style="width:80px"
+            />
+            期 / 共
+            <el-input-number
+              v-model="createForm.total_installments"
+              :min="1"
+              size="small"
+              style="width:80px"
+            />
+            期
+          </span>
+        </el-form-item>
+
+        <!-- 付款到期日 (for MON/INS/DEP) -->
+        <el-form-item
+          v-if="['MON', 'INS', 'DEP'].includes(createForm.pay_type)"
+          label="付款到期日"
+        >
+          <el-date-picker
+            v-model="createForm.due_date"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择到期日"
+            style="width:100%"
+          />
         </el-form-item>
 
         <el-form-item label="结算日期">
@@ -641,9 +790,13 @@ function quickFilter(flg: string) {
 function handleRowClick(row: SettlementRecord) {
     drawer.value = true
     detail.value = row
+    payableInfo.value = null
     fetchSettlementDetail(row.pcbillid)
         .then((r) => { detail.value = r.data })
         .catch(() => { /* keep row data */ })
+    fetchSettlementPayable(row.pcbillid)
+        .then((r) => { payableInfo.value = (r as any).data?.data ?? null })
+        .catch(() => { payableInfo.value = null })
 }
 
 // ---- 审核 ----
@@ -718,7 +871,19 @@ async function doVoid() {
 const editing = ref(false)
 const editLoading = ref(false)
 const editDetail = ref<SettlementRecord | null>(null)
-const editForm = reactive({ pay_type: 'COD', invoice_no: '', invoice_date: '', pcdate: '', whcd: [] as string[], memo: '' })
+const editForm = reactive({
+    pay_type: 'COD',
+    invoice_no: '',
+    invoice_date: '',
+    pcdate: '',
+    whcd: [] as string[],
+    memo: '',
+    settlement_period: '',
+    settle_stage: 'final',
+    installment_no: null as number | null,
+    total_installments: null as number | null,
+    due_date: '',
+})
 const editDetails = reactive<{ ref_rgstbillid: string; ref_rgstlineno: number; itemcd: string; settle_qty: number; settle_price: number }[]>([])
 
 async function openEdit(row: SettlementRecord) {
@@ -746,6 +911,11 @@ async function openEdit(row: SettlementRecord) {
             if (whSet.size > 0) editForm.whcd = [...whSet]
         }
         editForm.memo = (d.memo as string) || ''
+        editForm.settlement_period = (d.settlement_period as string) || ''
+        editForm.settle_stage = (d.settle_stage as string) || 'final'
+        editForm.installment_no = (d as any).installment_no != null ? Number((d as any).installment_no) : null
+        editForm.total_installments = (d as any).total_installments != null ? Number((d as any).total_installments) : null
+        editForm.due_date = (d as any).due_date ? (d as any).due_date.split('T')[0] : ''
         editDetails.length = 0
         const lines = (d.details || []) as SettlementDetail[]
         for (const l of lines) {
@@ -803,6 +973,11 @@ const createForm = reactive({
     invoice_date: '',
     whcd: [] as string[],
     memo: '',
+    settlement_period: '',
+    settle_stage: 'final',
+    installment_no: null as number | null,
+    total_installments: null as number | null,
+    due_date: '',
 })
 
 // 可结算明细（供应商下所有订单的可结算行）
@@ -963,6 +1138,11 @@ function resetCreateForm() {
     createForm.invoice_date = ''
     createForm.whcd = []
     createForm.memo = ''
+    createForm.settlement_period = ''
+    createForm.settle_stage = 'final'
+    createForm.installment_no = null
+    createForm.total_installments = null
+    createForm.due_date = ''
     settleableItems.value = []
     createDetails.length = 0
     selectedSettleableRows.value = []
@@ -1046,6 +1226,11 @@ async function handleCreate() {
             invoice_date: createForm.invoice_date,
             whcd: (createForm.whcd || []).join(','),
             memo: createForm.memo,
+            settlement_period: createForm.settlement_period || undefined,
+            settle_stage: createForm.settle_stage || undefined,
+            installment_no: createForm.installment_no ?? undefined,
+            total_installments: createForm.total_installments ?? undefined,
+            due_date: createForm.due_date || undefined,
             details: detailsToSubmit,
         })
         ElMessage.success('结算单创建成功')

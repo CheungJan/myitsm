@@ -53,6 +53,11 @@ class PurchaseBillCreate(BaseModel):
     pcdate: date | None = Field(None, description="结算日期")
     whcd: str | None = Field(None, max_length=2, description="入库仓库")
     memo: str | None = Field(None, max_length=255, description="备注")
+    settlement_period: str | None = Field(None, max_length=7, description="月结周期(YYYY-MM)")
+    settle_stage: str | None = Field("final", max_length=10, description="结算阶段(deposit=预付/final=尾款)")
+    installment_no: int | None = Field(None, description="分期序号")
+    total_installments: int | None = Field(None, description="分期总期数")
+    due_date: date | None = Field(None, description="付款到期日")
     details: list["PurchaseBillDetailCreate"] = Field(..., min_length=1, description="结算明细")
 
 
@@ -76,6 +81,11 @@ class PurchaseBillUpdate(BaseModel):
     pcdate: date | None = Field(None)
     whcd: str | None = Field(None, max_length=2)
     memo: str | None = Field(None, max_length=255)
+    settlement_period: str | None = Field(None, max_length=7)
+    settle_stage: str | None = Field(None, max_length=10)
+    installment_no: int | None = Field(None)
+    total_installments: int | None = Field(None)
+    due_date: date | None = Field(None)
     details: list["PurchaseBillDetailCreate"] | None = Field(None, description="结算明细（全量替换）")
 
 
@@ -157,6 +167,7 @@ class ProcurementQuery(BaseModel):
     suppliercd: str | None = Field(None, max_length=8)
     pcplanid: str | None = Field(None, max_length=20, description="需求单号模糊搜索")
     rgstbillid: str | None = Field(None, max_length=8, description="订单号模糊搜索")
+    ref_pcplanid: str | None = Field(None, max_length=20, description="关联需求单号模糊搜索")
     pctyp: str | None = Field(None, max_length=2)
     whcd: str | None = Field(None, max_length=2)
     start_date: datetime | None = Field(None, description="计划日期起始")

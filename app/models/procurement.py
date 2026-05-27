@@ -170,6 +170,11 @@ class PurchaseBill(BaseModel):
     auditflg = db.Column(db.String(1), default="0", comment="审核标志")
     auditman = db.Column(db.String(6), comment="审核人")
     auditdate = db.Column(db.DateTime, comment="审核日期")
+    settlement_period = db.Column(db.String(7), comment="月结周期(YYYY-MM)")
+    settle_stage = db.Column(db.String(10), default="final", comment="结算阶段(deposit=预付/final=尾款)")
+    installment_no = db.Column(db.Integer, comment="分期序号")
+    total_installments = db.Column(db.Integer, comment="分期总期数")
+    due_date = db.Column(db.Date, comment="付款到期日")
 
     details = db.relationship("PurchaseBillDt", back_populates="bill", lazy="dynamic")
 
