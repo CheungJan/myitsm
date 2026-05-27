@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class PurchasePlanCreate(BaseModel):
@@ -51,7 +51,7 @@ class PurchaseBillCreate(BaseModel):
     invoice_no: str | None = Field(None, max_length=50, description="发票号码")
     invoice_date: date | None = Field(None, description="发票日期")
     pcdate: date | None = Field(None, description="结算日期")
-    whcd: str | None = Field(None, max_length=2, description="入库仓库")
+    whcd: str | None = Field(None, max_length=50, description="入库仓库")
     memo: str | None = Field(None, max_length=255, description="备注")
     settlement_period: str | None = Field(None, max_length=7, description="月结周期(YYYY-MM)")
     settle_stage: str | None = Field("final", max_length=10, description="结算阶段(deposit=预付/final=尾款)")
@@ -59,6 +59,13 @@ class PurchaseBillCreate(BaseModel):
     total_installments: int | None = Field(None, description="分期总期数")
     due_date: date | None = Field(None, description="付款到期日")
     details: list["PurchaseBillDetailCreate"] = Field(..., min_length=1, description="结算明细")
+
+    @field_validator("invoice_date", "pcdate", "due_date", mode="before")
+    @classmethod
+    def _empty_str_to_none(cls, v: object) -> object:
+        if v == "" or v is None:
+            return None
+        return v
 
 
 class PurchaseBillDetailCreate(BaseModel):
@@ -79,7 +86,7 @@ class PurchaseBillUpdate(BaseModel):
     invoice_no: str | None = Field(None, max_length=50)
     invoice_date: date | None = Field(None)
     pcdate: date | None = Field(None)
-    whcd: str | None = Field(None, max_length=2)
+    whcd: str | None = Field(None, max_length=50)
     memo: str | None = Field(None, max_length=255)
     settlement_period: str | None = Field(None, max_length=7)
     settle_stage: str | None = Field(None, max_length=10)
@@ -87,6 +94,13 @@ class PurchaseBillUpdate(BaseModel):
     total_installments: int | None = Field(None)
     due_date: date | None = Field(None)
     details: list["PurchaseBillDetailCreate"] | None = Field(None, description="结算明细（全量替换）")
+
+    @field_validator("invoice_date", "pcdate", "due_date", mode="before")
+    @classmethod
+    def _empty_str_to_none(cls, v: object) -> object:
+        if v == "" or v is None:
+            return None
+        return v
 
 
 class SupplierAppraisalCreate(BaseModel):
