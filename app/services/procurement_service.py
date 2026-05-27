@@ -860,13 +860,14 @@ class PurchaseBillService:
             .first()
         )
         receiving_whcd = receiving_wh[0] if receiving_wh else None
-        # 查询该订单的分期历史
+        # 查询该订单的分期历史（通过明细表关联）
         latest_ins = (
             db.session.query(PurchaseBill.installment_no, PurchaseBill.total_installments)
+            .join(PurchaseBillDt, PurchaseBill.pcbillid == PurchaseBillDt.pcbillid)
             .filter(
                 PurchaseBill.pay_type == "INS",
                 PurchaseBill.useflg != "9",
-                PurchaseBill.ref_rgstbillid == rgstbillid,
+                PurchaseBillDt.ref_rgstbillid == rgstbillid,
             )
             .order_by(PurchaseBill.installment_no.desc())
             .first()
