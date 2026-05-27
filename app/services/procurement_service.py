@@ -706,8 +706,8 @@ class PurchaseBillService:
             db.session.query(StockIn.whcd)
             .filter(
                 StockIn.refbillid == rgstbillid,
-                StockIn.invtyp == "1",   # 仅采购入库
-                StockIn.auditflg == "2",  # 仅已审核
+                StockIn.invtyp == "1",    # 仅采购入库
+                StockIn.auditflg != "9",  # 排除已作废
             )
             .order_by(StockIn.indate.desc())
             .first()
