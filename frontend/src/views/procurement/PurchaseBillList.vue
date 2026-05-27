@@ -587,6 +587,13 @@
 
         <el-form-item label="结算明细">
           <div style="width:100%">
+            <!-- 预付/分期：全局比例设置 -->
+            <div v-if="['DEP','INS'].includes(createForm.pay_type) && settleableItems.length > 0" style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
+              <span style="font-size:13px;white-space:nowrap">结算比例</span>
+              <el-input-number v-model="globalRatio" :min="0" :max="100" size="small" style="width:100px"/> <span style="font-size:13px">%</span>
+              <el-button size="small" @click="applyGlobalRatio">应用</el-button>
+              <span style="font-size:12px;color:#909399">勾选行按比例自动计算结算数量</span>
+            </div>
             <el-alert
               v-if="!createForm.suppliercd"
               title="请先选择供应商"
@@ -998,6 +1005,28 @@ interface SettleableLine {
 
 const settleableItems = ref<SettleableLine[]>([])
 const settleableLoading = ref(false)
+const globalRatio = ref(100)
+
+function applyGlobalRatio() {
+    const ratio = (globalRatio.value || 0) / 100
+    if (ratio <= 0 || ratio > 1) return
+    for (let i = 0; i < settleableItems.value.length; i++) {
+        const row = settleableItems.value[i]
+        const qty = Math.round(row.remain_qty * ratio)
+        if (qty <= 0) continue
+        if (!createDetails[i]) {
+            createDetails[i] = {
+                ref_rgstbillid: row.ref_rgstbillid,
+                ref_rgstlineno: row.ref_rgstlineno,
+                itemcd: row.itemcd,
+                settle_qty: 0,
+                settle_price: 0,
+            }
+        }
+        createDetails[i].settle_qty = qty
+        createDetails[i].settle_price = row.unit_price
+    }
+}
 
 // 用户填写的结算明细（与 settleableItems 一一对应，通过 checkbox 选中）
 interface CreateDetail {

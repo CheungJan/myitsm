@@ -660,6 +660,7 @@ class PurchaseBillService:
         PurchaseBillService._sync_invoice_flag(data)
         record = PurchaseBillRepository.create(data, creator)
         for i, d in enumerate(validated_details, start=1):
+            d.pop("order_price", None)  # 仅用于校验，不入库
             PurchaseBillRepository.add_detail(record.pcbillid, i, d)
         db.session.commit()
         return PurchaseBillService.get(record.pcbillid)  # type: ignore[return-value]
@@ -752,6 +753,7 @@ class PurchaseBillService:
             data["total_settle_amt"] = total_amt
             PurchaseBillRepository.clear_details(pcbillid)
             for i, d in enumerate(validated_details, start=1):
+                d.pop("order_price", None)  # 仅用于校验，不入库
                 PurchaseBillRepository.add_detail(pcbillid, i, d)
 
         PurchaseBillService._sync_invoice_flag(data)
@@ -819,10 +821,10 @@ class PurchaseBillService:
                 existing_payable.remark = f"采购结算单 {record.pcbillid}"
                 existing_payable.opercd = auditor
 
-            # PIA 款到发货：标记应付状态为"已结算待入库"
+            # PIA 款到发货：标记应付状态为"已付"（等待入库流程）
             if (record.pay_type or "").upper() == "PIA":
                 target = existing_payable if existing_payable else payable
-                target.status = "PAID_PENDING_DELIVERY"
+                target.status = "PAID"
 
         db.session.commit()
         return {"success": True, "pcbillid": pcbillid}
@@ -878,10 +880,9 @@ class PurchaseBillService:
     def get_monthly_receiving(suppliercd: str, period: str) -> list[dict[str, Any]]:
         """查询某供应商某月已审核订单的入库记录（月结汇总用）。"""
         from app.models.procurement import PurchaseRegister
-        from datetime import datetime as dt_parse, timedelta
 
         try:
-            period_date = dt_parse.strptime(period, "%Y-%m")
+            period_date = dt.strptime(period, "%Y-%m")
         except ValueError:
             raise ValueError(f"period 格式错误: {period}，应为 YYYY-MM")
 
