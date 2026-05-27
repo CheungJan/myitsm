@@ -248,6 +248,15 @@
           <el-descriptions-item label="付款方式">
             {{ payTypeMap[auditTarget.pay_type as string] || auditTarget.pay_type || '-' }}
           </el-descriptions-item>
+          <el-descriptions-item label="入库仓库">
+            {{ auditTarget.whcd || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="发票号">
+            {{ auditTarget.invoice_no || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="发票日期">
+            {{ formatDate(auditTarget.invoice_date) }}
+          </el-descriptions-item>
         </el-descriptions>
         <h4 style="margin:12px 0 8px">结算明细</h4>
         <el-table
