@@ -704,7 +704,11 @@ class PurchaseBillService:
         # 查入库仓库（用于结算单自动带出）
         receiving_wh = (
             db.session.query(StockIn.whcd)
-            .filter(StockIn.refbillid == rgstbillid, StockIn.auditflg != "9")
+            .filter(
+                StockIn.refbillid == rgstbillid,
+                StockIn.invtyp == "1",   # 仅采购入库
+                StockIn.auditflg == "2",  # 仅已审核
+            )
             .order_by(StockIn.indate.desc())
             .first()
         )
