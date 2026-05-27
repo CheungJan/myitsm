@@ -21,6 +21,7 @@
             filterable
             placeholder="选择订单"
             @change="doSearch"
+            @clear="doSearch"
           >
             <el-option
               v-for="o in orderOptions"
@@ -38,6 +39,7 @@
             style="width:140px"
             clearable
             @change="doSearch"
+            @clear="doSearch"
           >
             <el-option
               v-for="(nm, cd) in reasonMap"
