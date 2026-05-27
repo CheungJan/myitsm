@@ -314,6 +314,7 @@
           <el-select v-model="editForm.whcd" multiple clearable filterable placeholder="选择仓库" style="width:280px">
             <el-option v-for="w in warehouseOptions" :key="w.whcd" :label="`${w.whcd} ${w.whnm}`" :value="w.whcd"/>
           </el-select>
+        </el-form-item>
         <el-form-item label="备注"><el-input v-model="editForm.memo" type="textarea" :rows="2"/></el-form-item>
 
         <el-divider content-position="left">结算明细</el-divider>
