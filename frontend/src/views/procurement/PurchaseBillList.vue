@@ -329,6 +329,9 @@
           <el-table-column prop="settle_qty" label="结算数量" width="90" align="right" />
           <el-table-column prop="settle_price" label="结算单价" width="90" align="right" />
           <el-table-column prop="settle_amt" label="结算金额" width="100" align="right" />
+          <el-table-column label="结算比例" width="80" align="right">
+            <template #default="{ row }">{{ Number(row.order_qty) > 0 ? Math.round(Number(row.settle_qty)/Number(row.order_qty)*100) + '%' : '-' }}</template>
+          </el-table-column>
         </el-table>
         <el-input
           v-model="auditMemo"
