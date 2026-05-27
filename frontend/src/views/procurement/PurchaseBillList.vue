@@ -310,7 +310,10 @@
         <el-form-item label="发票号"><el-input v-model="editForm.invoice_no"/></el-form-item>
         <el-form-item label="发票日期"><el-date-picker v-model="editForm.invoice_date" type="date" value-format="YYYY-MM-DD" style="width:200px"/></el-form-item>
         <el-form-item label="结算日期"><el-date-picker v-model="editForm.pcdate" type="date" value-format="YYYY-MM-DD" style="width:200px"/></el-form-item>
-        <el-form-item label="仓库"><el-input v-model="editForm.whcd" style="width:120px"/></el-form-item>
+        <el-form-item label="仓库">
+          <el-select v-model="editForm.whcd" clearable filterable placeholder="选择仓库" style="width:200px">
+            <el-option v-for="w in warehouseOptions" :key="w.whcd" :label="`${w.whcd} ${w.whnm}`" :value="w.whcd"/>
+          </el-select>
         <el-form-item label="备注"><el-input v-model="editForm.memo" type="textarea" :rows="2"/></el-form-item>
 
         <el-divider content-position="left">结算明细</el-divider>
@@ -397,7 +400,9 @@
         </el-form-item>
 
         <el-form-item label="入库仓库">
-          <el-input v-model="createForm.whcd" placeholder="选填，仓库编码" style="width:200px" />
+          <el-select v-model="createForm.whcd" clearable filterable placeholder="选择仓库" style="width:200px">
+            <el-option v-for="w in warehouseOptions" :key="w.whcd" :label="`${w.whcd} ${w.whnm}`" :value="w.whcd"/>
+          </el-select>
         </el-form-item>
 
         <el-form-item label="备注">
@@ -524,7 +529,7 @@ import {
 } from '@/api/procurement'
 import type { SettlementRecord, SettlementDetail } from '@/api/procurement'
 import { useDict } from '@/composables/useDict'
-import { fetchSuppliersSimple } from '@/api/master'
+import { fetchSuppliersSimple, fetchWarehouses } from '@/api/master'
 
 // ---- 字典映射 ----
 const { dictMap: payTypeMap } = useDict('PYMT')
@@ -536,9 +541,10 @@ const { items, loading, page, perPage, total, load, onSearch } =
     useListPage<SettlementRecord>(fetchSettlements)
 const { drawer, detail } = useDetailDrawer<SettlementRecord>()
 
-// ---- 供应商选项 ----
+// ---- 供应商/仓库选项 ----
 const supplierOptions = ref<{ supp_cd: string; supp_nm: string }[]>([])
 const supplierNameMap = ref<Record<string, string>>({})
+const warehouseOptions = ref<{ whcd: string; whnm: string }[]>([])
 
 onMounted(async () => {
     try {
@@ -548,6 +554,12 @@ onMounted(async () => {
         for (const s of list) {
             supplierNameMap.value[s.supp_cd] = s.supp_nm
         }
+    } catch {
+        /* ignore */
+    }
+    try {
+        const r = await fetchWarehouses()
+        warehouseOptions.value = (r.data as { whcd: string; whnm: string }[]) || []
     } catch {
         /* ignore */
     }
