@@ -184,6 +184,16 @@
           <el-descriptions-item label="付款方式">
             {{ payTypeMap[detail.pay_type as string] || detail.pay_type || '-' }}
           </el-descriptions-item>
+          <el-descriptions-item v-if="detail.settlement_period" label="结算月份">{{ detail.settlement_period }}</el-descriptions-item>
+          <el-descriptions-item v-if="detail.settle_stage" label="结算阶段">
+            <el-tag :type="detail.settle_stage === 'deposit' ? 'warning' : 'success'" size="small">{{ detail.settle_stage === 'deposit' ? '预付款' : '尾款' }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="detail.pay_type === 'INS'" label="分期信息">
+            第 {{ detail.installment_no }} 期 / 共 {{ detail.total_installments }} 期
+          </el-descriptions-item>
+          <el-descriptions-item v-if="detail.pay_type === 'DEP' && getSettleRatio(detail) !== null" label="结算比例">
+            {{ getSettleRatio(detail) }}%
+          </el-descriptions-item>
           <el-descriptions-item label="结算金额">
             {{ detail.total_settle_amt != null ? Number(detail.total_settle_amt).toFixed(2) : '-' }}
           </el-descriptions-item>
@@ -738,6 +748,14 @@ const warehouseNameMap = ref<Record<string, string>>({})
 function getWarehouseNames(whcd: string | undefined | null): string {
     if (!whcd) return '-'
     return whcd.split(',').map(c => warehouseNameMap.value[c] ? `${c} ${warehouseNameMap.value[c]}` : c).join(', ')
+}
+
+function getSettleRatio(d: SettlementRecord | null): number | null {
+    if (!d?.details?.length) return null
+    const lines = d.details as SettlementDetail[]
+    const ratios = lines.filter(l => (l.order_qty as number) > 0).map(l => Math.round((l.settle_qty as number) / (l.order_qty as number) * 100))
+    if (ratios.length === 0) return null
+    return ratios.every(r => r === ratios[0]) ? ratios[0] : null
 }
 
 onMounted(async () => {
