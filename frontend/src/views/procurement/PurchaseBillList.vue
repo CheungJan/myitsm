@@ -689,6 +689,20 @@ async function openEdit(row: SettlementRecord) {
         editForm.invoice_date = (d.invoice_date as string) || ''
         editForm.pcdate = (d.pcdate as string) || ''
         editForm.whcd = ((d.whcd as string) || '').split(',').filter(Boolean)
+        // 如果 whcd 为空，从订单入库记录自动补全
+        if (editForm.whcd.length === 0) {
+            const orderIds = [...new Set((d.details as SettlementDetail[] || []).map(l => l.ref_rgstbillid).filter(Boolean))]
+            const whSet = new Set<string>()
+            for (const oid of orderIds) {
+                try {
+                    const r = await fetchSettleableItems(oid)
+                    for (const l of (r.data || []) as any[]) {
+                        if (l.receiving_whcd) whSet.add(l.receiving_whcd)
+                    }
+                } catch { /* skip */ }
+            }
+            if (whSet.size > 0) editForm.whcd = [...whSet]
+        }
         editForm.memo = (d.memo as string) || ''
         editDetails.length = 0
         const lines = (d.details || []) as SettlementDetail[]
