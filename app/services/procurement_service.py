@@ -1181,15 +1181,37 @@ class ReturnPurchaseService:
 
     @staticmethod
     def list_returnable_orders() -> list[dict[str, Any]]:
-        """列出所有有可退货商品行的已审核订单。"""
-        from app.models.procurement import PurchaseRegister
+        """列出所有有可退货商品行的已审核订单（入库量 > 已退量）。"""
+        from app.models.procurement import (
+            PurchaseRegister, PurchaseRegisterDt,
+            ReturnPurchaseBill, ReturnPurchaseBillDt,
+        )
+        from sqlalchemy import func
+        # 子查询：每行(rgstbillid, lineno)已退累计
+        returned_sub = (
+            db.session.query(
+                ReturnPurchaseBill.ref_rgstbillid,
+                ReturnPurchaseBillDt.ref_rgstlineno,
+                func.coalesce(func.sum(ReturnPurchaseBillDt.rpcqty), 0).label("returned"),
+            )
+            .join(ReturnPurchaseBill, ReturnPurchaseBill.pcbillid == ReturnPurchaseBillDt.pcbillid)
+            .filter(ReturnPurchaseBill.useflg != "9", ReturnPurchaseBill.ref_rgstbillid.isnot(None))
+            .group_by(ReturnPurchaseBill.ref_rgstbillid, ReturnPurchaseBillDt.ref_rgstlineno)
+            .subquery()
+        )
         rows = (
             db.session.query(PurchaseRegister.rgstbillid, PurchaseRegister.suppliercd)
             .join(PurchaseRegisterDt, PurchaseRegister.rgstbillid == PurchaseRegisterDt.rgstbillid)
+            .outerjoin(
+                returned_sub,
+                (PurchaseRegisterDt.rgstbillid == returned_sub.c.ref_rgstbillid)
+                & (PurchaseRegisterDt.lineno == returned_sub.c.ref_rgstlineno),
+            )
             .filter(
                 PurchaseRegister.auditflg == "2",
                 PurchaseRegister.useflg != "9",
                 PurchaseRegisterDt.inqty > 0,
+                PurchaseRegisterDt.inqty - func.coalesce(returned_sub.c.returned, 0) > 0,
             )
             .distinct()
             .order_by(PurchaseRegister.rgstbillid)
