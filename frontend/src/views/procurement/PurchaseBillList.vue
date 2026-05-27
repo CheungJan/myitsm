@@ -654,6 +654,7 @@
               style="margin-bottom:8px"
             />
             <el-table
+              ref="settleTableRef"
               v-if="settleableItems.length > 0"
               :data="settleableItems"
               size="small"
@@ -728,7 +729,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElTable } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { useListPage } from '@/composables/useListPage'
 import { useDetailDrawer } from '@/composables/useDetailDrawer'
@@ -1088,21 +1089,27 @@ function applyGlobalRatio() {
 }
 
 // 按订单快速选择
+const settleTableRef = ref<InstanceType<typeof ElTable>>()
 const quickOrderSelect = ref('')
 const uniqueOrderIds = computed(() => [...new Set(settleableItems.value.map(l => l.ref_rgstbillid).filter(Boolean))])
 
 function onQuickOrderSelect(oid: string) {
-    if (!oid) { uncheckAll(); return }
-    for (let i = 0; i < settleableItems.value.length; i++) {
-        const row = settleableItems.value[i]
-        row._selected = (row.ref_rgstbillid === oid)
-    }
+    const table = settleTableRef.value
+    if (!table) return
+    table.clearSelection()
+    if (!oid) return
+    settleableItems.value.forEach((row, i) => {
+        if (row.ref_rgstbillid === oid) table.toggleRowSelection(row, true)
+    })
 }
 function checkAll() {
-    for (const row of settleableItems.value) row._selected = true
+    const table = settleTableRef.value
+    if (!table) return
+    settleableItems.value.forEach(row => table.toggleRowSelection(row, true))
 }
 function uncheckAll() {
-    for (const row of settleableItems.value) { row._selected = false; quickOrderSelect.value = '' }
+    settleTableRef.value?.clearSelection()
+    quickOrderSelect.value = ''
 }
 
 // 用户填写的结算明细（与 settleableItems 一一对应，通过 checkbox 选中）
