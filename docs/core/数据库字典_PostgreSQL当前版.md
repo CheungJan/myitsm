@@ -22,7 +22,7 @@
 | 主数据 (tmm) | 25 | 客户/物料/设备/供应商/区域（不含押金） |
 | ITSM 核心 (tit) | 33 | 维护/翻新/开通/归档/变更 |
 | 仓储 (twh) | 15 | 入库/出库/库存/调拨 |
-| 采购 (tpc) | 10 | 采购计划/订单 |
+| 采购 (tpc) | 11 | 采购计划/订单 |
 | 销售 (tsl) | 3 | 销售/延期 |
 | 财务 (tfn) | 5 | 账务/支付 |
 | 财务 (tac/tht) | 1 | 合同/发票 |
@@ -41,7 +41,7 @@
 | 价格 (tip) | 3 | 价格规则 |
 | 预计划 (plan) | 1 | 预计划客户 |
 | 采购验收 (tmp) | 1 | 采购验收明细 |
-| **合计** | **143** | |
+| **合计** | **144** | |
 
 ---
 
@@ -1793,7 +1793,7 @@
 | 12 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-### 采购 (tpc) — 10 张表
+### 采购 (tpc) — 11 张表
 > 采购计划/订单
 
 #### 1. tpc01_pcplan
@@ -1890,60 +1890,105 @@
 | 12 | created_at | TIMESTAMP | NOT NULL |  |
 | 13 | updated_at | TIMESTAMP | NOT NULL |  |
 
-#### 6. tpc14_pcbill
+#### 6. tpc14_pcbill — 采购结算单主表
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | pcbillid | VARCHAR(8) | PK NOT NULL | 采购单号 |
+| 1 | pcbillid | VARCHAR(8) | PK NOT NULL | 结算单号（SB前缀，IdMaster取号） |
 | 2 | pctyp | VARCHAR(2) |  | 采购类型 |
-| 3 | custcd | VARCHAR(8) |  | 客户编码 |
-| 4 | refbillid | VARCHAR(8) |  | 关联单号 |
-| 5 | pcdate | TIMESTAMP |  | 采购日期 |
-| 6 | pcamt | NUMERIC(16,4) |  | 采购金额 |
-| 7 | whcd | VARCHAR(2) |  | 入库仓库 |
-| 8 | invoiceflg | VARCHAR(1) |  | 发票标志 |
-| 9 | ptimes | INTEGER |  | 打印次数 |
-| 10 | opercd | VARCHAR(6) |  | 操作员 |
-| 11 | memo | VARCHAR(255) |  | 备注 |
-| 12 | gendate | TIMESTAMP |  | 创建日期 |
-| 13 | useflg | VARCHAR(1) |  | 有效标志 |
-| 14 | created_at | TIMESTAMP | NOT NULL |  |
-| 15 | updated_at | TIMESTAMP | NOT NULL |  |
+| 3 | suppliercd | VARCHAR(8) |  | 供应商编码（由custcd重命名） |
+| 4 | pcdate | TIMESTAMP |  | 结算日期 |
+| 5 | whcd | VARCHAR(2) |  | 入库仓库 |
+| 6 | invoiceflg | VARCHAR(1) |  | 发票标志（0=未开票, 1=已开票） |
+| 7 | ptimes | INTEGER |  | 打印次数 |
+| 8 | opercd | VARCHAR(6) |  | 操作员 |
+| 9 | memo | VARCHAR(255) |  | 备注 |
+| 10 | gendate | TIMESTAMP |  | 创建日期 |
+| 11 | useflg | VARCHAR(1) |  | 有效标志（1=有效, 9=作废） |
+| 12 | ref_rgstbillid | VARCHAR(8) |  | 来源采购订单号（月结置空） |
+| 13 | pay_type | VARCHAR(3) | DEFAULT 'COD' | 付款方式（COD/PIA/DEP/MON/INS） |
+| 14 | invoice_no | VARCHAR(50) |  | 发票号码 |
+| 15 | invoice_date | DATE |  | 发票日期 |
+| 16 | total_settle_amt | NUMERIC(16,4) | DEFAULT 0 | 结算总额 |
+| 17 | auditflg | VARCHAR(1) | DEFAULT '0' | 审核标志（0=未审,1=待审,2=已审,9=作废） |
+| 18 | auditman | VARCHAR(6) |  | 审核人 |
+| 19 | auditdate | TIMESTAMP |  | 审核日期 |
+| 20 | created_at | TIMESTAMP | NOT NULL | 创建时间 |
+| 21 | updated_at | TIMESTAMP | NOT NULL | 更新时间 |
 
-#### 7. tpc16_rpcbill
+> **变更记录**（2026-05-26）：custcd→suppliercd 重命名；新增 ref_rgstbillid/pay_type/invoice_no/invoice_date/total_settle_amt/auditflg/auditman/auditdate；删除旧字段 refbillid/pcamt。
+
+#### 7. tpc14_pcbilldt — 采购结算明细表（新增 2026-05-26）
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | pcbillid | VARCHAR(8) | PK NOT NULL | 退货单号 |
-| 2 | custcd | VARCHAR(8) |  | 客户编码 |
+| 1 | id | INTEGER | PK NOT NULL | 自增主键 |
+| 2 | pcbillid | VARCHAR(8) | FK NOT NULL | 结算单号 → tpc14_pcbill.pcbillid CASCADE |
+| 3 | lineno | INTEGER | NOT NULL | 行号 |
+| 4 | ref_rgstbillid | VARCHAR(8) | FK NOT NULL | 来源采购订单号 |
+| 5 | ref_rgstlineno | INTEGER | FK NOT NULL | 来源订单行号 |
+| 6 | itemcd | VARCHAR(6) | NOT NULL | 物料编码 |
+| 7 | order_qty | NUMERIC(12,2) | DEFAULT 0 | 订购数量（快照） |
+| 8 | received_qty | NUMERIC(12,2) | DEFAULT 0 | 已入库数量（快照） |
+| 9 | already_settled | NUMERIC(12,2) | DEFAULT 0 | 该行已结算累计（不含本次） |
+| 10 | settle_qty | NUMERIC(12,2) | NOT NULL | 本次结算数量 |
+| 11 | settle_price | NUMERIC(16,4) | NOT NULL | 结算单价 |
+| 12 | settle_amt | NUMERIC(16,4) | NOT NULL | 结算金额 = qty × price |
+| 13 | created_at | TIMESTAMP | DEFAULT NOW() | 创建时间 |
+| 14 | updated_at | TIMESTAMP | DEFAULT NOW() | 更新时间 |
+
+外键：
+- `(pcbillid) → tpc14_pcbill(pcbillid) ON DELETE CASCADE`
+- `(ref_rgstbillid, ref_rgstlineno) → tpc13_registerdt(rgstbillid, lineno) ON DELETE RESTRICT`
+- UNIQUE(pcbillid, lineno)
+
+#### 8. tpc16_rpcbill — 采购退货单主表
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | pcbillid | VARCHAR(8) | PK NOT NULL | 退货单号（RT前缀，IdMaster取号） |
+| 2 | suppliercd | VARCHAR(8) |  | 供应商编码（由custcd重命名） |
 | 3 | pcdate | TIMESTAMP |  | 退货日期 |
-| 4 | pcamt | INTEGER |  | 退货金额 |
+| 4 | pcamt | INTEGER |  | 退货金额（自动计算） |
 | 5 | whcd | VARCHAR(2) |  | 仓库编码 |
 | 6 | invoiceflg | VARCHAR(2) |  | 发票标志 |
 | 7 | ptimes | INTEGER |  | 打印次数 |
 | 8 | opercd | VARCHAR(6) |  | 操作员 |
 | 9 | memo | VARCHAR(255) |  | 备注 |
-| 10 | useflg | VARCHAR(1) |  | 有效标志 |
+| 10 | useflg | VARCHAR(1) |  | 有效标志（1=有效, 9=作废） |
 | 11 | gendate | TIMESTAMP |  | 创建日期 |
-| 12 | created_at | TIMESTAMP | NOT NULL |  |
-| 13 | updated_at | TIMESTAMP | NOT NULL |  |
+| 12 | ref_rgstbillid | VARCHAR(8) |  | 来源采购订单号 |
+| 13 | return_reason | VARCHAR(20) |  | 退货原因（quality/quantity/spec/other） |
+| 14 | auditflg | VARCHAR(1) | DEFAULT '0' | 审核标志 |
+| 15 | auditman | VARCHAR(6) |  | 审核人 |
+| 16 | auditdate | TIMESTAMP |  | 审核日期 |
+| 17 | created_at | TIMESTAMP | NOT NULL | 创建时间 |
+| 18 | updated_at | TIMESTAMP | NOT NULL | 更新时间 |
 
-#### 8. tpc17_rpcbilldt
+> **变更记录**（2026-05-26）：custcd→suppliercd 重命名；新增 return_reason。
+
+#### 9. tpc17_rpcbilldt — 采购退货明细表
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | id | INTEGER | PK NOT NULL |  |
-| 2 | pcbillid | VARCHAR(8) | NOT NULL | 退货单号 |
+| 1 | id | INTEGER | PK NOT NULL | 自增主键 |
+| 2 | pcbillid | VARCHAR(8) | FK NOT NULL | 退货单号 → tpc16_rpcbill.pcbillid |
 | 3 | lineno | INTEGER | NOT NULL | 行号 |
 | 4 | itemtyp | VARCHAR(2) |  | 物料类型 |
 | 5 | itemcd | VARCHAR(6) | NOT NULL | 物料编码 |
 | 6 | eid | VARCHAR(13) |  | 设备EID |
 | 7 | seid | VARCHAR(30) |  | 序列号 |
 | 8 | rpcqty | INTEGER |  | 退货数量 |
-| 9 | invoiceqty | INTEGER |  | 发票数量 |
-| 10 | units | VARCHAR(4) |  | 单位 |
-| 11 | created_at | TIMESTAMP | NOT NULL |  |
-| 12 | updated_at | TIMESTAMP | NOT NULL |  |
+| 9 | return_price | NUMERIC(16,4) |  | 退货单价 |
+| 10 | return_amt | NUMERIC(16,4) |  | 退货金额 = rpcqty × return_price |
+| 11 | invoiceqty | INTEGER |  | 发票数量 |
+| 12 | units | VARCHAR(4) |  | 单位 |
+| 13 | ref_rgstlineno | INTEGER |  | 来源订单行号 |
+| 14 | line_reason | VARCHAR(100) |  | 行级退货原因说明 |
+| 15 | created_at | TIMESTAMP | NOT NULL | 创建时间 |
+| 16 | updated_at | TIMESTAMP | NOT NULL | 更新时间 |
+
+> **变更记录**（2026-05-26）：新增 return_price/return_amt/line_reason。
 
 #### 9. tpc20_suppappraisal
 
@@ -1976,8 +2021,28 @@
 | 8 | created_at | TIMESTAMP | NOT NULL |  |
 | 9 | updated_at | TIMESTAMP | NOT NULL |  |
 
+**11:tpc20_requisition_order_link**
+
+| 字段         | 类型                 | 说明                                          |
+| :----------- | :------------------- | :-------------------------------------------- |
+| `id`         | integer (自增 PK)    | 主键                                          |
+| `pcplanid`   | varchar(20) NOT NULL | 来源需求单号（关联 `tpc10_pcplan`）           |
+| `pclineno`   | integer NOT NULL     | 来源需求单行号                                |
+| `rgstbillid` | varchar(20) NOT NULL | 采购订单号（FK → `tpc12_register`，级联删除） |
+| `rgstlineno` | integer NOT NULL     | 采购订单行号                                  |
+| `linkqty`    | numeric(12,2)        | 关联数量（该需求行分配到该订单的数量）        |
+| `linkstatus` | varchar(20)          | 关联状态（预留，目前未强制使用）              |
+| `gendate`    | timestamp            | 创建时间                                      |
+| `upddate`    | timestamp            | 更新时间                                      |
+| `opercd`     | varchar(20)          | 操作员                                        |
+| `created_at` | timestamp NOT NULL   | 系统创建时间                                  |
+| `updated_at` | timestamp NOT NULL   | 系统更新时间                                  |
+
+**唯一约束**：`(pcplanid, pclineno, rgstbillid, rgstlineno)` — 同一需求行不能重复关联同一订单行。
+**级联删除**：订单（`tpc12_register`）删除时，关联记录自动清除。
 
 ### 销售 (tsl) — 3 张表
+
 > 销售/延期
 
 #### 1. tsl01_extend

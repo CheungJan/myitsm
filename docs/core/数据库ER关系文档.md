@@ -2,7 +2,7 @@
 
 **版本**: v2.1  
 **更新日期**: 2026-05-08  
-**模型总数**: 143个业务模型（BaseModel 为公共基类，不计入）  
+**模型总数**: 144个业务模型（BaseModel 为公共基类，不计入）  
 **本次更新**: 2026-05-14 P0 物料增强完成，新增 SupplierPrice 模型
 
 > **v2.0 变更说明**：修正所有表名为实际 `__tablename__` 值，与 Oracle 数据库字典保持一致；
@@ -234,7 +234,7 @@ TWH01_WAREHOUSE (Warehouse)
 
 ---
 
-### 2.5 采购域（11个模型，procurement.py）
+### 2.5 采购域（12个模型，procurement.py）
 
 | 模型 | 实际表名 | 说明 |
 |------|---------|------|
@@ -243,8 +243,9 @@ TWH01_WAREHOUSE (Warehouse)
 | PurchasePlanStatus | tpc03_pcplanstatus | 计划状态 |
 | PurchaseRegister | tpc12_register | 采购登记 |
 | PurchaseRegisterDt | tpc13_registerdt | 登记明细 |
-| PurchaseBill | tpc14_pcbill | 采购单据 |
-| ReturnPurchaseBill | tpc16_rpcbill | 退货单 |
+| PurchaseBill | tpc14_pcbill | 采购结算单 |
+| PurchaseBillDt | tpc14_pcbilldt | 结算明细 |
+| ReturnPurchaseBill | tpc16_rpcbill | 采购退货单 |
 | ReturnPurchaseBillDt | tpc17_rpcbilldt | 退货明细 |
 | SupplierAppraisal | tpc20_suppappraisal | 供应商评价 |
 | SupplierAppraisalDt | tpc21_suppappraisaldt | 评价明细 |
