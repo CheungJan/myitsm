@@ -528,7 +528,7 @@ import type { ReturnPurchaseRecord, ReturnPurchaseDetail } from '@/api/procureme
 
 // ---- 字典映射 ----
 const { dictMap: reasonMap } = useDict('RT')
-const { dictMap: auditMap } = useDict('AST')
+const { dictMap: auditMap } = useDict('AF')
 
 // ---- composables ----
 const { userName } = useUserNames()

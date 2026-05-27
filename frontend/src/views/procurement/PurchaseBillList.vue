@@ -510,7 +510,7 @@ import { fetchSuppliersSimple } from '@/api/master'
 
 // ---- 字典映射 ----
 const { dictMap: payTypeMap } = useDict('PYMT')
-const { dictMap: auditMap } = useDict('AST')
+const { dictMap: auditMap } = useDict('AF')
 
 // ---- composables ----
 const { userName } = useUserNames()
