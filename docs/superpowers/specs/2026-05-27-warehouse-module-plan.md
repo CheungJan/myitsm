@@ -281,6 +281,7 @@ TWH16 — 出库明细(EID+PRD)  TWH19 — 资产盘点主表
 
 ## 八、相关文档
 
-- `docs/core/采购-仓库-质检跨模块流程衔接设计.md`
+- **实施计划**：`~/.windsurf/plans/warehouse-module-impl-d1e2c7.md`（具体代码改动 + 迁移脚本 + 执行顺序）
+- `docs/core/采购-仓库-质检跨模块流程衔接设计.md`（全局流程 + 模块衔接）
 - `docs/core/数据库ER关系文档.md`
 - `docs/core/数据库字典_PostgreSQL当前版.md`
