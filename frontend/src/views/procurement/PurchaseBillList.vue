@@ -258,6 +258,9 @@
           <el-table-column prop="settle_qty" label="本次结算数量" width="100" align="right" />
           <el-table-column prop="settle_price" label="结算单价" width="90" align="right" />
           <el-table-column prop="settle_amt" label="结算金额" width="100" align="right" />
+          <el-table-column label="结算比例" width="80" align="right">
+            <template #default="{ row }">{{ Number(row.order_qty) > 0 ? Math.round(Number(row.settle_qty)/Number(row.order_qty)*100) + '%' : '-' }}</template>
+          </el-table-column>
         </el-table>
         <div style="margin-top:8px;padding:8px;background:#f5f5f5;border-radius:4px;display:flex;gap:16px;font-size:13px">
           <span>订单金额: <strong>¥{{ calcDetailOrderAmt() }}</strong></span>
@@ -455,7 +458,13 @@
           <el-table-column label="金额" width="100">
             <template #default="{ $index }">{{ ((editDetails[$index].settle_qty||0) * (editDetails[$index].settle_price||0)).toFixed(2) }}</template>
           </el-table-column>
+          <el-table-column label="结算比例" width="80" align="right">
+            <template #default="{ $index }">
+              {{ calcEditLineRatio($index) }}
+            </template>
+          </el-table-column>
         </el-table>
+        <div v-if="calcEditRatio() !== null" style="font-size:13px;color:#909399;margin-top:4px">全局结算比例: {{ calcEditRatio() }}%</div>
         <div style="margin-top:8px;padding:8px;background:#f5f5f5;border-radius:4px;display:flex;gap:16px;font-size:13px">
           <span>订单金额: <strong>¥{{ calcEditOrderAmt() }}</strong></span>
           <span>已结算: <strong>¥{{ calcEditSettled() }}</strong></span>
@@ -753,7 +762,27 @@ function getWarehouseNames(whcd: string | undefined | null): string {
 function getSettleRatio(d: SettlementRecord | null): number | null {
     if (!d?.details?.length) return null
     const lines = d.details as SettlementDetail[]
-    const ratios = lines.filter(l => (l.order_qty as number) > 0).map(l => Math.round((l.settle_qty as number) / (l.order_qty as number) * 100))
+    const ratios = lines.filter(l => Number(l.order_qty) > 0).map(l => Math.round(Number(l.settle_qty) / Number(l.order_qty) * 100))
+    if (ratios.length === 0) return null
+    return ratios.every(r => r === ratios[0]) ? ratios[0] : null
+}
+
+function calcEditLineRatio(index: number): string {
+    const d = editDetails[index]
+    if (!d || !editDetail.value?.details) return '-'
+    const orig = (editDetail.value.details as SettlementDetail[])[index]
+    const oq = Number(orig?.order_qty || 0)
+    if (oq <= 0) return '-'
+    return Math.round((d.settle_qty || 0) / oq * 100) + '%'
+}
+
+function calcEditRatio(): number | null {
+    if (editDetails.length === 0) return null
+    const orderQtys = (editDetail.value?.details as SettlementDetail[] || [])
+    const ratios = editDetails.map((d, i) => {
+        const oq = Number(orderQtys[i]?.order_qty || 0)
+        return oq > 0 ? Math.round((d.settle_qty || 0) / oq * 100) : 0
+    }).filter(r => r > 0)
     if (ratios.length === 0) return null
     return ratios.every(r => r === ratios[0]) ? ratios[0] : null
 }
