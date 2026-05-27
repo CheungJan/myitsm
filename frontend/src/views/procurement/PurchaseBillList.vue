@@ -311,7 +311,7 @@
         <el-form-item label="发票日期"><el-date-picker v-model="editForm.invoice_date" type="date" value-format="YYYY-MM-DD" style="width:200px"/></el-form-item>
         <el-form-item label="结算日期"><el-date-picker v-model="editForm.pcdate" type="date" value-format="YYYY-MM-DD" style="width:200px"/></el-form-item>
         <el-form-item label="仓库">
-          <el-select v-model="editForm.whcd" clearable filterable placeholder="选择仓库" style="width:200px">
+          <el-select v-model="editForm.whcd" multiple clearable filterable placeholder="选择仓库" style="width:280px">
             <el-option v-for="w in warehouseOptions" :key="w.whcd" :label="`${w.whcd} ${w.whnm}`" :value="w.whcd"/>
           </el-select>
         <el-form-item label="备注"><el-input v-model="editForm.memo" type="textarea" :rows="2"/></el-form-item>
@@ -400,7 +400,7 @@
         </el-form-item>
 
         <el-form-item label="入库仓库">
-          <el-select v-model="createForm.whcd" clearable filterable placeholder="选择仓库" style="width:200px">
+          <el-select v-model="createForm.whcd" multiple clearable filterable placeholder="自动关联，可多选" style="width:280px">
             <el-option v-for="w in warehouseOptions" :key="w.whcd" :label="`${w.whcd} ${w.whnm}`" :value="w.whcd"/>
           </el-select>
         </el-form-item>
@@ -675,7 +675,7 @@ async function doVoid() {
 const editing = ref(false)
 const editLoading = ref(false)
 const editDetail = ref<SettlementRecord | null>(null)
-const editForm = reactive({ pay_type: 'COD', invoice_no: '', invoice_date: '', pcdate: '', whcd: '', memo: '' })
+const editForm = reactive({ pay_type: 'COD', invoice_no: '', invoice_date: '', pcdate: '', whcd: [] as string[], memo: '' })
 const editDetails = reactive<{ ref_rgstbillid: string; ref_rgstlineno: number; itemcd: string; settle_qty: number; settle_price: number }[]>([])
 
 async function openEdit(row: SettlementRecord) {
@@ -687,7 +687,7 @@ async function openEdit(row: SettlementRecord) {
         editForm.invoice_no = (d.invoice_no as string) || ''
         editForm.invoice_date = (d.invoice_date as string) || ''
         editForm.pcdate = (d.pcdate as string) || ''
-        editForm.whcd = (d.whcd as string) || ''
+        editForm.whcd = ((d.whcd as string) || '').split(',').filter(Boolean)
         editForm.memo = (d.memo as string) || ''
         editDetails.length = 0
         const lines = (d.details || []) as SettlementDetail[]
@@ -712,6 +712,7 @@ async function doEdit() {
     try {
         await updateSettlement(editDetail.value.pcbillid, {
             ...editForm,
+            whcd: (editForm.whcd || []).join(','),
             details: details.map(d => ({
                 ref_rgstbillid: d.ref_rgstbillid,
                 ref_rgstlineno: d.ref_rgstlineno,
@@ -743,7 +744,7 @@ const createForm = reactive({
     pcdate: today(),
     invoice_no: '',
     invoice_date: '',
-    whcd: '',
+    whcd: [] as string[],
     memo: '',
 })
 
@@ -871,10 +872,8 @@ watch(
                 const w = (l as any).receiving_whcd as string
                 if (w) whSet.add(w)
             }
-            if (whSet.size === 1) {
-                createForm.whcd = [...whSet][0]
-            } else if (whSet.size > 1) {
-                createForm.whcd = '' // 多个仓库，留空让用户选择
+            if (whSet.size >= 1) {
+                createForm.whcd = [...whSet] // 自动全选所有关联仓库
             }
             // 初始化 createDetails，结算数量默认=可结算数量，单价默认来自订单单价
             for (let i = 0; i < allLines.length; i++) {
@@ -904,7 +903,7 @@ function resetCreateForm() {
     createForm.pcdate = today()
     createForm.invoice_no = ''
     createForm.invoice_date = ''
-    createForm.whcd = ''
+    createForm.whcd = []
     createForm.memo = ''
     settleableItems.value = []
     createDetails.length = 0
@@ -987,7 +986,7 @@ async function handleCreate() {
             pcdate: createForm.pcdate,
             invoice_no: createForm.invoice_no,
             invoice_date: createForm.invoice_date,
-            whcd: createForm.whcd,
+            whcd: (createForm.whcd || []).join(','),
             memo: createForm.memo,
             details: detailsToSubmit,
         })

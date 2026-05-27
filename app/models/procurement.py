@@ -160,7 +160,7 @@ class PurchaseBill(BaseModel):
     invoice_date = db.Column(db.Date, comment="发票日期")
     pcdate = db.Column(db.DateTime, comment="结算日期")
     total_settle_amt = db.Column(db.Numeric(16, 4), default=0, comment="结算总额")
-    whcd = db.Column(db.String(2), comment="入库仓库")
+    whcd = db.Column(db.String(50), comment="入库仓库（多选逗号分隔）")
     invoiceflg = db.Column(db.String(1), comment="发票标志")
     ptimes = db.Column(db.Integer, comment="打印次数")
     opercd = db.Column(db.String(6), comment="操作员")
