@@ -4,6 +4,28 @@
 
 ---
 
+## [v0.10.0] — 2026-05-27 — 采购结算/退货模块
+
+### 新增
+- **采购结算单（TPC14 + TPC14_DT）**：完整 CRUD + 审核 + 作废，支持 COD/PIA/DEP/MON/INS 五种付款方式
+- **采购退货单（TPC16/TPC17）增强**：完整 CRUD + 审核 + 作废，退货数量校验（≤ 入库量-已退量）
+- **14 条新 API 路由**：结算/退货各 6 条 + 可结算/可退货查询 2 条
+- **前端页面**：结算单列表/新建/编辑/审核，退货单列表/新建/编辑/审核
+- **TPC20 需求-订单关联表** + **v_requisition_execution 视图**实时计算执行状态
+
+### 变更
+- `tpc14_pcbill`：custcd→suppliercd 重命名，新增 pay_type/invoice/audit 字段，删除 refbillid/pcamt
+- `tpc16_rpcbill`：custcd→suppliercd 重命名，新增 return_reason
+- `tpc17_rpcbilldt`：新增 return_price/return_amt/line_reason
+- 结算/退货单号由随机 ID 改为 IdMaster 取号（SB/RT 前缀）
+- `tpc13_registerdt` 新增 UNIQUE(rgstbillid, lineno) 约束
+
+### 修复
+- 采购需求执行状态视图：ordered_qty < audit_qty 时正确归为"执行中"
+- 历史测试路由更新 + SQLite 视图兼容
+
+---
+
 ## [v0.9.0] — 2026-05-13 — P0 资产台账重构 + 数据质量治理
 
 ### 新增

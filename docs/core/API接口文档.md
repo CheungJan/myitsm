@@ -2,7 +2,7 @@
 
 **版本**: v1.2  
 **基础路径**: `/api/v1`  
-**更新日期**: 2026-05-08（新增资产盘点+POS变更端点）
+**更新日期**: 2026-05-27（采购结算/退货14端点+路由重命名）
 
 ---
 
@@ -336,31 +336,52 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 
 路由前缀：`/api/v1/procurement`
 
-#### 采购计划
+#### 采购需求
 
 | 方法 | 路径 | 说明 | 查询参数 |
 |------|------|------|---------|
-| GET | `/plans` | 采购计划列表 | `auditflg`, `pctyp`, `page`, `per_page` |
-| GET | `/plans/<pcplanid>` | 采购计划详情 | - |
-| POST | `/plans` | 创建采购计划（含明细） | Body + `details[]` |
-| POST | `/plans/<pcplanid>/audit` | 审核采购计划 | - |
+| GET | `/requisitions` | 需求列表 | `auditflg`, `pctyp`, `execution_status`, `page`, `per_page`, `exclude_completed`, `hide_unavailable` |
+| GET | `/requisitions/<pcplanid>` | 需求详情（含执行跟踪） | - |
+| POST | `/requisitions` | 创建需求（含明细） | Body + `details[]` |
+| PUT | `/requisitions/<pcplanid>` | 编辑需求 | Body |
+| POST | `/requisitions/<pcplanid>/audit` | 审核需求 | Body: `auditflg`, `checkmemo`, `details[]` |
+| POST | `/requisitions/<pcplanid>/void` | 作废需求 | Body: `reason` |
 
-#### 采购登记
-
-| 方法 | 路径 | 说明 | 查询参数 |
-|------|------|------|---------|
-| GET | `/registers` | 采购登记列表 | `suppliercd`, `auditflg`, `page`, `per_page` |
-| GET | `/registers/<rgstbillid>` | 采购登记详情 | - |
-| POST | `/registers` | 创建采购登记（含明细） | Body + `details[]` |
-| POST | `/registers/<rgstbillid>/audit` | 审核采购登记 | - |
-
-#### 采购单据
+#### 采购订单
 
 | 方法 | 路径 | 说明 | 查询参数 |
 |------|------|------|---------|
-| GET | `/bills` | 采购单据列表 | `whcd`, `page`, `per_page` |
-| GET | `/bills/<pcbillid>` | 采购单据详情 | - |
-| POST | `/bills` | 创建采购单据 | Body: `PurchaseBillCreate` |
+| GET | `/orders` | 订单列表 | `suppliercd`, `auditflg`, `execution_status`, `page`, `per_page` |
+| GET | `/orders/<rgstbillid>` | 订单详情 | - |
+| POST | `/orders` | 创建订单（含明细） | Body + `details[]` |
+| POST | `/orders/batch` | 批量创建订单 | Body: `orders[]` |
+| POST | `/orders/batch/validate` | 批量预校验 | Body: `orders[]` |
+| POST | `/orders/<rgstbillid>/audit` | 审核订单 | - |
+| GET | `/available-items` | 可采购商品查询 | `suppliercd` |
+
+#### 采购结算单
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/settlements` | 结算单列表 | `suppliercd`, `auditflg`, `pay_type`, `page`, `per_page` |
+| GET | `/settlements/<pcbillid>` | 结算单详情（含明细） | - |
+| POST | `/settlements` | 创建结算单（含明细） | Body: `PurchaseBillCreate` |
+| PUT | `/settlements/<pcbillid>` | 编辑结算单 | Body: `PurchaseBillUpdate` |
+| POST | `/settlements/<pcbillid>/audit` | 审核结算单 | Body: `auditflg` |
+| POST | `/settlements/<pcbillid>/void` | 作废结算单 | - |
+| GET | `/orders/<rgstbillid>/settleable-items` | 查询订单可结算行 | - |
+
+#### 采购退货
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/returns` | 退货列表 | `suppliercd`, `auditflg`, `page`, `per_page` |
+| GET | `/returns/<pcbillid>` | 退货详情（含明细） | - |
+| POST | `/returns` | 创建退货单（含明细） | Body: `ReturnPurchaseBillCreate` |
+| PUT | `/returns/<pcbillid>` | 编辑退货单 | Body: `ReturnPurchaseBillUpdate` |
+| POST | `/returns/<pcbillid>/audit` | 审核退货单 | Body: `auditflg` |
+| POST | `/returns/<pcbillid>/void` | 作废退货单 | - |
+| GET | `/orders/<rgstbillid>/returnable-items` | 查询订单可退货行 | - |
 
 #### 供应商评价
 
@@ -369,15 +390,6 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | GET | `/supplier-appraisals` | 供应商评价列表 | `auditflg`, `page`, `per_page` |
 | GET | `/supplier-appraisals/<appid>` | 供应商评价详情 | - |
 | POST | `/supplier-appraisals` | 创建供应商评价（含明细） | Body + `details[]` |
-
-#### 质检管理
-
-路由前缀：`/api/v1/qc`
-
-| 方法 | 路径 | 说明 | 查询参数 |
-|------|------|------|---------|
-| GET | `/qc` | 质检结果列表（分页） | `page`,`per_page`,`search` |
-| GET | `/qc/<qcbillid>` | 质检详情（含按产品明细+按EID明细） | - |
 
 ---
 
@@ -759,7 +771,7 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | system | /api/v1 | 57 | 阶段1 |
 | itsm | /api/v1/itsm | 36 | 阶段2 |
 | warehouse | /api/v1/warehouse | 23 | 阶段3+7（资产盘点6+POS变更4） |
-| procurement | /api/v1/procurement | 13 | 阶段3 |
+| procurement | /api/v1/procurement | 43 | 阶段3+结算/退货14端点 |
 | sales | /api/v1/sales | 11 | 阶段3 |
 | sla | /api/v1/sla | 8 | 阶段3 |
 | attendance | /api/v1/attendance | 3 | 阶段4 |
