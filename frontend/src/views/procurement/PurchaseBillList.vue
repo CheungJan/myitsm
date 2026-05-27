@@ -318,12 +318,12 @@
           <el-table-column prop="ref_rgstbillid" label="来源订单" width="90"/>
           <el-table-column prop="itemcd" label="物料" width="80"/>
           <el-table-column label="结算数量" width="130">
-            <template #default="{ row, $index }">
+            <template #default="{ $index }">
               <el-input-number v-model="editDetails[$index].settle_qty" :min="1" size="small" style="width:110px" controls-position="right"/>
             </template>
           </el-table-column>
           <el-table-column label="结算单价" width="130">
-            <template #default="{ row, $index }">
+            <template #default="{ $index }">
               <el-input-number v-model="editDetails[$index].settle_price" :min="0" :precision="2" size="small" style="width:110px" controls-position="right"/>
             </template>
           </el-table-column>
@@ -451,7 +451,7 @@
                 </template>
               </el-table-column>
               <el-table-column label="结算单价" width="120">
-                <template #default="{ row, $index }">
+                <template #default="{ $index }">
                   <el-input-number
                     :model-value="createDetails[$index]?.settle_price"
                     @update:model-value="
@@ -505,16 +505,11 @@ import {
     fetchOrders,
 } from '@/api/procurement'
 import type { SettlementRecord, SettlementDetail } from '@/api/procurement'
-import { fetchSuppliers } from '@/api/master'
+import { useDict } from '@/composables/useDict'
+import { fetchSuppliersSimple } from '@/api/master'
 
 // ---- 字典映射 ----
-const payTypeMap: Record<string, string> = {
-    COD: '货到付款',
-    PIA: '款到发货',
-    DEP: '预付+尾款',
-    MON: '月结',
-    INS: '分期付款',
-}
+const { dictMap: payTypeMap } = useDict('PYMT')
 const auditMap: Record<string, string> = {
     '0': '未审核',
     '1': '待审核',
@@ -534,7 +529,7 @@ const supplierNameMap = ref<Record<string, string>>({})
 
 onMounted(async () => {
     try {
-        const r = await fetchSuppliers()
+        const r = await fetchSuppliersSimple()
         const list = (r.data as { supp_cd: string; supp_nm: string }[]) || []
         supplierOptions.value = list
         for (const s of list) {
@@ -734,6 +729,7 @@ interface SettleableLine {
     received_qty: number
     already_settled: number
     remain_qty: number
+    unit_price: number
     [key: string]: unknown
 }
 
@@ -831,6 +827,7 @@ watch(
                                     (Number(line.received_qty) || 0) -
                                         (Number(line.already_settled) || 0)
                                 ),
+                            unit_price: Number(line.rgstprice) || 0,
                         })
                     }
                 } catch {
@@ -838,14 +835,14 @@ watch(
                 }
             }
             settleableItems.value = allLines
-            // 初始化 createDetails
+            // 初始化 createDetails，结算单价默认来自订单单价
             for (let i = 0; i < allLines.length; i++) {
                 createDetails.push({
                     ref_rgstbillid: allLines[i].ref_rgstbillid,
                     ref_rgstlineno: allLines[i].ref_rgstlineno,
                     itemcd: allLines[i].itemcd,
                     settle_qty: 0,
-                    settle_price: 0,
+                    settle_price: allLines[i].unit_price,
                 })
             }
         } catch (e: any) {

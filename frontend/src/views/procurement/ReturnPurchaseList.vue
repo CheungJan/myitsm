@@ -523,15 +523,11 @@ import {
     fetchReturnableItems,
     fetchOrders,
 } from '@/api/procurement'
+import { useDict } from '@/composables/useDict'
 import type { ReturnPurchaseRecord, ReturnPurchaseDetail } from '@/api/procurement'
 
 // ---- 字典映射 ----
-const reasonMap: Record<string, string> = {
-    quality: '质量问题',
-    quantity: '数量不符',
-    spec: '规格错误',
-    other: '其他',
-}
+const { dictMap: reasonMap } = useDict('RT')
 const auditMap: Record<string, string> = {
     '0': '未审核',
     '1': '待审核',
