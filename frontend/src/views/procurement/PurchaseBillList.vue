@@ -225,6 +225,12 @@
           <el-table-column prop="settle_price" label="结算单价" width="90" align="right" />
           <el-table-column prop="settle_amt" label="结算金额" width="100" align="right" />
         </el-table>
+        <div style="margin-top:8px;padding:8px;background:#f5f5f5;border-radius:4px;display:flex;gap:16px;font-size:13px">
+          <span>订单金额: <strong>¥{{ calcDetailOrderAmt() }}</strong></span>
+          <span>已结算: <strong>¥{{ calcDetailSettled() }}</strong></span>
+          <span>本次结算: <strong>¥{{ calcDetailCurrent() }}</strong></span>
+          <span>剩余: <strong>¥{{ calcDetailRemaining() }}</strong></span>
+        </div>
       </template>
     </el-dialog>
 
@@ -345,6 +351,12 @@
             <template #default="{ $index }">{{ ((editDetails[$index].settle_qty||0) * (editDetails[$index].settle_price||0)).toFixed(2) }}</template>
           </el-table-column>
         </el-table>
+        <div style="margin-top:8px;padding:8px;background:#f5f5f5;border-radius:4px;display:flex;gap:16px;font-size:13px">
+          <span>订单金额: <strong>¥{{ calcEditOrderAmt() }}</strong></span>
+          <span>已结算: <strong>¥{{ calcEditSettled() }}</strong></span>
+          <span>本次结算: <strong>¥{{ calcEditCurrent() }}</strong></span>
+          <span>剩余: <strong>¥{{ calcEditRemaining() }}</strong></span>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="editing=false">取消</el-button>
@@ -508,6 +520,12 @@
                 </template>
               </el-table-column>
             </el-table>
+            <div v-if="selectedSettleableRows.length > 0" style="margin-top:8px;padding:8px;background:#f5f5f5;border-radius:4px;display:flex;gap:16px;font-size:13px">
+              <span>订单金额: <strong>¥{{ calcCreateOrderAmt() }}</strong></span>
+              <span>已结算: <strong>¥{{ calcCreateSettled() }}</strong></span>
+              <span>本次结算: <strong>¥{{ calcCreateCurrent() }}</strong></span>
+              <span>剩余: <strong>¥{{ calcCreateRemaining() }}</strong></span>
+            </div>
           </div>
         </el-form-item>
       </el-form>
@@ -537,8 +555,9 @@ import {
     voidSettlement,
     fetchSettleableItems,
     fetchOrders,
+    fetchSettlementPayable,
 } from '@/api/procurement'
-import type { SettlementRecord, SettlementDetail } from '@/api/procurement'
+import type { SettlementRecord, SettlementDetail, PayableRecord } from '@/api/procurement'
 import { useDict } from '@/composables/useDict'
 import { fetchSuppliersSimple, fetchWarehouses } from '@/api/master'
 
@@ -551,6 +570,7 @@ const { userName } = useUserNames()
 const { items, loading, page, perPage, total, load, onSearch } =
     useListPage<SettlementRecord>(fetchSettlements)
 const { drawer, detail } = useDetailDrawer<SettlementRecord>()
+const payableInfo = ref<PayableRecord | null>(null)
 
 // ---- 供应商/仓库选项 ----
 const supplierOptions = ref<{ supp_cd: string; supp_nm: string }[]>([])
@@ -817,6 +837,11 @@ const selectedSettleableRows = ref<SettleableLine[]>([])
 
 function onSettleableSelectionChange(rows: SettleableLine[]) {
     selectedSettleableRows.value = rows
+    const whSet = new Set<string>()
+    for (const row of rows) {
+        if (row.receiving_whcd) whSet.add(row.receiving_whcd)
+    }
+    createForm.whcd = [...whSet]
 }
 
 function onSettleQtyChange(index: number, qty: number) {
@@ -904,23 +929,18 @@ watch(
                     /* skip orders that fail */
                 }
             }
-            settleableItems.value = allLines.filter(l => l.remain_qty > 0)
-            // 自动关联入库仓库
-            const whSet = new Set<string>()
-            for (const l of allLines) {
-                if (l.receiving_whcd) whSet.add(l.receiving_whcd)
-            }
-            if (whSet.size >= 1) {
-                createForm.whcd = [...whSet] // 自动全选所有关联仓库
-            }
+            const validLines = allLines.filter(l => l.remain_qty > 0)
+            settleableItems.value = validLines
+            createForm.whcd = []
+            selectedSettleableRows.value = []
             // 初始化 createDetails，结算数量默认=可结算数量，单价默认来自订单单价
-            for (let i = 0; i < allLines.length; i++) {
+            for (let i = 0; i < validLines.length; i++) {
                 createDetails.push({
-                    ref_rgstbillid: allLines[i].ref_rgstbillid,
-                    ref_rgstlineno: allLines[i].ref_rgstlineno,
-                    itemcd: allLines[i].itemcd,
-                    settle_qty: allLines[i].remain_qty,
-                    settle_price: allLines[i].unit_price,
+                    ref_rgstbillid: validLines[i].ref_rgstbillid,
+                    ref_rgstlineno: validLines[i].ref_rgstlineno,
+                    itemcd: validLines[i].itemcd,
+                    settle_qty: validLines[i].remain_qty,
+                    settle_price: validLines[i].unit_price,
                 })
             }
         } catch (e: any) {
@@ -1037,6 +1057,92 @@ async function handleCreate() {
     } finally {
         saving.value = false
     }
+}
+
+// ---- 创建：金额汇总 ----
+function calcCreateOrderAmt(): string {
+    const amt = selectedSettleableRows.value.reduce((s, r) => s + (r.order_qty || 0) * (r.unit_price || 0), 0)
+    return amt.toFixed(2)
+}
+function calcCreateSettled(): string {
+    const amt = selectedSettleableRows.value.reduce((s, r) => s + (r.already_settled || 0) * (r.unit_price || 0), 0)
+    return amt.toFixed(2)
+}
+function calcCreateCurrent(): string {
+    const amt = selectedSettleableRows.value.reduce((s, row) => {
+        const idx = settleableItems.value.findIndex(
+            i => i.ref_rgstbillid === row.ref_rgstbillid && i.ref_rgstlineno === row.ref_rgstlineno && i.itemcd === row.itemcd
+        )
+        if (idx < 0 || !createDetails[idx]) return s
+        return s + (createDetails[idx].settle_qty || 0) * (createDetails[idx].settle_price || 0)
+    }, 0)
+    return amt.toFixed(2)
+}
+function calcCreateRemaining(): string {
+    const orderAmt = selectedSettleableRows.value.reduce((s, r) => s + (r.order_qty || 0) * (r.unit_price || 0), 0)
+    const settled = selectedSettleableRows.value.reduce((s, r) => s + (r.already_settled || 0) * (r.unit_price || 0), 0)
+    const current = selectedSettleableRows.value.reduce((s, row) => {
+        const idx = settleableItems.value.findIndex(
+            i => i.ref_rgstbillid === row.ref_rgstbillid && i.ref_rgstlineno === row.ref_rgstlineno && i.itemcd === row.itemcd
+        )
+        if (idx < 0 || !createDetails[idx]) return s
+        return s + (createDetails[idx].settle_qty || 0) * (createDetails[idx].settle_price || 0)
+    }, 0)
+    return Math.max(0, orderAmt - settled - current).toFixed(2)
+}
+
+// ---- 编辑：金额汇总 ----
+function calcEditOrderAmt(): string {
+    if (!editDetail.value?.details) return '0.00'
+    const details = editDetail.value.details as SettlementDetail[]
+    const amt = details.reduce((s, d) => s + (d.order_qty || 0) * (d.settle_price || 0), 0)
+    return amt.toFixed(2)
+}
+function calcEditSettled(): string {
+    if (!editDetail.value?.details) return '0.00'
+    const details = editDetail.value.details as SettlementDetail[]
+    const amt = details.reduce((s, d) => s + (d.already_settled || 0) * (d.settle_price || 0), 0)
+    return amt.toFixed(2)
+}
+function calcEditCurrent(): string {
+    const amt = editDetails.reduce((s, d) => s + (d.settle_qty || 0) * (d.settle_price || 0), 0)
+    return amt.toFixed(2)
+}
+function calcEditRemaining(): string {
+    if (!editDetail.value?.details) return '0.00'
+    const details = editDetail.value.details as SettlementDetail[]
+    const orderAmt = details.reduce((s, d) => s + (d.order_qty || 0) * (d.settle_price || 0), 0)
+    const settled = details.reduce((s, d) => s + (d.already_settled || 0) * (d.settle_price || 0), 0)
+    const current = editDetails.reduce((s, d) => s + (d.settle_qty || 0) * (d.settle_price || 0), 0)
+    return Math.max(0, orderAmt - settled - current).toFixed(2)
+}
+
+// ---- 详情：金额汇总 ----
+function calcDetailOrderAmt(): string {
+    if (!detail.value?.details) return '0.00'
+    const details = detail.value.details as SettlementDetail[]
+    const amt = details.reduce((s, d) => s + (d.order_qty || 0) * (d.settle_price || 0), 0)
+    return amt.toFixed(2)
+}
+function calcDetailSettled(): string {
+    if (!detail.value?.details) return '0.00'
+    const details = detail.value.details as SettlementDetail[]
+    const amt = details.reduce((s, d) => s + (d.already_settled || 0) * (d.settle_price || 0), 0)
+    return amt.toFixed(2)
+}
+function calcDetailCurrent(): string {
+    if (!detail.value?.details) return '0.00'
+    const details = detail.value.details as SettlementDetail[]
+    const amt = details.reduce((s, d) => s + (d.settle_amt || 0), 0)
+    return amt.toFixed(2)
+}
+function calcDetailRemaining(): string {
+    if (!detail.value?.details) return '0.00'
+    const details = detail.value.details as SettlementDetail[]
+    const orderAmt = details.reduce((s, d) => s + (d.order_qty || 0) * (d.settle_price || 0), 0)
+    const settled = details.reduce((s, d) => s + (d.already_settled || 0) * (d.settle_price || 0), 0)
+    const current = details.reduce((s, d) => s + (d.settle_amt || 0), 0)
+    return Math.max(0, orderAmt - settled - current).toFixed(2)
 }
 
 // ---- 工具函数 ----
