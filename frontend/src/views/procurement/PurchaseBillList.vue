@@ -1133,29 +1133,42 @@ function onSettleableSelectionChange(rows: SettleableLine[]) {
     createForm.whcd = [...whSet]
     // 勾选后检查付款方式冲突
     if (rows.length > 0) {
-        const currentPay = createForm.pay_type
-        const conflicts: string[] = []
-        for (const row of rows) {
-            const prevTypes = ((row as any).prev_pay_types || []) as string[]
-            for (const pt of prevTypes) {
-                if (pt !== currentPay && !conflicts.includes(pt)) {
-                    conflicts.push(pt)
-                }
-            }
-        }
-        if (conflicts.length > 0) {
-            const prevStr = conflicts.map(p => payTypeMap[p] || p).join('、')
-            ElMessage.warning(`所选订单曾使用 [${prevStr}] 结算，当前选择 [${payTypeMap[currentPay] || currentPay}]，请注意付款方式一致性`)
-        }
-        // INS 分期自动填充
-        const insRows = rows.filter(r => (r as any).ins_total > 0)
-        if (insRows.length > 0 && currentPay === 'INS') {
-            const first = insRows[0] as any
-            createForm.total_installments = first.ins_total
-            createForm.installment_no = first.ins_next_no
-        }
+        checkPayTypeConflict()
     }
 }
+
+function checkPayTypeConflict() {
+    const rows = selectedSettleableRows.value
+    if (rows.length === 0) return
+    const currentPay = createForm.pay_type
+    const conflicts: string[] = []
+    for (const row of rows) {
+        const prevTypes = ((row as any).prev_pay_types || []) as string[]
+        for (const pt of prevTypes) {
+            if (pt !== currentPay && !conflicts.includes(pt)) {
+                conflicts.push(pt)
+            }
+        }
+    }
+    if (conflicts.length > 0) {
+        const prevStr = conflicts.map((p: string) => payTypeMap.value[p] || p).join('、')
+        ElMessage.warning(`所选订单曾使用 [${prevStr}] 结算，当前选择 [${payTypeMap.value[currentPay] || currentPay}]，请注意付款方式一致性`)
+    }
+    // INS 分期自动填充
+    const insRows = rows.filter(r => (r as any).ins_total > 0)
+    if (insRows.length > 0 && currentPay === 'INS') {
+        const first = insRows[0] as any
+        createForm.total_installments = first.ins_total
+        createForm.installment_no = first.ins_next_no
+    }
+}
+
+// 切换付款方式时重新检测冲突
+watch(() => createForm.pay_type, () => {
+    if (selectedSettleableRows.value.length > 0) {
+        checkPayTypeConflict()
+    }
+})
 
 function onSettleQtyChange(index: number, qty: number) {
     const row = settleableItems.value[index]
