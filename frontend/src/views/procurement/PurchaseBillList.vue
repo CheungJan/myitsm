@@ -899,7 +899,7 @@ watch(
                     /* skip orders that fail */
                 }
             }
-            settleableItems.value = allLines
+            settleableItems.value = allLines.filter(l => l.remain_qty > 0)
             // 自动关联入库仓库
             const whSet = new Set<string>()
             for (const l of allLines) {
