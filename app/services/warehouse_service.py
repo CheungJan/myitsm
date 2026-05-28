@@ -330,6 +330,37 @@ class StockBalanceService:
             "per_page": per_page,
         }
 
+    @staticmethod
+    def list_movements(
+        whcd: str | None = None,
+        itemcd: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        billid: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> dict[str, Any]:
+        """查询 TWH12 库存流水。"""
+        from app.models.warehouse import StockDetailDt
+
+        query = db.session.query(StockDetailDt).filter(StockDetailDt.useflg == "1")
+        if whcd:
+            query = query.filter(StockDetailDt.whcd == whcd)
+        if itemcd:
+            query = query.filter(StockDetailDt.itemcd == itemcd)
+        if start_date:
+            query = query.filter(StockDetailDt.gendate >= start_date)
+        if end_date:
+            query = query.filter(StockDetailDt.gendate <= end_date + " 23:59:59")
+        if billid:
+            query = query.filter(StockDetailDt.billid.ilike(f"%{billid}%"))
+        total = query.count()
+        items = query.order_by(StockDetailDt.gendate.desc()).offset((page - 1) * per_page).limit(per_page).all()
+        data = [item.to_dict() for item in items]
+        _enrich_warehouse_names(data)
+        _enrich_item_names(data)
+        return {"items": data, "total": total, "page": page, "per_page": per_page}
+
 
 # ---------------------------------------------------------------------------
 # 资产盘点

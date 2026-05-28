@@ -126,9 +126,12 @@ def create_stock_in():  # type: ignore[no-untyped-def]
 @warehouse_bp.post("/stock-in/<inbillid>/audit")
 @login_required
 def audit_stock_in(inbillid: str):  # type: ignore[no-untyped-def]
-    """审核入库单（审核后更新库存）。"""
+    """审核入库单（审核后更新库存）。支持传入 whcd 覆盖入库仓库。"""
+    json_data = request.get_json(silent=True) or {}
+    whcd: str = json_data.get("whcd", "")
+    checkmemo: str = json_data.get("checkmemo", "")
     user_cd: str = g.current_user
-    result = StockInService.audit(inbillid, user_cd)
+    result = StockInService.audit(inbillid, user_cd, whcd=whcd, checkmemo=checkmemo)
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
     return success_response(data=result)
@@ -185,8 +188,9 @@ def audit_stock_out(outbillid: str):  # type: ignore[no-untyped-def]
     """审核出库单。审核通过扣库存，退回不扣。"""
     json_data = request.get_json(silent=True) or {}
     auditflg = json_data.get("auditflg", "2")
+    checkmemo: str = json_data.get("checkmemo", "")
     user_cd: str = g.current_user
-    result = StockOutService.audit(outbillid, user_cd, auditflg)
+    result = StockOutService.audit(outbillid, user_cd, auditflg, checkmemo=checkmemo)
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
     return success_response(data=result)
@@ -206,6 +210,24 @@ def list_stock():  # type: ignore[no-untyped-def]
         data = StockBalanceService.list_stock(
             whcd=params.whcd, page=params.page, per_page=params.per_page
         )
+    return success_response(data=data)
+
+
+@warehouse_bp.get("/stock-movement")
+@login_required
+def list_stock_movements():  # type: ignore[no-untyped-def]
+    """库存流水查询。"""
+    whcd = request.args.get("whcd")
+    itemcd = request.args.get("itemcd")
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    billid = request.args.get("billid")
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    data = StockBalanceService.list_movements(
+        whcd=whcd, itemcd=itemcd, start_date=start_date,
+        end_date=end_date, billid=billid, page=page, per_page=per_page,
+    )
     return success_response(data=data)
 
 

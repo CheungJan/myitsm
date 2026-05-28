@@ -45,6 +45,11 @@ export interface StockItem { itemcd: string; item_nm: string; whcd: string; stor
 export interface StockPage { items: StockItem[]; total: number }
 export function fetchStock(params?: Record<string,string>) { return request.get<never,{data:StockPage}>('/warehouse/stock',{params}) }
 
+// ---- 库存流水 ----
+export interface StockMovement { seqno: number; whcd: string; whnm?: string; itemcd: string; item_nm?: string; gendate: string; billid: string; itemqty: number; iotyp: string; invtyp: string; storeqty: number; [key:string]: unknown }
+export interface StockMovementPage { items: StockMovement[]; total: number }
+export function fetchStockMovements(params?: Record<string,string>) { return request.get<never,{data:StockMovementPage}>('/warehouse/stock-movement',{params}) }
+
 // ---- 盘盈盘亏 ----
 export interface OverLostRecord { olbillid: string; whcd: string; whnm?: string; oltyp?: string; olsign?: string; olreason?: string; memo?: string; auditflg?: string; gendate?: string; opercd?: string; details?: Record<string,unknown>[]; details_eid?: Record<string,unknown>[]; [key:string]: unknown }
 export interface OverLostPage { items: OverLostRecord[]; total: number }

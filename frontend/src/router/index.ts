@@ -100,13 +100,16 @@ const router = createRouter({
                     path: 'warehouse/stock-balance', name: 'StockBalance', component: () => import('@/views/warehouse/StockBalance.vue'), meta: { title: '库存查询' }
                 },
                 {
+                    path: 'warehouse/stock-movement', name: 'StockMovement', component: () => import('@/views/warehouse/StockMovement.vue'), meta: { title: '库存流水' }
+                },
+                {
                     path: 'warehouse/stock-out',
                     name: 'StockOutList',
                     component: () => import('@/views/warehouse/StockOutList.vue'),
                     meta: { title: '出库单管理' }
                 },
                 {
-                    path: 'procurement/dashboard', name: 'RequisitionDashboard', component: () => import('@/views/procurement/RequisitionDashboard.vue'), meta: { title: '执行看板' }
+                    path: 'procurement/dashboard', name: 'RequisitionDashboard', component: () => import('@/views/procurement/RequisitionDashboard.vue'), meta: { title: '采购看板' }
                 },
                 {
                     path: 'procurement/suppliers', name: 'SupplierList', component: () => import('@/views/procurement/SupplierList.vue'), meta: { title: '供应商管理' }
