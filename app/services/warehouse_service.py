@@ -183,8 +183,17 @@ class StockInService:
                         synchronize_session=False,
                     )
             # P1: 更新 TPC20 linkstatus (ordered → partial_in/completed)
-            dt_list = record.details.all()  # type: ignore[attr-defined]
-            all_full = all(dt.inqty and dt.inqty >= dt.rgsqty for dt in dt_list)
+            # 检查订单行是否全部入库完毕（TWH14.inqty vs TPC13.rgsqty）
+            order_lines = db.session.query(
+                PurchaseRegisterDt.lineno, PurchaseRegisterDt.rgsqty
+            ).filter(
+                PurchaseRegisterDt.rgstbillid == record.refbillid
+            ).all()
+            inqty_map = {d.reflineno: d.inqty or 0 for d in record.details}  # type: ignore[attr-defined]
+            all_full = all(
+                inqty_map.get(ol.lineno, 0) >= (ol.rgsqty or 0)
+                for ol in order_lines
+            )
             db.session.query(RequisitionOrderLink).filter(
                 RequisitionOrderLink.rgstbillid == record.refbillid
             ).update(
@@ -294,11 +303,12 @@ class StockOutService:
                     billid=record.outbillid, invtyp=record.invtyp or "",
                     iotyp="0", operator=auditor,
                 )
-            # P1-3: 退货出库审核通过 → 更新退货单状态为已完成
+            # P1-3: 退货出库审核通过 → 更新退货单状态
             if record.invtyp == "6" and record.refbillid:
                 from app.models.procurement import ReturnPurchaseBill
                 db.session.query(ReturnPurchaseBill).filter(
-                    ReturnPurchaseBill.pcbillid == record.refbillid
+                    ReturnPurchaseBill.pcbillid == record.refbillid,
+                    ReturnPurchaseBill.auditflg != "2",
                 ).update(
                     {"auditflg": "2"},
                     synchronize_session=False,
