@@ -206,8 +206,8 @@ class StockOutRepository:
         return record
 
     @staticmethod
-    def audit(record: StockOut, auditor: str) -> StockOut:
-        record.auditflg = "2"  # 对齐 PB: 0=未审, 1=在审, 2=已审
+    def audit(record: StockOut, auditor: str, auditflg: str = "2") -> StockOut:
+        record.auditflg = auditflg
         record.auditman = auditor
         record.auditdate = datetime.now(UTC)
         return record

@@ -182,9 +182,11 @@ def create_stock_out():  # type: ignore[no-untyped-def]
 @warehouse_bp.post("/stock-out/<outbillid>/audit")
 @login_required
 def audit_stock_out(outbillid: str):  # type: ignore[no-untyped-def]
-    """审核出库单（审核后扣减库存）。"""
+    """审核出库单。审核通过扣库存，退回不扣。"""
+    json_data = request.get_json(silent=True) or {}
+    auditflg = json_data.get("auditflg", "2")
     user_cd: str = g.current_user
-    result = StockOutService.audit(outbillid, user_cd)
+    result = StockOutService.audit(outbillid, user_cd, auditflg)
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
     return success_response(data=result)

@@ -228,27 +228,29 @@ class StockOutService:
         return record.to_dict()
 
     @staticmethod
-    def audit(outbillid: str, auditor: str) -> dict[str, object]:
+    def audit(outbillid: str, auditor: str, auditflg: str = "2") -> dict[str, object]:
         record = StockOutRepository.get_by_id(outbillid)
         if record is None:
             return {"success": False, "error": "出库单不存在"}
         if record.auditflg == "2":
             return {"success": False, "error": "已审核，不可重复审核"}
-        StockOutRepository.audit(record, auditor)
-        for detail in record.details_eid:  # type: ignore[attr-defined]
-            StockDetailRepository.update_balance(
-                whcd=record.whcd,
-                itemcd=detail.itemcd,
-                qty_delta=-(detail.outqty or 0),
-                operator=auditor,
-            )
-        for detail in record.details_prd:  # type: ignore[attr-defined]
-            StockDetailRepository.update_balance(
-                whcd=record.whcd,
-                itemcd=detail.itemcd,
-                qty_delta=-(detail.outqty or 0),
-                operator=auditor,
-            )
+        StockOutRepository.audit(record, auditor, auditflg)
+        # 仅审核通过时扣库存
+        if auditflg == "2":
+            for detail in record.details_eid:  # type: ignore[attr-defined]
+                StockDetailRepository.update_balance(
+                    whcd=record.whcd,
+                    itemcd=detail.itemcd,
+                    qty_delta=-(detail.outqty or 0),
+                    operator=auditor,
+                )
+            for detail in record.details_prd:  # type: ignore[attr-defined]
+                StockDetailRepository.update_balance(
+                    whcd=record.whcd,
+                    itemcd=detail.itemcd,
+                    qty_delta=-(detail.outqty or 0),
+                    operator=auditor,
+                )
         db.session.commit()
         return {"success": True, "outbillid": record.outbillid}
 

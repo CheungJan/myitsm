@@ -42,12 +42,34 @@
         </el-table-column>
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.auditflg === '0'" link type="primary" size="small" @click.stop="doAudit(row)">审核</el-button>
+            <el-button v-if="row.auditflg === '0'" link type="primary" size="small" @click.stop="openAudit(row)">审核</el-button>
           </template>
         </el-table-column>
       </el-table>
       <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:12px;justify-content:flex-end" />
     </el-card>
+
+    <!-- 审核弹窗 -->
+    <el-dialog title="审核出库单" v-model="auditing" width="600px" @closed="auditTarget = null">
+      <template v-if="auditTarget">
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="单号">{{ auditTarget.outbillid }}</el-descriptions-item>
+          <el-descriptions-item label="关联单据">{{ auditTarget.refbillid || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="仓库">{{ auditTarget.whnm || auditTarget.whcd }}</el-descriptions-item>
+          <el-descriptions-item label="类型">{{ ovLabel(auditTarget.invtyp) }}</el-descriptions-item>
+        </el-descriptions>
+        <h4 style="margin:12px 0 8px">出库明细</h4>
+        <el-table :data="auditTarget.details || []" size="small" stripe>
+          <el-table-column prop="itemcd" label="物料" width="100"/>
+          <el-table-column prop="item_nm" label="物料名称" min-width="140"/>
+          <el-table-column prop="outqty" label="数量" width="70"/>
+        </el-table>
+      </template>
+      <template #footer>
+        <el-button @click="handleAudit('9')" :loading="auditLoading">退回</el-button>
+        <el-button type="primary" @click="handleAudit('2')" :loading="auditLoading">审核通过</el-button>
+      </template>
+    </el-dialog>
 
     <el-drawer v-model="drawer" title="出库单详情" size="550px">
       <template v-if="detail">
@@ -139,14 +161,30 @@ async function openDrawer(row: StockOutRecord) {
     }
 }
 
-async function doAudit(row: any) {
+const auditing = ref(false)
+const auditTarget = ref<StockOutRecord | null>(null)
+const auditLoading = ref(false)
+
+async function openAudit(row: StockOutRecord) {
+    auditTarget.value = row
+    auditing.value = true
     try {
-        await auditStockOut(row.outbillid)
-        ElMessage.success('审核成功')
+        const r = await fetchStockOutDetail(row.outbillid)
+        auditTarget.value = r.data
+    } catch { /* use row data */ }
+}
+
+async function handleAudit(flg: string) {
+    if (!auditTarget.value) return
+    auditLoading.value = true
+    try {
+        await auditStockOut(auditTarget.value.outbillid, flg)
+        ElMessage.success(flg === '2' ? '审核通过' : '已退回')
+        auditing.value = false
         load()
     } catch (e: any) {
         ElMessage.error(e?.response?.data?.message || '审核失败')
-    }
+    } finally { auditLoading.value = false }
 }
 </script>
 
