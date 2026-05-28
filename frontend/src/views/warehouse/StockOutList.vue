@@ -58,12 +58,14 @@
           <el-descriptions-item label="仓库">{{ auditTarget.whnm || auditTarget.whcd }}</el-descriptions-item>
           <el-descriptions-item label="类型">{{ ovLabel(auditTarget.invtyp) }}</el-descriptions-item>
         </el-descriptions>
-        <h4 style="margin:12px 0 8px">出库明细(产品)</h4>
-        <el-table :data="auditTarget.details_prd || []" size="small" stripe>
-          <el-table-column prop="itemcd" label="物料" width="100"/>
-          <el-table-column prop="item_nm" label="物料名称" min-width="140"/>
-          <el-table-column prop="outqty" label="数量" width="70"/>
-        </el-table>
+        <template v-if="(auditTarget.details_prd||[]).length > 0">
+          <h4 style="margin:12px 0 8px">出库明细</h4>
+          <el-table :data="auditTarget.details_prd || []" size="small" stripe>
+            <el-table-column prop="itemcd" label="物料" width="100"/>
+            <el-table-column prop="item_nm" label="物料名称" min-width="140"/>
+            <el-table-column prop="outqty" label="数量" width="70"/>
+          </el-table>
+        </template>
         <template v-if="(auditTarget.details_eid||[]).length > 0">
           <h4 style="margin:12px 0 8px">出库明细(EID)</h4>
           <el-table :data="auditTarget.details_eid || []" size="small" stripe>
@@ -102,12 +104,14 @@
           </el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ detail.memo || '-' }}</el-descriptions-item>
         </el-descriptions>
-        <h4 style="margin:16px 0 8px">出库明细(产品)</h4>
-        <el-table :data="detail.details_prd || []" size="small" stripe>
-          <el-table-column prop="itemcd" label="物料" width="100" />
-          <el-table-column prop="item_nm" label="物料名称" min-width="140" />
-          <el-table-column prop="outqty" label="数量" width="70" />
-        </el-table>
+        <template v-if="(detail.details_prd||[]).length > 0">
+          <h4 style="margin:16px 0 8px">出库明细</h4>
+          <el-table :data="detail.details_prd || []" size="small" stripe>
+            <el-table-column prop="itemcd" label="物料" width="100" />
+            <el-table-column prop="item_nm" label="物料名称" min-width="140" />
+            <el-table-column prop="outqty" label="数量" width="70" />
+          </el-table>
+        </template>
         <template v-if="(detail.details_eid||[]).length > 0">
           <h4 style="margin:16px 0 8px">出库明细(EID)</h4>
           <el-table :data="detail.details_eid || []" size="small" stripe>
