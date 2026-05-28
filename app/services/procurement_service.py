@@ -1151,27 +1151,42 @@ class ReturnPurchaseService:
         # P0-3: 审核通过后自动生成退货出库草稿
         if auditflg == "2":
             from app.services.warehouse_service import StockOutService
-            try:
-                prd_details = []
-                for dt_line in record.details:  # type: ignore[attr-defined]
-                    prd_details.append({
-                        "itemcd": dt_line.itemcd,
-                        "itemtyp": dt_line.itemtyp or "DJ",
-                        "outqty": dt_line.rpcqty or 0,
-                        "reflineno": dt_line.ref_rgstlineno,
-                    })
-                StockOutService.create(
-                    data={
-                        "invtyp": "6",
-                        "whcd": record.whcd or "",
-                        "refbillid": record.pcbillid,
-                        "suppcd": record.suppliercd or "",
-                    },
-                    details_prd=prd_details,
-                    creator=auditor,
-                )
-            except Exception:
-                logger.exception("生成退货出库草稿失败: pcbillid=%s", pcbillid)
+            if not record.whcd:
+                logger.warning("退货单 %s 无仓库编码，跳过生成出库草稿", pcbillid)
+            else:
+                try:
+                    prd_details = []
+                    eid_details = []
+                    for dt_line in record.details:  # type: ignore[attr-defined]
+                        prd_details.append({
+                            "itemcd": dt_line.itemcd,
+                            "itemtyp": dt_line.itemtyp or "DJ",
+                            "outqty": dt_line.rpcqty or 0,
+                            "reflineno": dt_line.ref_rgstlineno,
+                        })
+                        # 有 EID 的退货行同时生成 EID 明细
+                        if dt_line.eid:
+                            eid_details.append({
+                                "itemcd": dt_line.itemcd,
+                                "itemtyp": dt_line.itemtyp or "DJ",
+                                "eid": dt_line.eid,
+                                "seid": dt_line.seid or "",
+                                "outqty": dt_line.rpcqty or 0,
+                                "reflineno": dt_line.ref_rgstlineno,
+                            })
+                    StockOutService.create(
+                        data={
+                            "invtyp": "6",
+                            "whcd": record.whcd,
+                            "refbillid": record.pcbillid,
+                            "suppcd": record.suppliercd or "",
+                        },
+                        details_eid=eid_details if eid_details else None,
+                        details_prd=prd_details,
+                        creator=auditor,
+                    )
+                except Exception:
+                    logger.exception("生成退货出库草稿失败: pcbillid=%s", pcbillid)
         db.session.commit()
         return {"success": True, "pcbillid": pcbillid}
 
