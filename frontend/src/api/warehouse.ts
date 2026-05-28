@@ -36,6 +36,7 @@ export interface StockOutRecord { outbillid: string; whcd: string; custcd?: stri
 export interface StockOutPage { items: StockOutRecord[]; total: number }
 export function fetchStockOut(params?: Record<string,string>) { return request.get<never,{data:StockOutPage}>('/warehouse/stock-out',{params}) }
 export function fetchStockOutDetail(id:string) { return request.get<never,{data:StockOutRecord}>(`/warehouse/stock-out/${id}`) }
+export function auditStockOut(id:string) { return request.post<never,unknown>(`/warehouse/stock-out/${id}/audit`) }
 
 // ---- 库存 ----
 export interface StockItem { itemcd: string; item_nm: string; whcd: string; storeqty: number; upperlimit?: number; lowerlimit?: number; [key:string]: unknown }
