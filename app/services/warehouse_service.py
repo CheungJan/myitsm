@@ -170,6 +170,12 @@ class StockInService:
                 billid=record.inbillid, invtyp=record.invtyp or "",
                 iotyp="1", operator=auditor,
             )
+            # EID 设备入库 → 同步更新 TMM43_EID.whcd
+            if detail.eid:
+                from app.models.master import Eid
+                db.session.query(Eid).filter(
+                    Eid.itemcd == detail.itemcd, Eid.eid == detail.eid,
+                ).update({"whcd": record.whcd}, synchronize_session=False)
         # P0-1: 采购入库审核后更新 TPC13.inqty
         if record.invtyp == "1" and record.refbillid:
             from app.models.procurement import PurchaseRegisterDt, RequisitionOrderLink
@@ -290,6 +296,12 @@ class StockOutService:
                     billid=record.outbillid, invtyp=record.invtyp or "",
                     iotyp="0", operator=auditor,
                 )
+                # EID 设备出库 → 清空 TMM43_EID.whcd
+                if detail.eid:
+                    from app.models.master import Eid
+                    db.session.query(Eid).filter(
+                        Eid.itemcd == detail.itemcd, Eid.eid == detail.eid,
+                    ).update({"whcd": None}, synchronize_session=False)
             for detail in record.details_prd:  # type: ignore[attr-defined]
                 StockDetailRepository.update_balance(
                     whcd=record.whcd,
@@ -303,6 +315,13 @@ class StockOutService:
                     billid=record.outbillid, invtyp=record.invtyp or "",
                     iotyp="0", operator=auditor,
                 )
+                # EID 设备出库 → 清空 TMM43_EID.whcd
+                eid_val = getattr(detail, 'eid', None)
+                if eid_val:
+                    from app.models.master import Eid
+                    db.session.query(Eid).filter(
+                        Eid.itemcd == detail.itemcd, Eid.eid == eid_val,
+                    ).update({"whcd": None}, synchronize_session=False)
             # P1-3: 退货出库审核通过 → 更新退货单状态
             if record.invtyp == "6" and record.refbillid:
                 from app.models.procurement import ReturnPurchaseBill
