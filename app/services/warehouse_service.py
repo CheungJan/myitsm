@@ -290,6 +290,15 @@ class StockOutService:
                     billid=record.outbillid, invtyp=record.invtyp or "",
                     iotyp="0", operator=auditor,
                 )
+            # P1-3: 退货出库审核通过 → 更新退货单状态为已完成
+            if record.invtyp == "6" and record.refbillid:
+                from app.models.procurement import ReturnPurchaseBill
+                db.session.query(ReturnPurchaseBill).filter(
+                    ReturnPurchaseBill.pcbillid == record.refbillid
+                ).update(
+                    {"auditflg": "2"},
+                    synchronize_session=False,
+                )
         db.session.commit()
         return {"success": True, "outbillid": record.outbillid}
 
