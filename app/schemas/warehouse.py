@@ -65,6 +65,7 @@ class StockOutDetailCreate(BaseModel):
     itemtyp: str | None = Field(None, max_length=2, description="物料类型")
     outqty: int = Field(..., ge=1, description="出库数量")
     eid: str | None = Field(None, max_length=13, description="设备EID")
+    reflineno: int | None = Field(None, description="关联行号")
 
 
 class WarehouseQuery(BaseModel):
