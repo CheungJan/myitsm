@@ -28,10 +28,10 @@
         <el-table-column label="出库类型" width="80">
           <template #default="{ row }">{{ ovLabel(row.invtyp) }}</template>
         </el-table-column>
-        <el-table-column label="出库日期" width="100">
+        <el-table-column label="出库日期" width="140">
           <template #default="{ row }">{{ formatDate(row.outdate || row.gendate) }}</template>
         </el-table-column>
-        <el-table-column prop="memo" label="备注" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="memo" label="备注" min-width="120" show-overflow-tooltip />
         <el-table-column label="操作员" width="80">
           <template #default="{ row }">{{ userName(row.opercd) }}</template>
         </el-table-column>
@@ -58,12 +58,21 @@
           <el-descriptions-item label="仓库">{{ auditTarget.whnm || auditTarget.whcd }}</el-descriptions-item>
           <el-descriptions-item label="类型">{{ ovLabel(auditTarget.invtyp) }}</el-descriptions-item>
         </el-descriptions>
-        <h4 style="margin:12px 0 8px">出库明细</h4>
-        <el-table :data="auditTarget.details || []" size="small" stripe>
+        <h4 style="margin:12px 0 8px">出库明细(产品)</h4>
+        <el-table :data="auditTarget.details_prd || []" size="small" stripe>
           <el-table-column prop="itemcd" label="物料" width="100"/>
           <el-table-column prop="item_nm" label="物料名称" min-width="140"/>
           <el-table-column prop="outqty" label="数量" width="70"/>
         </el-table>
+        <template v-if="(auditTarget.details_eid||[]).length > 0">
+          <h4 style="margin:12px 0 8px">出库明细(EID)</h4>
+          <el-table :data="auditTarget.details_eid || []" size="small" stripe>
+            <el-table-column prop="eid" label="EID" min-width="140"/>
+            <el-table-column prop="itemcd" label="物料" width="100"/>
+            <el-table-column prop="item_nm" label="物料名称" min-width="140"/>
+            <el-table-column prop="outqty" label="数量" width="70"/>
+          </el-table>
+        </template>
         <el-input
           v-model="auditMemo"
           type="textarea"
@@ -93,12 +102,21 @@
           </el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ detail.memo || '-' }}</el-descriptions-item>
         </el-descriptions>
-        <h4 style="margin:16px 0 8px">出库明细</h4>
-        <el-table :data="detail.details || []" size="small" stripe>
+        <h4 style="margin:16px 0 8px">出库明细(产品)</h4>
+        <el-table :data="detail.details_prd || []" size="small" stripe>
           <el-table-column prop="itemcd" label="物料" width="100" />
           <el-table-column prop="item_nm" label="物料名称" min-width="140" />
           <el-table-column prop="outqty" label="数量" width="70" />
         </el-table>
+        <template v-if="(detail.details_eid||[]).length > 0">
+          <h4 style="margin:16px 0 8px">出库明细(EID)</h4>
+          <el-table :data="detail.details_eid || []" size="small" stripe>
+            <el-table-column prop="eid" label="EID" min-width="140" />
+            <el-table-column prop="itemcd" label="物料" width="100" />
+            <el-table-column prop="item_nm" label="物料名称" min-width="140" />
+            <el-table-column prop="outqty" label="数量" width="70" />
+          </el-table>
+        </template>
       </template>
     </el-drawer>
   </div>
@@ -168,9 +186,7 @@ async function openDrawer(row: StockOutRecord) {
     drawer.value = true
     try {
         const r = await fetchStockOutDetail(row.outbillid)
-        const d = r.data as any
-        d.details = [...(d.details_prd || []), ...(d.details_eid || [])]
-        detail.value = d
+        detail.value = r.data as any
     } catch {
         detail.value = row
     }
@@ -186,9 +202,7 @@ async function openAudit(row: StockOutRecord) {
     auditing.value = true
     try {
         const r = await fetchStockOutDetail(row.outbillid)
-        const d = r.data as any
-        d.details = [...(d.details_prd || []), ...(d.details_eid || [])]
-        auditTarget.value = d
+        auditTarget.value = r.data as any
     } catch { /* use row data */ }
 }
 
