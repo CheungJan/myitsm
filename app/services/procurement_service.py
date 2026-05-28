@@ -504,6 +504,29 @@ class PurchaseRegisterService:
                 for dt in record.details:  # type: ignore[attr-defined]
                     PurchaseRegisterRepository.update_audit_qty(
                         rgstbillid, dt.lineno, int(dt.rgsqty or 0))
+            # P1-2: 审核通过后自动生成入库草稿
+            from app.services.warehouse_service import StockInService
+            try:
+                in_details = []
+                for dt_line in record.details:  # type: ignore[attr-defined]
+                    in_details.append({
+                        "itemcd": dt_line.itemcd,
+                        "itemtyp": dt_line.itemtyp or "DJ",
+                        "inqty": int(dt_line.rgsqty or 0),
+                        "reflineno": dt_line.lineno,
+                    })
+                StockInService.create(
+                    data={
+                        "invtyp": "1",
+                        "refbillid": rgstbillid,
+                        "suppcd": record.suppliercd or "",
+                        "whcd": "",
+                    },
+                    details=in_details,
+                    creator=auditor,
+                )
+            except Exception:
+                logger.exception("生成入库草稿失败: rgstbillid=%s", rgstbillid)
         db.session.commit()
         return {"success": True, "rgstbillid": record.rgstbillid}
 

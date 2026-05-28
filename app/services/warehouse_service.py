@@ -123,7 +123,12 @@ class StockInService:
         creator: str,
     ) -> dict[str, Any]:
         record = StockInRepository.create(data, creator)
+        # P1-1: 采购入库时冗余来源订单信息到明细
+        ref_rgstbillid = data.get("refbillid") if data.get("invtyp") == "1" else None
         for idx, detail_data in enumerate(details, start=1):
+            if ref_rgstbillid:
+                detail_data["ref_rgstbillid"] = ref_rgstbillid
+                detail_data["ref_rgstlineno"] = detail_data.get("reflineno")
             StockInRepository.add_detail(
                 inbillid=record.inbillid,
                 whcd=record.whcd,
@@ -234,13 +239,13 @@ class StockOutService:
         return record.to_dict()
 
     @staticmethod
-    def audit(outbillid: str, auditor: str, auditflg: str = "2") -> dict[str, object]:
+    def audit(outbillid: str, auditor: str, auditflg: str = "2", checkmemo: str = "") -> dict[str, object]:
         record = StockOutRepository.get_by_id(outbillid)
         if record is None:
             return {"success": False, "error": "出库单不存在"}
         if record.auditflg == "2":
             return {"success": False, "error": "已审核，不可重复审核"}
-        StockOutRepository.audit(record, auditor, auditflg)
+        StockOutRepository.audit(record, auditor, auditflg, checkmemo=checkmemo)
         # 仅审核通过时扣库存
         if auditflg == "2":
             for detail in record.details_eid:  # type: ignore[attr-defined]

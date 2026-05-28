@@ -142,6 +142,8 @@ class StockInDetail(BaseModel):
     batchid = db.Column(db.String(50), comment="批次号")
     inqty = db.Column(db.Integer, default=0, comment="入库数量")
     reflineno = db.Column(db.Integer, comment="关联行号")
+    ref_rgstbillid = db.Column(db.String(8), comment="来源订单号")
+    ref_rgstlineno = db.Column(db.Integer, comment="来源订单行号")
     s_money = db.Column(db.Numeric(10, 2), comment="金额")
 
     stock_in = db.relationship("StockIn", back_populates="details")
