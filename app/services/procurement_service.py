@@ -513,7 +513,6 @@ class PurchaseRegisterService:
                 for dt_line in record.details:  # type: ignore[attr-defined]
                     in_details.append({
                         "itemcd": dt_line.itemcd,
-                        "itemtyp": dt_line.itemtyp or "DJ",
                         "inqty": int(dt_line.rgsqty or 0),
                         "reflineno": dt_line.lineno,
                     })
