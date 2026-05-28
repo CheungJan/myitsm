@@ -56,6 +56,7 @@ procurement_bp = Blueprint("procurement", __name__)
 def list_requisitions():  # type: ignore[no-untyped-def]
     """采购需求列表。"""
     params = ProcurementQuery.model_validate(request.args.to_dict())
+    show_voided_req = request.args.get("show_voided", "false").lower() == "true"
     data = PurchasePlanService.list_records(
         auditflg=params.auditflg,
         pcplanid=params.pcplanid,
@@ -68,6 +69,7 @@ def list_requisitions():  # type: ignore[no-untyped-def]
         per_page=params.per_page,
         exclude_completed=params.exclude_completed,
         hide_unavailable=params.hide_unavailable,
+        show_voided=show_voided_req,
     )
     return success_response(data=data)
 

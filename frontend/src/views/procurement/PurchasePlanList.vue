@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <div class="page-header"><h2>采购需求</h2><div style="display:flex;gap:8px"><el-button type="warning" size="small" plain @click="quickFilter('1')">待审核</el-button><el-button type="danger" size="small" plain @click="searchOverdue = !searchOverdue; doSearch()" :type="searchOverdue ? 'danger' : ''">{{ searchOverdue ? '取消逾期' : '逾期' }}</el-button><el-button type="primary" size="small" @click="openCreate">新建需求</el-button></div></div>
+    <div class="page-header"><h2>采购需求</h2><div style="display:flex;gap:8px"><el-button type="warning" size="small" plain @click="quickFilter('1')">待审核</el-button><el-button type="danger" size="small" plain @click="searchOverdue = !searchOverdue; doSearch()" :type="searchOverdue ? 'danger' : ''">{{ searchOverdue ? '取消逾期' : '逾期' }}</el-button><el-button size="small" @click="searchShowVoided = !searchShowVoided; doSearch()" :type="searchShowVoided ? 'danger' : ''">{{ searchShowVoided ? '返回正常单据' : '作废单据' }}</el-button><el-button type="primary" size="small" @click="openCreate">新建需求</el-button></div></div>
 
     <el-card shadow="never" style="margin-bottom:16px">
       <div class="search-bar">
@@ -187,9 +187,9 @@ async function doVoid(){
 }
 
 // 筛选条件
-const searchPcplanid=ref('');const searchPctyp=ref('');const searchAuditflg=ref('');const searchStartDate=ref('');const searchEndDate=ref('');const searchExecStatus=ref('');const searchOverdue=ref(false)
-function doSearch(){const p:Record<string,string>={};if(searchPcplanid.value)p.pcplanid=searchPcplanid.value;if(searchPctyp.value)p.pctyp=searchPctyp.value;if(searchAuditflg.value)p.auditflg=searchAuditflg.value;if(searchStartDate.value)p.start_date=searchStartDate.value;if(searchEndDate.value)p.end_date=searchEndDate.value;if(searchExecStatus.value)p.execution_status=searchExecStatus.value;if(searchOverdue.value)p.overdue_only='true';onSearch(p)}
-function doReset(){searchPcplanid.value='';searchPctyp.value='';searchAuditflg.value='';searchStartDate.value='';searchEndDate.value='';searchExecStatus.value='';searchOverdue.value=false;onSearch({})}
+const searchPcplanid=ref('');const searchPctyp=ref('');const searchAuditflg=ref('');const searchStartDate=ref('');const searchEndDate=ref('');const searchExecStatus=ref('');const searchOverdue=ref(false);const searchShowVoided=ref(false)
+function doSearch(){const p:Record<string,string>={};if(searchPcplanid.value)p.pcplanid=searchPcplanid.value;if(searchPctyp.value)p.pctyp=searchPctyp.value;if(searchAuditflg.value)p.auditflg=searchAuditflg.value;if(searchStartDate.value)p.start_date=searchStartDate.value;if(searchEndDate.value)p.end_date=searchEndDate.value;if(searchExecStatus.value)p.execution_status=searchExecStatus.value;if(searchOverdue.value)p.overdue_only='true';if(searchShowVoided.value)p.show_voided='true';onSearch(p)}
+function doReset(){searchPcplanid.value='';searchPctyp.value='';searchAuditflg.value='';searchStartDate.value='';searchEndDate.value='';searchExecStatus.value='';searchOverdue.value=false;searchShowVoided.value=false;onSearch({})}
 function quickFilter(flg:string){searchAuditflg.value=flg;doSearch()}
 
 // 详情

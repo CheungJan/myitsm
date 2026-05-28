@@ -82,8 +82,13 @@ class PurchasePlanRepository:
         hide_unavailable: bool = False,
         page: int = 1,
         per_page: int = 20,
+        show_voided: bool = False,
     ) -> tuple[list[PurchasePlan], int]:
-        query = db.session.query(PurchasePlan).filter(PurchasePlan.useflg != "9")
+        query = db.session.query(PurchasePlan)
+        if show_voided:
+            query = query.filter(PurchasePlan.useflg == "9")
+        else:
+            query = query.filter(PurchasePlan.useflg != "9")
         if auditflg:
             query = query.filter(PurchasePlan.auditflg == auditflg)
         if pcplanid:

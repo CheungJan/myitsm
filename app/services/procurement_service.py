@@ -87,10 +87,12 @@ class PurchasePlanService:
         page: int = 1,
         per_page: int = 20,
         exclude_completed: bool = False,
+        show_voided: bool = False,
     ) -> dict[str, Any]:
         items, total = PurchasePlanRepository.list_by_filters(
             auditflg=auditflg, pcplanid=pcplanid, pctyp=pctyp, start_date=start_date, end_date=end_date,
-            execution_status=execution_status, overdue_only=overdue_only, hide_unavailable=hide_unavailable, page=page, per_page=per_page
+            execution_status=execution_status, overdue_only=overdue_only, hide_unavailable=hide_unavailable, page=page, per_page=per_page,
+            show_voided=show_voided,
         )
         result_items = []
         for item in items:
