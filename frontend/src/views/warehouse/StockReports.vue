@@ -26,15 +26,10 @@
                         </el-table-column>
                         <el-table-column prop="itemcd" label="物料编码" width="100" />
                         <el-table-column prop="item_nm" label="物料名称" min-width="140" show-overflow-tooltip />
+                        <el-table-column prop="begin_qty" label="期初库存" width="100" align="right" />
                         <el-table-column prop="in_qty" label="本期入库" width="100" align="right" />
                         <el-table-column prop="out_qty" label="本期出库" width="100" align="right" />
-                        <el-table-column label="净变动" width="100" align="right">
-                            <template #default="{ row }">
-                                <span :style="{ color: row.net_qty >= 0 ? '#67c23a' : '#f56c6c' }">
-                                    {{ row.net_qty }}
-                                </span>
-                            </template>
-                        </el-table-column>
+                        <el-table-column prop="end_qty" label="期末库存" width="100" align="right" />
                     </el-table>
                     <AppPagination v-model:current-page="summaryPage" v-model:page-size="summaryPerPage" :total="summaryTotal"
                         style="margin-top:12px;justify-content:flex-end" />
@@ -66,6 +61,7 @@
                         <el-table-column prop="item_nm" label="物料名称" min-width="140" show-overflow-tooltip />
                         <el-table-column prop="in_qty" label="当日入库" width="100" align="right" />
                         <el-table-column prop="out_qty" label="当日出库" width="100" align="right" />
+                        <el-table-column prop="snapshot_qty" label="当前库存" width="100" align="right" />
                     </el-table>
                     <AppPagination v-model:current-page="dailyPage" v-model:page-size="dailyPerPage" :total="dailyTotal"
                         style="margin-top:12px;justify-content:flex-end" />
