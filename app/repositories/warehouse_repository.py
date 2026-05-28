@@ -9,6 +9,8 @@ from typing import Any
 from sqlalchemy import desc
 
 from app.extensions import db
+from app.repositories.procurement_repository import _gen_master_id
+
 from app.models.warehouse import (
     AssetCheckAccept,
     AssetCheckAcceptDtl,
@@ -98,7 +100,7 @@ class StockInRepository:
     def create(data: dict[str, Any], creator: str) -> StockIn:
         now = datetime.now(UTC)
         record = StockIn(
-            inbillid=_gen_id(),
+            inbillid=_gen_master_id("IN", "入库单号"),
             opercd=creator,
             gendate=now,
             auditflg="0",
@@ -162,7 +164,7 @@ class StockOutRepository:
     def create(data: dict[str, Any], creator: str) -> StockOut:
         now = datetime.now(UTC)
         record = StockOut(
-            outbillid=_gen_id(),
+            outbillid=_gen_master_id("OT", "出库单号"),
             opercd=creator,
             gendate=now,
             auditflg="0",
