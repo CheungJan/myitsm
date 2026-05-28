@@ -1178,18 +1178,19 @@ class ReturnPurchaseService:
                     prd_details = []
                     eid_details = []
                     for dt_line in record.details:  # type: ignore[attr-defined]
-                        prd_details.append({
-                            "itemcd": dt_line.itemcd,
-                            "itemtyp": dt_line.itemtyp or "DJ",
-                            "outqty": dt_line.rpcqty or 0,
-                            "reflineno": dt_line.ref_rgstlineno,
-                        })
-                        # 有 EID 的退货行同时生成 EID 明细
+                        # 有 EID → 只生成 EID 明细；无 EID → 生成 PRD 明细
                         if dt_line.eid:
                             eid_details.append({
                                 "itemcd": dt_line.itemcd,
                                 "itemtyp": dt_line.itemtyp or "DJ",
                                 "eid": dt_line.eid,
+                                "outqty": dt_line.rpcqty or 0,
+                                "reflineno": dt_line.ref_rgstlineno,
+                            })
+                        else:
+                            prd_details.append({
+                                "itemcd": dt_line.itemcd,
+                                "itemtyp": dt_line.itemtyp or "DJ",
                                 "outqty": dt_line.rpcqty or 0,
                                 "reflineno": dt_line.ref_rgstlineno,
                             })
