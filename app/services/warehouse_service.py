@@ -168,7 +168,7 @@ class StockInService:
             )
         # P0-1: 采购入库审核后更新 TPC13.inqty
         if record.invtyp == "1" and record.refbillid:
-            from app.models.procurement import PurchaseRegisterDt
+            from app.models.procurement import PurchaseRegisterDt, RequisitionOrderLink
             for detail in record.details:  # type: ignore[attr-defined]
                 if detail.reflineno:
                     db.session.query(PurchaseRegisterDt).filter(
@@ -178,6 +178,15 @@ class StockInService:
                         {PurchaseRegisterDt.inqty: PurchaseRegisterDt.inqty + (detail.inqty or 0)},
                         synchronize_session=False,
                     )
+            # P1: 更新 TPC20 linkstatus (ordered → partial_in/completed)
+            dt_list = record.details.all()  # type: ignore[attr-defined]
+            all_full = all(dt.inqty and dt.inqty >= dt.rgsqty for dt in dt_list)
+            db.session.query(RequisitionOrderLink).filter(
+                RequisitionOrderLink.rgstbillid == record.refbillid
+            ).update(
+                {"linkstatus": "completed" if all_full else "partial_in"},
+                synchronize_session=False,
+            )
         db.session.commit()
         return {"success": True, "inbillid": record.inbillid}
 
