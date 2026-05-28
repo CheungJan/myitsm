@@ -147,11 +147,33 @@ def _register_error_handlers(app: Flask) -> None:
     def handle_validation_error(exc: Exception) -> tuple[Any, int]:
         """Pydantic 校验错误，返回中文消息。"""
         from pydantic import ValidationError
+        import re
         if isinstance(exc, ValidationError):
+            _msg_map = {
+                "Field required": "必填",
+                "Input should be a valid date": "日期格式无效",
+                "Input should be a valid datetime": "日期时间格式无效",
+                "value is not a valid integer": "不是有效整数",
+                "value is not a valid float": "不是有效数字",
+            }
             msgs = []
             for e in exc.errors():
                 loc = " → ".join(str(l) for l in e["loc"])
-                msgs.append(f"{loc}: {e['msg']}")
+                msg = e["msg"]
+                # 翻译常见消息
+                for eng, chn in _msg_map.items():
+                    if eng in msg:
+                        msg = msg.replace(eng, chn)
+                        break
+                # 翻译 "String should have at most N characters"
+                m = re.search(r"String should have at most (\d+) characters?", msg)
+                if m:
+                    msg = f"最多{m.group(1)}个字符"
+                # 翻译 "String should have at least N characters"
+                m = re.search(r"String should have at least (\d+) characters?", msg)
+                if m:
+                    msg = f"至少{m.group(1)}个字符"
+                msgs.append(f"{loc}: {msg}")
             return jsonify(_make_error_body(400, "；".join(msgs))), 400
         # 非 ValidationError 走通用处理
         request_id = getattr(g, "request_id", "")
