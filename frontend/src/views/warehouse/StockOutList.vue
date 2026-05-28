@@ -29,7 +29,7 @@
           <template #default="{ row }">{{ ovLabel(row.invtyp) }}</template>
         </el-table-column>
         <el-table-column label="出库日期" width="100">
-          <template #default="{ row }">{{ row.outdate || row.gendate || '-' }}</template>
+          <template #default="{ row }">{{ formatDate(row.outdate || row.gendate) }}</template>
         </el-table-column>
         <el-table-column prop="memo" label="备注" min-width="140" show-overflow-tooltip />
         <el-table-column label="操作员" width="80">
@@ -50,7 +50,7 @@
     </el-card>
 
     <!-- 审核弹窗 -->
-    <el-dialog title="审核出库单" v-model="auditing" width="600px" @closed="auditTarget = null">
+    <el-dialog title="审核出库单" v-model="auditing" width="620px" @closed="auditTarget = null; auditMemo = ''">
       <template v-if="auditTarget">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="单号">{{ auditTarget.outbillid }}</el-descriptions-item>
@@ -64,10 +64,18 @@
           <el-table-column prop="item_nm" label="物料名称" min-width="140"/>
           <el-table-column prop="outqty" label="数量" width="70"/>
         </el-table>
+        <el-input
+          v-model="auditMemo"
+          type="textarea"
+          :rows="2"
+          placeholder="审核备注"
+          style="margin-top:12px"
+        />
       </template>
       <template #footer>
-        <el-button @click="handleAudit('9')" :loading="auditLoading">退回</el-button>
-        <el-button type="primary" @click="handleAudit('2')" :loading="auditLoading">审核通过</el-button>
+        <el-button @click="auditing = false">取消</el-button>
+        <el-button type="danger" @click="handleAudit('9')" :loading="auditLoading">退回</el-button>
+        <el-button type="success" @click="handleAudit('2')" :loading="auditLoading">审核通过</el-button>
       </template>
     </el-dialog>
 
@@ -78,7 +86,7 @@
           <el-descriptions-item label="关联单据">{{ detail.refbillid || '-' }}</el-descriptions-item>
           <el-descriptions-item label="仓库">{{ detail.whnm || detail.whcd }}</el-descriptions-item>
           <el-descriptions-item label="类型">{{ ovLabel(detail.invtyp) }}</el-descriptions-item>
-          <el-descriptions-item label="日期">{{ detail.outdate || detail.gendate }}</el-descriptions-item>
+          <el-descriptions-item label="日期">{{ formatDate(detail.outdate || detail.gendate) }}</el-descriptions-item>
           <el-descriptions-item label="操作员">{{ userName(detail.opercd) }}</el-descriptions-item>
           <el-descriptions-item label="审批">
             <el-tag :type="auditTag(detail.auditflg)" size="small">{{ auditLabel(detail.auditflg) }}</el-tag>
@@ -140,6 +148,11 @@ function auditTag(cd: string) {
     return m[cd] || 'info'
 }
 
+function formatDate(val: string | undefined): string {
+    if (!val) return '-'
+    return val.replace('T', ' ').substring(0, 19)
+}
+
 function auditLabel(cd: string) {
     return auditMap.value[cd] || cd
 }
@@ -166,13 +179,16 @@ async function openDrawer(row: StockOutRecord) {
 const auditing = ref(false)
 const auditTarget = ref<StockOutRecord | null>(null)
 const auditLoading = ref(false)
+const auditMemo = ref('')
 
 async function openAudit(row: StockOutRecord) {
     auditTarget.value = row
     auditing.value = true
     try {
         const r = await fetchStockOutDetail(row.outbillid)
-        auditTarget.value = r.data
+        const d = r.data as any
+        d.details = [...(d.details_prd || []), ...(d.details_eid || [])]
+        auditTarget.value = d
     } catch { /* use row data */ }
 }
 
@@ -180,7 +196,7 @@ async function handleAudit(flg: string) {
     if (!auditTarget.value) return
     auditLoading.value = true
     try {
-        await auditStockOut(auditTarget.value.outbillid, flg)
+        await auditStockOut(auditTarget.value.outbillid, flg, auditMemo.value || undefined)
         ElMessage.success(flg === '2' ? '审核通过' : '已退回')
         auditing.value = false
         load()
