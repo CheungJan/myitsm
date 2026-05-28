@@ -85,6 +85,9 @@ class PurchasePlanRepository:
         show_voided: bool = False,
     ) -> tuple[list[PurchasePlan], int]:
         query = db.session.query(PurchasePlan)
+        # auditflg='9' 时自动切为显示作废单据
+        if auditflg == "9":
+            show_voided = True
         if show_voided:
             query = query.filter(PurchasePlan.useflg == "9")
         else:
