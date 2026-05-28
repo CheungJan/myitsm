@@ -144,6 +144,8 @@ class StockInDetail(BaseModel):
     reflineno = db.Column(db.Integer, comment="关联行号")
     ref_rgstbillid = db.Column(db.String(8), comment="来源订单号")
     ref_rgstlineno = db.Column(db.Integer, comment="来源订单行号")
+    eid = db.Column(db.String(13), comment="设备EID（质检后）")
+    seid = db.Column(db.String(30), comment="序列号（质检后）")
     s_money = db.Column(db.Numeric(10, 2), comment="金额")
 
     stock_in = db.relationship("StockIn", back_populates="details")

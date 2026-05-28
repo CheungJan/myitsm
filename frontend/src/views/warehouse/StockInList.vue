@@ -154,6 +154,11 @@
                   <el-input-number v-model="createDetails[$index].inqty" :min="1" size="small" style="width:90px"/>
                 </template>
               </el-table-column>
+              <el-table-column label="EID" width="130">
+                <template #default="{$index}">
+                  <el-input v-model="createDetails[$index].eid" size="small" style="width:120px" placeholder="设备序列号（可选）"/>
+                </template>
+              </el-table-column>
               <el-table-column label="关联行号" width="100">
                 <template #default="{$index}">
                   <el-input-number v-model="createDetails[$index].reflineno" :min="0" size="small" style="width:90px"/>
@@ -211,7 +216,7 @@ const invtypOptions = [
 const creating = ref(false)
 const createSaving = ref(false)
 const createForm = reactive({ invtyp: '', whcd: '', refbillid: '', suppcd: '', indate: '', memo: '' })
-interface DetailRow { itemcd: string; inqty: number; reflineno: number | undefined }
+interface DetailRow { itemcd: string; inqty: number; eid: string; reflineno: number | undefined }
 const createDetails = reactive<DetailRow[]>([])
 const suppOptions = ref<{ supp_cd: string; supp_nm: string }[]>([])
 const itemOptions = ref<ItemRecord[]>([])
@@ -280,7 +285,7 @@ async function searchItems(query: string) {
 }
 
 function addDetail() {
-    createDetails.push({ itemcd: '', inqty: 1, reflineno: undefined })
+    createDetails.push({ itemcd: '', inqty: 1, eid: '', reflineno: undefined })
 }
 
 function removeDetail(index: number) {

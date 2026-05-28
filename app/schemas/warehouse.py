@@ -43,6 +43,8 @@ class StockInDetailCreate(BaseModel):
     itemtyp: str | None = Field(None, max_length=2, description="物料类型")
     inqty: int = Field(..., ge=1, description="入库数量")
     batchid: str | None = Field(None, max_length=50, description="批次号")
+    eid: str | None = Field(None, max_length=13, description="设备EID")
+    seid: str | None = Field(None, max_length=30, description="序列号")
     reflineno: int | None = Field(None, description="关联行号")
 
 
