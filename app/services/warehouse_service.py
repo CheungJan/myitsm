@@ -139,12 +139,19 @@ class StockInService:
         return record.to_dict()
 
     @staticmethod
-    def audit(inbillid: str, auditor: str) -> dict[str, object]:
+    def audit(inbillid: str, auditor: str, whcd: str = "", checkmemo: str = "") -> dict[str, object]:
         record = StockInRepository.get_by_id(inbillid)
         if record is None:
             return {"success": False, "error": "入库单不存在"}
         if record.auditflg == "2":
             return {"success": False, "error": "已审核，不可重复审核"}
+        # 如果传入 whcd 则覆盖（用于自动生成的空 whcd 草稿）
+        if whcd:
+            record.whcd = whcd
+        if not record.whcd:
+            return {"success": False, "error": "请先选择入库仓库后再审核"}
+        if checkmemo:
+            record.memo = checkmemo
         StockInRepository.audit(record, auditor)
         for detail in record.details:  # type: ignore[attr-defined]
             StockDetailRepository.update_balance(
@@ -295,8 +302,11 @@ class StockBalanceService:
         items, total = StockDetailRepository.list_by_warehouse(
             whcd=whcd, page=page, per_page=per_page
         )
+        data = [item.to_dict() for item in items]
+        _enrich_warehouse_names(data)
+        _enrich_item_names(data)
         return {
-            "items": [item.to_dict() for item in items],
+            "items": data,
             "total": total,
             "page": page,
             "per_page": per_page,
