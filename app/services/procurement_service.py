@@ -1148,6 +1148,29 @@ class ReturnPurchaseService:
         record.auditflg = auditflg
         record.auditman = auditor
         record.auditdate = dt.now(UTC)
+        # P0-3: 审核通过后自动生成退货出库草稿
+        if auditflg == "2":
+            from app.services.warehouse_service import StockOutService
+            try:
+                prd_details = []
+                for dt_line in record.details:  # type: ignore[attr-defined]
+                    prd_details.append({
+                        "itemcd": dt_line.itemcd,
+                        "outqty": dt_line.rpcqty or 0,
+                        "reflineno": dt_line.ref_rgstlineno,
+                    })
+                StockOutService.create(
+                    data={
+                        "invtyp": "6",
+                        "whcd": record.whcd or "",
+                        "refbillid": record.pcbillid,
+                        "suppcd": record.suppliercd or "",
+                    },
+                    details_prd=prd_details,
+                    creator=auditor,
+                )
+            except Exception:
+                logger.exception("生成退货出库草稿失败: pcbillid=%s", pcbillid)
         db.session.commit()
         return {"success": True, "pcbillid": pcbillid}
 

@@ -178,6 +178,7 @@ class StockOut(BaseModel):
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     targetwhcd = db.Column(db.String(2), comment="目标仓库（调拨）")
     suppcd = db.Column(db.String(8), comment="供应商编码（退货）")
+    refbillid = db.Column(db.String(8), comment="关联单据号")
 
     details_eid = db.relationship("StockOutDetailEid", back_populates="stock_out", lazy="dynamic")
     details_prd = db.relationship("StockOutDetailPrd", back_populates="stock_out", lazy="dynamic")

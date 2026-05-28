@@ -148,6 +148,18 @@ class StockInService:
                 qty_delta=detail.inqty or 0,
                 operator=auditor,
             )
+        # P0-1: 采购入库审核后更新 TPC13.inqty
+        if record.invtyp == "1" and record.refbillid:
+            from app.models.procurement import PurchaseRegisterDt
+            for detail in record.details:  # type: ignore[attr-defined]
+                if detail.reflineno:
+                    db.session.query(PurchaseRegisterDt).filter(
+                        PurchaseRegisterDt.rgstbillid == record.refbillid,
+                        PurchaseRegisterDt.lineno == detail.reflineno,
+                    ).update(
+                        {PurchaseRegisterDt.inqty: PurchaseRegisterDt.inqty + (detail.inqty or 0)},
+                        synchronize_session=False,
+                    )
         db.session.commit()
         return {"success": True, "inbillid": record.inbillid}
 
