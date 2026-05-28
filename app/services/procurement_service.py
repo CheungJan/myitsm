@@ -1039,8 +1039,28 @@ class ReturnPurchaseService:
             start_date=start_date, end_date=end_date, page=page, per_page=per_page,
             show_voided=show_voided,
         )
+        # 批量查关联出库单状态
+        pcbillids = [item.pcbillid for item in items]
+        linked_out_map: dict[str, dict[str, str]] = {}
+        if pcbillids:
+            rows = db.session.execute(
+                sa.text(
+                    "SELECT refbillid, outbillid, auditflg FROM twh15_out "
+                    "WHERE invtyp='6' AND refbillid = ANY(:ids)"
+                ),
+                {"ids": pcbillids},
+            ).fetchall()
+            for r in rows:
+                linked_out_map[r.refbillid] = {"outbillid": r.outbillid, "auditflg": r.auditflg}
+        result_items = []
+        for item in items:
+            d = item.to_dict()
+            linked = linked_out_map.get(item.pcbillid)
+            d["linked_out_id"] = linked["outbillid"] if linked else None
+            d["linked_out_auditflg"] = linked["auditflg"] if linked else None
+            result_items.append(d)
         return {
-            "items": [item.to_dict() for item in items],
+            "items": result_items,
             "total": total, "page": page, "per_page": per_page,
         }
 
@@ -1170,7 +1190,6 @@ class ReturnPurchaseService:
                                 "itemcd": dt_line.itemcd,
                                 "itemtyp": dt_line.itemtyp or "DJ",
                                 "eid": dt_line.eid,
-                                "seid": dt_line.seid or "",
                                 "outqty": dt_line.rpcqty or 0,
                                 "reflineno": dt_line.ref_rgstlineno,
                             })
