@@ -231,6 +231,44 @@ def list_stock_movements():  # type: ignore[no-untyped-def]
     return success_response(data=data)
 
 
+# ---- 仓库报表 ----
+
+
+@warehouse_bp.get("/reports/inventory-summary")
+@login_required
+def inventory_summary():  # type: ignore[no-untyped-def]
+    """收发存汇总：期初+入库-出库=期末，按月×仓库×物料。"""
+    whcd = request.args.get("whcd", "")
+    period = request.args.get("period", "")  # YYYY-MM, 默认当月
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    data = StockBalanceService.inventory_summary(whcd=whcd or None, period=period, page=page, per_page=per_page)
+    return success_response(data=data)
+
+
+@warehouse_bp.get("/reports/daily-snapshot")
+@login_required
+def daily_snapshot():  # type: ignore[no-untyped-def]
+    """库存日报：指定日期的库存快照。"""
+    whcd = request.args.get("whcd", "")
+    date_str = request.args.get("date", "")  # YYYY-MM-DD, 默认今天
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    data = StockBalanceService.daily_snapshot(whcd=whcd or None, date_str=date_str, page=page, per_page=per_page)
+    return success_response(data=data)
+
+
+@warehouse_bp.get("/reports/aging")
+@login_required
+def inventory_aging():  # type: ignore[no-untyped-def]
+    """库龄分析：物料在库时间分布。"""
+    whcd = request.args.get("whcd", "")
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    data = StockBalanceService.inventory_aging(whcd=whcd or None, page=page, per_page=per_page)
+    return success_response(data=data)
+
+
 # ---- 资产盘点 ----
 
 

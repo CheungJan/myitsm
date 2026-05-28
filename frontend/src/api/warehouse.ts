@@ -58,3 +58,14 @@ export function fetchOverLost(params?: Record<string,string>) { return request.g
 export function fetchOverLostDetail(id:string) { return request.get<never,{data:OverLostRecord}>(`/warehouse/overlost/${id}`) }
 export function createOverLost(data:Record<string,unknown>) { return request.post<never,unknown>('/warehouse/overlost',data) }
 export function auditOverLost(id:string) { return request.post<never,unknown>(`/warehouse/overlost/${id}/audit`) }
+
+// ---- 仓库报表 ----
+export function fetchInventorySummary(params?: Record<string,string>) {
+    return request.get<never,{data:{items:Record<string,unknown>[],total:number,period:string}}>('/warehouse/reports/inventory-summary',{params})
+}
+export function fetchDailySnapshot(params?: Record<string,string>) {
+    return request.get<never,{data:{items:Record<string,unknown>[],total:number,date:string}}>('/warehouse/reports/daily-snapshot',{params})
+}
+export function fetchInventoryAging(params?: Record<string,string>) {
+    return request.get<never,{data:{items:Record<string,unknown>[],total:number}}>('/warehouse/reports/aging',{params})
+}

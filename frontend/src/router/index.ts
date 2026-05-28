@@ -214,6 +214,7 @@ const router = createRouter({
                 { path: 'system/transfers', name: 'TransferAccountList', component: () => import('@/views/system/TransferAccountList.vue'), meta: { title: '调拨科目' } },
                 { path: 'reports/center', name: 'ReportCenter', component: () => import('@/views/reports/ReportCenter.vue'), meta: { title: '报表中心' } },
                 { path: 'warehouse/overlost', name: 'OverLostList', component: () => import('@/views/warehouse/OverLostList.vue'), meta: { title: '盘盈盘亏' } },
+{ path: 'warehouse/reports', name: 'StockReports', component: () => import('@/views/warehouse/StockReports.vue'), meta: { title: '仓库报表' } },
                 { path: 'itsm/free-replace', name: 'FreeReplaceList', component: () => import('@/views/itsm/FreeReplaceList.vue'), meta: { title: '免费更换' } },
                 { path: 'procurement/returns', name: 'ReturnPurchaseList', component: () => import('@/views/procurement/ReturnPurchaseList.vue'), meta: { title: '采购退货' } },
                 { path: 'qc/audit', name: 'QcAudit', component: () => import('@/views/qc/QcAudit.vue'), meta: { title: '质检审核' } },

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime as dt_parse
+
 from typing import Any
+
+from sqlalchemy import func
 
 from app.extensions import db
 from app.models.master import Item
@@ -357,6 +361,132 @@ class StockBalanceService:
         total = query.count()
         items = query.order_by(StockDetailDt.gendate.desc()).offset((page - 1) * per_page).limit(per_page).all()
         data = [item.to_dict() for item in items]
+        _enrich_warehouse_names(data)
+        _enrich_item_names(data)
+        return {"items": data, "total": total, "page": page, "per_page": per_page}
+
+    @staticmethod
+    def inventory_summary(whcd: str | None = None, period: str = "", page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        """收发存汇总。按仓库×物料×月份聚合 TWH12 变动数据。"""
+        from app.models.warehouse import StockDetailDt
+        from sqlalchemy import case
+
+        if period:
+            try:
+                pd = dt_parse.strptime(period, "%Y-%m")
+            except ValueError:
+                pd = dt_parse.now()
+        else:
+            pd = dt_parse.now()
+
+        start_date = pd.replace(day=1)
+        if pd.month == 12:
+            end_date = pd.replace(year=pd.year + 1, month=1, day=1)
+        else:
+            end_date = pd.replace(month=pd.month + 1, day=1)
+
+        q = db.session.query(
+            StockDetailDt.whcd, StockDetailDt.itemcd,
+            func.sum(case((StockDetailDt.iotyp == "1", StockDetailDt.itemqty), else_=0)).label("in_qty"),
+            func.sum(case((StockDetailDt.iotyp == "0", func.abs(StockDetailDt.itemqty)), else_=0)).label("out_qty"),
+        ).filter(
+            StockDetailDt.useflg == "1",
+            StockDetailDt.gendate >= start_date,
+            StockDetailDt.gendate < end_date,
+        )
+        if whcd:
+            q = q.filter(StockDetailDt.whcd == whcd)
+        q = q.group_by(StockDetailDt.whcd, StockDetailDt.itemcd)
+        total = q.count()
+        rows = q.order_by(StockDetailDt.whcd, StockDetailDt.itemcd).offset((page - 1) * per_page).limit(per_page).all()
+
+        data = [
+            {
+                "whcd": r.whcd, "itemcd": r.itemcd,
+                "in_qty": float(r.in_qty or 0), "out_qty": float(r.out_qty or 0),
+                "net_qty": float(r.in_qty or 0) - float(r.out_qty or 0),
+            }
+            for r in rows
+        ]
+        _enrich_warehouse_names(data)
+        _enrich_item_names(data)
+        return {"items": data, "total": total, "page": page, "per_page": per_page, "period": period or pd.strftime("%Y-%m")}
+
+    @staticmethod
+    def daily_snapshot(whcd: str | None = None, date_str: str = "", page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        """库存日报。从 TWH12 取当日变动聚合。"""
+        from app.models.warehouse import StockDetailDt
+        from sqlalchemy import case
+        from datetime import timedelta
+
+        if date_str:
+            try:
+                target_date = dt_parse.strptime(date_str, "%Y-%m-%d")
+            except ValueError:
+                target_date = dt_parse.now()
+        else:
+            target_date = dt_parse.now()
+
+        next_date = target_date + timedelta(days=1)
+
+        q = db.session.query(
+            StockDetailDt.whcd, StockDetailDt.itemcd,
+            func.sum(case((StockDetailDt.iotyp == "1", StockDetailDt.itemqty), else_=0)).label("in_qty"),
+            func.sum(case((StockDetailDt.iotyp == "0", func.abs(StockDetailDt.itemqty)), else_=0)).label("out_qty"),
+        ).filter(
+            StockDetailDt.useflg == "1",
+            StockDetailDt.gendate >= target_date,
+            StockDetailDt.gendate < next_date,
+        )
+        if whcd:
+            q = q.filter(StockDetailDt.whcd == whcd)
+        q = q.group_by(StockDetailDt.whcd, StockDetailDt.itemcd)
+
+        total = q.count()
+        rows = q.order_by(StockDetailDt.whcd, StockDetailDt.itemcd).offset((page - 1) * per_page).limit(per_page).all()
+
+        data = [
+            {"whcd": r.whcd, "itemcd": r.itemcd, "in_qty": float(r.in_qty or 0), "out_qty": float(r.out_qty or 0)}
+            for r in rows
+        ]
+        _enrich_warehouse_names(data)
+        _enrich_item_names(data)
+        return {"items": data, "total": total, "page": page, "per_page": per_page, "date": target_date.strftime("%Y-%m-%d")}
+
+    @staticmethod
+    def inventory_aging(whcd: str | None = None, page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        """库龄分析。按 TWH11 当前库存，基于 TWH12 最早入库日期计算在库天数。"""
+        from app.models.warehouse import StockDetail, StockDetailDt
+
+        now = dt_parse.now()
+        first_in = db.session.query(
+            StockDetailDt.whcd, StockDetailDt.itemcd,
+            func.min(StockDetailDt.gendate).label("first_in_date"),
+        ).filter(
+            StockDetailDt.useflg == "1", StockDetailDt.iotyp == "1"
+        ).group_by(StockDetailDt.whcd, StockDetailDt.itemcd).subquery()
+
+        q = db.session.query(
+            StockDetail.whcd, StockDetail.itemcd, StockDetail.itemqty,
+            first_in.c.first_in_date,
+        ).outerjoin(
+            first_in,
+            (StockDetail.whcd == first_in.c.whcd) & (StockDetail.itemcd == first_in.c.itemcd),
+        ).filter(StockDetail.itemqty > 0)
+        if whcd:
+            q = q.filter(StockDetail.whcd == whcd)
+
+        total = q.count()
+        rows = q.order_by(StockDetail.whcd, StockDetail.itemcd).offset((page - 1) * per_page).limit(per_page).all()
+
+        data: list[dict[str, Any]] = []
+        for r in rows:
+            days = (now - r.first_in_date).days if r.first_in_date else None
+            data.append({
+                "whcd": r.whcd, "itemcd": r.itemcd, "itemqty": r.itemqty,
+                "first_in": r.first_in_date.strftime("%Y-%m-%d") if r.first_in_date else None,
+                "age_days": days,
+            })
         _enrich_warehouse_names(data)
         _enrich_item_names(data)
         return {"items": data, "total": total, "page": page, "per_page": per_page}
