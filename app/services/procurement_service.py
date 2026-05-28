@@ -1156,6 +1156,7 @@ class ReturnPurchaseService:
                 for dt_line in record.details:  # type: ignore[attr-defined]
                     prd_details.append({
                         "itemcd": dt_line.itemcd,
+                        "itemtyp": dt_line.itemtyp or "DJ",
                         "outqty": dt_line.rpcqty or 0,
                         "reflineno": dt_line.ref_rgstlineno,
                     })
