@@ -385,7 +385,8 @@ class StockBalanceService:
         else:
             end_date = pd.replace(month=pd.month + 1, day=1)
 
-        q = db.session.query(
+        # 本期变动
+        month_q = db.session.query(
             StockDetailDt.whcd, StockDetailDt.itemcd,
             func.sum(case((StockDetailDt.iotyp == "1", StockDetailDt.itemqty), else_=0)).label("in_qty"),
             func.sum(case((StockDetailDt.iotyp == "0", func.abs(StockDetailDt.itemqty)), else_=0)).label("out_qty"),
@@ -393,18 +394,37 @@ class StockBalanceService:
             StockDetailDt.useflg == "1",
             StockDetailDt.gendate >= start_date,
             StockDetailDt.gendate < end_date,
+        ).group_by(StockDetailDt.whcd, StockDetailDt.itemcd).subquery()
+
+        # 期初库存（月初之前的累计净变动）
+        begin_q = db.session.query(
+            StockDetailDt.whcd, StockDetailDt.itemcd,
+            func.coalesce(func.sum(StockDetailDt.itemqty), 0).label("begin_qty"),
+        ).filter(
+            StockDetailDt.useflg == "1",
+            StockDetailDt.gendate < start_date,
+        ).group_by(StockDetailDt.whcd, StockDetailDt.itemcd).subquery()
+
+        q = db.session.query(
+            month_q.c.whcd, month_q.c.itemcd,
+            func.coalesce(begin_q.c.begin_qty, 0).label("begin_qty"),
+            month_q.c.in_qty, month_q.c.out_qty,
+            (func.coalesce(begin_q.c.begin_qty, 0) + month_q.c.in_qty - month_q.c.out_qty).label("end_qty"),
+        ).outerjoin(
+            begin_q,
+            (month_q.c.whcd == begin_q.c.whcd) & (month_q.c.itemcd == begin_q.c.itemcd),
         )
         if whcd:
-            q = q.filter(StockDetailDt.whcd == whcd)
-        q = q.group_by(StockDetailDt.whcd, StockDetailDt.itemcd)
+            q = q.filter(month_q.c.whcd == whcd)
         total = q.count()
-        rows = q.order_by(StockDetailDt.whcd, StockDetailDt.itemcd).offset((page - 1) * per_page).limit(per_page).all()
+        rows = q.order_by(month_q.c.whcd, month_q.c.itemcd).offset((page - 1) * per_page).limit(per_page).all()
 
         data = [
             {
                 "whcd": r.whcd, "itemcd": r.itemcd,
+                "begin_qty": float(r.begin_qty or 0),
                 "in_qty": float(r.in_qty or 0), "out_qty": float(r.out_qty or 0),
-                "net_qty": float(r.in_qty or 0) - float(r.out_qty or 0),
+                "end_qty": float(r.end_qty or 0),
             }
             for r in rows
         ]
@@ -445,8 +465,22 @@ class StockBalanceService:
         total = q.count()
         rows = q.order_by(StockDetailDt.whcd, StockDetailDt.itemcd).offset((page - 1) * per_page).limit(per_page).all()
 
+        # 当日末库存快照（从 TWH11）
+        from app.models.warehouse import StockDetail as SD
+        item_keys = {(r.whcd, r.itemcd) for r in rows}
+        snap_map = {}
+        if item_keys:
+            for sd_row in db.session.query(SD).filter(
+                SD.whcd.in_([k[0] for k in item_keys])
+            ).all():
+                snap_map[(sd_row.whcd, sd_row.itemcd)] = sd_row.itemqty or 0
+
         data = [
-            {"whcd": r.whcd, "itemcd": r.itemcd, "in_qty": float(r.in_qty or 0), "out_qty": float(r.out_qty or 0)}
+            {
+                "whcd": r.whcd, "itemcd": r.itemcd,
+                "in_qty": float(r.in_qty or 0), "out_qty": float(r.out_qty or 0),
+                "snapshot_qty": int(snap_map.get((r.whcd, r.itemcd), 0)),
+            }
             for r in rows
         ]
         _enrich_warehouse_names(data)
@@ -455,7 +489,7 @@ class StockBalanceService:
 
     @staticmethod
     def inventory_aging(whcd: str | None = None, page: int = 1, per_page: int = 20) -> dict[str, Any]:
-        """库龄分析。按 TWH11 当前库存，基于 TWH12 最早入库日期计算在库天数。"""
+        """库龄分析：首次入库天数（简化方案，非 FIFO 批次库龄）。"""
         from app.models.warehouse import StockDetail, StockDetailDt
 
         now = dt_parse.now()
@@ -486,6 +520,7 @@ class StockBalanceService:
                 "whcd": r.whcd, "itemcd": r.itemcd, "itemqty": r.itemqty,
                 "first_in": r.first_in_date.strftime("%Y-%m-%d") if r.first_in_date else None,
                 "age_days": days,
+                "note": "首次入库天数（非FIFO批次库龄）",
             })
         _enrich_warehouse_names(data)
         _enrich_item_names(data)
