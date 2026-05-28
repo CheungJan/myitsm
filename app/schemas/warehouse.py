@@ -51,6 +51,7 @@ class StockOutCreate(BaseModel):
     whcd: str = Field(..., max_length=2, description="仓库编码")
     invtyp: str = Field(..., max_length=1, description="出库类型")
     outdate: str | None = Field(None, description="出库日期")
+    refbillid: str | None = Field(None, max_length=8, description="关联单据号")
     targetwhcd: str | None = Field(None, max_length=2, description="目标仓库（调拨）")
     suppcd: str | None = Field(None, max_length=8, description="供应商（退货）")
     memo: str | None = Field(None, max_length=255, description="备注")
