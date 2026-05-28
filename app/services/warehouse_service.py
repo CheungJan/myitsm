@@ -148,6 +148,12 @@ class StockInService:
                 qty_delta=detail.inqty or 0,
                 operator=auditor,
             )
+            StockDetailRepository.add_movement(
+                whcd=record.whcd, itemcd=detail.itemcd,
+                itemqty=detail.inqty or 0,
+                billid=record.inbillid, invtyp=record.invtyp or "",
+                iotyp="1", operator=auditor,
+            )
         # P0-1: 采购入库审核后更新 TPC13.inqty
         if record.invtyp == "1" and record.refbillid:
             from app.models.procurement import PurchaseRegisterDt
@@ -244,12 +250,24 @@ class StockOutService:
                     qty_delta=-(detail.outqty or 0),
                     operator=auditor,
                 )
+                StockDetailRepository.add_movement(
+                    whcd=record.whcd, itemcd=detail.itemcd,
+                    itemqty=-(detail.outqty or 0),
+                    billid=record.outbillid, invtyp=record.invtyp or "",
+                    iotyp="0", operator=auditor,
+                )
             for detail in record.details_prd:  # type: ignore[attr-defined]
                 StockDetailRepository.update_balance(
                     whcd=record.whcd,
                     itemcd=detail.itemcd,
                     qty_delta=-(detail.outqty or 0),
                     operator=auditor,
+                )
+                StockDetailRepository.add_movement(
+                    whcd=record.whcd, itemcd=detail.itemcd,
+                    itemqty=-(detail.outqty or 0),
+                    billid=record.outbillid, invtyp=record.invtyp or "",
+                    iotyp="0", operator=auditor,
                 )
         db.session.commit()
         return {"success": True, "outbillid": record.outbillid}

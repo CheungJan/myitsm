@@ -155,7 +155,9 @@ async function openDrawer(row: StockOutRecord) {
     drawer.value = true
     try {
         const r = await fetchStockOutDetail(row.outbillid)
-        detail.value = r.data
+        const d = r.data as any
+        d.details = [...(d.details_prd || []), ...(d.details_eid || [])]
+        detail.value = d
     } catch {
         detail.value = row
     }

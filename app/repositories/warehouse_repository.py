@@ -272,6 +272,33 @@ class StockDetailRepository:
             record.upddate = now
         return record
 
+    @staticmethod
+    def add_movement(
+        whcd: str,
+        itemcd: str,
+        itemqty: int,
+        billid: str,
+        invtyp: str = "",
+        iotyp: str = "",
+        operator: str = "",
+    ) -> None:
+        """写入库存变动明细 (TWH12)。"""
+        from app.models.warehouse import StockDetailDt
+
+        now = datetime.now(UTC)
+        movement = StockDetailDt(
+            whcd=whcd,
+            itemcd=itemcd,
+            itemqty=itemqty,
+            billid=billid,
+            invtyp=invtyp,
+            iotyp=iotyp,
+            opercd=operator,
+            gendate=now,
+            useflg="1",
+        )
+        db.session.add(movement)
+
 
 # ---------------------------------------------------------------------------
 # 资产盘点
