@@ -15,6 +15,13 @@ class PurchasePlanCreate(BaseModel):
     plandate: datetime | None = Field(None, description="计划日期")
     memo: str | None = Field(None, max_length=255, description="备注")
 
+    @field_validator("slbillid", "memo", mode="before")
+    @classmethod
+    def _empty_str_to_none(cls, v: object) -> object:
+        if v == "" or v is None:
+            return None
+        return v
+
 
 class PurchasePlanDetailCreate(BaseModel):
     """采购计划明细。"""
