@@ -1,6 +1,6 @@
 # 完整数据库字典（myitsm）
 
-> 生成时间：2026-05-13 | 更新：2026-05-16 | 数据库：myitsm | PostgreSQL | +2表(tmm40,tmm52)
+> 生成时间：2026-05-13 | 更新：2026-06-10 | 数据库：myitsm | PostgreSQL | v1.2 tqc10_result 加 batch_id
 > 🟢=自动生成（information_schema）| 🟡=手动维护 | 🔗=引用ER文档
 > 配套：`数据库ER关系文档.md`（ER关联）| `数据库变更追踪_迁移后.md`（变更历史）
 
@@ -495,6 +495,36 @@
 | 9 | sysflg | VARCHAR(1) |  | 系统标志 |
 | 10 | memo | VARCHAR(60) |  | 说明 |
 
+> **编码类型 (code_typ) 字典值**（截至 2026-06-01）：
+>
+> **OV（出库类型）**：
+> | code_cd | code_nm | 本质 |
+> |---------|---------|------|
+> | 1 | 销售出库 | 移动型 |
+> | 2 | 服务领用出库 | 移动型（targetwhcd=工程师仓） |
+> | 3 | 调拨出库 | 移动型（自动生成 IV=4 入库草稿） |
+> | 4 | 借出出库 | 移动型 |
+> | 5 | 质检出库 | 移动型 |
+> | 6 | 退货出库 | 移动型 |
+> | 7 | 报废出库 | — |
+> | 8 | 生产出库 | 转换型（BOM 配件→成品） |
+> | 9 | 返修出库 | 移动型 |
+> | 10 | 翻新出库 | 转换型（旧 EID→新 EID） |
+>
+> **IV（入库类型）**：
+> | code_cd | code_nm | 对应出库 |
+> |---------|---------|----------|
+> | 1 | 采购入库 | — |
+> | 2 | 销售退货入库 | — |
+> | 3 | 服务返还入库 | OV=2 |
+> | 4 | 调拨入库 | OV=3 |
+> | 5 | 借出归还入库 | OV=4 |
+> | 6 | 翻新入库 | OV=10 |
+> | 7 | 回收入库 | — |
+> | 8 | 生产入库 | OV=8 |
+> | 9 | 返修入库 | OV=9 |
+> | 11 | 质检入库 | OV=5 |
+
 #### 15. tmm34_idmaster
 
 | # | 列名 | 类型 | 约束 | 说明 |
@@ -636,6 +666,7 @@
 | 22 | recycle_status | VARCHAR(10) |  |  |
 | 23 | asset_owner | VARCHAR(20) |  |  |
 | 24 | install_date | TIMESTAMP |  |  |
+| 25 | ref_eid | VARCHAR(13) |  | 来源EID（翻新溯源链，OV=10翻新出库→IV=6翻新入库后写入，可递归追溯） |
 
 #### 21. tmm43_eid_track
 
@@ -1549,7 +1580,7 @@
 | 5 | prddate | TIMESTAMP |  | 生产日期 |
 | 6 | billid | VARCHAR(8) |  | 单据号 |
 | 7 | invdate | TIMESTAMP |  | 库存日期 |
-| 8 | invtyp | VARCHAR(1) |  | 出入库类型 |
+| 8 | invtyp | VARCHAR(2) |  | 出入库类型 |
 | 9 | itemqty | INTEGER |  | 变动数量 |
 | 10 | storeqty | INTEGER |  | 库存余量 |
 | 11 | opercd | VARCHAR(6) |  | 操作员 |
@@ -1566,8 +1597,8 @@
 | 1 | inbillid | VARCHAR(8) | PK NOT NULL | 入库单号 |
 | 2 | whcd | VARCHAR(2) | NOT NULL | 仓库编码 |
 | 3 | indate | TIMESTAMP |  | 入库日期 |
-| 4 | invtyp | VARCHAR(1) | NOT NULL | 入库类型 |
-| 5 | refbillid | VARCHAR(8) |  | 关联单据号 |
+| 4 | invtyp | VARCHAR(2) | NOT NULL | 入库类型 |
+| 5 | refbillid | VARCHAR(30) |  | 关联单据号 |
 | 6 | ptimes | INTEGER |  | 打印次数 |
 | 7 | memo | VARCHAR(255) |  | 备注 |
 | 8 | opercd | VARCHAR(6) |  | 操作员 |
@@ -1596,8 +1627,12 @@
 | 9 | inqty | INTEGER |  | 入库数量 |
 | 10 | reflineno | INTEGER |  | 关联行号 |
 | 11 | s_money | NUMERIC(10,2) |  | 金额 |
-| 12 | created_at | TIMESTAMP | NOT NULL |  |
-| 13 | updated_at | TIMESTAMP | NOT NULL |  |
+| 12 | ref_rgstbillid | VARCHAR(8) |  | 采购订单号（冗余，非采购入库为空） |
+| 13 | ref_rgstlineno | INTEGER |  | 采购订单行号（冗余，非采购入库为空） |
+| 14 | eid | VARCHAR(13) |  | 设备EID（非空=EID模式入库） |
+| 15 | seid | VARCHAR(30) |  | 序列号 |
+| 16 | created_at | TIMESTAMP | NOT NULL |  |
+| 17 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 6. twh15_out
 
@@ -1606,7 +1641,7 @@
 | 1 | outbillid | VARCHAR(8) | PK NOT NULL | 出库单号 |
 | 2 | whcd | VARCHAR(2) | NOT NULL | 仓库编码 |
 | 3 | outdate | TIMESTAMP |  | 出库日期 |
-| 4 | invtyp | VARCHAR(1) | NOT NULL | 出库类型 |
+| 4 | invtyp | VARCHAR(2) | NOT NULL | 出库类型 |
 | 5 | ptimes | INTEGER |  | 打印次数 |
 | 6 | memo | VARCHAR(255) |  | 备注 |
 | 7 | opercd | VARCHAR(6) |  | 操作员 |
@@ -1618,8 +1653,9 @@
 | 13 | useflg | VARCHAR(1) |  | 有效标志 |
 | 14 | targetwhcd | VARCHAR(2) |  | 目标仓库（调拨） |
 | 15 | suppcd | VARCHAR(8) |  | 供应商编码（退货） |
-| 16 | created_at | TIMESTAMP | NOT NULL |  |
-| 17 | updated_at | TIMESTAMP | NOT NULL |  |
+| 16 | refbillid | VARCHAR(30) |  | 关联单据号 |
+| 17 | created_at | TIMESTAMP | NOT NULL |  |
+| 18 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 7. twh16_outdteid
 
@@ -1637,8 +1673,13 @@
 | 10 | qcqty | INTEGER |  | 质检数量 |
 | 11 | reflineno | INTEGER |  | 关联行号 |
 | 12 | s_money | NUMERIC(10,2) |  | 金额 |
-| 13 | created_at | TIMESTAMP | NOT NULL |  |
-| 14 | updated_at | TIMESTAMP | NOT NULL |  |
+| 13 | closed_flg | VARCHAR(1) |  | 结案标志 0=未结案 1=已结案 |
+| 14 | closed_reason | VARCHAR(100) |  | 结案原因 |
+| 15 | closed_by | VARCHAR(6) |  | 结案操作人 |
+| 16 | closed_at | TIMESTAMP |  | 结案时间 |
+| 17 | ref_inbillid | VARCHAR(8) |  | 来源入库单号（质检出库追溯） |
+| 18 | created_at | TIMESTAMP | NOT NULL |  |
+| 19 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 8. twh16_outdtprd
 
@@ -1655,8 +1696,13 @@
 | 9 | qcqty | INTEGER |  | 质检数量 |
 | 10 | reflineno | INTEGER |  | 关联行号 |
 | 11 | s_money | NUMERIC(10,2) |  | 金额 |
-| 12 | created_at | TIMESTAMP | NOT NULL |  |
-| 13 | updated_at | TIMESTAMP | NOT NULL |  |
+| 12 | closed_flg | VARCHAR(1) |  | 结案标志 0=未结案 1=已结案 |
+| 13 | closed_reason | VARCHAR(100) |  | 结案原因 |
+| 14 | closed_by | VARCHAR(6) |  | 结案操作人 |
+| 15 | closed_at | TIMESTAMP |  | 结案时间 |
+| 16 | ref_inbillid | VARCHAR(8) |  | 来源入库单号（质检出库追溯） |
+| 17 | created_at | TIMESTAMP | NOT NULL |  |
+| 18 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 9. twh17_overlost
 
@@ -1847,7 +1893,7 @@
 | 7 | gendate | TIMESTAMP |  | 创建日期 |
 | 8 | useflg | VARCHAR(1) |  | 有效标志 |
 | 9 | upddate | TIMESTAMP |  | 更新日期 |
-| 10 | refbillid | VARCHAR(8) |  | 关联单号 |
+| 10 | refbillid | VARCHAR(30) |  | 关联单号 |
 | 11 | created_at | TIMESTAMP | NOT NULL |  |
 | 12 | updated_at | TIMESTAMP | NOT NULL |  |
 
@@ -1914,9 +1960,12 @@
 | 18 | auditman | VARCHAR(6) |  | 审核人 |
 | 19 | auditdate | TIMESTAMP |  | 审核日期 |
 | 20 | created_at | TIMESTAMP | NOT NULL | 创建时间 |
-| 21 | updated_at | TIMESTAMP | NOT NULL | 更新时间 |
+| 21 | updated_at | TIMESTAMP | NOT NULL | 更新时间<br /> |
+| 22 | pay_type_override | varchar(1) |  | 是否强制覆盖付款方式一致性(Y/N) |
 
 > **变更记录**（2026-05-26）：custcd→suppliercd 重命名；新增 ref_rgstbillid/pay_type/invoice_no/invoice_date/total_settle_amt/auditflg/auditman/auditdate；删除旧字段 refbillid/pcamt。
+>
+> 是否强制覆盖付款方式一致性(Y/N)，说明追加至memo，操作人/时间复用opercd/gendate'
 
 #### 7. tpc14_pcbilldt — 采购结算明细表（新增 2026-05-26）
 
@@ -2426,7 +2475,7 @@
 | 4 | itemtyp | VARCHAR(2) |  | 物料类型 |
 | 5 | billid | VARCHAR(8) |  | 单号 |
 | 6 | invdate | TIMESTAMP |  | 库存日期 |
-| 7 | invtyp | VARCHAR(1) |  | 出入库类型 |
+| 7 | invtyp | VARCHAR(2) |  | 出入库类型 |
 | 8 | itemqty | NUMERIC(12,0) |  | 本次数量 |
 | 9 | storeqty | NUMERIC(12,0) |  | 库存数量 |
 | 10 | opercd | VARCHAR(6) |  | 操作员 |
@@ -2767,7 +2816,7 @@
 | 6 | plan_end | date |  | 计划完成日期 |
 | 7 | actual_start | date |  | 实际开始日期 |
 | 8 | actual_end | date |  | 实际完成日期 |
-| 9 | status | VARCHAR(10) |  | 状态（DRAFT/RELEASED/IN_PROGRESS/COMPLETED/CANCELLED） |
+| 9 | status | VARCHAR(20) |  | 状态（DRAFT/RELEASED/IN_PROGRESS/COMPLETED/CANCELLED） |
 | 10 | priority | VARCHAR(10) |  | 优先级 |
 | 11 | warehouse_cd | VARCHAR(20) |  | 目标仓库 |
 | 12 | remark | VARCHAR(200) |  | 备注 |
@@ -2803,7 +2852,7 @@
 | 5 | plan_qty | INTEGER |  | 计划数量 |
 | 6 | actual_qty | INTEGER |  | 完成数量 |
 | 7 | defect_qty | INTEGER |  | 不良品数量 |
-| 8 | status | VARCHAR(10) |  | 状态（PENDING/IN_PROGRESS/COMPLETED/SKIPPED） |
+| 8 | status | VARCHAR(20) |  | 状态（PENDING/IN_PROGRESS/COMPLETED/SKIPPED） |
 | 9 | start_time | TIMESTAMP |  | 开始时间 |
 | 10 | end_time | TIMESTAMP |  | 结束时间 |
 | 11 | worker_cd | VARCHAR(20) |  | 操作工 |
@@ -2945,9 +2994,10 @@
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | qcbillid | VARCHAR(8) | PK NOT NULL | 质检单号 |
-| 2 | optyp | VARCHAR(2) |  | 操作类型 |
-| 3 | refbillid | VARCHAR(8) |  | 关联单号 |
+| 1 | qcbillid | VARCHAR(12) | PK NOT NULL | 质检单号 |
+| 2 | batch_id | VARCHAR(12) |  | 批次号 |
+| 3 | optyp | VARCHAR(2) |  | 操作类型 |
+| 3 | refbillid | VARCHAR(30) |  | 关联单号 |
 | 4 | itemcd | VARCHAR(6) |  | 物料编码 |
 | 5 | eid | VARCHAR(13) |  | 设备序列号 |
 | 6 | opercd | VARCHAR(6) |  | 操作员 |
@@ -2958,15 +3008,16 @@
 | 11 | auditflg | VARCHAR(1) |  | 审核标志 |
 | 12 | auditdate | TIMESTAMP |  | 审核日期 |
 | 13 | qcstatus | VARCHAR(2) |  | 质检状态 |
-| 14 | created_at | TIMESTAMP | NOT NULL |  |
-| 15 | updated_at | TIMESTAMP | NOT NULL |  |
+| 14 | memo | VARCHAR(200) |  | 备注 |
+| 15 | created_at | TIMESTAMP | NOT NULL |  |
+| 16 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 2. tqc11_resultdt
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | id | INTEGER | PK NOT NULL | 主键 |
-| 2 | qcbillid | VARCHAR(8) | NOT NULL | 质检单号 |
+| 2 | qcbillid | VARCHAR(12) | NOT NULL | 质检单号 |
 | 3 | itemcd | VARCHAR(6) | NOT NULL | 物料编码 |
 | 4 | itemtyp | VARCHAR(2) |  | 物料类型 |
 | 5 | prddate | TIMESTAMP |  | 生产日期 |
@@ -2982,15 +3033,16 @@
 | 15 | inspector | VARCHAR(8) |  | 检验员 |
 | 16 | qc_source | VARCHAR(1) |  | 质检来源 |
 | 17 | remark | VARCHAR(100) |  | 备注 |
-| 18 | created_at | TIMESTAMP | NOT NULL |  |
-| 19 | updated_at | TIMESTAMP | NOT NULL |  |
+| 18 | ref_rgstbillid | VARCHAR(30) |  | 来源入库单号 |
+| 19 | created_at | TIMESTAMP | NOT NULL |  |
+| 20 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 3. tqc11_resulteid
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | id | INTEGER | PK NOT NULL | 主键 |
-| 2 | qcbillid | VARCHAR(8) | NOT NULL | 质检单号 |
+| 2 | qcbillid | VARCHAR(12) | NOT NULL | 质检单号 |
 | 3 | itemcd | VARCHAR(6) |  | 物料编码 |
 | 4 | itemtyp | VARCHAR(2) |  | 物料类型 |
 | 5 | prddate | TIMESTAMP |  | 生产日期 |
@@ -3008,8 +3060,9 @@
 | 17 | qc_source | VARCHAR(1) |  | 质检来源 |
 | 18 | remark | VARCHAR(100) |  | 备注 |
 | 19 | manuf_seq | VARCHAR(100) |  | 制造序列号 |
-| 20 | created_at | TIMESTAMP | NOT NULL |  |
-| 21 | updated_at | TIMESTAMP | NOT NULL |  |
+| 20 | ref_rgstbillid | VARCHAR(30) |  | 来源入库单号 |
+| 21 | created_at | TIMESTAMP | NOT NULL |  |
+| 22 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
 ### 调拨 (ttx) — 1 张表

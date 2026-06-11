@@ -42,9 +42,11 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'stock-in', menu_nm: '入库单管理', path: '/warehouse/stock-in' },
             { menu_cd: 'stock-out', menu_nm: '出库单管理', path: '/warehouse/stock-out' },
             { menu_cd: 'stock', menu_nm: '库存查询', path: '/warehouse/stock-balance' },
+            { menu_cd: 'stock-movement', menu_nm: '库存流水', path: '/warehouse/stock-movement' },
             { menu_cd: 'asset-check', menu_nm: '资产盘点', path: '/warehouse/asset-check' },
             { menu_cd: 'pos-change', menu_nm: '设备回收确认', path: '/warehouse/pos-change' },
-            { menu_cd: 'overlost', menu_nm: '盘盈盘亏', path: '/warehouse/overlost' }
+            { menu_cd: 'overlost', menu_nm: '盘盈盘亏', path: '/warehouse/overlost' },
+            { menu_cd: 'warehouse-reports', menu_nm: '仓库报表', path: '/warehouse/reports' }
         ]
     },
     {
@@ -87,8 +89,7 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         menu_cd: 'qc', menu_nm: '质检管理',
         children: [
             { menu_cd: 'qc-results', menu_nm: '质检结果', path: '/qc/results' },
-            { menu_cd: 'qc-input', menu_nm: '质检录入', path: '/qc/input' },
-            { menu_cd: 'qc-audit', menu_nm: '质检审核', path: '/qc/audit' }
+            { menu_cd: 'qc-input', menu_nm: '质检录入', path: '/qc/input' }
         ]
     },
     {

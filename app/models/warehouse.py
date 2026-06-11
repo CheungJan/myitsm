@@ -78,7 +78,7 @@ class StockDetailDt(BaseModel):
     prddate = db.Column(db.DateTime, comment="生产日期")
     billid = db.Column(db.String(8), comment="单据号")
     invdate = db.Column(db.DateTime, comment="库存日期")
-    invtyp = db.Column(db.String(1), comment="出入库类型")
+    invtyp = db.Column(db.String(2), comment="出入库类型")
     itemqty = db.Column(db.Integer, default=0, comment="变动数量")
     storeqty = db.Column(db.Integer, default=0, comment="库存余量")
     opercd = db.Column(db.String(6), comment="操作员")
@@ -106,8 +106,8 @@ class StockIn(BaseModel):
     inbillid = db.Column(db.String(8), primary_key=True, comment="入库单号")
     whcd = db.Column(db.String(2), nullable=False, comment="仓库编码")
     indate = db.Column(db.DateTime, comment="入库日期")
-    invtyp = db.Column(db.String(1), nullable=False, comment="入库类型")
-    refbillid = db.Column(db.String(8), comment="关联单据号")
+    invtyp = db.Column(db.String(2), nullable=False, comment="入库类型")
+    refbillid = db.Column(db.String(30), comment="关联单据号")
     ptimes = db.Column(db.Integer, comment="打印次数")
     memo = db.Column(db.String(255), comment="备注")
     opercd = db.Column(db.String(6), comment="操作员")
@@ -142,7 +142,7 @@ class StockInDetail(BaseModel):
     batchid = db.Column(db.String(50), comment="批次号")
     inqty = db.Column(db.Integer, default=0, comment="入库数量")
     reflineno = db.Column(db.Integer, comment="关联行号")
-    ref_rgstbillid = db.Column(db.String(8), comment="来源订单号")
+    ref_rgstbillid = db.Column(db.String(30), comment="来源订单号")
     ref_rgstlineno = db.Column(db.Integer, comment="来源订单行号")
     eid = db.Column(db.String(13), comment="设备EID（质检后）")
     seid = db.Column(db.String(30), comment="序列号（质检后）")
@@ -170,7 +170,7 @@ class StockOut(BaseModel):
     outbillid = db.Column(db.String(8), primary_key=True, comment="出库单号")
     whcd = db.Column(db.String(2), nullable=False, comment="仓库编码")
     outdate = db.Column(db.DateTime, comment="出库日期")
-    invtyp = db.Column(db.String(1), nullable=False, comment="出库类型")
+    invtyp = db.Column(db.String(2), nullable=False, comment="出库类型")
     ptimes = db.Column(db.Integer, comment="打印次数")
     memo = db.Column(db.String(255), comment="备注")
     opercd = db.Column(db.String(6), comment="操作员")
@@ -182,7 +182,7 @@ class StockOut(BaseModel):
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     targetwhcd = db.Column(db.String(2), comment="目标仓库（调拨）")
     suppcd = db.Column(db.String(8), comment="供应商编码（退货）")
-    refbillid = db.Column(db.String(8), comment="关联单据号")
+    refbillid = db.Column(db.String(30), comment="关联单据号")
 
     details_eid = db.relationship("StockOutDetailEid", back_populates="stock_out", lazy="dynamic")
     details_prd = db.relationship("StockOutDetailPrd", back_populates="stock_out", lazy="dynamic")
@@ -210,6 +210,11 @@ class StockOutDetailEid(BaseModel):
     qcqty = db.Column(db.Integer, default=0, comment="质检数量")
     reflineno = db.Column(db.Integer, comment="关联行号")
     s_money = db.Column(db.Numeric(10, 2), comment="金额")
+    closed_flg = db.Column(db.String(1), default="0", comment="结案标志 0=未结案 1=已结案")
+    closed_reason = db.Column(db.String(100), comment="结案原因")
+    closed_by = db.Column(db.String(6), comment="结案操作人")
+    closed_at = db.Column(db.DateTime, comment="结案时间")
+    ref_inbillid = db.Column(db.String(8), comment="来源入库单号（质检出库追溯）")
 
     stock_out = db.relationship("StockOut", back_populates="details_eid")
 
@@ -235,6 +240,11 @@ class StockOutDetailPrd(BaseModel):
     qcqty = db.Column(db.Integer, default=0, comment="质检数量")
     reflineno = db.Column(db.Integer, comment="关联行号")
     s_money = db.Column(db.Numeric(10, 2), comment="金额")
+    closed_flg = db.Column(db.String(1), default="0", comment="结案标志 0=未结案 1=已结案")
+    closed_reason = db.Column(db.String(100), comment="结案原因")
+    closed_by = db.Column(db.String(6), comment="结案操作人")
+    closed_at = db.Column(db.DateTime, comment="结案时间")
+    ref_inbillid = db.Column(db.String(8), comment="来源入库单号（质检出库追溯）")
 
     stock_out = db.relationship("StockOut", back_populates="details_prd")
 
@@ -433,9 +443,10 @@ class QcResult(BaseModel):
 
     __tablename__ = "tqc10_result"
 
-    qcbillid = db.Column(db.String(8), primary_key=True, comment="质检单号")
+    qcbillid = db.Column(db.String(12), primary_key=True, comment="质检单号")
+    batch_id = db.Column(db.String(12), nullable=True, comment="批次号")
     optyp = db.Column(db.String(2), comment="操作类型")
-    refbillid = db.Column(db.String(8), comment="关联单号")
+    refbillid = db.Column(db.String(30), comment="关联单号")
     itemcd = db.Column(db.String(6), comment="物料编码")
     eid = db.Column(db.String(13), comment="设备序列号")
     opercd = db.Column(db.String(6), comment="操作员")
@@ -446,6 +457,7 @@ class QcResult(BaseModel):
     auditflg = db.Column(db.String(1), comment="审核标志")
     auditdate = db.Column(db.DateTime, comment="审核日期")
     qcstatus = db.Column(db.String(2), comment="质检状态")
+    memo = db.Column(db.String(200), comment="备注")
 
     detail_items = db.relationship("QcResultDt", back_populates="qc_result", lazy="dynamic")
     detail_eids = db.relationship("QcResultEid", back_populates="qc_result", lazy="dynamic")
@@ -458,7 +470,7 @@ class QcResultDt(BaseModel):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="主键")
     qcbillid = db.Column(
-        db.String(8),
+        db.String(12),
         db.ForeignKey("tqc10_result.qcbillid"),
         nullable=False,
         comment="质检单号",
@@ -478,6 +490,7 @@ class QcResultDt(BaseModel):
     inspector = db.Column(db.String(8), comment="检验员")
     qc_source = db.Column(db.String(1), comment="质检来源")
     remark = db.Column(db.String(100), comment="备注")
+    ref_rgstbillid = db.Column(db.String(30), comment="来源入库单号")
 
     qc_result = db.relationship("QcResult", back_populates="detail_items")
 
@@ -489,7 +502,7 @@ class QcResultEid(BaseModel):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="主键")
     qcbillid = db.Column(
-        db.String(8),
+        db.String(12),
         db.ForeignKey("tqc10_result.qcbillid"),
         nullable=False,
         comment="质检单号",
@@ -511,6 +524,7 @@ class QcResultEid(BaseModel):
     qc_source = db.Column(db.String(1), comment="质检来源")
     remark = db.Column(db.String(100), comment="备注")
     manuf_seq = db.Column(db.String(100), comment="制造序列号")
+    ref_rgstbillid = db.Column(db.String(30), comment="来源入库单号")
 
     qc_result = db.relationship("QcResult", back_populates="detail_eids")
 

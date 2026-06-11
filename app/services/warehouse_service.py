@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime as dt_parse
+from datetime import UTC, datetime as dt_parse
 
 from typing import Any
 
@@ -10,7 +10,7 @@ from sqlalchemy import func
 
 from app.extensions import db
 from app.models.master import Item
-from app.models.warehouse import Warehouse
+from app.models.warehouse import StockDetail, StockIn, StockOut, Warehouse
 from app.repositories.warehouse_repository import (
     AssetCheckRepository,
     OverLostRepository,
@@ -40,19 +40,52 @@ def _enrich_warehouse_names(rows: list[dict[str, Any]]) -> None:
 
 
 def _enrich_item_names(details: list[dict[str, Any]]) -> None:
-    """批量补充明细中的物料名称 item_nm。"""
+    """批量补充明细中的物料名称 item_nm、易耗品标志 consume、库存上下限、中类编码 class_cd、是否成品 is_bom。"""
     itemcds = list({d.get("itemcd") for d in details if d.get("itemcd")})
     if not itemcds:
         return
-    item_map = dict(
-        db.session.query(Item.item_cd, Item.item_nm)
+    rows = (
+        db.session.query(Item.item_cd, Item.item_nm, Item.consume,
+                         Item.upperlimit, Item.lowerlimit, Item.class_cd)
         .filter(Item.item_cd.in_(itemcds))
         .all()
     )
+    item_map = {r[0]: (r[1] or "", r[2] or "", r[3], r[4], r[5] or "") for r in rows}
+    # 查询哪些物料是成品（在 BOM 主表中）
+    from app.models.master import Bom
+    bom_cds = {r[0] for r in db.session.query(Bom.bomcd).filter(Bom.bomcd.in_(itemcds)).all()}
+    _default = ("", "", None, None, "")
     for d in details:
         cd = d.get("itemcd")
         if cd:
-            d["item_nm"] = item_map.get(cd, "")
+            v = item_map.get(cd, _default)
+            d["item_nm"] = v[0]
+            d["consume"] = v[1]
+            d["upperlimit"] = v[2]
+            d["lowerlimit"] = v[3]
+            d["class_cd"] = v[4]
+            d["is_bom"] = cd in bom_cds
+
+
+def _enrich_prddate_from_out(details: list[dict[str, Any]], outbillid: str) -> None:
+    """如果入库明细 prddate 为空，从关联出库单批次明细按 reflineno 回填。"""
+    from app.models.warehouse import StockOutDetailPrd
+
+    # 找出缺少 prddate 且有 reflineno 的明细
+    need_fill = [d for d in details if not d.get("prddate") and d.get("reflineno")]
+    if not need_fill:
+        return
+    # 查询出库单批次明细
+    prd_rows = (
+        db.session.query(StockOutDetailPrd.lineno, StockOutDetailPrd.prddate)
+        .filter(StockOutDetailPrd.outbillid == outbillid, StockOutDetailPrd.prddate.isnot(None))
+        .all()
+    )
+    prd_map = {r.lineno: r.prddate.isoformat() for r in prd_rows}
+    for d in need_fill:
+        ref = d.get("reflineno")
+        if ref and ref in prd_map:
+            d["prddate"] = prd_map[ref]
 
 
 class WarehouseService:
@@ -90,6 +123,190 @@ class StockInService:
     """入库单服务。"""
 
     @staticmethod
+    def list_receivable_orders() -> list[dict[str, Any]]:
+        """查询可入库的采购订单列表（供前端选择订单下拉框）。"""
+        return StockInRepository.find_receivable_orders()
+
+    @staticmethod
+    def list_transferable_orders() -> list[dict[str, Any]]:
+        """查询可调拨入库的调拨出库单列表。"""
+        return StockInRepository.find_transferable_orders()
+
+    @staticmethod
+    def skip_service_return(maintenance_id: str, reason: str, eids: list[str] | None = None) -> dict[str, object]:
+        """按EID标记ITSM配件变更为不入库。eids为空则标记该工单全部。"""
+        from app.models.itsm import AccessoriesUpdate
+        query = (
+            db.session.query(AccessoriesUpdate)
+            .filter(
+                AccessoriesUpdate.maintenance_id == maintenance_id,
+                AccessoriesUpdate.old_accessories_id.isnot(None),
+                AccessoriesUpdate.old_accessories_id != "",
+                AccessoriesUpdate.in_wh.is_distinct_from("1"),
+            )
+        )
+        if eids:
+            query = query.filter(AccessoriesUpdate.old_accessories_id.in_(eids))
+        records = query.all()
+        if not records:
+            return {"success": False, "error": "未找到待处理的配件变更记录"}
+        for r in records:
+            r.in_wh = "2"
+            r.description = (r.description or "") + f" [不入库: {reason}]"
+        db.session.commit()
+        return {"success": True, "maintenance_id": maintenance_id, "count": len(records)}
+
+    @staticmethod
+    def confirm_service_return(maintenance_ids: list[str], operator: str) -> dict[str, object]:
+        """确认ITSM配件变更并生成服务返还入库草稿。"""
+        from app.models.itsm import AccessoriesUpdate
+
+        created = []
+        for mid in maintenance_ids:
+            records = (
+                db.session.query(AccessoriesUpdate)
+                .filter(
+                    AccessoriesUpdate.maintenance_id == mid,
+                    AccessoriesUpdate.old_accessories_id.isnot(None),
+                    AccessoriesUpdate.old_accessories_id != "",
+                    AccessoriesUpdate.in_wh.is_distinct_from("1"),
+                )
+                .all()
+            )
+            if not records:
+                continue
+
+            from app.models.master import Eid as EidModel
+            eids = [r.old_accessories_id for r in records if r.old_accessories_id]
+            if not eids:
+                continue
+
+            details = []
+            for r in records:
+                details.append({
+                    "itemcd": "",
+                    "inqty": 1,
+                    "eid": r.old_accessories_id,
+                })
+
+            if details:
+                # 补物料编码
+                eid_info = {
+                    r[0]: r[1] for r in db.session.query(EidModel.eid, EidModel.itemcd)
+                    .filter(EidModel.eid.in_([d["eid"] for d in details]))
+                    .all()
+                }
+                for d in details:
+                    d["itemcd"] = eid_info.get(d["eid"], "")
+
+                StockInService.create(
+                    data={
+                        "invtyp": "3",
+                        "refbillid": mid,
+                        "whcd": "",
+                    },
+                    details=details,
+                    creator=operator,
+                    _commit=False,
+                )
+                # 标记为已入库
+                for r in records:
+                    r.in_wh = "1"
+                created.append(mid)
+
+        db.session.commit()
+        return {"success": True, "created": len(created), "maintenance_ids": created}
+
+    @staticmethod
+    def get_lendable_order_lines(outbillid: str) -> list[dict[str, Any]]:
+        """查询某借出出库单中尚未归还的明细行。"""
+        return StockInRepository.get_lendable_order_lines(outbillid)
+
+    @staticmethod
+    def list_repair_returnable() -> list[dict[str, Any]]:
+        """查询可返修入库的返修出库单列表（已审核且未完全入库）。"""
+        return StockInRepository.find_repair_returnable_orders()
+
+    @staticmethod
+    def get_repair_returnable_lines(outbillid: str) -> list[dict[str, Any]]:
+        """查询某返修出库单中尚未入库的明细行。"""
+        return StockInRepository.get_repair_returnable_lines(outbillid)
+
+    @staticmethod
+    def list_production_returnable() -> list[dict[str, Any]]:
+        """查询可生产入库的生产出库单列表。"""
+        return StockInRepository.find_production_returnable_orders()
+
+    @staticmethod
+    def get_production_returnable_lines(outbillid: str) -> list[dict[str, Any]]:
+        """查询某生产出库单中尚未入库的明细行。"""
+        return StockInRepository.get_production_returnable_lines(outbillid)
+
+    @staticmethod
+    def list_renovation_returnable() -> list[dict[str, Any]]:
+        """查询可翻新入库的翻新出库单列表（OV=10，供 IV=6 选单）。"""
+        return StockInRepository.find_renovation_returnable_orders()
+
+    @staticmethod
+    def get_renovation_returnable_lines(outbillid: str) -> list[dict[str, Any]]:
+        """查询某翻新出库单中尚未入库的明细行。"""
+        return StockInRepository.get_renovation_returnable_lines(outbillid)
+
+    @staticmethod
+    def list_qc_returnable() -> list[dict[str, Any]]:
+        """查询可质检入库的质检出库单列表（IV=11）。"""
+        return StockInRepository.find_qc_returnable_orders()
+
+    @staticmethod
+    def list_ov5_for_qc() -> list[dict[str, Any]]:
+        """查询还有未QC物料的 OV=5 质检出库单列表。"""
+        return StockInRepository.find_ov5_for_qc()
+
+    @staticmethod
+    def get_qc_returnable_lines(outbillid: str) -> list[dict[str, Any]]:
+        """查询某质检出库单中尚未入库的明细行。"""
+        return StockInRepository.get_qc_returnable_lines(outbillid)
+
+    @staticmethod
+    def list_qc_out_pending() -> list[dict[str, Any]]:
+        """查询可供质检出库选单的已审核采购入库单（OV=5 来源单）。"""
+        return StockInRepository.find_qc_out_pending_orders()
+
+    @staticmethod
+    def get_qc_pending_lines(inbillid: str) -> list[dict[str, Any]]:
+        """查询某采购入库单的物料明细（供 OV=5 质检出库选择）。
+
+        返回该入库单下的所有物料明细，包括批次和EID信息。
+        """
+        return StockInRepository.get_qc_pending_lines(inbillid)
+
+    @staticmethod
+    def list_sales_returnable() -> list[dict[str, Any]]:
+        """查询可销售退货入库的销售出库单（IV=2）。"""
+        return StockInRepository.find_sales_returnable_orders()
+
+    @staticmethod
+    def get_sales_returnable_lines(outbillid: str) -> list[dict[str, Any]]:
+        """查询某销售出库单中尚未退货的明细行。"""
+        return StockInRepository.get_sales_returnable_lines(outbillid)
+
+    @staticmethod
+    def list_service_returnable() -> list[dict[str, Any]]:
+        """查询 ITSM 工单中可返还的自有资产旧配件。"""
+        result = StockInRepository.find_service_returnable_items()
+        # 补充物料名称
+        all_items = []
+        for r in result:
+            all_items.extend(r.get("items", []))
+        _enrich_item_names(all_items)
+        return result
+
+    @staticmethod
+    def get_receivable_order_lines(rgstbillid: str) -> list[dict[str, Any]]:
+        """查询某采购订单的可入库明细行。"""
+        return StockInRepository.get_receivable_order_lines(rgstbillid)
+
+    @staticmethod
     def get(inbillid: str) -> dict[str, Any] | None:
         record = StockInRepository.get_by_id(inbillid)
         if record is None:
@@ -98,6 +315,10 @@ class StockInService:
         result["details"] = [d.to_dict() for d in record.details]  # type: ignore[attr-defined]
         _enrich_warehouse_names([result])
         _enrich_item_names(result["details"])
+        # 如果入库明细 prddate 为空且有关联出库单，从出库单批次明细回填
+        refbillid = result.get("refbillid")
+        if refbillid:
+            _enrich_prddate_from_out(result["details"], refbillid)
         return result
 
     @staticmethod
@@ -105,11 +326,16 @@ class StockInService:
         whcd: str | None = None,
         invtyp: str | None = None,
         auditflg: str | None = None,
+        inbillid: str | None = None,
+        indate_from: str | None = None,
+        indate_to: str | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> dict[str, Any]:
         items, total = StockInRepository.list_by_filters(
-            whcd=whcd, invtyp=invtyp, auditflg=auditflg, page=page, per_page=per_page
+            whcd=whcd, invtyp=invtyp, auditflg=auditflg,
+            inbillid=inbillid, indate_from=indate_from, indate_to=indate_to,
+            page=page, per_page=per_page,
         )
         data = [item.to_dict() for item in items]
         _enrich_warehouse_names(data)
@@ -121,14 +347,107 @@ class StockInService:
         }
 
     @staticmethod
+    def _validate_details(details: list[dict[str, Any]], invtyp: str = "") -> str | None:
+        """校验明细：itemcd 存在性、itemtyp 合法性、EID 匹配与位置。返回错误信息或 None。"""
+        from app.models.master import Item, SysCode, Eid
+        valid_qc = {c.code_cd for c in db.session.query(SysCode.code_cd).filter(SysCode.code_typ == "QC").all()}
+        # 销售退货入库、翻新入库：EID 必须在库外且未在门店活跃部署
+        check_store_off = invtyp in ("2", "6")
+        # 回收入库：EID 必须在库外
+        check_outside = invtyp == "7"
+        for i, d in enumerate(details, 1):
+            itemcd = d.get("itemcd", "")
+            if not itemcd: continue
+            if not db.session.query(Item.item_cd).filter(Item.item_cd == itemcd).scalar():
+                return f"第{i}行物料 {itemcd} 不存在"
+            ityp = d.get("itemtyp", "")
+            if ityp and ityp not in valid_qc:
+                return f"第{i}行物料类型 {ityp} 无效（有效值: {', '.join(sorted(valid_qc))}）"
+            eid = d.get("eid", "")
+            if eid:
+                eid_rec = db.session.query(Eid.itemcd, Eid.eid, Eid.whcd).filter(Eid.eid == eid).first()
+                if eid_rec is None:
+                    return f"第{i}行 EID {eid} 不存在"
+                elif eid_rec.itemcd != itemcd:
+                    return f"第{i}行 EID {eid} 属于物料 {eid_rec.itemcd}，与填写的 {itemcd} 不匹配"
+                if check_store_off or check_outside:
+                    if eid_rec.whcd:
+                        return f"第{i}行 EID {eid} 当前在 {eid_rec.whcd} 仓"
+                if check_store_off:
+                    from app.models.master import CustPosRl, Customer
+                    active_pos = db.session.query(
+                        CustPosRl.pos_cd, CustPosRl.cust_cd,
+                    ).filter(
+                        CustPosRl.eid == eid,
+                        CustPosRl.useflg == "1",
+                    ).first()
+                    if active_pos:
+                        location = active_pos.pos_cd or ""
+                        if active_pos.cust_cd:
+                            cust = db.session.query(Customer.cust_nm).filter(
+                                Customer.cust_cd == active_pos.cust_cd,
+                            ).scalar()
+                            if cust:
+                                location = f"{cust}({active_pos.cust_cd})" if location else f"客户 {cust}"
+                        if not location:
+                            location = "客户现场"
+                        return f"第{i}行 EID {eid} 仍在 {location} 服役，请先走取机流程"
+        return None
+
+
     def create(
         data: dict[str, Any],
         details: list[dict[str, Any]],
         creator: str,
+        _commit: bool = True,
     ) -> dict[str, Any]:
+        # 明细校验
+        err = StockInService._validate_details(details, data.get("invtyp", ""))
+        if err:
+            return {"success": False, "error": err}
+        ref_rgstbillid = data.get("refbillid") if data.get("invtyp") in ("1", "4", "5", "8", "9") else None
+
+        # 如果同一来源单据已有未审核草稿，则更新草稿而非新建
+        existing_draft = None
+        if ref_rgstbillid:
+            from app.models.warehouse import StockIn as StockInModel
+            existing_draft = (
+                db.session.query(StockInModel)
+                .filter(
+                    StockInModel.refbillid == data["refbillid"],
+                    StockInModel.invtyp == data.get("invtyp"),
+                    StockInModel.auditflg == "0",
+                )
+                .first()
+            )
+
+        if existing_draft:
+            # 更新已有草稿：仓库、供应商、日期、备注
+            existing_draft.whcd = data.get("whcd", existing_draft.whcd)
+            existing_draft.suppcd = data.get("suppcd", existing_draft.suppcd)
+            if data.get("indate"):
+                existing_draft.indate = data["indate"]
+            elif not existing_draft.indate:
+                existing_draft.indate = dt_parse.now(UTC)
+            existing_draft.memo = (data.get("memo") or "") + " [手动更新]"
+            existing_draft.opercd = creator
+            # 删除旧明细，写入新明细
+            existing_draft.details.delete()
+            for idx, detail_data in enumerate(details, start=1):
+                detail_data["ref_rgstbillid"] = ref_rgstbillid
+                detail_data["ref_rgstlineno"] = detail_data.get("reflineno")
+                StockInRepository.add_detail(
+                    inbillid=existing_draft.inbillid,
+                    whcd=existing_draft.whcd,
+                    lineno=idx,
+                    data=detail_data,
+                )
+            if _commit:
+                db.session.commit()
+            return existing_draft.to_dict()
+
+        # 无草稿则新建
         record = StockInRepository.create(data, creator)
-        # P1-1: 采购入库时冗余来源订单信息到明细
-        ref_rgstbillid = data.get("refbillid") if data.get("invtyp") == "1" else None
         for idx, detail_data in enumerate(details, start=1):
             if ref_rgstbillid:
                 detail_data["ref_rgstbillid"] = ref_rgstbillid
@@ -139,23 +458,54 @@ class StockInService:
                 lineno=idx,
                 data=detail_data,
             )
-        db.session.commit()
+        if _commit:
+            db.session.commit()
         return record.to_dict()
 
     @staticmethod
-    def audit(inbillid: str, auditor: str, whcd: str = "", checkmemo: str = "") -> dict[str, object]:
+    def audit(
+        inbillid: str, auditor: str,
+        whcd: str = "", checkmemo: str = "",
+        auditflg: str = "2",
+    ) -> dict[str, object]:
         record = StockInRepository.get_by_id(inbillid)
         if record is None:
             return {"success": False, "error": "入库单不存在"}
         if record.auditflg == "2":
             return {"success": False, "error": "已审核，不可重复审核"}
+        if record.auditflg == "8" and auditflg == "8":
+            return {"success": False, "error": "已退回，请先编辑后再审核"}
         # 如果传入 whcd 则覆盖（用于自动生成的空 whcd 草稿）
         if whcd:
             record.whcd = whcd
         if not record.whcd:
             return {"success": False, "error": "请先选择入库仓库后再审核"}
+
+        # 审核退回（auditflg='8'）：仅改状态+备注，不更新库存
+        if auditflg == "8":
+            record.auditflg = "8"
+            record.auditman = auditor
+            record.auditdate = dt_parse.now(UTC)
+            if checkmemo:
+                record.memo = (record.memo or "") + " [退回: " + checkmemo + "]"
+            db.session.commit()
+            return {"success": True, "inbillid": record.inbillid}
+
         if checkmemo:
-            record.memo = checkmemo
+            record.memo = (record.memo or "") + " [审核: " + checkmemo + "]"
+
+        if auditflg != "2":
+            return {"success": False, "error": f"不支持的审核动作: {auditflg}"}
+
+        # 服务返还入库且无明细（全部不入库）：审核后标 S
+        if record.invtyp == "3" and record.details.count() == 0:  # type: ignore[attr-defined]
+            record.auditflg = "S"
+            record.auditman = auditor
+            record.auditdate = dt_parse.now(UTC)
+            # 不更新库存（无明细），直接提交
+            db.session.commit()
+            return {"success": True, "inbillid": record.inbillid}
+
         StockInRepository.audit(record, auditor)
         for detail in record.details:  # type: ignore[attr-defined]
             StockDetailRepository.update_balance(
@@ -163,19 +513,104 @@ class StockInService:
                 itemcd=detail.itemcd,
                 qty_delta=detail.inqty or 0,
                 operator=auditor,
+                itemtyp=getattr(detail, 'itemtyp', None),
+                prddate=getattr(detail, 'prddate', None),
             )
             StockDetailRepository.add_movement(
                 whcd=record.whcd, itemcd=detail.itemcd,
                 itemqty=detail.inqty or 0,
                 billid=record.inbillid, invtyp=record.invtyp or "",
                 iotyp="1", operator=auditor,
+                itemtyp=getattr(detail, 'itemtyp', None),
+                prddate=getattr(detail, 'prddate', None),
             )
-            # EID 设备入库 → 同步更新 TMM43_EID.whcd
+            # EID 设备入库 → 同步更新或创建 TMM43_EID
             if detail.eid:
                 from app.models.master import Eid
+                eid_val = detail.eid
+                itemcd_val = detail.itemcd
+                whcd_val = record.whcd
+                vals: dict[str, Any] = {"whcd": whcd_val}
+                if record.invtyp in ("3", "7"):
+                    vals["qcflg"] = "DJ"
+                    vals["sflg"] = "2"
+                elif record.invtyp == "5":
+                    vals["sflg"] = "2"
+                elif record.invtyp in ("6", "8"):
+                    # 翻新/生产入库：新机/成品 EID 回库，标记在库可用
+                    vals["sflg"] = "1"
+                    vals["qcflg"] = "HG"  # 合格
                 db.session.query(Eid).filter(
-                    Eid.itemcd == detail.itemcd, Eid.eid == detail.eid,
-                ).update({"whcd": record.whcd}, synchronize_session=False)
+                    Eid.itemcd == itemcd_val, Eid.eid == eid_val,
+                ).update(vals, synchronize_session=False)
+        # QC 不合格品入库审核 → 自动生成对应出库单（报废→OV=7, 返修→OV=9, 退换→OV=6）
+        if record.invtyp == "11" and record.refbillid and record.refbillid.startswith("QC"):
+            try:
+                from app.models.warehouse import QcResult as Qc
+                qc = db.session.get(Qc, record.refbillid)
+                if qc and qc.qcstatus in ("BF", "BH", "TH"):
+                    ov_map = {"BF": "7", "BH": "9", "TH": "6"}
+                    label_map = {"BF": "报废", "BH": "返修", "TH": "退换"}
+                    ov_type = ov_map[qc.qcstatus]
+                    ov_wh = record.whcd  # 跟随 IV 入库仓库（操作员可能已修改）
+                    label = label_map[qc.qcstatus]
+                    out_eid: list[dict[str, Any]] = []
+                    out_prd: list[dict[str, Any]] = []
+                    for dt in record.details:
+                        d: dict[str, Any] = {"itemcd": dt.itemcd, "outqty": dt.inqty or 1, "itemtyp": qc.qcstatus}
+                        if getattr(dt, 'prddate', None):
+                            d["prddate"] = dt.prddate.isoformat() if hasattr(dt.prddate, 'isoformat') else str(dt.prddate)
+                        if getattr(dt, 'eid', None):
+                            d["eid"] = dt.eid
+                            out_eid.append(d)
+                        else:
+                            out_prd.append(d)
+                    if out_eid or out_prd:
+                        StockOutService.create(
+                            data={"invtyp": ov_type, "whcd": ov_wh, "refbillid": qc.qcbillid,
+                                  "memo": f"QC判定{label}自动出库 {record.inbillid}"},
+                            details_eid=out_eid, details_prd=out_prd, creator=auditor,
+                        )
+            except Exception:
+                pass  # 自动生成失败不影响入库审核
+
+        # 翻新入库审核通过 → 关联翻新出库单的旧机 EID 标记翻新完成（已报废/已翻新）
+        if record.invtyp == "6" and record.refbillid:
+            from app.models.master import Eid as EidModel
+            from app.models.warehouse import StockOutDetailEid as OutEid
+            old_eids = (
+                db.session.query(OutEid.eid, OutEid.itemcd)
+                .filter(OutEid.outbillid == record.refbillid)
+                .all()
+            )
+            for old_eid, old_itemcd in old_eids:
+                if old_eid:
+                    db.session.query(EidModel).filter(
+                        EidModel.eid == old_eid,
+                    ).update({
+                        "sflg": "8",    # 翻新完成（旧机已废弃）
+                        "qcflg": "BF",
+                    }, synchronize_session=False)
+            # 新EID溯源：ref_eid指向旧机EID（取第一个旧EID）
+            first_old = old_eids[0].eid if old_eids else None
+            if first_old:
+                in_eids = [d.eid for d in record.details if d.eid]  # type: ignore[attr-defined]
+                for new_eid in in_eids:
+                    db.session.query(EidModel).filter(
+                        EidModel.eid == new_eid,
+                    ).update({"ref_eid": first_old}, synchronize_session=False)
+        # 返修入库审核通过 → 重新激活入库明细中的EID（待检状态）
+        if record.invtyp == "9" and record.refbillid:
+            from app.models.master import Eid as EidModel
+            in_eids = [(d.eid, d.itemcd) for d in record.details if d.eid]  # type: ignore[attr-defined]
+            for eid_val, itemcd_val in in_eids:
+                db.session.query(EidModel).filter(
+                    EidModel.itemcd == itemcd_val, EidModel.eid == eid_val,
+                ).update({
+                    "whcd": record.whcd,
+                    "sflg": "3",    # 待检
+                    "qcflg": "DJ",  # 待检
+                }, synchronize_session=False)
         # P0-1: 采购入库审核后更新 TPC13.inqty
         if record.invtyp == "1" and record.refbillid:
             from app.models.procurement import PurchaseRegisterDt, RequisitionOrderLink
@@ -206,12 +641,141 @@ class StockInService:
                 {"linkstatus": "completed" if all_full else "partial_in"},
                 synchronize_session=False,
             )
+        # 质检出库(OV=5)不在此自动生成——操作员通过质检出库选择器手动触发
+        # 选择器接口: GET /stock-out/qc-pending（返回已审核的采购入库单列表）
+
+        # 服务返还入库审核：按EID标记 TIT25.in_wh='1'（仅入库的EID）
+        if record.invtyp == "3" and record.refbillid:
+            from app.models.itsm import AccessoriesUpdate
+            in_eids = [d.eid for d in record.details if d.eid]  # type: ignore[attr-defined]
+            if in_eids:
+                db.session.query(AccessoriesUpdate).filter(
+                    AccessoriesUpdate.maintenance_id == record.refbillid,
+                    AccessoriesUpdate.old_accessories_id.in_(in_eids),
+                ).update({"in_wh": "1"}, synchronize_session=False)
+
+        db.session.commit()
+        return {"success": True, "inbillid": record.inbillid}
+
+    @staticmethod
+    def void(inbillid: str, operator: str) -> dict[str, object]:
+        """作废入库单（仅未审核/已退回可作废）。
+
+        设计原则（见设计文档 §6.5.3）：
+        - 草稿入库单可独立作废，不影响已审核的来源出库单
+        - 入库单尚未生效（库存未增加），作废不产生库存影响
+        - 作废后可手动重新创建
+        """
+        record = StockInRepository.get_by_id(inbillid)
+        if record is None:
+            return {"success": False, "error": "入库单不存在"}
+        if record.auditflg == "2":
+            return {"success": False, "error": "已审核单据不可作废，请先反审核"}
+        if record.auditflg == "V":
+            return {"success": False, "error": "已作废"}
+        # 检查上游 QC 是否已审核
+        if record.refbillid and record.refbillid.startswith("QC"):
+            from app.models.warehouse import QcResult as Qc
+            qc = db.session.get(Qc, record.refbillid)
+            if qc and qc.auditflg == "1":
+                return {"success": False, "error": "上游 QC 已审核，请先反审核 QC 后再作废"}
+        # 服务返还入库：作废时按EID回退 TIT25.in_wh
+        if record.invtyp == "3" and record.refbillid:
+            from app.models.itsm import AccessoriesUpdate
+            in_eids = [d.eid for d in record.details if d.eid]  # type: ignore[attr-defined]
+            if in_eids:
+                db.session.query(AccessoriesUpdate).filter(
+                    AccessoriesUpdate.maintenance_id == record.refbillid,
+                    AccessoriesUpdate.old_accessories_id.in_(in_eids),
+                ).update({"in_wh": "0"}, synchronize_session=False)
+        record.auditflg = "V"
+        record.opercd = operator
+        db.session.commit()
+        return {"success": True, "inbillid": record.inbillid}
+
+    @staticmethod
+    def update(
+        inbillid: str, operator: str,
+        whcd: str = "", memo: str = "", indate: str = "",
+        details: list[dict[str, Any]] | None = None,
+    ) -> dict[str, object]:
+        """编辑入库单（仅未审核/已退回状态可编辑）。"""
+        record = StockInRepository.get_by_id(inbillid)
+        if record is None:
+            return {"success": False, "error": "入库单不存在"}
+        if record.auditflg not in ("0", "8"):
+            return {"success": False, "error": "仅未审核或已退回的单据可编辑"}
+        if details is not None:
+            err = StockInService._validate_details(details, record.invtyp or "")
+            if err:
+                return {"success": False, "error": err}
+        # 编辑后重置为未审核
+        record.auditflg = "0"
+        record.opercd = operator
+        if whcd:
+            record.whcd = whcd
+        if memo:
+            record.memo = memo
+        if indate:
+            record.indate = dt_parse.fromisoformat(indate) if isinstance(indate, str) else indate
+        elif not record.indate:
+            record.indate = dt_parse.now(UTC)
+        # 更新明细
+        if details is not None:
+            record.details.delete()
+            ref_rgstbillid = record.refbillid if record.invtyp in ("1", "4", "5", "8", "9") else None
+            for idx, detail_data in enumerate(details, start=1):
+                if ref_rgstbillid:
+                    detail_data["ref_rgstbillid"] = ref_rgstbillid
+                    detail_data["ref_rgstlineno"] = detail_data.get("reflineno")
+                StockInRepository.add_detail(
+                    inbillid=record.inbillid,
+                    whcd=record.whcd,
+                    lineno=idx,
+                    data=detail_data,
+                )
         db.session.commit()
         return {"success": True, "inbillid": record.inbillid}
 
 
 class StockOutService:
     """出库单服务。"""
+
+    @staticmethod
+    def _write_material_consume(record: Any, auditor: str) -> None:
+        """OV=8/OV=10 审核后写入 TMS04，同物料多次出库累加 actual_qty。"""
+        from app.models.mes import MaterialConsume
+        wo_id = getattr(record, "refbillid", None) or record.outbillid
+        now_ts = dt_parse.now(UTC)
+        for detail_list in [getattr(record, "details_eid", []), getattr(record, "details_prd", [])]:
+            for d in detail_list:  # type: ignore[var-annotated]
+                dd = d.to_dict() if hasattr(d, "to_dict") else d
+                item_cd = dd.get("itemcd", "") if isinstance(dd, dict) else ""
+                qty = int(dd.get("outqty", 0) or 0) if isinstance(dd, dict) else 0
+                if not item_cd or qty <= 0:
+                    continue
+                existing = db.session.query(MaterialConsume).filter(
+                    MaterialConsume.wo_id == wo_id, MaterialConsume.item_cd == item_cd,
+                ).first()
+                if existing:
+                    existing.actual_qty = (existing.actual_qty or 0) + qty
+                    existing.upddate = now_ts
+                else:
+                    db.session.add(MaterialConsume(
+                        wo_id=wo_id, item_cd=item_cd, actual_qty=qty,
+                        warehouse_cd=record.whcd, consume_date=now_ts.date(),
+                        opercd=auditor, upddate=now_ts,
+                    ))
+
+    @staticmethod
+    def list_returnable_orders() -> list[dict[str, Any]]:
+        """查询可退货出库的退货单列表。"""
+        return StockOutRepository.find_returnable_orders()
+
+    @staticmethod
+    def get_returnable_order_lines(pcbillid: str) -> list[dict[str, Any]]:
+        """查询某退货单的可退货出库明细行。"""
+        return StockOutRepository.get_returnable_order_lines(pcbillid)
 
     @staticmethod
     def get(outbillid: str) -> dict[str, Any] | None:
@@ -224,6 +788,36 @@ class StockOutService:
         _enrich_warehouse_names([result])
         _enrich_item_names(result["details_eid"])
         _enrich_item_names(result["details_prd"])
+
+        # 返修出库已审核：补充每行已入库数量，前端据此判断是否显示结案按钮
+        if record.invtyp == "9" and record.auditflg == "2":
+            from app.models.warehouse import StockIn, StockInDetail
+            returned_rows = (
+                db.session.query(
+                    StockInDetail.reflineno,
+                    func.sum(StockInDetail.inqty).label("returned_qty"),
+                )
+                .join(StockIn, StockInDetail.inbillid == StockIn.inbillid)
+                .filter(
+                    StockIn.invtyp == "9",
+                    StockIn.auditflg == "2",
+                    StockIn.refbillid == outbillid,
+                )
+                .group_by(StockInDetail.reflineno)
+                .all()
+            )
+            # 是否已有返修入库记录（至少收过一次货才允许结案）
+            result["has_returned"] = len(returned_rows) > 0
+            ret_map = {r.reflineno: int(r.returned_qty or 0) for r in returned_rows}
+            for d in result["details_eid"]:
+                ret = ret_map.get(d.get("lineno"), 0)
+                d["returned_qty"] = ret
+                d["pending_qty"] = max((d.get("outqty") or 0) - ret, 0)
+            for d in result["details_prd"]:
+                ret = ret_map.get(d.get("lineno"), 0)
+                d["returned_qty"] = ret
+                d["pending_qty"] = max((d.get("outqty") or 0) - ret, 0)
+
         return result
 
     @staticmethod
@@ -231,11 +825,13 @@ class StockOutService:
         whcd: str | None = None,
         invtyp: str | None = None,
         auditflg: str | None = None,
+        outbillid: str | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> dict[str, Any]:
         items, total = StockOutRepository.list_by_filters(
-            whcd=whcd, invtyp=invtyp, auditflg=auditflg, page=page, per_page=per_page
+            whcd=whcd, invtyp=invtyp, auditflg=auditflg,
+            outbillid=outbillid, page=page, per_page=per_page,
         )
         data = [item.to_dict() for item in items]
         _enrich_warehouse_names(data)
@@ -253,22 +849,60 @@ class StockOutService:
         details_prd: list[dict[str, Any]] | None = None,
         creator: str = "",
     ) -> dict[str, Any]:
+        # 明细校验（出库不传 invtyp，避免触发入库特有的位置校验）
+        all_details = (details_eid or []) + (details_prd or [])
+        err = StockInService._validate_details(all_details, "")
+        if err:
+            return {"success": False, "error": err}
+        # 退货出库：如果同一退货单已有未审核草稿，则更新草稿而非新建
+        existing_draft = None
+        if data.get("invtyp") == "6" and data.get("refbillid"):
+            existing_draft = (
+                db.session.query(StockOut)
+                .filter(
+                    StockOut.refbillid == data["refbillid"],
+                    StockOut.invtyp == "6",
+                    StockOut.auditflg == "0",
+                )
+                .first()
+            )
+
+        if existing_draft:
+            existing_draft.whcd = data.get("whcd", existing_draft.whcd)
+            existing_draft.suppcd = data.get("suppcd", existing_draft.suppcd)
+            if data.get("outdate"):
+                existing_draft.outdate = data["outdate"]
+            existing_draft.memo = (data.get("memo") or "") + " [手动更新]"
+            existing_draft.opercd = creator
+            # 替换明细
+            existing_draft.details_prd.delete()
+            existing_draft.details_eid.delete()
+            if details_eid:
+                for idx, detail_data in enumerate(details_eid, start=1):
+                    StockOutRepository.add_detail_eid(
+                        outbillid=existing_draft.outbillid,
+                        whcd=existing_draft.whcd, lineno=idx, data=detail_data,
+                    )
+            if details_prd:
+                for idx, detail_data in enumerate(details_prd, start=1):
+                    StockOutRepository.add_detail_prd(
+                        outbillid=existing_draft.outbillid,
+                        whcd=existing_draft.whcd, lineno=idx, data=detail_data,
+                    )
+            db.session.commit()
+            return existing_draft.to_dict()
+
+        # 无草稿则新建
         record = StockOutRepository.create(data, creator)
         if details_eid:
             for idx, detail_data in enumerate(details_eid, start=1):
                 StockOutRepository.add_detail_eid(
-                    outbillid=record.outbillid,
-                    whcd=record.whcd,
-                    lineno=idx,
-                    data=detail_data,
+                    outbillid=record.outbillid, whcd=record.whcd, lineno=idx, data=detail_data,
                 )
         if details_prd:
             for idx, detail_data in enumerate(details_prd, start=1):
                 StockOutRepository.add_detail_prd(
-                    outbillid=record.outbillid,
-                    whcd=record.whcd,
-                    lineno=idx,
-                    data=detail_data,
+                    outbillid=record.outbillid, whcd=record.whcd, lineno=idx, data=detail_data,
                 )
         db.session.commit()
         return record.to_dict()
@@ -280,48 +914,209 @@ class StockOutService:
             return {"success": False, "error": "出库单不存在"}
         if record.auditflg == "2":
             return {"success": False, "error": "已审核，不可重复审核"}
+        # 审核退回（'8'）：仅改状态+备注，不扣库存
+        if auditflg == "8":
+            record.auditflg = "8"
+            record.auditman = auditor
+            record.auditdate = dt_parse.now(UTC)
+            if checkmemo:
+                record.memo = (record.memo or "") + " [退回: " + checkmemo + "]"
+            db.session.commit()
+            return {"success": True, "outbillid": record.outbillid}
+        if auditflg != "2":
+            return {"success": False, "error": f"不支持的审核动作: {auditflg}"}
+
+        # 库存校验（在标记审核之前，校验失败不污染状态）
+        for detail in record.details_prd:  # type: ignore[attr-defined]
+            stock = int(
+                db.session.query(func.coalesce(func.sum(StockDetail.itemqty), 0))
+                .filter(StockDetail.whcd == record.whcd, StockDetail.itemcd == detail.itemcd)
+                .scalar() or 0
+            )
+            if stock < (detail.outqty or 0):
+                return {"success": False, "error": f"仓库 {record.whcd} 物料 {detail.itemcd} 库存不足（当前{stock}，需要{detail.outqty}）"}
+        for detail in record.details_eid:  # type: ignore[attr-defined]
+            if detail.eid:
+                from app.models.master import Eid
+                eid_wh = (
+                    db.session.query(Eid.whcd)
+                    .filter(Eid.eid == detail.eid)
+                    .scalar()
+                )
+                if eid_wh and eid_wh != record.whcd:
+                    return {"success": False, "error": f"EID {detail.eid} 在 {eid_wh} 仓，不在出库仓库 {record.whcd}，请修改仓库"}
+            stock = int(
+                db.session.query(func.coalesce(func.sum(StockDetail.itemqty), 0))
+                .filter(StockDetail.whcd == record.whcd, StockDetail.itemcd == detail.itemcd)
+                .scalar() or 0
+            )
+            if stock < (detail.outqty or 0):
+                return {"success": False, "error": f"仓库 {record.whcd} 物料 {detail.itemcd} 库存不足（当前{stock}，需要{detail.outqty}）"}
+
         StockOutRepository.audit(record, auditor, auditflg, checkmemo=checkmemo)
-        # 仅审核通过时扣库存
+        # 审核通过后扣库存
         if auditflg == "2":
+            for detail in record.details_eid:  # type: ignore[attr-defined]
+                # EID模式：校验该设备是否在出库仓库
+                if detail.eid:
+                    from app.models.master import Eid
+                    eid_wh = (
+                        db.session.query(Eid.whcd)
+                        .filter(Eid.eid == detail.eid)
+                        .scalar()
+                    )
+                    if eid_wh and eid_wh != record.whcd:
+                        return {
+                            "success": False,
+                            "error": f"EID {detail.eid} 在 {eid_wh} 仓，不在出库仓库 {record.whcd}，请修改仓库",
+                        }
+                stock = int(
+                    db.session.query(func.coalesce(func.sum(StockDetail.itemqty), 0))
+                    .filter(
+                        StockDetail.whcd == record.whcd,
+                        StockDetail.itemcd == detail.itemcd,
+                    )
+                    .scalar() or 0
+                )
+                if stock < (detail.outqty or 0):
+                    return {
+                        "success": False,
+                        "error": f"仓库 {record.whcd} 物料 {detail.itemcd} 库存不足（当前{stock}，需要{detail.outqty}）",
+                    }
+
             for detail in record.details_eid:  # type: ignore[attr-defined]
                 StockDetailRepository.update_balance(
                     whcd=record.whcd,
                     itemcd=detail.itemcd,
                     qty_delta=-(detail.outqty or 0),
                     operator=auditor,
+                    itemtyp=getattr(detail, 'itemtyp', None),
+                    prddate=getattr(detail, 'prddate', None),
                 )
                 StockDetailRepository.add_movement(
                     whcd=record.whcd, itemcd=detail.itemcd,
                     itemqty=-(detail.outqty or 0),
                     billid=record.outbillid, invtyp=record.invtyp or "",
                     iotyp="0", operator=auditor,
+                    itemtyp=getattr(detail, 'itemtyp', None),
+                    prddate=getattr(detail, 'prddate', None),
                 )
-                # EID 设备出库 → 清空 TMM43_EID.whcd
+                # EID 设备出库
                 if detail.eid:
                     from app.models.master import Eid
+                    eid_updates: dict[str, Any] = {}
+                    if record.invtyp == "2" and getattr(record, "targetwhcd", None):
+                        # 服务领用：EID 移到工程师仓，标记持有
+                        eid_updates["whcd"] = record.targetwhcd
+                        eid_updates["sflg"] = "1"
+                    elif record.invtyp == "4":
+                        # 借出出库：EID 离库，标记借出中
+                        eid_updates["whcd"] = None
+                        eid_updates["sflg"] = "6"
+                    elif record.invtyp == "7":
+                        # 报废出库：EID 标记已报废
+                        eid_updates["whcd"] = None
+                        eid_updates["sflg"] = "2"
+                        eid_updates["qcflg"] = "BF"
+                    elif record.invtyp == "9":
+                        # 返修出库：EID 离库，标记返修中
+                        eid_updates["whcd"] = None
+                        eid_updates["sflg"] = "5"
+                    elif record.invtyp == "8":
+                        # 生产出库：EID 离库，标记生产中
+                        eid_updates["whcd"] = None
+                        eid_updates["sflg"] = "7"
+                    elif record.invtyp == "10":
+                        # 翻新出库：旧机 EID 离库，标记翻新中（与生产中共用 sflg='7'）
+                        eid_updates["whcd"] = None
+                        eid_updates["sflg"] = "7"
+                    else:
+                        # 其他出库：EID 清空 whcd（离库）
+                        eid_updates["whcd"] = None
                     db.session.query(Eid).filter(
                         Eid.itemcd == detail.itemcd, Eid.eid == detail.eid,
-                    ).update({"whcd": None}, synchronize_session=False)
+                    ).update(eid_updates, synchronize_session=False)
+                # 服务领用/调拨：目的仓增加库存
+                target_wh = getattr(record, "targetwhcd", None)
+                if record.invtyp == "2" and target_wh:
+                    StockDetailRepository.update_balance(
+                        whcd=target_wh,
+                        itemcd=detail.itemcd,
+                        qty_delta=(detail.outqty or 0),
+                        operator=auditor,
+                        itemtyp=getattr(detail, 'itemtyp', None),
+                        prddate=getattr(detail, 'prddate', None),
+                    )
+                    StockDetailRepository.add_movement(
+                        whcd=target_wh, itemcd=detail.itemcd,
+                        itemqty=(detail.outqty or 0),
+                        billid=record.outbillid, invtyp=record.invtyp or "",
+                        iotyp="1", operator=auditor,
+                        itemtyp=getattr(detail, 'itemtyp', None),
+                        prddate=getattr(detail, 'prddate', None),
+                    )
             for detail in record.details_prd:  # type: ignore[attr-defined]
                 StockDetailRepository.update_balance(
                     whcd=record.whcd,
                     itemcd=detail.itemcd,
                     qty_delta=-(detail.outqty or 0),
                     operator=auditor,
+                    itemtyp=getattr(detail, 'itemtyp', None),
+                    prddate=getattr(detail, 'prddate', None),
                 )
                 StockDetailRepository.add_movement(
                     whcd=record.whcd, itemcd=detail.itemcd,
                     itemqty=-(detail.outqty or 0),
                     billid=record.outbillid, invtyp=record.invtyp or "",
                     iotyp="0", operator=auditor,
+                    itemtyp=getattr(detail, 'itemtyp', None),
+                    prddate=getattr(detail, 'prddate', None),
                 )
-                # EID 设备出库 → 清空 TMM43_EID.whcd
+                # 服务领用/调拨：目的仓增加库存
+                target_wh = getattr(record, "targetwhcd", None)
+                if record.invtyp == "2" and target_wh:
+                    StockDetailRepository.update_balance(
+                        whcd=target_wh,
+                        itemcd=detail.itemcd,
+                        qty_delta=(detail.outqty or 0),
+                        operator=auditor,
+                        itemtyp=getattr(detail, 'itemtyp', None),
+                        prddate=getattr(detail, 'prddate', None),
+                    )
+                    StockDetailRepository.add_movement(
+                        whcd=target_wh, itemcd=detail.itemcd,
+                        itemqty=(detail.outqty or 0),
+                        billid=record.outbillid, invtyp=record.invtyp or "",
+                        iotyp="1", operator=auditor,
+                        itemtyp=getattr(detail, 'itemtyp', None),
+                        prddate=getattr(detail, 'prddate', None),
+                    )
+                # EID 设备出库
                 eid_val = getattr(detail, 'eid', None)
                 if eid_val:
                     from app.models.master import Eid
+                    eid_updates: dict[str, Any] = {}
+                    if record.invtyp == "2" and getattr(record, "targetwhcd", None):
+                        eid_updates["whcd"] = record.targetwhcd
+                        eid_updates["sflg"] = "1"
+                    elif record.invtyp == "4":
+                        eid_updates["whcd"] = None
+                        eid_updates["sflg"] = "6"
+                    elif record.invtyp == "7":
+                        eid_updates["whcd"] = None
+                        eid_updates["sflg"] = "2"
+                        eid_updates["qcflg"] = "BF"
+                    elif record.invtyp == "9":
+                        eid_updates["whcd"] = None
+                        eid_updates["sflg"] = "5"  # 返修中
+                    elif record.invtyp == "8":
+                        eid_updates["whcd"] = None
+                        eid_updates["sflg"] = "7"  # 生产中
+                    else:
+                        eid_updates["whcd"] = None
                     db.session.query(Eid).filter(
                         Eid.itemcd == detail.itemcd, Eid.eid == eid_val,
-                    ).update({"whcd": None}, synchronize_session=False)
+                    ).update(eid_updates, synchronize_session=False)
             # P1-3: 退货出库审核通过 → 更新退货单状态
             if record.invtyp == "6" and record.refbillid:
                 from app.models.procurement import ReturnPurchaseBill
@@ -332,6 +1127,289 @@ class StockOutService:
                     {"auditflg": "2"},
                     synchronize_session=False,
                 )
+        # P0: 调拨出库审核通过 → 自动生成调拨入库草稿
+        if record.invtyp == "3" and getattr(record, "targetwhcd", None):
+            from app.models.warehouse import StockOutDetailPrd as OutPrd, StockOutDetailEid as OutEid
+            in_details = []
+            for d in record.details_prd:
+                dd = d.to_dict()
+                in_details.append({
+                    "itemcd": dd.get("itemcd"), "inqty": dd.get("outqty", 0),
+                    "reflineno": dd.get("lineno"),
+                })
+            for d in record.details_eid:
+                dd = d.to_dict()
+                in_details.append({
+                    "itemcd": dd.get("itemcd"), "inqty": dd.get("outqty", 0),
+                    "eid": dd.get("eid"), "reflineno": dd.get("lineno"),
+                })
+            if in_details:
+                StockInService.create(
+                    data={
+                        "invtyp": "4",
+                        "refbillid": record.outbillid,
+                        "whcd": record.targetwhcd,
+                    },
+                    details=in_details,
+                    creator=auditor,
+                    _commit=False,  # 由外层 audit 统一提交，保证原子性
+                )
+        # 返修出库审核通过 → 自动生成返修入库草稿（保留EID和批次信息）
+        if record.invtyp == "9":
+            in_details = []
+            for d in record.details_eid:  # type: ignore[attr-defined]
+                dd = d.to_dict()
+                in_details.append({
+                    "itemcd": dd.get("itemcd"), "inqty": dd.get("outqty", 0),
+                    "eid": dd.get("eid"), "reflineno": dd.get("lineno"),
+                })
+            for d in record.details_prd:  # type: ignore[attr-defined]
+                dd = d.to_dict()
+                in_details.append({
+                    "itemcd": dd.get("itemcd"), "inqty": dd.get("outqty", 0),
+                    "reflineno": dd.get("lineno"),
+                    **({"prddate": dd["prddate"]} if dd.get("prddate") else {}),
+                })
+            if in_details:
+                StockInService.create(
+                    data={
+                        "invtyp": "9",
+                        "refbillid": record.outbillid,
+                        "whcd": record.whcd,
+                    },
+                    details=in_details,
+                    creator=auditor,
+                    _commit=False,
+                )
+        # 生产出库审核 → 写入 TMS04，并推进工单到生产中。
+        # IV=8 成品入库由 FQC 审核 GA/GB/GC 后生成，避免未质检即入库。
+        if record.invtyp == "8":
+            # OV=8 → TMS04 + 推进工单到生产中
+            StockOutService._write_material_consume(record, auditor)
+            if record.refbillid:
+                from app.models.mes import WorkOrder
+                wo = db.session.get(WorkOrder, record.refbillid)
+                if wo and wo.status == "PICKING":
+                    wo.status = "IN_PROGRESS"
+                    wo.actual_start = dt_parse.now(UTC).date()
+        # OV=10 → TMS04
+        if record.invtyp == "10":
+            StockOutService._write_material_consume(record, auditor)
+        # OV=5 质检出库审核：不在此生成 IV=11。
+        # IV=11 在 QC 结果审核时按判定生成（仅 C1 合格物料入库）。
+        # 销售出库审核通过 → 自动生成销售退货入库草稿
+        if record.invtyp == "1":
+            in_details = []
+            for d in record.details_eid:  # type: ignore[attr-defined]
+                dd = d.to_dict()
+                in_details.append({
+                    "itemcd": dd.get("itemcd"), "inqty": dd.get("outqty", 0),
+                    "eid": dd.get("eid"), "reflineno": dd.get("lineno"),
+                })
+            for d in record.details_prd:  # type: ignore[attr-defined]
+                dd = d.to_dict()
+                in_details.append({
+                    "itemcd": dd.get("itemcd"), "inqty": dd.get("outqty", 0),
+                    "reflineno": dd.get("lineno"),
+                    **({
+                        "prddate": dd["prddate"]
+                    } if dd.get("prddate") else {}),
+                })
+            if in_details:
+                StockInService.create(
+                    data={
+                        "invtyp": "2",
+                        "refbillid": record.outbillid,
+                        "whcd": record.whcd,  # 退货入库仓库与出库仓库相同
+                    },
+                    details=in_details,
+                    creator=auditor,
+                    _commit=False,
+                )
+        db.session.commit()
+        return {"success": True, "outbillid": record.outbillid}
+
+    @staticmethod
+    def void(outbillid: str, operator: str) -> dict[str, object]:
+        """作废出库单（仅未审核/已退回可作废）。
+
+        设计原则（见设计文档 §6.5.3）：
+        - 出库单草稿作废时，关联入库单尚未自动生成（审核才生成），无需联动
+        - 出库单已审核不可作废，需走反审核流程
+        - 关联入库单草稿应独立作废，不影响已审核的出库单
+        """
+        record = StockOutRepository.get_by_id(outbillid)
+        if record is None:
+            return {"success": False, "error": "出库单不存在"}
+        if record.auditflg == "2":
+            return {"success": False, "error": "已审核单据不可作废，请先反审核"}
+        if record.auditflg == "V":
+            return {"success": False, "error": "已作废"}
+        # 检查上游 QC 是否已审核
+        if record.refbillid and record.refbillid.startswith("QC"):
+            from app.models.warehouse import QcResult as Qc
+            qc = db.session.get(Qc, record.refbillid)
+            if qc and qc.auditflg == "1":
+                return {"success": False, "error": "上游 QC 已审核，请先反审核 QC 后再作废"}
+        # 边界保护：如有关联入库单且已审核，不可作废（库存已入，防止孤立已审核入库单）
+        from app.models.warehouse import StockIn as StockInModel
+        linked_audited = db.session.query(StockInModel).filter(
+            StockInModel.refbillid == record.outbillid,
+            StockInModel.invtyp.in_(["2", "4", "8", "9", "11"]),
+            StockInModel.auditflg == "2",
+        ).first()
+        if linked_audited:
+            return {"success": False, "error": f"关联入库单 {linked_audited.inbillid} 已审核且库存已入，不可作废"}
+        record.auditflg = "V"
+        record.opercd = operator
+        db.session.commit()
+        return {"success": True, "outbillid": record.outbillid}
+
+    @staticmethod
+    def close_lines(
+        outbillid: str,
+        lines: list[dict[str, Any]],
+        reason: str,
+        operator: str,
+    ) -> dict[str, object]:
+        """出库单行级结案（标记指定明细行不再等待入库）。
+
+        lines 格式: [{"lineno": 1, "type": "eid"}, {"lineno": 5, "type": "prd"}]
+        仅已审核的出库单才允许行级结案。
+        """
+        from app.models.warehouse import StockOutDetailEid, StockOutDetailPrd
+
+        record = StockOutRepository.get_by_id(outbillid)
+        if record is None:
+            return {"success": False, "error": "出库单不存在"}
+        if record.auditflg != "2":
+            return {"success": False, "error": "仅已审核的出库单可进行行级结案"}
+
+        now = dt_parse.now(UTC)
+        closed_count = 0
+        for line in lines:
+            lineno = line.get("lineno")
+            line_type = line.get("type", "")
+            if lineno is None:
+                continue
+            if line_type == "eid":
+                detail = db.session.query(StockOutDetailEid).filter(
+                    StockOutDetailEid.outbillid == outbillid,
+                    StockOutDetailEid.lineno == lineno,
+                ).first()
+            elif line_type == "prd":
+                detail = db.session.query(StockOutDetailPrd).filter(
+                    StockOutDetailPrd.outbillid == outbillid,
+                    StockOutDetailPrd.lineno == lineno,
+                ).first()
+            else:
+                continue
+            if detail and getattr(detail, "closed_flg", "0") != "1":
+                detail.closed_flg = "1"
+                detail.closed_reason = reason
+                detail.closed_by = operator
+                detail.closed_at = now
+                closed_count += 1
+
+        # TODO: 当前草稿复用机制下（同 refbillid+invtyp 只有一张草稿），
+        # 操作员手动新建 IV=9 会更新而非新建，草稿审核后不存在待清理的草稿，
+        # 因此以下 draft cleanup 逻辑在当前流程中极少触发。
+        # 保留作为极端情况兜底（如并发创建绕过草稿复用），后续评估是否简化。
+        if closed_count > 0:
+            from app.models.warehouse import StockIn, StockInDetail
+            closed_linenos = {
+                line.get("lineno") for line in lines
+                if line.get("lineno") is not None
+            }
+            # 查找关联的 IV=9 未审核草稿
+            drafts = db.session.query(StockIn).filter(
+                StockIn.refbillid == outbillid,
+                StockIn.invtyp == "9",
+                StockIn.auditflg.in_(["0", "8"]),  # 草稿或退回
+            ).all()
+            voided_drafts: list[str] = []
+            cleaned_lines = 0
+            for draft in drafts:
+                # 删除草稿中 reflineno 匹配已结案行的明细
+                to_delete = db.session.query(StockInDetail).filter(
+                    StockInDetail.inbillid == draft.inbillid,
+                    StockInDetail.reflineno.in_(closed_linenos),
+                ).all()
+                for td in to_delete:
+                    db.session.delete(td)
+                    cleaned_lines += 1
+                # 如果草稿明细被删光，自动作废
+                remaining = db.session.query(StockInDetail).filter(
+                    StockInDetail.inbillid == draft.inbillid,
+                    ~StockInDetail.reflineno.in_(closed_linenos),
+                ).count()
+                if remaining == 0:
+                    draft.auditflg = "V"
+                    voided_drafts.append(draft.inbillid)
+
+        # 结案EID行时同步更新设备状态为已报废（确认不返修 = 报废处理）
+        if closed_count > 0:
+            from app.models.warehouse import StockOutDetailEid as OutEid
+            from app.models.master import Eid as EidModel
+            for line in lines:
+                if line.get("type") != "eid":
+                    continue
+                eid_row = db.session.query(OutEid).filter(
+                    OutEid.outbillid == outbillid,
+                    OutEid.lineno == line.get("lineno"),
+                ).first()
+                if eid_row and eid_row.eid:
+                    db.session.query(EidModel).filter(
+                        EidModel.itemcd == eid_row.itemcd,
+                        EidModel.eid == eid_row.eid,
+                    ).update({
+                        "sflg": "2",     # 已报废
+                        "qcflg": "BF",   # 报废
+                        "whcd": None,
+                    }, synchronize_session=False)
+
+        db.session.commit()
+        result: dict[str, object] = {
+            "success": True, "outbillid": outbillid, "closed_count": closed_count,
+        }
+        if closed_count > 0 and voided_drafts:
+            result["voided_drafts"] = voided_drafts
+        if closed_count > 0 and cleaned_lines:
+            result["cleaned_lines"] = cleaned_lines
+        return result
+
+    @staticmethod
+    def update(
+        outbillid: str, operator: str,
+        whcd: str = "", memo: str = "", outdate: str = "",
+        details_eid: list[dict[str, Any]] | None = None,
+        details_prd: list[dict[str, Any]] | None = None,
+    ) -> dict[str, object]:
+        """编辑出库单（仅未审核/已退回可编辑）。"""
+        record = StockOutRepository.get_by_id(outbillid)
+        if record is None:
+            return {"success": False, "error": "出库单不存在"}
+        if record.auditflg not in ("0", "8"):
+            return {"success": False, "error": "仅未审核或已退回的单据可编辑"}
+        if details_eid is not None or details_prd is not None:
+            all_details = (details_eid or []) + (details_prd or [])
+            err = StockInService._validate_details(all_details, "")
+            if err:
+                return {"success": False, "error": err}
+        record.auditflg = "0"
+        record.opercd = operator
+        if whcd: record.whcd = whcd
+        if memo: record.memo = memo
+        if outdate: record.outdate = dt_parse.fromisoformat(outdate) if isinstance(outdate, str) else outdate
+        if details_eid is not None or details_prd is not None:
+            record.details_eid.delete()
+            record.details_prd.delete()
+            if details_eid:
+                for idx, d in enumerate(details_eid, start=1):
+                    StockOutRepository.add_detail_eid(outbillid=record.outbillid, whcd=record.whcd, lineno=idx, data=d)
+            if details_prd:
+                for idx, d in enumerate(details_prd, start=1):
+                    StockOutRepository.add_detail_prd(outbillid=record.outbillid, whcd=record.whcd, lineno=idx, data=d)
         db.session.commit()
         return {"success": True, "outbillid": record.outbillid}
 

@@ -16,7 +16,23 @@ from app.schemas.auth import LoginRequest
 from app.services.auth_service import AuthService
 from app.utils.response import error_response, success_response
 
-__all__ = ["auth_bp", "login_required"]
+def auditor_required(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """审核权限装饰器 — 仅管理员和指定审批人可操作。"""
+
+    @wraps(fn)
+    @login_required
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        user_cd = g.get("current_user", "")
+        # 管理员或审批人列表（可通过 sysparam/数据库配置）
+        auditors = {"admin", "auditor", "system"}
+        if user_cd not in auditors:
+            return error_response(message="无审核权限，请联系管理员", code=403)
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+__all__ = ["auth_bp", "login_required", "auditor_required"]
 
 auth_bp = Blueprint("auth", __name__)
 

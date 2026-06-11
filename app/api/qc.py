@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from flask import Blueprint, request
 
-from app.api.auth import login_required
-from app.schemas.qc import QcCreate
+from app.api.auth import auditor_required, login_required
+from app.schemas.qc import QcAudit, QcCreate
 from app.services.qc_service import QcService
 from app.utils.response import error_response, success_response
 
@@ -30,6 +30,12 @@ def get_qc_stats():  # type: ignore[no-untyped-def]
     """质检状态统计。"""
     return success_response(data=QcService.get_stats())
 
+@qc_bp.get("/ov5-completion")
+@login_required
+def get_ov5_completion():  # type: ignore[no-untyped-def]
+    """OV=5质检出库完成情况统计。"""
+    return success_response(data=QcService.get_ov5_completion())
+
 
 @qc_bp.get("/<qcbillid>")
 @login_required
@@ -44,28 +50,125 @@ def get_qc_result(qcbillid: str):  # type: ignore[no-untyped-def]
 @qc_bp.post("")
 @login_required
 def create_qc_result():  # type: ignore[no-untyped-def]
-    """创建质检单（含明细）。"""
+    """创建质检单（含明细）。old_batch_id 存在时先作废旧批次再建新。"""
     body = request.get_json(silent=True) or {}
     try:
-        req = QcCreate(**body)
+        req = QcCreate(**{k: v for k, v in body.items() if k not in ("old_batch_id", "batch_id")})
     except Exception as e:
         return error_response(str(e), 400)
-    return success_response(
-        data=QcService.create(
-            data=req.model_dump(exclude={"details", "eid_details"}),
-            details=req.details,
-            eid_details=req.eid_details,
-        ),
-        code=201,
+    data = req.model_dump(exclude={"details", "eid_details"})
+    if "batch_id" in body:
+        data["batch_id"] = body["batch_id"]
+    result = QcService.create(
+        data=data,
+        details=req.details,
+        eid_details=req.eid_details,
+        old_batch_id=body.get("old_batch_id"),
     )
+    if not result.get("success", True):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result, code=201)
 
 
 @qc_bp.post("/<qcbillid>/audit")
-@login_required
+@auditor_required
 def audit_qc_result(qcbillid: str):  # type: ignore[no-untyped-def]
-    """审核质检单。"""
+    """审核质检单（通过/退回）。"""
     user_cd: str = request.headers.get("X-User-Cd", request.args.get("user_cd", "system"))
-    result = QcService.audit(qcbillid, auditor=user_cd)
+    try:
+        req = QcAudit(**(request.get_json(silent=True) or {}))
+    except Exception as e:
+        return error_response(str(e), 400)
+    result = QcService.audit(
+        qcbillid, auditor=user_cd,
+        auditflg=req.auditflg,
+        checkmemo=req.checkmemo,
+    )
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
-    return success_response(message="审核成功")
+    msg = "审核通过" if req.auditflg == "1" else "已退回"
+    return success_response(message=msg)
+
+
+@qc_bp.post("/<qcbillid>/unaudit")
+@auditor_required
+def unaudit_qc_result(qcbillid: str):  # type: ignore[no-untyped-def]
+    """QC 反审核。"""
+    user_cd: str = request.headers.get("X-User-Cd", request.args.get("user_cd", "system"))
+    result = QcService.unaudit(qcbillid, auditor=user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(message="已反审核")
+
+
+@qc_bp.post("/<qcbillid>/void")
+@login_required
+def void_qc_result(qcbillid: str):  # type: ignore[no-untyped-def]
+    """作废质检单（仅草稿/已退回）。"""
+    user_cd: str = request.headers.get("X-User-Cd", request.args.get("user_cd", "system"))
+    result = QcService.void(qcbillid, operator=user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(message="已作废")
+
+
+# ── 批次层端点 ──
+
+@qc_bp.get("/batches")
+@login_required
+def list_qc_batches():  # type: ignore[no-untyped-def]
+    """按批次聚合查询质检结果。"""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    search = request.args.get("search")
+    auditflg = request.args.get("auditflg")
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    eid = request.args.get("eid")
+    batches, total = QcService.list_batches(
+        page=page, per_page=per_page, search=search, auditflg=auditflg,
+        start_date=start_date, end_date=end_date, eid=eid,
+    )
+    return success_response(data={"items": batches, "total": total})
+
+
+@qc_bp.get("/batches/<batch_id>")
+@login_required
+def get_qc_batch(batch_id: str):  # type: ignore[no-untyped-def]
+    """获取批次详情（含所有子记录及明细）。"""
+    result = QcService.get_batch_details(batch_id)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=404)
+    return success_response(data=result)
+
+
+@qc_bp.post("/batches/<batch_id>/audit")
+@auditor_required
+def audit_qc_batch(batch_id: str):  # type: ignore[no-untyped-def]
+    """批次审核（通过/退回）。"""
+    body = request.get_json(silent=True) or {}
+    try:
+        req = QcAudit(**body)
+    except Exception as e:
+        return error_response(str(e), 400)
+    user_cd: str = request.headers.get("X-User-Cd", request.args.get("user_cd", "system"))
+    result = QcService.batch_audit(
+        batch_id, auditor=user_cd,
+        auditflg=req.auditflg,
+        checkmemo=req.checkmemo,
+    )
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    msg = "批次审核通过" if req.auditflg == "1" else "批次已退回"
+    return success_response(message=msg)
+
+
+@qc_bp.post("/batches/<batch_id>/void")
+@auditor_required
+def void_qc_batch(batch_id: str):  # type: ignore[no-untyped-def]
+    """批次作废。"""
+    user_cd: str = request.headers.get("X-User-Cd", request.args.get("user_cd", "system"))
+    result = QcService.batch_void(batch_id, operator=user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(message="批次已作废")
