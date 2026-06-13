@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from flask import g
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app.extensions import db
 from app.models.warehouse import QcResult, QcResultDt, QcResultEid
@@ -176,13 +176,23 @@ class QcRepository:
                 MIN(q.gendate) as gendate,
                 MIN(q.opercd) as opercd,
                 MIN(q.auditflg) as auditflg,
+                MIN(q.draft_type) as draft_type,
                 COUNT(DISTINCT q.qcbillid) as total_count,
                 SUM(CASE WHEN q.qcstatus = 'GA' THEN 1 ELSE 0 END) as ga_count,
                 SUM(CASE WHEN q.qcstatus = 'GB' THEN 1 ELSE 0 END) as gb_count,
                 SUM(CASE WHEN q.qcstatus = 'GC' THEN 1 ELSE 0 END) as gc_count,
                 SUM(CASE WHEN q.qcstatus = 'BF' THEN 1 ELSE 0 END) as bf_count,
                 SUM(CASE WHEN q.qcstatus = 'BH' THEN 1 ELSE 0 END) as bh_count,
-                SUM(CASE WHEN q.qcstatus = 'TH' THEN 1 ELSE 0 END) as th_count
+                SUM(CASE WHEN q.qcstatus = 'TH' THEN 1 ELSE 0 END) as th_count,
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM tqc10_result q2
+                    JOIN tqc11_resultdt dt ON q2.qcbillid = dt.qcbillid
+                    WHERE q2.batch_id = q.batch_id AND dt.replenish_status = 'pending'
+                ) OR EXISTS (
+                    SELECT 1 FROM tqc10_result q3
+                    JOIN tqc11_resulteid eid2 ON q3.qcbillid = eid2.qcbillid
+                    WHERE q3.batch_id = q.batch_id AND eid2.replenish_status = 'pending'
+                ) THEN 1 ELSE 0 END AS has_pending_replenish
             FROM tqc10_result q
             {eid_join}
             WHERE q.useflg = '1' AND q.batch_id IS NOT NULL
@@ -289,6 +299,78 @@ class QcRepository:
             qc.upddate = datetime.now(timezone.utc)
         db.session.commit()
         return qcs
+
+    @staticmethod
+    def get_eids_by_refbillid(refbillid: str) -> list[QcResultEid]:
+        """获取指定来源单据的所有已审核EID记录（用于FQC回显IPQC的配件EID）。"""
+        return list(
+            db.session.query(QcResultEid)
+            .join(QcResult, QcResultEid.qcbillid == QcResult.qcbillid)
+            .filter(
+                QcResult.refbillid == refbillid,
+                QcResult.auditflg == "1",
+                QcResult.useflg == "1",
+            )
+            .order_by(QcResultEid.lineno)
+            .all()
+        )
+
+    @staticmethod
+    def get_non_pass_details(batch_id: str) -> tuple[list[QcResultDt], list[QcResultEid]]:
+        """获取批次中所有 BF/BH/TH 且未补料的明细行。"""
+        qcs = QcRepository.get_batch_details(batch_id)
+        qcbillids = [q.qcbillid for q in qcs]
+        if not qcbillids:
+            return [], []
+        prd_rows = db.session.query(QcResultDt).filter(
+            QcResultDt.qcbillid.in_(qcbillids),
+            QcResultDt.qcstatus.in_(["BF", "BH", "TH"]),
+            db.or_(
+                QcResultDt.replenish_ov_billid == "",
+                QcResultDt.replenish_ov_billid.is_(None),
+            ),
+        ).all()
+        eid_rows = db.session.query(QcResultEid).filter(
+            QcResultEid.qcbillid.in_(qcbillids),
+            QcResultEid.qcstatus.in_(["BF", "BH", "TH"]),
+            db.or_(
+                QcResultEid.replenish_ov_billid == "",
+                QcResultEid.replenish_ov_billid.is_(None),
+            ),
+        ).all()
+        return list(prd_rows), list(eid_rows)
+
+    @staticmethod
+    def mark_details_replenished(batch_id: str, replenish_ov_billid: str) -> int:
+        """标记批次中所有非合格行为已申请补料，返回更新的行数。"""
+        qcs = QcRepository.get_batch_details(batch_id)
+        qcbillids = [q.qcbillid for q in qcs]
+        if not qcbillids:
+            return 0
+        count = 0
+        count += db.session.query(QcResultDt).filter(
+            QcResultDt.qcbillid.in_(qcbillids),
+            QcResultDt.qcstatus.in_(["BF", "BH", "TH"]),
+            db.or_(
+                QcResultDt.replenish_ov_billid == "",
+                QcResultDt.replenish_ov_billid.is_(None),
+            ),
+        ).update(
+            {"replenish_status": "pending", "replenish_ov_billid": replenish_ov_billid},
+            synchronize_session=False,
+        )
+        count += db.session.query(QcResultEid).filter(
+            QcResultEid.qcbillid.in_(qcbillids),
+            QcResultEid.qcstatus.in_(["BF", "BH", "TH"]),
+            db.or_(
+                QcResultEid.replenish_ov_billid == "",
+                QcResultEid.replenish_ov_billid.is_(None),
+            ),
+        ).update(
+            {"replenish_status": "pending", "replenish_ov_billid": replenish_ov_billid},
+            synchronize_session=False,
+        )
+        return count
 
     @staticmethod
     def get_stats() -> list[dict[str, object]]:

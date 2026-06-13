@@ -457,6 +457,7 @@ class QcResult(BaseModel):
     auditflg = db.Column(db.String(1), comment="审核标志")
     auditdate = db.Column(db.DateTime, comment="审核日期")
     qcstatus = db.Column(db.String(2), comment="质检状态")
+    draft_type = db.Column(db.String(1), default="", comment="草稿类型：S=暂存 C=提交")
     memo = db.Column(db.String(200), comment="备注")
 
     detail_items = db.relationship("QcResultDt", back_populates="qc_result", lazy="dynamic")
@@ -491,6 +492,8 @@ class QcResultDt(BaseModel):
     qc_source = db.Column(db.String(1), comment="质检来源")
     remark = db.Column(db.String(100), comment="备注")
     ref_rgstbillid = db.Column(db.String(30), comment="来源入库单号")
+    replenish_status = db.Column(db.String(10), default="", comment="补料状态")
+    replenish_ov_billid = db.Column(db.String(12), default="", comment="补料出库单号")
 
     qc_result = db.relationship("QcResult", back_populates="detail_items")
 
@@ -525,6 +528,8 @@ class QcResultEid(BaseModel):
     remark = db.Column(db.String(100), comment="备注")
     manuf_seq = db.Column(db.String(100), comment="制造序列号")
     ref_rgstbillid = db.Column(db.String(30), comment="来源入库单号")
+    replenish_status = db.Column(db.String(10), default="", comment="补料状态")
+    replenish_ov_billid = db.Column(db.String(12), default="", comment="补料出库单号")
 
     qc_result = db.relationship("QcResult", back_populates="detail_eids")
 

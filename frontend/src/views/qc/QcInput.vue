@@ -36,10 +36,18 @@
       <span>明细: {{ detailRows.length }} 行</span>
       <el-button size="small" @click="setAllJudgment('GA')">全部合格</el-button>
       <el-button size="small" @click="setAllJudgment('BF')">全部报废</el-button>
+      <el-button size="small" type="primary" @click="batchGenerateLabels" :loading="batchGenLoading">批量生成标签</el-button>
+      <el-button size="small" @click="expandAll">全部展开</el-button>
+      <el-button size="small" @click="collapseAll">全部折叠</el-button>
     </div>
 
-    <el-table :data="detailRows" border stripe size="small" style="width:100%">
-      <el-table-column prop="itemcd" label="物料编码" width="100" />
+    <el-table ref="detailTable" :data="detailRows" row-key="_id" :tree-props="{children:'children'}" :indent="0" border stripe size="small" style="width:100%" class="qc-input-table">
+      <el-table-column prop="itemcd" label="物料编码" width="100" align="left" class-name="itemcd-column">
+        <template #default="{row}">
+          <span v-if="row.children" style="display:inline-block;padding-left:0">{{ row.itemcd }}</span>
+          <span v-else style="display:inline-block;padding-left:0">{{ row.itemcd }}</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="item_nm" label="物料名称" min-width="120" />
       <el-table-column label="来源入库单" width="110">
         <template #default="{row}">{{ row.refInbillid || '-' }}</template>
@@ -67,17 +75,24 @@
           <el-input v-model="row.faultDesc" size="small" placeholder="不良原因" :disabled="['GA','GB','GC'].includes(row.judgment)"/>
         </template>
       </el-table-column>
-      <el-table-column label="EID/标签" width="200">
+      <el-table-column label="EID/标签" width="220">
+        <template #header>
+          <div style="display:flex;align-items:center;gap:4px">EID/标签<el-input v-model="labelSign" size="small" maxlength="1" style="width:36px" title="成品标签标识符（默认L）"/><span style="font-size:11px;color:#909399">+</span></div>
+        </template>
         <template #default="{row}">
           <template v-if="row.eid">
-            <el-tag size="small" type="success">{{ row.eid }}</el-tag>
+            <el-tag size="small" type="success" style="user-select:text;cursor:pointer" @click="copyEid(row.eid)">{{ row.eid }}</el-tag>
           </template>
           <template v-else-if="row.isConsumable">
             <span style="color:#909399;font-size:12px">无需标签</span>
           </template>
           <template v-else>
             <div style="display:flex;gap:4px;align-items:center">
-              <el-select v-model="row.selectedEid" filterable clearable size="small" style="width:120px" placeholder="选择标签">
+              <template v-if="row.selectedEid && !(row as any)._editingEid">
+                <el-tag size="small" type="success" style="user-select:text;cursor:pointer;max-width:130px;overflow:hidden;text-overflow:ellipsis" @click="copyEid(row.selectedEid)">{{ row.selectedEid }}</el-tag>
+                <el-button size="small" link @click="(row as any)._editingEid=true" title="更换标签">✎</el-button>
+              </template>
+              <el-select v-else v-model="row.selectedEid" filterable clearable size="small" style="width:120px" placeholder="选择标签" @change="(row as any)._editingEid=false">
                 <el-option v-for="lbl in row.availableLabels" :key="lbl.labelid" :label="lbl.labelid" :value="lbl.labelid"/>
               </el-select>
               <el-button size="small" circle @click="generateLabelForRow(row)" :loading="row.generatingLabel" title="生成标签">+</el-button>
@@ -97,25 +112,45 @@
           </el-select>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="60" fixed="right">
-        <template #default="{row, $index}">
-          <el-button v-if="row.outqty > 1" size="small" link type="primary" @click="splitRow($index)">拆分</el-button>
+      <el-table-column label="操作" width="90" fixed="right">
+        <template #default="{row}">
+          <el-button v-if="row.outqty > 1" size="small" link type="primary" @click="splitRow(row)">拆分</el-button>
+          <el-button v-if="['BF','BH','TH'].includes(row.judgment) && !row.replenishOvBillid" size="small" link type="warning" @click="handleReplenish(row)">申请补料</el-button>
+          <el-tag v-else-if="row.replenishOvBillid" size="small" :type="row.replenishStatus === 'completed' ? 'success' : 'info'">{{ row.replenishStatus === 'completed' ? '已补料' : '补料中' }}</el-tag>
         </template>
       </el-table-column>
     </el-table>
 
     <div style="margin-top:16px;display:flex;gap:8px;align-items:flex-start">
       <el-input v-model="globalMemo" type="textarea" :rows="2" placeholder="全局备注（所有质检单共享）" style="flex:1"/>
-      <el-button type="primary" @click="doBatchSubmit" :loading="saving">提交质检</el-button>
+      <el-button @click="doBatchSubmit('save')" :loading="saving">暂存</el-button>
+      <el-button type="primary" @click="doBatchSubmit('submit')" :loading="saving">提交质检</el-button>
     </div>
   </el-card>
+
+  <!-- 补料数量编辑对话框 -->
+  <el-dialog v-model="replenishDialogVisible" title="申请补料" width="480px">
+    <el-table :data="replenishForm.items" size="small" border>
+      <el-table-column prop="itemcd" label="物料编码" width="100"/>
+      <el-table-column prop="item_nm" label="物料名称" min-width="100"/>
+      <el-table-column label="补料数量" width="120">
+        <template #default="{row}">
+          <el-input-number v-model="row.adjustQty" :min="1" :max="999" size="small" controls-position="right" style="width:100px"/>
+        </template>
+      </el-table-column>
+    </el-table>
+    <template #footer>
+      <el-button @click="replenishDialogVisible = false">取消</el-button>
+      <el-button type="primary" :loading="replenishSaving" @click="doReplenish">确认申请</el-button>
+    </template>
+  </el-dialog>
 </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { createQcResult, getQcBatch, listQcBatches, voidQcBatch, type QcDetailItem, type QcEidDetailItem, type QcBatchItem } from '@/api/qc'
+import { createQcResult, getQcBatch, listQcBatches, voidQcBatch, getQcEidsByRefbillid, replenishQcBatch, type QcDetailItem, type QcEidDetailItem, type QcBatchItem } from '@/api/qc'
 import { fetchQcOutOrders, fetchStockOutDetail } from '@/api/warehouse'
 import { fetchWorkOrders } from '@/api/mes'
 import { fetchAvailableLabels, generateLabels } from '@/api/inventory'
@@ -135,7 +170,17 @@ const filteredWoOptions = computed(() => woOptions.value.filter((w:any) => qcTyp
 const globalMemo = ref('')
 const batchNo = ref('')
 const saving = ref(false)
+const detailTable = ref<any>(null)
+function expandAll() { flattenRows(detailRows.value).filter(r => r.children?.length).forEach(r => { detailTable.value?.toggleRowExpansion(r, true) }) }
+function collapseAll() { detailRows.value.forEach(r => { detailTable.value?.toggleRowExpansion(r, false) }) }
+
+const batchGenLoading = ref(false)
+const replenishDialogVisible = ref(false)
+const replenishSaving = ref(false)
+const replenishForm = reactive<{ items: { itemcd: string; item_nm: string; qty: number; adjustQty: number }[] }>({ items: [] })
+const labelSign = ref('L')  // 成品标签标识符，默认L
 interface QcRow {
+  _id: string
   itemcd: string; item_nm: string; refInbillid: string; prddate: string; itemtyp: string
   outqty: number; eid: string; lineno: number; reflineno: number
   isConsumable: boolean; isBom: boolean; classCd: string; whcd: string
@@ -145,6 +190,11 @@ interface QcRow {
   _allLabels: { labelid: string; classcd: string }[]
   generatingLabel: boolean
   _opts: [string, string][]
+  isReplaced?: boolean
+  isReplacement?: boolean
+  replenishOvBillid?: string
+  replenishStatus?: string
+  children?: QcRow[]
 }
 const detailRows = ref<QcRow[]>([])
 
@@ -231,6 +281,8 @@ async function overlaySavedQcData(refbillid: string) {
         row.judgment = rec.qcstatus || 'GA'
         row.qcqty = d.qcqty || 1
         row.faultDesc = d.fault_desc || ''
+        row.replenishOvBillid = d.replenish_ov_billid || ''
+        row.replenishStatus = d.replenish_status || ''
         newRows.push(row)
       }
       for (const d of eids) {
@@ -252,15 +304,50 @@ async function overlaySavedQcData(refbillid: string) {
         row.judgment = rec.qcstatus || 'GA'
         row.qcqty = d.qcqty || 1
         row.faultDesc = d.fault_desc || ''
+        row.replenishOvBillid = d.replenish_ov_billid || ''
+        row.replenishStatus = d.replenish_status || ''
         row.selectedEid = d.eid || ''
         row.manufSeq = d.manuf_seq || ''
         newRows.push(row)
       }
     }
-    // 重建后触发判定变更 + 加载可用标签
-    newRows.forEach(r => { r._opts = buildOpts(r); onJudgmentChange(r) })
-    detailRows.value = newRows
-    preloadLabels(newRows)
+    // FQC：复用当前树形结构，仅回填判定/EID/补料信息
+    if (qcType.value === 'FQC') {
+      // 构建已存数据的物码→数据映射（按出现顺序消费）
+      const savedDt: any[] = []
+      const savedEid: any[] = []
+      for (const rec of records) {
+        savedDt.push(...(rec.details || []))
+        savedEid.push(...(rec.eid_details || []))
+      }
+      // 将已存数据按物码建索引，匹配时消费
+      const dtByCd: Record<string, any[]> = {}; const eidByCd: Record<string, any[]> = {}
+      savedDt.forEach((d: any) => { if (!dtByCd[d.itemcd]) dtByCd[d.itemcd] = []; dtByCd[d.itemcd].push(d) })
+      savedEid.forEach((d: any) => { if (!eidByCd[d.itemcd]) eidByCd[d.itemcd] = []; eidByCd[d.itemcd].push(d) })
+      const walkAndFill = (rws: QcRow[]) => {
+        for (const row of rws) {
+          // 父行先匹配（与保存时 flattenRows 顺序一致）
+          const eidPool = eidByCd[row.itemcd] || []
+          const dtPool = dtByCd[row.itemcd] || []
+          const d = eidPool.length > 0 ? eidPool.shift()! : dtPool.length > 0 ? dtPool.shift()! : null
+          if (d) {
+            row.judgment = d.qcstatus || 'GA'
+            if (d.eid) row.selectedEid = d.eid
+            row.replenishOvBillid = d.replenish_ov_billid || ''
+            row.replenishStatus = d.replenish_status || ''
+            row.qcqty = d.qcqty || 1
+          }
+          row._opts = buildOpts(row)
+          onJudgmentChange(row)
+          if (row.children) walkAndFill(row.children)
+        }
+      }
+      walkAndFill(detailRows.value)
+    } else {
+      newRows.forEach(r => { r._opts = buildOpts(r); onJudgmentChange(r) })
+      detailRows.value = newRows
+    }
+    preloadLabels(detailRows.value)
   } catch { savingBatchId.value = '' }
 }
 
@@ -283,7 +370,8 @@ async function loadQcOutDetails(outbillid: string) {
     })
 
     detailRows.value = rows
-    rows.forEach(r => { r._opts = buildOpts(r) })
+    const initTree = (rws: QcRow[]) => rws.forEach(r => { r._opts = buildOpts(r); if (r.children) initTree(r.children) })
+    initTree(rows)
     await preloadLabels(rows)
   } catch { detailRows.value = [] }
 }
@@ -293,37 +381,123 @@ async function loadWoMaterials(woId: string) {
     const wo = woOptions.value.find(w => w.wo_id === woId)
     const rows: QcRow[] = []
     if (qcType.value === 'FQC') {
-      // FQC: 只判定成品整机
+      // FQC: 每成品一行父行 + BOM配件作为子行（树形层级）
       if (wo?.item_cd) {
+        const today = new Date().toISOString().substring(0, 10)
+        let itemName = wo.item_cd
+        let planQty = 1
         try {
-          const r = await request.get(`/mes/work-orders/${woId}`) as any
-          const detail = r?.data || {}
-          rows.push(makeRow({ itemcd: wo.item_cd, item_nm: detail.item_nm || wo.item_cd, outqty: detail.actual_qty || detail.plan_qty || 1, itemtyp: '', prddate: '', eid: null, lineno: 0, reflineno: 0, ref_inbillid: '', consume: '', class_cd: '' }, 'prd', ''))
-        } catch {
-          rows.push(makeRow({ itemcd: wo.item_cd, item_nm: wo.item_cd, outqty: 1, itemtyp: '', prddate: '', eid: null, lineno: 0, reflineno: 0, ref_inbillid: '', consume: '', class_cd: '' }, 'prd', ''))
+          const woRes = await request.get(`/mes/work-orders/${woId}`) as any
+          const detail = woRes?.data || {}
+          itemName = detail.item_nm || wo.item_cd
+          planQty = detail.plan_qty || 1
+        } catch { /* 降级 */ }
+
+        // 加载 BOM 配件信息
+        const whcd = wo.pick_whcd || wo.warehouse_cd || '01'
+        let bomDetails: any[] = []
+        let stockMap: Record<string, any> = {}
+        let ipqcEids: Record<string, string[]> = {}
+        try {
+          const bomDetail = await request.get(`/bom/${wo.item_cd}`) as any
+          bomDetails = bomDetail?.data?.details || []
+        } catch { /* */ }
+        try {
+          const bomR = await request.get(`/bom/${wo.item_cd}/expand`, { params: { qty: 1, whcd } }) as any
+          ;((bomR as any)?.data?.lines || []).forEach((l: any) => {
+            if (!stockMap[l.itemcd] || (l.prddate && l.prddate > (stockMap[l.itemcd]?.prddate||'')))
+              stockMap[l.itemcd] = l
+          })
+        } catch { /* */ }
+        try {
+          const eidR = await getQcEidsByRefbillid(woId) as any
+          ;(eidR?.data || []).forEach((e: any) => {
+            if (!ipqcEids[e.itemcd]) ipqcEids[e.itemcd] = []
+            ipqcEids[e.itemcd].push(e.eid)
+          })
+        } catch { /* */ }
+
+        // 为每台成品创建父行 + 子行
+        for (let pi = 0; pi < planQty; pi++) {
+          const parent = makeRow({
+            itemcd: wo.item_cd, item_nm: itemName,
+            outqty: 1,  // 每成品 1 台
+            itemtyp: '', prddate: today, eid: null, lineno: 0, reflineno: 0,
+            ref_inbillid: '', consume: '', class_cd: '',
+            is_bom: true,
+          }, 'prd', '')
+          parent.children = []
+
+          for (const m of bomDetails) {
+            const s = stockMap[m.itemcd] || {}
+            const eids = ipqcEids[m.itemcd] || []
+            const qty = m.bomqty || 1  // 每台成品用几个该配件
+            for (let ci = 0; ci < qty; ci++) {
+              const child = makeRow({
+                itemcd: m.itemcd, item_nm: s.item_nm || m.item_nm || '',
+                outqty: 1,  // 每行 1 个
+                itemtyp: s.itemtyp || '', prddate: (s.prddate||'').replace('T',' ').substring(0,10),
+                eid: eids.length > ci ? eids[ci] : null,
+                lineno: 0, reflineno: 0,
+                ref_inbillid: s.ref_inbillid || '', consume: s.consume || '', class_cd: '',
+              }, eids.length > ci ? 'eid' : 'prd', '')
+              parent.children!.push(child)
+            }
+          }
+          rows.push(parent)
         }
       }
     } else {
-      // IPQC: 显示 BOM 子件（用于过程检选择异常物料）
+      // IPQC: BOM 明细 + expand 取最新批次信息（不拆分FIFO，一行一物料）
       if (wo?.item_cd) {
         try {
-          const bomR = await request.get(`/bom/${wo.item_cd}/expand`, { params: { qty: 1 } }) as any
-          const materials = (bomR?.data || []) as any[]
-          materials.forEach((m: any) => {
-            rows.push(makeRow({ itemcd: m.itemcd, item_nm: m.item_nm || m.itemcd, outqty: m.bomqty || 1, itemtyp: m.itemtyp || '', prddate: '', eid: null, lineno: 0, reflineno: 0, ref_inbillid: '', consume: m.consume || '', class_cd: '' }, 'prd', ''))
+          const whcd = wo.pick_whcd || wo.warehouse_cd || '01'
+          const bomDetail = await request.get(`/bom/${wo.item_cd}`) as any
+          const details = bomDetail?.data?.details || []
+          // expand 获取库存批次信息（含来源入库单号）
+          let stockMap: Record<string, any> = {}
+          try {
+            const bomR = await request.get(`/bom/${wo.item_cd}/expand`, { params: { qty: 1, whcd } }) as any
+            ;((bomR as any)?.data?.lines || []).forEach((l: any) => {
+              if (!stockMap[l.itemcd] || (l.prddate && l.prddate > (stockMap[l.itemcd]?.prddate||'')))
+                stockMap[l.itemcd] = l
+            })
+          } catch { /* 无库存信息不阻塞 */ }
+          details.forEach((m: any) => {
+            const s = stockMap[m.itemcd] || {}
+            rows.push(makeRow({
+              itemcd: m.itemcd, item_nm: s.item_nm || '', outqty: m.bomqty || 1,
+              itemtyp: s.itemtyp || '', prddate: (s.prddate||'').replace('T',' ').substring(0,10),
+              eid: null, lineno: 0, reflineno: 0, ref_inbillid: s.ref_inbillid || '', consume: s.consume || '', class_cd: '',
+            }, 'prd', ''))
           })
-        } catch { /* BOM 展开失败，无子件 */ }
+        } catch {
+          rows.push(makeRow({ itemcd: wo.item_cd, item_nm: wo.item_nm || wo.item_cd, outqty: 1, itemtyp: '', prddate: '', eid: null, lineno: 0, reflineno: 0, ref_inbillid: '', consume: '', class_cd: '' }, 'prd', ''))
+        }
       }
     }
     detailRows.value = rows
-    rows.forEach(r => { r._opts = buildOpts(r) })
+    const initTree = (rws: QcRow[]) => rws.forEach(r => { r._opts = buildOpts(r); if (r.children) initTree(r.children) })
+    initTree(rows)
     await preloadLabels(rows)
   } catch { detailRows.value = [] }
 }
 
+// 树形辅助：扁平化
+function flattenRows(roots: QcRow[]): QcRow[] {
+  const out: QcRow[] = []
+  const w = (rws: QcRow[]) => { rws.forEach(r => { out.push(r); if (r.children) w(r.children) }) }
+  w(roots)
+  return out
+}
+
+let _rowIdCounter = 0
+function nextRowId() { return `r${++_rowIdCounter}` }
+
 function makeRow(d: any, src: string, whcd: string): QcRow {
   const consume = d.consume || ''
   return {
+    _id: nextRowId(),
     itemcd: d.itemcd,
     item_nm: d.item_nm || '',
     refInbillid: d.ref_inbillid || '',
@@ -358,8 +532,9 @@ watch(() => qcMap.value, () => {
 
 // 任何行的 selectedEid 变化时，过滤其他行下拉（排除已选）
 watch(() => detailRows.value.map(r => r.selectedEid), () => {
-  const used = new Set(detailRows.value.filter(r => r.selectedEid).map(r => r.selectedEid))
-  detailRows.value.forEach(r => {
+  const allR = flattenRows(detailRows.value)
+  const used = new Set(allR.filter(r => r.selectedEid).map(r => r.selectedEid))
+  allR.forEach(r => {
     r.availableLabels = (r._allLabels || r.availableLabels).filter(l => !used.has(l.labelid))
   })
 }, { deep: true })
@@ -367,25 +542,31 @@ watch(() => detailRows.value.map(r => r.selectedEid), () => {
 function buildOpts(row: QcRow): [string, string][] {
   const opts: [string, string][] = []
   for (const [cd, nm] of Object.entries(qcMap.value || {})) {
-    if (cd === 'QA' || cd === 'DJ') continue
+    if (cd === 'QA') continue
+    // 成品：GA/GB/GC/DJ/BF/BH（不含TH退换，成品不退换）
+    if (row.isBom && cd === 'TH') continue
+    // DJ/GC 仅成品可选
+    if (cd === 'DJ' && !row.isBom) continue
     if (cd === 'GC' && !row.isBom) continue
-    if (row.isConsumable && ['BH', 'GB', 'GC'].includes(cd)) continue
+    // 耗材：GA/GB/BF/TH（不返修BH/不降级GC/无待检DJ）
+    if (row.isConsumable && ['BH', 'GC', 'DJ'].includes(cd)) continue
     opts.push([cd, nm])
   }
   return opts
 }
 
 async function preloadLabels(rows: QcRow[]) {
-  const itemCds = [...new Set(rows.filter(r => !r.eid && !r.isConsumable).map(r => r.itemcd))]
+  const flat = flattenRows(rows)
+  const itemCds = [...new Set(flat.filter(r => !r.eid && !r.isConsumable).map(r => r.itemcd))]
   const usedInGrid = new Set(rows.filter(r => r.selectedEid).map(r => r.selectedEid))
   for (const cd of itemCds) {
     try {
       const r = await fetchAvailableLabels(cd, 200)
       let labels = (r.data || []) as { labelid: string; classcd: string }[]
       labels = labels.filter(l => !usedInGrid.has(l.labelid))
-      rows.filter(r => r.itemcd === cd).forEach(r => {
-        const filtered = labels.filter(l => r.isBom ? /^\d{8}/.test(l.labelid) : l.labelid.startsWith(r.itemcd))
-        r._allLabels = filtered  // 缓存全量，watch时用来排除已选
+      flat.filter(r => r.itemcd === cd).forEach(r => {
+        const filtered = labels.filter(l => l.labelid.startsWith(r.itemcd) || (r.isBom && /^\d{8}/.test(l.labelid)))
+        r._allLabels = filtered
         r.availableLabels = filtered
       })
     } catch { /* */ }
@@ -397,36 +578,39 @@ async function generateLabelForRow(row: QcRow) {
   try {
     const needQty = row.qcqty || 1
     // 收集当前明细已选的EID（排除它们避免冲突）
-    const usedInGrid = new Set(detailRows.value.filter(r => r.selectedEid).map(r => r.selectedEid))
+    const usedInGrid = new Set(flattenRows(detailRows.value).filter(r => r.selectedEid).map(r => r.selectedEid))
     // 先查已有未激活标签
     let lblR = await fetchAvailableLabels(row.itemcd, 200)
     let allLabels = (lblR.data || []) as { labelid: string; classcd: string }[]
     // 排除当前表格已选 + 按格式过滤（配件=itemcd开头，成品=日期开头）
-    allLabels = allLabels.filter(l => !usedInGrid.has(l.labelid) && (row.isBom ? /^\d{8}/.test(l.labelid) : l.labelid.startsWith(row.itemcd)))
+    allLabels = allLabels.filter(l => !usedInGrid.has(l.labelid) && (row.isBom ? /^\d{8}/.test(l.labelid) && l.labelid.substring(8, 9) === labelSign.value : l.labelid.startsWith(row.itemcd)))
     const existing = allLabels.length
     let genNew = 0
     // 不够再补生成
     if (existing < needQty) {
       const short = needQty - existing
       const typflg = row.isBom ? '1' : '0'
-      const sign = row.isBom ? 'L' : undefined
+      const sign = row.isBom ? labelSign.value : undefined
       const r = await generateLabels({ classcd: row.itemcd, typflg, count: short, ...(sign ? { sign } : {}) })
       genNew = r.data?.inserted || 0
       lblR = await fetchAvailableLabels(row.itemcd, 200)
-      allLabels = (lblR.data || []) as { labelid: string; classcd: string }[]
+      allLabels = ((lblR.data || []) as { labelid: string; classcd: string }[]).filter(
+        l => !usedInGrid.has(l.labelid) && (row.isBom ? /^\d{8}/.test(l.labelid) && l.labelid.substring(8,9) === labelSign.value : l.labelid.startsWith(row.itemcd))
+      )
     }
     row.availableLabels = allLabels
     row._allLabels = allLabels
     // 数量>1：自动拆分，每行一个EID
     if (needQty > 1 && allLabels.length >= needQty) {
-      const rowIdx = detailRows.value.indexOf(row)
+      const parentArr = findRowParent(row, detailRows.value)
+      const rowIdx = parentArr ? parentArr.indexOf(row) : -1
       row.outqty = 1; row.qcqty = 1; row.selectedEid = allLabels[0].labelid
       row.generatingLabel = false
       for (let i = 1; i < needQty; i++) {
-        const newRow = { ...row, availableLabels: [...allLabels], generatingLabel: false }
+        const newRow = { ...row, _id: nextRowId(), availableLabels: [...allLabels], generatingLabel: false }
         newRow.selectedEid = allLabels[i]?.labelid || ''
         newRow._opts = buildOpts(newRow)
-        detailRows.value.splice(rowIdx + i, 0, newRow)
+        if (rowIdx >= 0) { parentArr!.splice(rowIdx + i, 0, newRow) }
       }
       const msg = genNew > 0 ? `使用 ${existing} 个已有 + 新生成 ${genNew} 个，拆为 ${needQty} 行` : `使用 ${needQty} 个已有标签，拆为 ${needQty} 行`
       ElMessage.success(msg)
@@ -439,11 +623,18 @@ async function generateLabelForRow(row: QcRow) {
 }
 
 function onJudgmentChange(row: QcRow) {
-  row.defectQty = ['GA','GB','GC'].includes(row.judgment) ? 0 : row.qcqty
-  // 不合格时清空 EID 标签
-  if (!['GA','GB','GC'].includes(row.judgment)) {
+  row.defectQty = ['GA','GB','GC','DJ'].includes(row.judgment) ? 0 : row.qcqty
+  if (!['GA','GB','GC','DJ'].includes(row.judgment)) {
     row.selectedEid = ''
     row.manufSeq = ''
+  }
+  // 子行变 BF/BH/TH → 父成品自动标 DJ（配件不合格时成品待定）
+  if (['BF','BH','TH'].includes(row.judgment) && !row.isBom) {
+    const parent = findParentRow(row, detailRows.value)
+    if (parent && parent.isBom) {
+      parent.judgment = 'DJ'
+      parent.defectQty = 0
+    }
   }
 }
 function onQtyChange(row: QcRow) {
@@ -451,7 +642,41 @@ function onQtyChange(row: QcRow) {
 }
 
 function setAllJudgment(judgment: string) {
-  detailRows.value.forEach(r => { r.judgment = judgment; onJudgmentChange(r) })
+  const walk = (rows: QcRow[]) => rows.forEach(r => {
+    r.judgment = judgment; onJudgmentChange(r)
+    if (r.children) walk(r.children)
+  })
+  walk(detailRows.value)
+}
+
+function findRowParent(target: QcRow, roots: QcRow[]): QcRow[] | null {
+  if (roots.includes(target)) return roots
+  for (const r of roots) {
+    if (r.children) {
+      const found = findRowParent(target, r.children)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function findParentRow(child: QcRow, roots: QcRow[]): QcRow | null {
+  for (const r of roots) {
+    if (r.children?.includes(child)) return r
+    if (r.children) {
+      const found = findParentRow(child, r.children)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function copyEid(eid: string) {
+  const ta = document.createElement('textarea')
+  ta.value = eid; ta.style.position = 'fixed'; ta.style.opacity = '0'
+  document.body.appendChild(ta); ta.select()
+  try { document.execCommand('copy'); ElMessage.success(`已复制 ${eid}`) } catch { /* */ }
+  document.body.removeChild(ta)
 }
 
 function itemtypLabel(v: string) {
@@ -459,9 +684,8 @@ function itemtypLabel(v: string) {
   return m[v] || v || '-'
 }
 
-async function splitRow(idx: number) {
+async function splitRow(row: QcRow) {
   import('element-plus').then(m => {
-    const row = detailRows.value[idx]
     const totalQty = row.outqty
     m.ElMessageBox.prompt('拆分数量（剩余将自动生成新行）', '拆分明细行', {
       inputType: 'number',
@@ -487,32 +711,175 @@ async function splitRow(idx: number) {
       row.qcqty = splitQty
       row.defectQty = 0
       row.judgment = 'GA'
-      // 插入新行
+      // 找到 row 所在的数组并插入新行
+      const parentArr = findRowParent(row, detailRows.value)
+      const rowIdx = parentArr ? parentArr.indexOf(row) : -1
       newRow._opts = buildOpts(newRow)
-      detailRows.value.splice(idx + 1, 0, newRow)
+      if (rowIdx >= 0) { parentArr!.splice(rowIdx + 1, 0, newRow) }
       ElMessage.success(`已拆分：${splitQty} / ${newRow.outqty}`)
     }).catch(() => {})
   })
 }
 
-async function doBatchSubmit() {
-  for (const row of detailRows.value) {
-    if (!row.judgment) { ElMessage.warning(`物料 ${row.itemcd} 未设置质检判定`); return }
-    const needEid = ['GA','GB','GC'].includes(row.judgment)
-    if (needEid && !row.eid && !row.isConsumable && !row.selectedEid) {
-      ElMessage.warning(`物料 ${row.itemcd} 判定为 ${qcMap.value?.[row.judgment] || row.judgment}，需要选择或生成EID标签`); return
+async function batchGenerateLabels() {
+  const allR = flattenRows(detailRows.value)
+  // 统计每种物料需要标签的行数（GA/GB/GC判定、无EID无标签、非耗材）
+  const needMap: Record<string, { itemcd: string; count: number; isBom: boolean }> = {}
+  allR.forEach(r => {
+    if (!['GA','GB','GC','DJ'].includes(r.judgment)) return
+    if (r.eid || r.selectedEid || r.isConsumable) return
+    if (!needMap[r.itemcd]) needMap[r.itemcd] = { itemcd: r.itemcd, count: 0, isBom: r.isBom }
+    needMap[r.itemcd].count++
+  })
+  const needList = Object.values(needMap)
+  if (!needList.length) { ElMessage.info('所有合格行已有标签'); return }
+
+  batchGenLoading.value = true
+  const usedInGrid = new Set(allR.filter(r => r.selectedEid).map(r => r.selectedEid))
+  const summaries: string[] = []
+  try {
+    for (const item of needList) {
+      // 获取已有未激活标签
+      let lblR = await fetchAvailableLabels(item.itemcd, 200)
+      let pool = ((lblR.data || []) as { labelid: string; classcd: string }[])
+        .filter(l => !usedInGrid.has(l.labelid))
+
+      const need = item.count
+      const existing = pool.length
+      let genNew = 0
+      if (existing < need) {
+        const short = need - existing
+        const typflg = item.isBom ? '1' : '0'
+        const sign = item.isBom ? labelSign.value : undefined
+        const genR = await generateLabels({ classcd: item.itemcd, typflg, count: short, ...(sign ? { sign } : {}) })
+        genNew = genR.data?.inserted || 0
+        // 重新拉取
+        lblR = await fetchAvailableLabels(item.itemcd, 200)
+        pool = ((lblR.data || []) as { labelid: string; classcd: string }[])
+          .filter(l => !usedInGrid.has(l.labelid))
+          .filter(l => item.isBom ? /^\d{8}/.test(l.labelid) && l.labelid.substring(8,9) === labelSign.value : l.labelid.startsWith(item.itemcd))
+      } else {
+        pool = pool.filter(l => item.isBom ? /^\d{8}/.test(l.labelid) && l.labelid.substring(8,9) === labelSign.value : l.labelid.startsWith(item.itemcd))
+      }
+      // 分配给各行
+      let assigned = 0
+      allR.forEach(r => {
+        if (assigned >= pool.length) return
+        if (r.itemcd !== item.itemcd) return
+        if (!['GA','GB','GC','DJ'].includes(r.judgment)) return
+        if (r.eid || r.selectedEid || r.isConsumable) return
+        r.selectedEid = pool[assigned].labelid
+        usedInGrid.add(pool[assigned].labelid)
+        assigned++
+      })
+      const msg = genNew > 0
+        ? `${item.itemcd}: 使用${existing}个已有 + 新生成${genNew}个`
+        : `${item.itemcd}: 使用${existing}个已有标签`
+      summaries.push(msg)
     }
-    // EID 模式下每个标签最多对应 1 台设备
-    if ((row.selectedEid || row.eid) && row.qcqty > 1) {
-      ElMessage.warning(`物料 ${row.itemcd} EID ${row.selectedEid} 质检数量为 ${row.qcqty}，每台设备应单独一行。请使用拆分功能`); return
+    ElMessage.success(`批量标签完成：${summaries.join('；')}`)
+  } catch (e: any) { ElMessage.error(e?.response?.data?.message || '批量生成失败') }
+  finally { batchGenLoading.value = false }
+}
+
+async function handleReplenish(row: QcRow) {
+  if (!['BF', 'BH', 'TH'].includes(row.judgment)) return
+
+  // 批次未保存时自动保存为草稿
+  if (!savingBatchId.value) {
+    await doBatchSubmit('save')
+    if (!savingBatchId.value) {
+      ElMessage.error('请先保存质检数据')
+      return
     }
   }
-  const groups = new Map<string, QcRow[]>()
-  detailRows.value.forEach(r => {
-    const k = r.judgment
-    if (!groups.has(k)) groups.set(k, [])
-    groups.get(k)!.push(r)
+
+  const nonPassRows = flattenRows(detailRows.value).filter(
+    r => ['BF', 'BH', 'TH'].includes(r.judgment) && !r.replenishOvBillid
+  )
+  if (!nonPassRows.length) {
+    ElMessage.warning('没有需要补料的物料')
+    return
+  }
+
+  // 弹出可编辑数量的补料对话框
+  const agg: Record<string, { itemcd: string; item_nm: string; qty: number }> = {}
+  nonPassRows.forEach(r => {
+    if (!agg[r.itemcd]) agg[r.itemcd] = { itemcd: r.itemcd, item_nm: r.item_nm, qty: 0 }
+    agg[r.itemcd].qty += r.qcqty
   })
+  replenishForm.items = Object.values(agg).map(i => ({ ...i, adjustQty: i.qty }))
+  replenishDialogVisible.value = true
+}
+
+async function doReplenish() {
+  replenishSaving.value = true
+  try {
+    const qtyMap: Record<string, number> = {}
+    replenishForm.items.forEach(i => { qtyMap[i.itemcd] = i.adjustQty })
+    const res = await replenishQcBatch(savingBatchId.value, qtyMap)
+    const data = (res as any)?.data || {}
+    const ovBillid = data.ov_billid || ''
+    flattenRows(detailRows.value).forEach(r => {
+      if (['BF', 'BH', 'TH'].includes(r.judgment) && !r.replenishOvBillid) {
+        r.replenishOvBillid = ovBillid
+        r.replenishStatus = 'pending'
+      }
+    })
+    ElMessage.success(`补料出库单 ${ovBillid} 已生成，共 ${data.item_count || 0} 种物料`)
+    replenishDialogVisible.value = false
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || '补料申请失败')
+  } finally { replenishSaving.value = false }
+}
+
+async function doBatchSubmit(mode: 'submit' | 'save' = 'submit') {
+  const isSubmit = mode === 'submit'
+  const allRows = flattenRows(detailRows.value)
+  // 暂存不校验，直接保存已有数据；提交时完整校验
+  if (isSubmit) {
+    for (const row of allRows) {
+      if (!row.judgment) { ElMessage.warning(`物料 ${row.itemcd} 未设置质检判定`); return }
+      const needEid = ['GA','GB','GC','DJ'].includes(row.judgment)
+      if (needEid && !row.eid && !row.isConsumable && !row.selectedEid) {
+        ElMessage.warning(`物料 ${row.itemcd} 判定为 ${qcMap.value?.[row.judgment] || row.judgment}，需要选择或生成EID标签`); return
+      }
+      if ((row.selectedEid || row.eid) && row.qcqty > 1) {
+        ElMessage.warning(`物料 ${row.itemcd} EID ${row.selectedEid} 质检数量为 ${row.qcqty}，每台设备应单独一行。请使用拆分功能`); return
+      }
+    }
+  }
+  // 提交时检查补料提醒；暂存跳过
+  if (isSubmit) {
+    const pendingReplenish = allRows.filter(
+      r => ['BF', 'BH', 'TH'].includes(r.judgment) && !r.replenishOvBillid
+    )
+    if (pendingReplenish.length > 0) {
+      try {
+        await ElMessageBox.confirm(
+          `有 ${pendingReplenish.length} 个不通过行未申请补料。建议先申请补料后再审核。是否继续提交？`,
+          '补料提醒',
+          { confirmButtonText: '继续提交', cancelButtonText: '去申请补料', type: 'warning',
+            distinguishCancelAndClose: true }
+        )
+      } catch {
+        return
+      }
+    }
+  }
+
+  // 扁平化树形数据
+  const groups = new Map<string, QcRow[]>()
+  if (qcType.value === 'FQC') {
+    groups.set('FQ', allRows)
+  } else {
+    // IPQC / 质检出库: 按判定分组
+    detailRows.value.forEach(r => {
+      const k = r.judgment
+      if (!groups.has(k)) groups.set(k, [])
+      groups.get(k)!.push(r)
+    })
+  }
 
   saving.value = true
   const now = new Date()
@@ -548,11 +915,22 @@ async function doBatchSubmit() {
         }
       })
       if (details.length || eid_details.length) {
+        // FQC 用成品物料编码和判定作为主记录
+        let primaryItemCd = rows[0]?.itemcd || ''
+        let primaryJudgment = rows[0]?.judgment || 'GA'
+        if (qcType.value === 'FQC') {
+          const productRow = rows.find((r: QcRow) => r.isBom)
+          if (productRow) {
+            primaryItemCd = productRow.itemcd
+            primaryJudgment = productRow.judgment || 'GA'
+          }
+        }
         const body: Record<string, unknown> = {
           refbillid: selectedBillId.value,
           optyp,
-          itemcd: rows[0].itemcd,
-          qcstatus: rows[0].judgment,
+          itemcd: primaryItemCd,
+          qcstatus: primaryJudgment,
+          draft_type: isSubmit ? 'C' : 'S',
           memo: globalMemo.value ? `${globalMemo.value}#${batchNo.value}` : `QC#${batchNo.value}`,
           details: details.length ? details : undefined,
           eid_details: eid_details.length ? eid_details : undefined,
@@ -564,11 +942,14 @@ async function doBatchSubmit() {
         created++
       }
     }
-    ElMessage.success(`录入成功，批次号 ${batchId}，创建 ${created} 条质检单`)
-    detailRows.value = []
-    selectedBillId.value = ''
-    globalMemo.value = ''
-    savingBatchId.value = ''
+    ElMessage.success(isSubmit ? `提交成功，批次号 ${batchId}` : `已暂存，批次号 ${batchId}`)
+    savingBatchId.value = batchId
+    if (isSubmit) {
+      detailRows.value = []
+      selectedBillId.value = ''
+      globalMemo.value = ''
+      savingBatchId.value = ''
+    }
   } catch (e: any) { ElMessage.error(e?.response?.data?.message || '录入失败') }
   finally { saving.value = false }
 }
@@ -578,4 +959,17 @@ async function doBatchSubmit() {
 .page { padding: 0 }
 .page-header { display: flex; justify-content: space-between; margin-bottom: 16px }
 .page-header h2 { font-size: 18px; font-weight: 600; margin: 0 }
+</style>
+
+<style>
+/* 强制覆盖树形表格子行的物料编码列缩进 - 使用最高权重 */
+.qc-input-table .el-table__row--level-1 .itemcd-column .cell {
+  padding-left: 0 !important;
+}
+.qc-input-table .el-table__row--level-2 .itemcd-column .cell {
+  padding-left: 0 !important;
+}
+.qc-input-table .el-table__row--level-3 .itemcd-column .cell {
+  padding-left: 0 !important;
+}
 </style>

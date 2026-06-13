@@ -351,6 +351,7 @@ class StockInService:
         """校验明细：itemcd 存在性、itemtyp 合法性、EID 匹配与位置。返回错误信息或 None。"""
         from app.models.master import Item, SysCode, Eid
         valid_qc = {c.code_cd for c in db.session.query(SysCode.code_cd).filter(SysCode.code_typ == "QC").all()}
+        valid_qc.add("0")  # 生产领料/通用类型，不做QC校验
         # 销售退货入库、翻新入库：EID 必须在库外且未在门店活跃部署
         check_store_off = invtyp in ("2", "6")
         # 回收入库：EID 必须在库外
@@ -537,9 +538,9 @@ class StockInService:
                 elif record.invtyp == "5":
                     vals["sflg"] = "2"
                 elif record.invtyp in ("6", "8"):
-                    # 翻新/生产入库：新机/成品 EID 回库，标记在库可用
-                    vals["sflg"] = "1"
-                    vals["qcflg"] = "HG"  # 合格
+                    # 翻新/生产入库：新机/成品 EID 回库，标记在库
+                    vals["sflg"] = "8"
+                    vals["qcflg"] = "GA"  # 合格
                 db.session.query(Eid).filter(
                     Eid.itemcd == itemcd_val, Eid.eid == eid_val,
                 ).update(vals, synchronize_session=False)
@@ -566,11 +567,50 @@ class StockInService:
                         else:
                             out_prd.append(d)
                     if out_eid or out_prd:
-                        StockOutService.create(
+                        out_rec = StockOutService.create(
                             data={"invtyp": ov_type, "whcd": ov_wh, "refbillid": qc.qcbillid,
                                   "memo": f"QC判定{label}自动出库 {record.inbillid}"},
                             details_eid=out_eid, details_prd=out_prd, creator=auditor,
                         )
+
+                        # 同步写入 TMS04 物料消耗（报废/返修/退换）
+                        from app.repositories.mes_repository import MaterialConsumeRepository
+                        from app.models.inventory import Price
+                        from app.models.mes import ConsumeType as _CT
+                        consume_type_map = {"7": _CT.SCRAP, "9": _CT.REPAIR, "6": _CT.RETURN}
+                        ct = consume_type_map.get(ov_type, "3")
+                        all_outs = out_eid + out_prd
+                        for od in all_outs:
+                            # 查询物料标准价格
+                            price_rec = Price.query.filter_by(
+                                itemcd=od["itemcd"],
+                                busityp="20",
+                                is_current=True,
+                                useflg="1"
+                            ).first()
+                            unit_cost = price_rec.itemprice if price_rec else None
+                            actual_qty = od["outqty"]
+                            total_cost = unit_cost * actual_qty if unit_cost else None
+
+                            MaterialConsumeRepository.create(
+                                data={
+                                    "wo_id": qc.refbillid if qc.refbillid.startswith("WO") else "",
+                                    "item_cd": od["itemcd"],
+                                    "plan_qty": 0,
+                                    "actual_qty": actual_qty,
+                                    "unit": "个",
+                                    "warehouse_cd": ov_wh,
+                                    "consume_date": dt_parse.now(UTC).date(),
+                                    "consume_type": ct,
+                                    "ref_bill_type": "OV",
+                                    "ref_bill_id": out_rec.get("outbillid", ""),
+                                    "ref_qc_id": qc.qcbillid,
+                                    "unit_cost": unit_cost,
+                                    "total_cost": total_cost,
+                                },
+                                creator=auditor,
+                            )
+                        db.session.flush()
             except Exception:
                 pass  # 自动生成失败不影响入库审核
 
@@ -754,18 +794,39 @@ class StockOutService:
                 qty = int(dd.get("outqty", 0) or 0) if isinstance(dd, dict) else 0
                 if not item_cd or qty <= 0:
                     continue
-                existing = db.session.query(MaterialConsume).filter(
-                    MaterialConsume.wo_id == wo_id, MaterialConsume.item_cd == item_cd,
-                ).first()
-                if existing:
-                    existing.actual_qty = (existing.actual_qty or 0) + qty
-                    existing.upddate = now_ts
-                else:
-                    db.session.add(MaterialConsume(
-                        wo_id=wo_id, item_cd=item_cd, actual_qty=qty,
-                        warehouse_cd=record.whcd, consume_date=now_ts.date(),
-                        opercd=auditor, upddate=now_ts,
-                    ))
+                # BOM计划用量：仅首次领料计算，补料时 plan_qty=0
+                plan_qty = None
+                try:
+                    from app.models.mes import WorkOrder
+                    wo = db.session.get(WorkOrder, wo_id)
+                    if wo:
+                        from app.models.master import BomDt
+                        bom_row = db.session.query(BomDt).filter(
+                            BomDt.bomcd == wo.item_cd, BomDt.itemcd == item_cd,
+                        ).first()
+                        if bom_row:
+                            plan_qty = int((bom_row.bomqty or 0)) * int(wo.plan_qty or 1)
+                    # 已有消耗记录则为补料，计划用量为0
+                    if plan_qty and db.session.query(MaterialConsume).filter(
+                        MaterialConsume.wo_id == wo_id, MaterialConsume.item_cd == item_cd,
+                    ).first():
+                        plan_qty = 0
+                except Exception:
+                    pass
+                # 从物料表获取单位
+                unit = None
+                try:
+                    from app.models.master import Item
+                    item = db.session.query(Item.unit).filter(Item.item_cd == item_cd).scalar()
+                    unit = item
+                except Exception:
+                    pass
+                # 每笔消耗独立记录（不聚合），通过 consume_date + id 区分
+                db.session.add(MaterialConsume(
+                    wo_id=wo_id, item_cd=item_cd, plan_qty=plan_qty, actual_qty=qty,
+                    unit=unit, warehouse_cd=record.whcd, consume_date=now_ts.date(),
+                    opercd=auditor, upddate=now_ts,
+                ))
 
     @staticmethod
     def list_returnable_orders() -> list[dict[str, Any]]:
@@ -914,13 +975,21 @@ class StockOutService:
             return {"success": False, "error": "出库单不存在"}
         if record.auditflg == "2":
             return {"success": False, "error": "已审核，不可重复审核"}
-        # 审核退回（'8'）：仅改状态+备注，不扣库存
+        # 审核退回（'8'）：仅改状态+备注，不扣库存。清空补料标记允许重新申请
         if auditflg == "8":
             record.auditflg = "8"
             record.auditman = auditor
             record.auditdate = dt_parse.now(UTC)
             if checkmemo:
                 record.memo = (record.memo or "") + " [退回: " + checkmemo + "]"
+            if record.invtyp == "8":
+                from app.models.warehouse import QcResultDt, QcResultEid
+                db.session.query(QcResultDt).filter(
+                    QcResultDt.replenish_ov_billid == outbillid,
+                ).update({"replenish_status": "", "replenish_ov_billid": ""}, synchronize_session=False)
+                db.session.query(QcResultEid).filter(
+                    QcResultEid.replenish_ov_billid == outbillid,
+                ).update({"replenish_status": "", "replenish_ov_billid": ""}, synchronize_session=False)
             db.session.commit()
             return {"success": True, "outbillid": record.outbillid}
         if auditflg != "2":
@@ -1189,7 +1258,7 @@ class StockOutService:
             if record.refbillid:
                 from app.models.mes import WorkOrder
                 wo = db.session.get(WorkOrder, record.refbillid)
-                if wo and wo.status == "PICKING":
+                if wo and wo.status in ("PICKING", "RELEASED"):
                     wo.status = "IN_PROGRESS"
                     wo.actual_start = dt_parse.now(UTC).date()
         # OV=10 → TMS04
@@ -1262,6 +1331,15 @@ class StockOutService:
             return {"success": False, "error": f"关联入库单 {linked_audited.inbillid} 已审核且库存已入，不可作废"}
         record.auditflg = "V"
         record.opercd = operator
+        # 补料出库单作废 → 清空 QC 明细行的补料标记
+        if record.invtyp == "8":
+            from app.models.warehouse import QcResultDt, QcResultEid
+            db.session.query(QcResultDt).filter(
+                QcResultDt.replenish_ov_billid == outbillid,
+            ).update({"replenish_status": "", "replenish_ov_billid": ""}, synchronize_session=False)
+            db.session.query(QcResultEid).filter(
+                QcResultEid.replenish_ov_billid == outbillid,
+            ).update({"replenish_status": "", "replenish_ov_billid": ""}, synchronize_session=False)
         db.session.commit()
         return {"success": True, "outbillid": record.outbillid}
 

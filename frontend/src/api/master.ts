@@ -58,6 +58,7 @@ export interface BomRecord {
     bomnm: string
     useflg: string
     gendate: string
+    redundancy_ratio?: number
     details?: BomDetailRecord[]
 }
 
@@ -82,6 +83,10 @@ export function fetchItemClassTree() {
 
 export function fetchSuppliers() {
     return request.get<never, { data: { supp_cd: string; supp_nm: string }[] }>('/suppliers')
+}
+
+export function fetchSuppliersSimple() {
+    return request.get<never, { data: { supp_cd: string; supp_nm: string }[] }>('/suppliers/simple')
 }
 
 export function fetchSuppliersByRequisition(pcplanid: string) {
@@ -429,6 +434,10 @@ export function fetchSupplierClasses() {
     return request.get('/supplierclasses')
 }
 
+export function fetchSupplierClassTree() {
+    return request.get('/supplierclasses/tree')
+}
+
 export function createSupplierClass(data: Record<string, unknown>) {
     return request.post('/supplierclasses', data)
 }
@@ -481,6 +490,10 @@ export function deleteSupplierPrice(suppCd: string, priceId: number) {
 
 export const batchCreateOrders = (data: { orders: Array<{ suppliercd: string; memo?: string; details: Array<{ itemcd: string; rgsqty: number; units?: string; ref_pcplanid: string; ref_pclineno: number; unitprice?: number }> }> }) =>
     request.post('/procurement/orders/batch', data)
+
+// 价格解析
+export const fetchPriceResolve = (itemcd: string, supp_cd: string, qty: number = 1) =>
+    request.get('/prices/resolve', { params: { itemcd, supp_cd, qty } })
 
 // 智能合并
 export const getMergePreview = () =>

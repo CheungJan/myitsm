@@ -71,7 +71,7 @@
 
         <!-- BOM 编辑/新建弹窗 -->
         <el-dialog :title="bomDialogTitle" v-model="bomDialogVisible" width="420px">
-            <el-form :model="bomForm" label-width="80px">
+            <el-form :model="bomForm" label-width="100px">
                 <el-form-item label="成品编码">
                     <el-input :model-value="bomForm.bomcd" disabled />
                 </el-form-item>
@@ -82,6 +82,10 @@
                     <el-select v-model="bomForm.useflg" style="width: 100%">
                         <el-option label="有效" value="1" /><el-option label="无效" value="0" />
                     </el-select>
+                </el-form-item>
+                <el-form-item label="补料冗余比例">
+                    <el-input-number v-model="bomForm.redundancy_ratio" :min="0" :max="1" :step="0.1" :precision="2" style="width: 100%" placeholder="0=不冗余，0.2=20%" />
+                    <div style="font-size:12px;color:#909399;margin-top:4px">补料数量 = 非合格数 × (1 + 冗余比例)</div>
                 </el-form-item>
             </el-form>
             <template #footer>
@@ -98,6 +102,7 @@
                     <span style="color:#999;font-size:13px">{{ selectedBom.bomnm || selectedItem?.item_nm }}</span>
                     <el-tag :type="bomType.type" size="small">{{ bomType.label }}</el-tag>
                     <el-tag :type="selectedBom.useflg==='0'?'danger':'success'" size="small">{{ selectedBom.useflg==='0'?'无效':'有效' }}</el-tag>
+                    <el-tag v-if="selectedBom.redundancy_ratio && selectedBom.redundancy_ratio > 0" type="info" size="small">冗余{{ (selectedBom.redundancy_ratio * 100).toFixed(0) }}%</el-tag>
                     <el-button type="primary" size="small" @click="openAddDetail">添加物料</el-button>
                     <el-button size="small" @click="openEditBom">重命名</el-button>
                 </div>
@@ -203,7 +208,7 @@ const bomDetailVisible = ref(false); const bomStatusMap = ref<Record<string,stri
 const bomNameMap = ref<Record<string,string>>({}); const bomOperMap = ref<Record<string,string>>({}); const bomDateMap = ref<Record<string,string>>({})
 
 const bomDialogVisible = ref(false); const isEditingBom = ref(false); const saving = ref(false)
-const bomForm = reactive({ bomcd: '', bomnm: '', useflg: '1' })
+const bomForm = reactive({ bomcd: '', bomnm: '', useflg: '1', redundancy_ratio: 0 })
 const bomDialogTitle = computed(() => isEditingBom.value ? '编辑 BOM' : '新建 BOM')
 
 const addDetailVisible = ref(false); const addingDetail = ref(false)
@@ -315,7 +320,9 @@ function openEditBom() {
     if (!selectedBom.value) return
     bomForm.bomcd = selectedBom.value.bomcd
     bomForm.bomnm = selectedBom.value.bomnm
-    bomForm.useflg = selectedBom.value.useflg; isEditingBom.value = true; bomDialogVisible.value = true
+    bomForm.useflg = selectedBom.value.useflg
+    bomForm.redundancy_ratio = Number(selectedBom.value.redundancy_ratio || 0)
+    isEditingBom.value = true; bomDialogVisible.value = true
 }
 
 async function handleSaveBom() {
@@ -323,9 +330,9 @@ async function handleSaveBom() {
     saving.value = true
     try {
         if (isEditingBom.value) {
-            await updateBom(bomForm.bomcd, { bomnm: bomForm.bomnm, useflg: bomForm.useflg })
+            await updateBom(bomForm.bomcd, { bomnm: bomForm.bomnm, useflg: bomForm.useflg, redundancy_ratio: bomForm.redundancy_ratio })
         } else {
-            await createBom({ bomcd: bomForm.bomcd, bomnm: bomForm.bomnm })
+            await createBom({ bomcd: bomForm.bomcd, bomnm: bomForm.bomnm, redundancy_ratio: bomForm.redundancy_ratio })
         }
         bomDialogVisible.value = false
         if (selectedItem.value) { await onSelectItem(selectedItem.value); loadItems() }

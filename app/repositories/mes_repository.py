@@ -42,6 +42,15 @@ class WorkOrderRepository:
         return record
 
     @staticmethod
+    @staticmethod
+    def delete(wo_id: str) -> bool:
+        record = db.session.get(WorkOrder, wo_id)
+        if record:
+            db.session.delete(record)
+            return True
+        return False
+
+    @staticmethod
     def update(
         record: WorkOrder,
         data: dict[str, Any],
@@ -132,6 +141,12 @@ class WorkProcessRepository:
     @staticmethod
     def get_by_id(wp_id: int) -> WorkProcess | None:
         return db.session.get(WorkProcess, wp_id)
+
+    @staticmethod
+    def delete(wp_id: int) -> bool:
+        record = db.session.get(WorkProcess, wp_id)
+        if record: db.session.delete(record); return True
+        return False
 
 
 class MaterialConsumeRepository:

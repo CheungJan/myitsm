@@ -1,6 +1,6 @@
 # 完整数据库字典（myitsm）
 
-> 生成时间：2026-05-13 | 更新：2026-06-10 | 数据库：myitsm | PostgreSQL | v1.2 tqc10_result 加 batch_id
+> 生成时间：2026-05-13 | 更新：2026-06-13 | 数据库：myitsm | PostgreSQL | v1.3 tqc/tms/tmm 列变更
 > 🟢=自动生成（information_schema）| 🟡=手动维护 | 🔗=引用ER文档
 > 配套：`数据库ER关系文档.md`（ER关联）| `数据库变更追踪_迁移后.md`（变更历史）
 
@@ -34,7 +34,7 @@
 | SLA (sla) | 2 | 服务级别 |
 | 门户 (tpt) | 3 | 自助报修/评价 |
 | IoT (tio) | 4 | 设备接入/监控 |
-| MES (tms) | 4 | 生产工单/工序 |
+| MES (tms) | 5 | 生产工单/工序 |
 | 押金 (tmm61) | 5 | 押金管理 |
 | 质检 (tqc) | 3 | 质检结果 |
 | 调拨 (ttx) | 1 | 调拨科目 |
@@ -495,36 +495,6 @@
 | 9 | sysflg | VARCHAR(1) |  | 系统标志 |
 | 10 | memo | VARCHAR(60) |  | 说明 |
 
-> **编码类型 (code_typ) 字典值**（截至 2026-06-01）：
->
-> **OV（出库类型）**：
-> | code_cd | code_nm | 本质 |
-> |---------|---------|------|
-> | 1 | 销售出库 | 移动型 |
-> | 2 | 服务领用出库 | 移动型（targetwhcd=工程师仓） |
-> | 3 | 调拨出库 | 移动型（自动生成 IV=4 入库草稿） |
-> | 4 | 借出出库 | 移动型 |
-> | 5 | 质检出库 | 移动型 |
-> | 6 | 退货出库 | 移动型 |
-> | 7 | 报废出库 | — |
-> | 8 | 生产出库 | 转换型（BOM 配件→成品） |
-> | 9 | 返修出库 | 移动型 |
-> | 10 | 翻新出库 | 转换型（旧 EID→新 EID） |
->
-> **IV（入库类型）**：
-> | code_cd | code_nm | 对应出库 |
-> |---------|---------|----------|
-> | 1 | 采购入库 | — |
-> | 2 | 销售退货入库 | — |
-> | 3 | 服务返还入库 | OV=2 |
-> | 4 | 调拨入库 | OV=3 |
-> | 5 | 借出归还入库 | OV=4 |
-> | 6 | 翻新入库 | OV=10 |
-> | 7 | 回收入库 | — |
-> | 8 | 生产入库 | OV=8 |
-> | 9 | 返修入库 | OV=9 |
-> | 11 | 质检入库 | OV=5 |
-
 #### 15. tmm34_idmaster
 
 | # | 列名 | 类型 | 约束 | 说明 |
@@ -621,8 +591,9 @@
 | 4 | gendate | TIMESTAMP |  | 创建日期 |
 | 5 | upddate | TIMESTAMP |  | 更新日期 |
 | 6 | useflg | VARCHAR(1) |  | 有效标志 |
-| 7 | created_at | TIMESTAMP | NOT NULL |  |
-| 8 | updated_at | TIMESTAMP | NOT NULL |  |
+| 7 | redundancy_ratio | NUMERIC(5,4) |  | 补料冗余比例 |
+| 8 | created_at | TIMESTAMP | NOT NULL |  |
+| 9 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 19. tmm42_bomdt
 
@@ -2801,7 +2772,7 @@
 | 16 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-### MES (tms) — 4 张表
+### MES (tms) — 5 张表
 > 生产工单/工序
 
 #### 1. tms01_work_order
@@ -2880,6 +2851,29 @@
 | 12 | upddate | TIMESTAMP |  | 更新日期 |
 | 13 | created_at | TIMESTAMP | NOT NULL |  |
 | 14 | updated_at | TIMESTAMP | NOT NULL |  |
+| 15 | consume_type | VARCHAR(2) | DEFAULT '1' | 消耗类型：1定额 2补料 3报废 4返修 5退换 |
+| 16 | ref_bill_type | VARCHAR(2) |  | 来源单据类型：OV出库/IV入库 |
+| 17 | ref_bill_id | VARCHAR(20) |  | 来源单据号 |
+| 18 | ref_qc_id | VARCHAR(12) |  | 关联质检单号 |
+| 19 | unit_cost | NUMERIC(12,4) |  | 单价（采购价/标准成本） |
+| 20 | total_cost | NUMERIC(14,2) |  | 总成本（actual_qty * unit_cost） |
+
+#### 5. tms05_replace_record
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | id | INTEGER | PK NOT NULL | 主键 |
+| 2 | wo_id | VARCHAR(20) | NOT NULL | 工单号 |
+| 3 | old_eid | VARCHAR(20) |  | 旧物料序列号 |
+| 4 | new_eid | VARCHAR(20) |  | 新物料序列号 |
+| 5 | itemcd | VARCHAR(12) |  | 物料编码 |
+| 6 | old_batch_no | VARCHAR(20) |  | 旧批次号（批次物料使用） |
+| 7 | new_batch_no | VARCHAR(20) |  | 新批次号（批次物料使用） |
+| 8 | replace_date | TIMESTAMP |  | 更换时间 |
+| 9 | opercd | VARCHAR(10) |  | 操作人 |
+| 10 | memo | VARCHAR(200) |  | 备注 |
+| 11 | created_at | TIMESTAMP | NOT NULL |  |
+| 12 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
 ### 押金 (tmm61) — 5 张表
@@ -3008,9 +3002,10 @@
 | 11 | auditflg | VARCHAR(1) |  | 审核标志 |
 | 12 | auditdate | TIMESTAMP |  | 审核日期 |
 | 13 | qcstatus | VARCHAR(2) |  | 质检状态 |
-| 14 | memo | VARCHAR(200) |  | 备注 |
-| 15 | created_at | TIMESTAMP | NOT NULL |  |
-| 16 | updated_at | TIMESTAMP | NOT NULL |  |
+| 14 | draft_type | VARCHAR(1) |  | 草稿类型：S=暂存 C=提交 |
+| 15 | memo | VARCHAR(200) |  | 备注 |
+| 16 | created_at | TIMESTAMP | NOT NULL |  |
+| 17 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 2. tqc11_resultdt
 
@@ -3034,8 +3029,10 @@
 | 16 | qc_source | VARCHAR(1) |  | 质检来源 |
 | 17 | remark | VARCHAR(100) |  | 备注 |
 | 18 | ref_rgstbillid | VARCHAR(30) |  | 来源入库单号 |
-| 19 | created_at | TIMESTAMP | NOT NULL |  |
-| 20 | updated_at | TIMESTAMP | NOT NULL |  |
+| 19 | replenish_status | VARCHAR(10) |  | 补料状态 |
+| 20 | replenish_ov_billid | VARCHAR(12) |  | 补料出库单号 |
+| 21 | created_at | TIMESTAMP | NOT NULL |  |
+| 22 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 3. tqc11_resulteid
 
@@ -3061,8 +3058,10 @@
 | 18 | remark | VARCHAR(100) |  | 备注 |
 | 19 | manuf_seq | VARCHAR(100) |  | 制造序列号 |
 | 20 | ref_rgstbillid | VARCHAR(30) |  | 来源入库单号 |
-| 21 | created_at | TIMESTAMP | NOT NULL |  |
-| 22 | updated_at | TIMESTAMP | NOT NULL |  |
+| 21 | replenish_status | VARCHAR(10) |  | 补料状态 |
+| 22 | replenish_ov_billid | VARCHAR(12) |  | 补料出库单号 |
+| 23 | created_at | TIMESTAMP | NOT NULL |  |
+| 24 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
 ### 调拨 (ttx) — 1 张表

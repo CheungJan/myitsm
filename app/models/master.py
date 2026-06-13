@@ -406,6 +406,7 @@ class Eid(BaseModel):
     etyp = db.Column(db.String(1), comment="设备类型")
     sflg = db.Column(db.String(1), comment="状态标志")
     refid = db.Column(db.String(8), comment="关联单号")
+    ref_eid = db.Column(db.String(13), comment="溯源旧EID（翻新时记录来源）")
     qcflg = db.Column(db.String(2), comment="质检标志")
     whcd = db.Column(db.String(2), comment="仓库编码")
     prddate = db.Column(db.DateTime, comment="生产日期")
@@ -485,6 +486,7 @@ class Bom(BaseModel):
     gendate = db.Column(db.DateTime, comment="创建日期")
     upddate = db.Column(db.DateTime, comment="更新日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    redundancy_ratio = db.Column(db.Numeric(5, 4), default=0, comment="补料冗余比例")
 
     details = db.relationship("BomDt", back_populates="bom", lazy="dynamic")
 

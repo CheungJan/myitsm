@@ -53,12 +53,14 @@ def create_qc_result():  # type: ignore[no-untyped-def]
     """创建质检单（含明细）。old_batch_id 存在时先作废旧批次再建新。"""
     body = request.get_json(silent=True) or {}
     try:
-        req = QcCreate(**{k: v for k, v in body.items() if k not in ("old_batch_id", "batch_id")})
+        req = QcCreate(**{k: v for k, v in body.items() if k not in ("old_batch_id", "batch_id", "draft_type")})
     except Exception as e:
         return error_response(str(e), 400)
     data = req.model_dump(exclude={"details", "eid_details"})
     if "batch_id" in body:
         data["batch_id"] = body["batch_id"]
+    if "draft_type" in body:
+        data["draft_type"] = body["draft_type"]
     result = QcService.create(
         data=data,
         details=req.details,
@@ -110,6 +112,15 @@ def void_qc_result(qcbillid: str):  # type: ignore[no-untyped-def]
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
     return success_response(message="已作废")
+
+
+@qc_bp.get("/eids-by-refbillid/<refbillid>")
+@login_required
+def get_qc_eids_by_refbillid(refbillid: str):  # type: ignore[no-untyped-def]
+    """获取指定来源单据的所有质检EID记录（用于FQC回显IPQC的配件EID）。"""
+    from app.repositories.qc_repository import QcRepository
+    eids = QcRepository.get_eids_by_refbillid(refbillid)
+    return success_response(data=[e.to_dict() for e in eids])
 
 
 # ── 批次层端点 ──
@@ -172,3 +183,19 @@ def void_qc_batch(batch_id: str):  # type: ignore[no-untyped-def]
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
     return success_response(message="批次已作废")
+
+
+@qc_bp.post("/batches/<batch_id>/replenish")
+@login_required
+def replenish_qc_batch(batch_id: str):  # type: ignore[no-untyped-def]
+    """申请补料：为批次中的不良品（BF/BH/TH）创建 OV=8 出库单。"""
+    body = request.get_json(silent=True) or {}
+    user_cd: str = request.headers.get("X-User-Cd", request.args.get("user_cd", "system"))
+    replenish_qty: dict[str, int] | None = body.get("replenish_qty")
+    result = QcService.replenish(batch_id, operator=user_cd, replenish_qty=replenish_qty)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(
+        data=result,
+        message=f"补料出库单 {result.get('ov_billid', '')} 已生成",
+    )
