@@ -579,49 +579,7 @@ class StockInService:
                               "memo": f"QC判定{label}自动出库 {record.inbillid}"},
                         details_eid=out_eid, details_prd=out_prd, creator=auditor,
                     )
-
-                    # 同步写入 TMS04 物料消耗（报废/返修/退换）
-                    from app.repositories.mes_repository import MaterialConsumeRepository
-                    from app.models.inventory import Price
-                    from app.models.mes import ConsumeType as _CT
-                    consume_type_map = {"7": _CT.SCRAP, "9": _CT.REPAIR, "6": _CT.RETURN}
-                    ct = consume_type_map.get(ov_type, "3")
-                    all_outs = out_eid + out_prd
-                    for od in all_outs:
-                        # 查询物料标准价格
-                        price_rec = Price.query.filter_by(
-                            itemcd=od["itemcd"],
-                            busityp="20",
-                            is_current=True,
-                            useflg="1"
-                        ).first()
-                        unit_cost = price_rec.itemprice if price_rec else None
-                        actual_qty = od["outqty"]
-                        total_cost = unit_cost * actual_qty if unit_cost else None
-
-                        # 获取工单 ID（从 QC 单据的 refbillid）
-                        from app.models.warehouse import QcResult as _Qc2
-                        _qc = db.session.get(_Qc2, record.refbillid)
-                        _wo_id = (_qc.refbillid if _qc and (_qc.refbillid or "").startswith("WO") else "")
-                        MaterialConsumeRepository.create(
-                            data={
-                                    "wo_id": _wo_id,
-                                    "item_cd": od["itemcd"],
-                                    "plan_qty": 0,
-                                    "actual_qty": actual_qty,
-                                    "unit": "个",
-                                    "warehouse_cd": record.whcd,
-                                    "consume_date": dt_parse.now(UTC).date(),
-                                    "consume_type": ct,
-                                    "ref_bill_type": "OV",
-                                    "ref_bill_id": out_rec.get("outbillid", ""),
-                                    "ref_qc_id": record.refbillid,
-                                    "unit_cost": unit_cost,
-                                    "total_cost": total_cost,
-                                },
-                                creator=auditor,
-                            )
-                        db.session.flush()
+                    # TMS04 在 OV 审核时写入（_write_material_consume），此处不提前写入
             except Exception:
                 pass  # 自动生成失败不影响入库审核
 
@@ -911,9 +869,11 @@ class StockOutService:
                 except Exception:
                     pass
                 cur_bill = getattr(record, "outbillid", "")
-                # 消耗类型：定额领料 vs 不良补料
+                # 消耗类型：按 OV 类型映射
+                invtyp = getattr(record, "invtyp", "") or ""
                 memo = getattr(record, "memo", "") or ""
-                consume_type = "2" if "补料" in memo else "1"
+                _ct_map = {"7": "3", "9": "4", "6": "6"}  # OV→consume_type
+                consume_type = _ct_map.get(invtyp, "2" if "补料" in memo else "1")
                 # 查价格
                 unit_cost = None
                 try:
@@ -1389,6 +1349,9 @@ class StockOutService:
                     wo.actual_start = dt_parse.now(UTC).date()
         # OV=10 → TMS04
         if record.invtyp == "10":
+            StockOutService._write_material_consume(record, auditor)
+        # OV=6/7/9 不良品出库审核 → TMS04（IV审核时不再写入，改在此处写入）
+        if record.invtyp in ("6", "7", "9"):
             StockOutService._write_material_consume(record, auditor)
         # OV=5 质检出库审核：不在此生成 IV=11。
         # IV=11 在 QC 结果审核时按判定生成（仅 C1 合格物料入库）。

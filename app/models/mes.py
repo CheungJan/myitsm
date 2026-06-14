@@ -123,6 +123,7 @@ class ConsumeType:
     SCRAP = "3"      # 报废出库
     REPAIR = "4"     # 返修出库
     RETURN = "5"     # 退料入库
+    RETURN_EXCHANGE = "6"  # 退换出库
 
 
 class MaterialConsume(BaseModel):
