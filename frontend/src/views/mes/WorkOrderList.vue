@@ -153,6 +153,22 @@
           </el-table>
         </template>
 
+        <!-- 损耗明细 -->
+        <template v-if="detailLosses.length > 0">
+          <el-divider style="margin:16px 0 12px"/>
+          <h4 style="font-size:13px;color:#303133;margin:0 0 8px">损耗明细（TMS04）</h4>
+          <el-table :data="detailLosses" size="small" stripe :row-class-name="({row}: any) => row._sep ? 'consume-sep-row' : ''">
+            <el-table-column prop="item_cd" label="物料" width="90"><template #default="{row}"><span v-if="row._sep" style="color:#e6a23c;font-weight:600">{{ row._label }}</span><span v-else>{{ row.item_cd }}</span></template></el-table-column>
+            <el-table-column label="类型" width="80"><template #default="{row}"><span v-if="!row._sep">{{ consumeTypeLabel(row.consume_type) }}</span></template></el-table-column>
+            <el-table-column prop="actual_qty" label="实耗" width="60" align="right"><template #default="{row}"><span v-if="!row._sep">{{ row.actual_qty }}</span></template></el-table-column>
+            <el-table-column prop="plan_qty" label="计划" width="60" align="right"><template #default="{row}"><span v-if="!row._sep">{{ row.plan_qty }}</span></template></el-table-column>
+            <el-table-column label="仓库" width="70"><template #default="{row}"><span v-if="!row._sep">{{ whnm(row.warehouse_cd) }}</span></template></el-table-column>
+            <el-table-column label="关联号" width="100"><template #default="{row}"><span v-if="!row._sep">{{ row.ref_bill_id || '-' }}</span></template></el-table-column>
+            <el-table-column label="关联QC" width="100"><template #default="{row}"><span v-if="!row._sep">{{ (row as any).ref_qc_id || '-' }}</span></template></el-table-column>
+            <el-table-column prop="consume_date" label="日期" width="90"><template #default="{row}"><span v-if="!row._sep">{{ row.consume_date }}</span></template></el-table-column>
+          </el-table>
+        </template>
+
         <!-- 物料更换 -->
         <template v-if="detail.status==='QC_PENDING'||detail.status==='IN_PROGRESS'||detail.status==='COMPLETED'">
           <el-divider style="margin:16px 0 12px"/>
@@ -255,6 +271,7 @@ const { dictMap: qcMap } = useDict('QC')
 const drawer = ref(false)
 const detail = ref<WoRecord | null>(null)
 const detailMaterials = ref<any[]>([])
+const detailLosses = ref<any[]>([])
 const detailBom = ref<any[]>([])
 const detailBomNm = ref('')
 const transitioning = ref('')
@@ -306,7 +323,7 @@ async function openDetail(row: WoRecord) {
     try { const r = await request.get(`/mes/work-orders/${row.wo_id}`) as any; detail.value = r?.data || row } catch { detail.value = row }
     detailMaterials.value = []
     detailBom.value = []
-    try { const r = await fetchMaterialConsumes(row.wo_id as string); const raw = ((r.data as any)||[]).filter((d:any) => !['3','4','5'].includes(d.consume_type)).sort((a:any,b:any) => (a.consume_type||0)-(b.consume_type||0)); const grouped: any[] = []; let lastType = ''; raw.forEach((d:any) => { if (d.consume_type !== lastType) { grouped.push({ _sep: true, _label: consumeTypeLabel(d.consume_type) }); lastType = d.consume_type } grouped.push(d) }); detailMaterials.value = grouped } catch { /* */ }
+    try { const r = await fetchMaterialConsumes(row.wo_id as string); const all: any[] = (r.data as any)||[]; const raw = all.filter((d:any) => !['3','4','5','6'].includes(d.consume_type)).sort((a:any,b:any) => (a.consume_type||0)-(b.consume_type||0)); const grouped: any[] = []; let lastType = ''; raw.forEach((d:any) => { if (d.consume_type !== lastType) { grouped.push({ _sep: true, _label: consumeTypeLabel(d.consume_type) }); lastType = d.consume_type } grouped.push(d) }); detailMaterials.value = grouped; const loss = all.filter((d:any) => ['3','4','5','6'].includes(d.consume_type)).sort((a:any,b:any) => (a.consume_type||0)-(b.consume_type||0)); const lossGrouped: any[] = []; lastType = ''; loss.forEach((d:any) => { if (d.consume_type !== lastType) { lossGrouped.push({ _sep: true, _label: consumeTypeLabel(d.consume_type) }); lastType = d.consume_type } lossGrouped.push(d) }); detailLosses.value = lossGrouped } catch { /* */ }
     // 加载 BOM
     if (row.item_cd) { try { const r = await fetchBom(row.item_cd as string); const bom = r.data as any; detailBom.value = bom?.details || []; detailBomNm.value = bom?.bomnm || '' } catch { detailBomNm.value = '' } }
     // 加载更换历史（补料信息依赖它判断是否用完）
