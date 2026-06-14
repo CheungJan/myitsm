@@ -791,8 +791,8 @@ class StockInService:
             return {"success": False, "error": "已审核单据不可作废，请先反审核"}
         if record.auditflg == "V":
             return {"success": False, "error": "已作废"}
-        # 检查上游 QC 是否已审核
-        if record.refbillid and record.refbillid.startswith("QC"):
+        # 检查上游 QC：仅已审核入库单作废时拦截（草稿可自由作废）
+        if record.auditflg == "2" and record.refbillid and record.refbillid.startswith("QC"):
             from app.models.warehouse import QcResult as Qc
             qc = db.session.get(Qc, record.refbillid)
             if qc and qc.auditflg == "1":
@@ -1493,8 +1493,8 @@ class StockOutService:
             return {"success": False, "error": "已审核单据不可作废，请先反审核"}
         if record.auditflg == "V":
             return {"success": False, "error": "已作废"}
-        # 检查上游 QC 是否已审核
-        if record.refbillid and record.refbillid.startswith("QC"):
+        # 检查上游 QC：仅已审核出库单作废时拦截（草稿可自由作废）
+        if record.auditflg == "2" and record.refbillid and record.refbillid.startswith("QC"):
             from app.models.warehouse import QcResult as Qc
             qc = db.session.get(Qc, record.refbillid)
             if qc and qc.auditflg == "1":
