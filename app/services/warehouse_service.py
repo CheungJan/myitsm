@@ -889,19 +889,40 @@ class StockOutService:
                 except Exception:
                     pass
                 cur_bill = getattr(record, "outbillid", "")
-                # 同出库单已有记录则跳过（补料API已写入）
-                if db.session.query(MaterialConsume).filter(
+                # 消耗类型：定额领料 vs 不良补料
+                memo = getattr(record, "memo", "") or ""
+                consume_type = "2" if "补料" in memo else "1"
+                # 查价格
+                unit_cost = None
+                try:
+                    from app.models.inventory import Price
+                    price_rec = db.session.query(Price).filter(
+                        Price.itemcd == item_cd, Price.busityp == "20",
+                        Price.is_current == True, Price.useflg == "1",
+                    ).first()
+                    unit_cost = price_rec.itemprice if price_rec else None
+                except Exception:
+                    pass
+                total_cost = unit_cost * qty if unit_cost else None
+                # 已有记录则补全价格和消耗类型（补料API先写入时缺价格），否则新建
+                existing = db.session.query(MaterialConsume).filter(
                     MaterialConsume.ref_bill_id == cur_bill,
                     MaterialConsume.item_cd == item_cd,
-                ).first():
-                    continue
-                # 每笔消耗独立记录（不聚合），通过 consume_date + id 区分
-                db.session.add(MaterialConsume(
-                    wo_id=wo_id, item_cd=item_cd, plan_qty=plan_qty, actual_qty=qty,
-                    unit=unit, warehouse_cd=record.whcd, consume_date=now_ts.date(),
-                    opercd=auditor, upddate=now_ts,
-                    ref_bill_type="OV", ref_bill_id=cur_bill,
-                ))
+                ).first()
+                if existing:
+                    existing.consume_type = consume_type
+                    existing.unit_cost = unit_cost
+                    existing.total_cost = total_cost
+                    existing.plan_qty = plan_qty
+                    existing.upddate = now_ts
+                else:
+                    db.session.add(MaterialConsume(
+                        wo_id=wo_id, item_cd=item_cd, plan_qty=plan_qty, actual_qty=qty,
+                        unit=unit, warehouse_cd=record.whcd, consume_date=now_ts.date(),
+                        consume_type=consume_type, unit_cost=unit_cost, total_cost=total_cost,
+                        opercd=auditor, upddate=now_ts,
+                        ref_bill_type="OV", ref_bill_id=cur_bill,
+                    ))
 
     @staticmethod
     def list_returnable_orders() -> list[dict[str, Any]]:
