@@ -755,12 +755,21 @@ class StockInService:
                     Eid.itemcd == itemcd_val, Eid.eid == eid_val,
                 ).update(vals, synchronize_session=False)
 
-        # IV=11 的 OV refbillid 指向 QC 单号，反审核时一并作废下游草稿 OV
+        # IV=11 的 OV refbillid 指向 QC 单号，反审核时一并作废下游草稿 OV + 清理 TMS04
         if record.invtyp == "11":
-            db.session.query(StockOut).filter(
+            voided_ovs = db.session.query(StockOut.outbillid).filter(
                 StockOut.refbillid == record.refbillid,
                 StockOut.auditflg == "0",
-            ).update({"auditflg": "V"})
+            ).all()
+            ov_ids = [r.outbillid for r in voided_ovs]
+            if ov_ids:
+                db.session.query(StockOut).filter(
+                    StockOut.outbillid.in_(ov_ids),
+                ).update({"auditflg": "V"}, synchronize_session=False)
+                from app.models.mes import MaterialConsume
+                db.session.query(MaterialConsume).filter(
+                    MaterialConsume.ref_bill_id.in_(ov_ids),
+                ).delete(synchronize_session=False)
         else:
             db.session.query(StockOut).filter(
                 StockOut.refbillid == record.inbillid,
