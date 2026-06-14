@@ -297,10 +297,10 @@ class WorkOrderService:
         documents: list[dict[str, Any]] = []
         ref_ids = [wo_id, *fqc_ids]
 
-        # 出库单（领料/补料/报废/返修），排除作废
+        # 出库单（领料/补料/报废/返修），仅已审
         out_bills = (
             db.session.query(StockOut)
-            .filter(StockOut.refbillid.in_(ref_ids), StockOut.useflg == "1", StockOut.auditflg != "V")
+            .filter(StockOut.refbillid.in_(ref_ids), StockOut.useflg == "1", StockOut.auditflg == "2")
             .all()
         )
         out_ids = [o.outbillid for o in out_bills]
@@ -320,10 +320,10 @@ class WorkOrderService:
             ):
                 out_prd_map.setdefault(d.outbillid, []).append(d)
 
-        # 入库单（成品入库），排除作废
+        # 入库单（成品入库），仅已审
         in_bills = (
             db.session.query(StockIn)
-            .filter(StockIn.refbillid.in_(ref_ids), StockIn.auditflg != "V")
+            .filter(StockIn.refbillid.in_(ref_ids), StockIn.auditflg == "2")
             .all()
             if ref_ids
             else []

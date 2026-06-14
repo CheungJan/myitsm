@@ -548,8 +548,8 @@ async function loadFinalWhDocs() {
         request.get(`/warehouse/stock-out?per_page=50`)
       ])
       const related = [
-        ...(ivRes?.data?.items||[]).filter((d: any) => d.refbillid === qc.qcbillid && d.auditflg !== 'V'),
-        ...(ovRes?.data?.items||[]).filter((d: any) => d.refbillid === qc.qcbillid && d.auditflg !== 'V')
+        ...(ivRes?.data?.items||[]).filter((d: any) => d.refbillid === qc.qcbillid && d.auditflg === '2'),
+        ...(ovRes?.data?.items||[]).filter((d: any) => d.refbillid === qc.qcbillid && d.auditflg === '2')
       ]
       for (const d of related) {
         const detailRes = d.inbillid
