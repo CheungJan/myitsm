@@ -921,6 +921,7 @@ class StockOutService:
                         opercd=auditor, upddate=now_ts,
                         ref_bill_type="OV", ref_bill_id=cur_bill, ref_qc_id=ref_qc_id,
                     ))
+                    db.session.flush()  # 确保后续同单同物料可查到刚创建的记录
 
     @staticmethod
     def list_returnable_orders() -> list[dict[str, Any]]:
