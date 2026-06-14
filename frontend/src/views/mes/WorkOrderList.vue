@@ -583,7 +583,7 @@ async function loadReplaceHistory() {
   } catch { replaceHistory.value = [] }
 }
 
-const ctLabels: Record<string, string> = { '1':'定额领料','2':'不良补料','3':'报废出库','4':'返修出库','5':'退料入库' }
+const ctLabels: Record<string, string> = { '1':'定额领料','2':'不良补料','3':'报废出库','4':'返修出库','5':'退料入库','6':'退换出库' }
 function consumeTypeLabel(t: string) { return ctLabels[t] || t || '-' }
 function formatDate(d: any) { if (!d) return '-'; const s = String(d); return s.replace('T', ' ').substring(0, 19) }
 function doSearch() {
