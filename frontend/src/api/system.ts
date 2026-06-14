@@ -79,6 +79,9 @@ export function removeGroupMember(groupCd: string, userCd: string) {
 export function fetchSysparms() {
     return request.get<never, { data: Record<string,unknown>[] }>('/sysparms')
 }
+export function fetchSysparmByCd(parmCd: string) {
+    return request.get<never, { data: Record<string,unknown> | null }>(`/sysparms/${parmCd}`)
+}
 export function updateSysparm(parmCd: string, data: Record<string, unknown>) {
     return request.put<never, { data: Record<string, unknown> }>(`/sysparms/${parmCd}`, data)
 }

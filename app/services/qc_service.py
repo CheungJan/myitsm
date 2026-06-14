@@ -105,15 +105,27 @@ class QcService:
         if incomplete:
             return {"success": False, "error": f"存在 {len(incomplete)} 行未设置质检判定，请先完善数据"}
 
-        # 合格/让步/待检行必须有 EID 或已申请补料
+        # 合格/让步/待检行必须有 EID 或已申请补料（耗材豁免）
+        from app.models.master import Item as _Item
+        consumable_cds: set[str] = set()
+        try:
+            all_cds = {(getattr(r, "itemcd", "") or "").strip() for r in all_rows if (getattr(r, "itemcd", "") or "").strip()}
+            if all_cds:
+                consumable_cds = {r.item_cd for r in db.session.query(_Item.item_cd).filter(
+                    _Item.item_cd.in_(all_cds), _Item.consume == "1"
+                ).all()}
+        except Exception:
+            pass
         missing_eid: list[str] = []
         for row in all_rows:
             rq = (getattr(row, "qcstatus", "") or "").strip()
             if rq not in ("GA", "GB", "GC", "DJ"):
                 continue
+            itemcd = (getattr(row, "itemcd", "") or "").strip()
+            if itemcd in consumable_cds:
+                continue
             has_eid = bool((getattr(row, "eid", "") or "").strip())
             has_replenish = bool((getattr(row, "replenish_ov_billid", "") or "").strip())
-            itemcd = (getattr(row, "itemcd", "") or "").strip()
             if not has_eid and not has_replenish:
                 missing_eid.append(f"{itemcd}({rq})")
         if missing_eid:
@@ -264,7 +276,7 @@ class QcService:
             if has_product_pass:
                 # 自动退料：检查补料 OV=8 剩余 → 生成 IV=3 退料单
                 return_details: list[dict[str, Any]] = []
-                from app.models.warehouse import StockOut as SOut, StockOutDetailPrd
+                from app.models.warehouse import QcResultDt, QcResultEid, StockOut as SOut, StockOutDetailPrd
                 from sqlalchemy import func as sa_func
                 from app.repositories.mes_repository import MaterialConsumeRepository as MCR
                 from app.models.inventory import Price as PPrice
@@ -281,16 +293,13 @@ class QcService:
                         StockOutDetailPrd.outbillid == ov.outbillid,
                     ).all()
                     for od in ov_details:
-                        # 统计已替换的数量
-                        replaced_dt = db.session.query(sa_func.coalesce(sa_func.sum(QcResultDt.qcqty), 0)).filter(
-                            QcResultDt.replenish_ov_billid == ov.outbillid,
-                            QcResultDt.itemcd == od.itemcd,
+                        # 统计已更换的数量（从 tms05_replace_record）
+                        from app.models.mes import ReplaceRecord as _RR
+                        replaced_cnt = db.session.query(sa_func.count(_RR.id)).filter(
+                            _RR.wo_id == _wo.wo_id,
+                            _RR.itemcd == od.itemcd,
                         ).scalar() or 0
-                        replaced_eid = db.session.query(sa_func.coalesce(sa_func.sum(QcResultEid.qcqty), 0)).filter(
-                            QcResultEid.replenish_ov_billid == ov.outbillid,
-                            QcResultEid.itemcd == od.itemcd,
-                        ).scalar() or 0
-                        unused = float(od.outqty or 0) - (float(replaced_dt) + float(replaced_eid))
+                        unused = float(od.outqty or 0) - float(replaced_cnt)
                         if unused > 0.5:
                             return_details.append({
                                 "itemcd": od.itemcd,
@@ -377,33 +386,45 @@ class QcService:
                 )
 
         # BF/BH/TH → 分别 IV=11 入暂存仓（后续 OV 在仓库审核 IV 时自动触发）
-        def _gen_iv(rows_eid: list, rows_prd: list, wh: str, label: str) -> None:
+        def _get_defect_wh(parm_cd: str, default: str) -> str:
+            """从 sysparm 读取不良品仓库编码，未配置时用默认值。"""
+            from app.models.system import SysParm
+            sp = db.session.get(SysParm, parm_cd)
+            return (sp.parm_val or default) if sp else default
+
+        def _gen_iv(rows_eid: list, rows_prd: list, wh: str, label: str, itemtyp: str) -> None:
+            """生成 IV=11 入库单，绕过草稿复用直接创建独立单据。"""
             in_list: list[dict[str, Any]] = []
-            status = label  # BF/BH/TH
             for r in rows_eid:
                 if r.eid:
-                    d_in: dict[str, Any] = {"itemcd": r.itemcd or "", "inqty": int(r.qcqty or 1), "eid": r.eid or "", "itemtyp": status}
+                    d_in: dict[str, Any] = {"itemcd": r.itemcd or "", "inqty": int(r.qcqty or 1), "eid": r.eid or "", "itemtyp": itemtyp}
                     if getattr(r, "prddate", None):
                         d_in["prddate"] = r.prddate.isoformat() if hasattr(r.prddate, "isoformat") else str(r.prddate)
                     in_list.append(d_in)
             for r in rows_prd:
                 if r.itemcd:
-                    d_in: dict[str, Any] = {"itemcd": r.itemcd or "", "inqty": int(r.qcqty or 1), "itemtyp": status}
+                    d_in: dict[str, Any] = {"itemcd": r.itemcd or "", "inqty": int(r.qcqty or 1), "itemtyp": itemtyp}
                     if r.prddate:
                         d_in["prddate"] = r.prddate.isoformat() if hasattr(r.prddate, "isoformat") else str(r.prddate)
                     in_list.append(d_in)
             if in_list:
-                StockInService.create(
-                    data={"invtyp": "11", "whcd": wh, "refbillid": qcbillid, "memo": f"QC判定{label}待入库 {qcbillid}"},
-                    details=in_list, creator=auditor,
-                )
+                from app.repositories.warehouse_repository import StockInRepository
+                data = {"invtyp": "11", "whcd": wh, "refbillid": qcbillid, "memo": f"QC判定{label}待入库 {qcbillid}", "indate": dt_parse.now(UTC)}
+                record = StockInRepository.create(data, auditor)
+                for idx, detail_data in enumerate(in_list, start=1):
+                    StockInRepository.add_detail(
+                        inbillid=record.inbillid,
+                        whcd=record.whcd,
+                        lineno=idx,
+                        data=detail_data,
+                    )
 
         if scrap_eid or scrap_prd:
-            _gen_iv(scrap_eid, scrap_prd, "L1", "报废")
+            _gen_iv(scrap_eid, scrap_prd, _get_defect_wh("qc_scrap_warehouse", "L1"), "报废", "BF")
         if repair_eid or repair_prd:
-            _gen_iv(repair_eid, repair_prd, "LS", "返修")
+            _gen_iv(repair_eid, repair_prd, _get_defect_wh("qc_repair_warehouse", "LS"), "返修", "BH")
         if return_eid or return_prd:
-            _gen_iv(return_eid, return_prd, "LS", "退换")
+            _gen_iv(return_eid, return_prd, _get_defect_wh("qc_return_warehouse", "LS"), "退换", "TH")
 
         # IPQC/FQC 不良品补料 OV=8（跳过已在录入页申请补料的）
         non_pass_eid = [r for r in scrap_eid + repair_eid + return_eid
@@ -466,6 +487,53 @@ class QcService:
                         creator=auditor,
                     )
                 db.session.flush()
+
+        # ── 更换物料处理：生成 IV=11 入库（审核后自动生成 OV 出库）──
+        if is_fqc and has_product_pass:
+            from app.models.mes import ReplaceRecord
+            replace_recs = db.session.query(ReplaceRecord).filter(
+                ReplaceRecord.wo_id == _wo.wo_id,
+            ).all()
+            if replace_recs:
+                iv11_details: list[dict[str, Any]] = []
+                for rec in replace_recs:
+                    judgment = "BF"
+                    if rec.old_batch_no and "(" in (rec.old_batch_no or ""):
+                        judgment = rec.old_batch_no.split("(")[-1].rstrip(")")
+                    wh_map = {
+                        "BF": _get_defect_wh("qc_scrap_warehouse", "L1"),
+                        "BH": _get_defect_wh("qc_repair_warehouse", "LS"),
+                        "TH": _get_defect_wh("qc_return_warehouse", "LS"),
+                    }
+                    d: dict[str, Any] = {"itemcd": rec.itemcd, "inqty": 1, "itemtyp": judgment, "whcd": wh_map.get(judgment, _get_defect_wh("qc_scrap_warehouse", "L1"))}
+                    if rec.old_eid: d["eid"] = rec.old_eid
+                    iv11_details.append(d)
+                # 按仓库分组生成 IV=11
+                wh_groups: dict[str, list[dict[str, Any]]] = {}
+                for d in iv11_details:
+                    wh = d.pop("whcd", _get_defect_wh("qc_scrap_warehouse", "L1"))
+                    if wh not in wh_groups: wh_groups[wh] = []
+                    wh_groups[wh].append(d)
+                _JUDGMENT_CN = {"BF": "报废", "BH": "返修", "TH": "退换"}
+                for wh, items in wh_groups.items():
+                    typs = list({_JUDGMENT_CN.get(it.get("itemtyp") or "", it.get("itemtyp") or "?") for it in items})
+                    typ_label = "、".join(sorted(typs))
+                    StockInService.create(
+                        data={"invtyp": "11", "whcd": wh, "refbillid": qcbillid,
+                              "memo": f"FQC更换旧物料({typ_label}) {qcbillid}"},
+                        details=items, creator=auditor,
+                    )
+
+        # ── 更新更换下来的旧 EID 状态（报废/返修/退换）──
+        if is_fqc and has_product_pass:
+            from app.models.master import Eid as _EidModel
+            from app.models.mes import ReplaceRecord as _RR2
+            old_recs = db.session.query(_RR2).filter(_RR2.wo_id == _wo.wo_id).all()
+            for rec in old_recs:
+                if rec.old_eid:
+                    db.session.query(_EidModel).filter(_EidModel.eid == rec.old_eid).update(
+                        {"sflg": "2", "qcflg": "BF"}, synchronize_session=False
+                    )
 
         db.session.commit()
         return {"success": True}

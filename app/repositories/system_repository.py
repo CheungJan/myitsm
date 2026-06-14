@@ -283,13 +283,16 @@ class SystemRepository:
         return db.session.get(SysParm, parm_cd)
 
     @staticmethod
-    def update_sysparm(parm_cd: str, data: dict[str, Any]) -> SysParm | None:
-        """更新系统参数（单例表）。"""
+    def update_sysparm(parm_cd: str, data: dict[str, Any]) -> SysParm:
+        """更新或创建系统参数。"""
         r = db.session.get(SysParm, parm_cd)
-        if r:
+        if r is None:
+            r = SysParm(parm_cd=parm_cd, **data)
+            db.session.add(r)
+        else:
             for k, v in data.items():
                 setattr(r, k, v)
-            db.session.commit()
+        db.session.commit()
         return r
 
     # ——— 物料分类 ———
@@ -471,6 +474,24 @@ class SystemRepository:
         return db.session.get(Price, (item_cd, busityp))
 
     @staticmethod
+    def get_item_standard_price(item_cd: str, busityp: str = "20"):
+        """获取物料标准采购价（TIP01，当前有效）。"""
+        from datetime import date
+
+        from app.models.inventory import Price
+
+        today = date.today()
+        return (
+            db.session.query(Price)
+            .filter(
+                Price.itemcd == item_cd,
+                Price.busityp == busityp,
+                Price.is_current == True,
+            )
+            .first()
+        )
+
+    @staticmethod
     def add_item_price(data: dict[str, Any]):
         from app.models.inventory import Price
         r = Price(**data)
@@ -529,6 +550,17 @@ class SystemRepository:
     def get_supplier(supp_cd: str):
         """获取单个供应商。"""
         return db.session.get(Supplier, supp_cd)
+
+    @staticmethod
+    def list_suppliers_all() -> list:
+        """全量查询供应商简表（用于下拉选择）。"""
+        rows = (
+            db.session.query(Supplier)
+            .filter(Supplier.useflg != "9")
+            .order_by(Supplier.supp_nm)
+            .all()
+        )
+        return [{"supp_cd": r.supp_cd, "supp_nm": r.supp_nm} for r in rows]
 
     @staticmethod
     def list_suppliers_paginated(keyword: str = "", class_cd: str = "", page: int = 1, per_page: int = 20):
@@ -598,6 +630,104 @@ class SystemRepository:
     def count_appraisals_by_supplier(supp_cd: str) -> int:
         from app.models.procurement import SupplierAppraisalDt
         return db.session.query(SupplierAppraisalDt).filter(SupplierAppraisalDt.supplierid == supp_cd).count()
+
+    # ========== SupplierClass CRUD ==========
+
+    @staticmethod
+    def get_supplier_classes() -> list[dict[str, Any]]:
+        """获取所有供应商分类（扁平列表）。"""
+        classes = db.session.query(SupplierClass).order_by(SupplierClass.class_cd).all()
+        return [c.to_dict() for c in classes]
+
+    @staticmethod
+    def get_supplier_class_tree() -> list[dict[str, Any]]:
+        """获取供应商分类树（递归构建，parent 字段为上级编码）。"""
+        sql = db.text("""
+            WITH RECURSIVE tree AS (
+                SELECT class_cd, class_nm, parent, childflg, useflg, 0 AS depth
+                FROM tmm18_supplierclass
+                WHERE parent IS NULL OR parent = '' OR parent = '%'
+                UNION ALL
+                SELECT c.class_cd, c.class_nm, c.parent, c.childflg, c.useflg, t.depth + 1
+                FROM tmm18_supplierclass c
+                JOIN tree t ON c.parent = t.class_cd
+            )
+            SELECT t.class_cd, t.class_nm, t.parent, t.childflg, t.useflg, t.depth,
+                   COUNT(s.supp_cd) AS supp_count
+            FROM tree t
+            LEFT JOIN tmm19_suppliers s ON s.class_cd = t.class_cd
+            GROUP BY t.class_cd, t.class_nm, t.parent, t.childflg, t.useflg, t.depth
+            ORDER BY t.depth, t.class_cd
+        """)
+        rows = db.session.execute(sql).fetchall()
+        node_map: dict[str, dict[str, Any]] = {}
+        roots: list[dict[str, Any]] = []
+        for r in rows:
+            parent_cd = (r.parent or "").strip()
+            node = {
+                "class_cd": r.class_cd,
+                "class_nm": r.class_nm,
+                "parent": parent_cd,
+                "childflg": r.childflg,
+                "useflg": r.useflg,
+                "supp_count": int(r.supp_count),
+                "children": [],
+            }
+            node_map[r.class_cd] = node
+            if parent_cd and parent_cd != "%" and parent_cd in node_map:
+                node_map[parent_cd]["children"].append(node)
+            else:
+                roots.append(node)
+        return roots
+
+    @staticmethod
+    def get_supplier_class(class_cd: str) -> SupplierClass | None:
+        """按编码获取供应商分类。"""
+        return db.session.get(SupplierClass, class_cd)
+
+    @staticmethod
+    def create_supplier_class(data: dict[str, Any]) -> SupplierClass:
+        """新增供应商分类。"""
+        obj = SupplierClass(**data)
+        db.session.add(obj)
+        db.session.commit()
+        return obj
+
+    @staticmethod
+    def update_supplier_class(record: SupplierClass, data: dict[str, Any]) -> SupplierClass:
+        """更新供应商分类。"""
+        for k, v in data.items():
+            if hasattr(record, k):
+                setattr(record, k, v)
+        db.session.commit()
+        return record
+
+    @staticmethod
+    def delete_supplier_class(record: SupplierClass) -> None:
+        """删除供应商分类。"""
+        db.session.delete(record)
+        db.session.commit()
+
+    @staticmethod
+    def count_child_classes(class_cd: str) -> int:
+        """统计指定分类下的子分类数量。"""
+        return db.session.query(SupplierClass).filter(SupplierClass.parent == class_cd).count()
+
+    @staticmethod
+    def count_suppliers_by_class(class_cd: str) -> int:
+        """统计使用该分类的供应商数量。"""
+        return db.session.query(Supplier).filter(Supplier.class_cd == class_cd).count()
+
+    @staticmethod
+    def get_max_supplier_class_cd() -> str | None:
+        """获取最大的两位供应商分类编码（用于自动生成）。"""
+        result = (
+            db.session.query(SupplierClass.class_cd)
+            .filter(SupplierClass.class_cd.op("~")("^[0-9]{1,2}$"))
+            .order_by(SupplierClass.class_cd.desc())
+            .first()
+        )
+        return result[0] if result else None
 
     @staticmethod
     def create_item_class(data: dict[str, Any]) -> ItemClass:
@@ -807,14 +937,15 @@ class SystemRepository:
 
     @staticmethod
     def get_eid_list(page: int = 1, per_page: int = 20, search: str | None = None,
-                     class_cd: str | None = None) -> tuple[list[Eid], int]:
+                     class_cd: str | None = None, whcd: str | None = None) -> tuple[list[Eid], int]:
         q = db.session.query(Eid)
         if class_cd:
-            # 递归获取该分类下的所有物料编码
             cds = SystemRepository._get_descendant_class_cds(class_cd)
             if cds:
                 item_cds = db.session.query(Item.item_cd).filter(Item.class_cd.in_(cds)).all()
                 q = q.filter(Eid.itemcd.in_([r[0] for r in item_cds]))
+        if whcd:
+            q = q.filter(Eid.whcd == whcd)
         if search:
             q = q.filter(db.or_(Eid.eid.ilike(f"%{search}%"), Eid.itemcd.ilike(f"%{search}%")))
         q = q.order_by(Eid.eid.desc())
@@ -1196,16 +1327,16 @@ class SystemRepository:
     def get_supplier_items(supp_cd: str) -> list[dict[str, Any]]:
         """查询供应商关联的商品列表，含物料名称、单位、分类。"""
         rows = (
-            db.session.query(CustItems, Item.item_nm, Item.item_unit, Item.class_cd)
-            .join(Item, CustItems.itemcd == Item.item_cd)
+            db.session.query(CustItems, Item.item_nm, Item.unit, Item.class_cd)
+            .outerjoin(Item, CustItems.itemcd == Item.item_cd)
             .filter(CustItems.custcd == supp_cd)
             .all()
         )
         result = []
-        for ci, item_nm, item_unit, class_cd in rows:
+        for ci, item_nm, unit, class_cd in rows:
             d = ci.to_dict()
             d["item_nm"] = item_nm
-            d["item_unit"] = item_unit
+            d["item_unit"] = unit
             d["class_cd"] = class_cd
             result.append(d)
         return result
@@ -1227,7 +1358,7 @@ class SystemRepository:
             **{k: v for k, v in data.items() if k != "itemcd"},
         )
         db.session.add(obj)
-        db.session.flush()
+        db.session.commit()
         return obj
 
     @staticmethod
@@ -1238,12 +1369,13 @@ class SystemRepository:
             CustItems.custcd != cust_cd,
             CustItems.dfltflg == "Y",
         ).update({"dfltflg": "N"})
+        db.session.flush()
 
     @staticmethod
     def delete_supplier_item(obj: CustItems) -> None:
         """删除供应商-商品关联。"""
         db.session.delete(obj)
-        db.session.flush()
+        db.session.commit()
 
     @staticmethod
     def check_supplier_item_has_orders(supp_cd: str, item_cd: str) -> bool:
@@ -1270,6 +1402,47 @@ class SystemRepository:
             CustItems.custcd == supp_cd,
             CustItems.itemcd == item_cd,
         ).first() is not None
+
+    @staticmethod
+    def get_supplier_price_current(item_cd: str, supp_cd: str, qty: float = 1):
+        """获取供应商当前有效阶梯报价。
+
+        阶梯定价规则：取满足 min_qty <= qty 的记录中 min_qty 最大的一条
+        （最匹配的采购阶梯）。若无满足起订量的记录，退而取 min_qty 最小
+        的有效报价，并由调用方决定是否提示用户未达起订量。
+        """
+        from datetime import date
+
+        from app.models.inventory import SupplierPrice
+
+        today = date.today()
+        base_filters = [
+            SupplierPrice.itemcd == item_cd,
+            SupplierPrice.supp_cd == supp_cd,
+            SupplierPrice.effective_date <= today,
+        ]
+        # expire_date 可为空（永久有效）
+        import sqlalchemy as sa
+        expire_filter = sa.or_(
+            SupplierPrice.expire_date.is_(None),
+            SupplierPrice.expire_date >= today,
+        )
+        # 阶梯匹配：满足起订量，取 min_qty 最大的（最接近采购量的阶梯）
+        result = (
+            db.session.query(SupplierPrice)
+            .filter(*base_filters, expire_filter, SupplierPrice.min_qty <= qty)
+            .order_by(SupplierPrice.min_qty.desc())
+            .first()
+        )
+        if result:
+            return result
+        # 退而：数量未达任何起订量，取 min_qty 最小的有效报价供参考
+        return (
+            db.session.query(SupplierPrice)
+            .filter(*base_filters, expire_filter)
+            .order_by(SupplierPrice.min_qty.asc())
+            .first()
+        )
 
     @staticmethod
     def get_supplier_prices(supp_cd: str, item_cd: str = "", current_only: bool = False) -> list[dict[str, Any]]:
@@ -1304,7 +1477,7 @@ class SystemRepository:
         from app.models.inventory import SupplierPrice
         obj = SupplierPrice(**data)
         db.session.add(obj)
-        db.session.flush()
+        db.session.commit()
         return obj
 
     @staticmethod
@@ -1313,10 +1486,10 @@ class SystemRepository:
         for k, v in data.items():
             if hasattr(obj, k) and k not in skip:
                 setattr(obj, k, v)
-        db.session.flush()
+        db.session.commit()
         return obj
 
     @staticmethod
     def delete_supplier_price(obj: Any) -> None:
         db.session.delete(obj)
-        db.session.flush()
+        db.session.commit()

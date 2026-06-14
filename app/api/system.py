@@ -9,6 +9,9 @@ from __future__ import annotations
 from flask import Blueprint, request
 
 from app.api.auth import login_required
+from app.extensions import db
+from app.models.master import CustItems, Supplier, SupplierClass
+from sqlalchemy import func
 from app.schemas.warehouse import TransferAccountCreate, TransferAccountUpdate
 from app.services.system_service import SystemService
 from app.services.warehouse_service import TransferAccountService
@@ -226,20 +229,18 @@ def list_sysparms():  # type: ignore[no-untyped-def]
 @system_bp.get("/sysparms/<parm_cd>")
 @login_required
 def get_sysparm(parm_cd: str):  # type: ignore[no-untyped-def]
-    """获取指定系统参数。"""
+    """获取指定系统参数；不存在时返回 null 便于前端使用默认值。"""
     parm = _service.get_sysparm(parm_cd)
-    if parm is None:
-        return error_response(message="参数不存在", code=404)
     return success_response(data=parm)
 
 
 @system_bp.put("/sysparms/<parm_cd>")
 @login_required
 def update_sysparm(parm_cd: str):  # type: ignore[no-untyped-def]
-    """更新系统参数（单例表）。"""
+    """更新或创建系统参数。"""
     body = request.get_json(silent=True) or {}
     r = _service.update_sysparm(parm_cd, body)
-    return success_response(data=r) if r else error_response("参数不存在", 404)
+    return success_response(data=r)
 
 
 # ---- 码表查询 ----
@@ -410,7 +411,10 @@ def list_items():  # type: ignore[no-untyped-def]
 def create_item():  # type: ignore[no-untyped-def]
     """新增物料。"""
     body = request.get_json(silent=True) or {}
-    return success_response(data=_service.create_item(body), code=201)
+    try:
+        return success_response(data=_service.create_item(body), code=201)
+    except ValueError as e:
+        return error_response(str(e), 400)
 
 
 @system_bp.put("/items/<item_cd>")
@@ -418,8 +422,11 @@ def create_item():  # type: ignore[no-untyped-def]
 def update_item(item_cd: str):  # type: ignore[no-untyped-def]
     """更新物料。"""
     body = request.get_json(silent=True) or {}
-    r = _service.update_item(item_cd, body)
-    return success_response(data=r) if r else error_response("不存在", 404)
+    try:
+        r = _service.update_item(item_cd, body)
+        return success_response(data=r) if r else error_response("不存在", 404)
+    except ValueError as e:
+        return error_response(str(e), 400)
 
 
 @system_bp.delete("/items/<item_cd>")
@@ -440,6 +447,13 @@ def list_suppliers():  # type: ignore[no-untyped-def]
     return success_response(data=_service.list_suppliers(keyword, class_cd, page, per_page))
 
 
+@system_bp.get("/suppliers/simple")
+@login_required
+def list_suppliers_simple():  # type: ignore[no-untyped-def]
+    """供应商简表（全量，用于下拉选择）。"""
+    return success_response(data=_service.list_suppliers_all())
+
+
 @system_bp.get("/suppliers/<supp_cd>")
 @login_required
 def get_supplier(supp_cd: str):  # type: ignore[no-untyped-def]
@@ -450,13 +464,73 @@ def get_supplier(supp_cd: str):  # type: ignore[no-untyped-def]
     return success_response(data=data)
 
 
+@system_bp.get("/suppliers/by-requisition")
+@login_required
+def suppliers_by_requisition():  # type: ignore[no-untyped-def]
+    """根据采购需求单查询可供应其物料的供应商列表（仅含仍有可用量的物料）。"""
+    from app.models.procurement import PurchasePlanDt, RequisitionOrderLink
+
+    pcplanid = request.args.get("pcplanid", "").strip()
+    if not pcplanid:
+        return error_response("pcplanid 不能为空", 400)
+
+    # 子查询：仍有可用余额的需求行物料
+    available_items = (
+        db.session.query(PurchasePlanDt.itemcd)
+        .filter(
+            PurchasePlanDt.pcplanid == pcplanid,
+            PurchasePlanDt.rgstqty
+            > db.session.query(
+                func.coalesce(func.sum(RequisitionOrderLink.linkqty), 0)
+            )
+            .filter(
+                RequisitionOrderLink.pcplanid == PurchasePlanDt.pcplanid,
+                RequisitionOrderLink.pclineno == PurchasePlanDt.lineno,
+            )
+            .correlate(PurchasePlanDt)
+            .scalar_subquery(),
+        )
+    )
+
+    rows = (
+        db.session.query(Supplier.supp_cd, Supplier.supp_nm)
+        .join(CustItems, Supplier.supp_cd == CustItems.custcd)
+        .filter(
+            CustItems.itemcd.in_(available_items),
+            Supplier.useflg == "1",
+        )
+        .distinct()
+        .all()
+    )
+    return success_response(data=[{"supp_cd": r.supp_cd, "supp_nm": r.supp_nm} for r in rows])
+
+
 @system_bp.post("/suppliers")
 @login_required
 def create_supplier():  # type: ignore[no-untyped-def]
     """新增供应商。"""
     json_data = request.get_json(silent=True) or {}
     try:
-        return success_response(data=_service.create_supplier(json_data), code=201)
+        supp_cd = (json_data.get("supp_cd") or "").strip()
+        if supp_cd:
+            if db.session.get(Supplier, supp_cd):
+                return error_response(f"供应商编码 {supp_cd} 已存在", 400)
+        else:
+            max_cd = (
+                db.session.query(db.func.max(Supplier.supp_cd))
+                .filter(Supplier.supp_cd.op("~")(r"^\d{8}$"))
+                .scalar()
+            )
+            next_num = int(max_cd) + 1 if max_cd else 1
+            supp_cd = str(next_num).zfill(8)
+        if not json_data.get("supp_nm"):
+            return error_response("供应商名称不能为空", 400)
+        json_data["supp_cd"] = supp_cd
+        obj = Supplier(**json_data)
+        db.session.add(obj)
+        db.session.commit()
+        saved = db.session.get(Supplier, supp_cd)
+        return success_response(data=saved.to_dict() if saved else obj.to_dict(), code=201)
     except ValueError as e:
         return error_response(str(e), 400)
 
@@ -467,7 +541,16 @@ def update_supplier(supp_cd: str):  # type: ignore[no-untyped-def]
     """编辑供应商。"""
     json_data = request.get_json(silent=True) or {}
     try:
-        return success_response(data=_service.update_supplier(supp_cd, json_data))
+        obj = db.session.get(Supplier, supp_cd)
+        if obj is None:
+            return error_response(f"供应商 {supp_cd} 不存在", 404)
+        readonly = {"supp_cd", "custcd", "custnm", "opercd", "gendate", "upddate"}
+        for field, value in json_data.items():
+            if hasattr(obj, field) and field not in readonly:
+                setattr(obj, field, value)
+        db.session.commit()
+        saved = db.session.get(Supplier, supp_cd)
+        return success_response(data=saved.to_dict() if saved else obj.to_dict())
     except ValueError as e:
         return error_response(str(e), 400)
 
@@ -477,8 +560,15 @@ def update_supplier(supp_cd: str):  # type: ignore[no-untyped-def]
 def delete_supplier(supp_cd: str):  # type: ignore[no-untyped-def]
     """删除供应商（逻辑删除）。"""
     try:
-        result = _service.delete_supplier(supp_cd)
-        return success_response(data=result, message="删除成功")
+        obj = db.session.get(Supplier, supp_cd)
+        if obj is None:
+            return error_response(f"供应商 {supp_cd} 不存在", 404)
+        conflicts = _service._check_supplier_delete_conflicts(supp_cd)
+        if conflicts:
+            return error_response(f"该供应商存在以下关联：{'; '.join(conflicts)}，无法删除", 409)
+        db.session.delete(obj)
+        db.session.commit()
+        return success_response(data={"supp_cd": supp_cd, "conflicts": []}, message="删除成功")
     except ValueError as e:
         msg = str(e)
         if "不存在" in msg:
@@ -548,8 +638,12 @@ def list_supplier_prices(supp_cd: str):  # type: ignore[no-untyped-def]
 def create_supplier_price(supp_cd: str):  # type: ignore[no-untyped-def]
     """新增供应商报价。"""
     json_data = request.get_json(silent=True) or {}
+    force = json_data.pop("force", False)
     try:
-        return success_response(data=_service.create_supplier_price(supp_cd, json_data), code=201)
+        result = _service.create_supplier_price(supp_cd, json_data, force)
+        if result.get("requires_confirmation"):
+            return success_response(data=result, code=200)
+        return success_response(data=result, code=201)
     except ValueError as e:
         return error_response(str(e), 400)
 
@@ -563,6 +657,18 @@ def update_supplier_price(supp_cd: str, price_id: int):  # type: ignore[no-untyp
         return success_response(data=_service.update_supplier_price(price_id, json_data))
     except ValueError as e:
         return error_response(str(e), 400)
+
+
+@system_bp.get("/prices/resolve")
+@login_required
+def resolve_price():  # type: ignore[no-untyped-def]
+    """按优先级解析价格：供应商报价 > 标准采购价 > 手动填写。"""
+    item_cd = request.args.get("itemcd", "").strip()
+    supp_cd = request.args.get("supp_cd", "").strip()
+    qty = request.args.get("qty", 1, type=float)
+    if not item_cd or not supp_cd:
+        return error_response("itemcd 和 supp_cd 不能为空", 400)
+    return success_response(data=_service.resolve_price(item_cd, supp_cd, qty))
 
 
 @system_bp.delete("/suppliers/<supp_cd>/prices/<int:price_id>")
@@ -654,6 +760,13 @@ def delete_item_supplier(item_cd: str, cust_cd: str):  # type: ignore[no-untyped
 # ---- 供应商分类 ----
 
 
+@system_bp.get("/supplierclasses/tree")
+@login_required
+def get_supplier_class_tree():  # type: ignore[no-untyped-def]
+    """供应商分类树形结构。"""
+    return success_response(data=_service.get_supplier_class_tree())
+
+
 @system_bp.get("/supplierclasses")
 @login_required
 def list_supplier_classes():  # type: ignore[no-untyped-def]
@@ -664,12 +777,37 @@ def list_supplier_classes():  # type: ignore[no-untyped-def]
 @system_bp.post("/supplierclasses")
 @login_required
 def create_supplier_class():  # type: ignore[no-untyped-def]
-    """新增供应商分类。"""
+    """新增供应商分类（编码自动生成）。"""
     json_data = request.get_json(silent=True) or {}
-    if not json_data.get("class_cd") or not json_data.get("class_nm"):
-        return error_response("分类编码和名称不能为空", 400)
+    if not json_data.get("class_nm"):
+        return error_response("分类名称不能为空", 400)
     try:
-        return success_response(data=_service.create_supplier_class(json_data), code=201)
+        class_cd = (json_data.get("class_cd") or "").strip()
+        if not class_cd:
+            max_cd = (
+                db.session.query(SupplierClass.class_cd)
+                .filter(SupplierClass.class_cd.op("~")("^[0-9]{1,2}$"))
+                .order_by(SupplierClass.class_cd.desc())
+                .first()
+            )
+            if max_cd and max_cd[0].isdigit():
+                class_cd = str(int(max_cd[0]) + 1).zfill(2)
+            else:
+                class_cd = "01"
+        if db.session.get(SupplierClass, class_cd):
+            return error_response(f"分类编码 {class_cd} 已存在", 400)
+        obj = SupplierClass(
+            class_cd=class_cd,
+            class_nm=json_data["class_nm"],
+            parent=json_data.get("parent") or "%",
+            classtyp=json_data.get("classtyp") or "1",
+            childflg=json_data.get("childflg") or "0",
+            useflg=json_data.get("useflg") or "1",
+        )
+        db.session.add(obj)
+        db.session.commit()
+        saved = db.session.get(SupplierClass, class_cd)
+        return success_response(data=saved.to_dict() if saved else obj.to_dict(), code=201)
     except ValueError as e:
         return error_response(str(e), 400)
 
@@ -680,7 +818,15 @@ def update_supplier_class(class_cd: str):  # type: ignore[no-untyped-def]
     """编辑供应商分类。"""
     json_data = request.get_json(silent=True) or {}
     try:
-        return success_response(data=_service.update_supplier_class(class_cd, json_data))
+        obj = db.session.get(SupplierClass, class_cd)
+        if obj is None:
+            return error_response(f"分类 {class_cd} 不存在", 404)
+        for field in ("class_nm", "parent", "classtyp", "childflg", "useflg"):
+            if field in json_data:
+                setattr(obj, field, json_data[field])
+        db.session.commit()
+        saved = db.session.get(SupplierClass, class_cd)
+        return success_response(data=saved.to_dict() if saved else obj.to_dict())
     except ValueError as e:
         return error_response(str(e), 400)
 
@@ -690,7 +836,17 @@ def update_supplier_class(class_cd: str):  # type: ignore[no-untyped-def]
 def delete_supplier_class(class_cd: str):  # type: ignore[no-untyped-def]
     """删除供应商分类。"""
     try:
-        _service.delete_supplier_class(class_cd)
+        obj = db.session.get(SupplierClass, class_cd)
+        if obj is None:
+            return error_response(f"分类 {class_cd} 不存在", 404)
+        child_count = db.session.query(SupplierClass).filter(SupplierClass.parent == class_cd).count()
+        if child_count > 0:
+            return error_response(f"分类 {class_cd} 下存在 {child_count} 个子分类，无法删除", 409)
+        supplier_count = db.session.query(Supplier).filter(Supplier.class_cd == class_cd).count()
+        if supplier_count > 0:
+            return error_response(f"分类 {class_cd} 下存在 {supplier_count} 个供应商，无法删除", 409)
+        db.session.delete(obj)
+        db.session.commit()
         return success_response(message="删除成功")
     except ValueError as e:
         msg = str(e)
@@ -786,15 +942,27 @@ def get_eid_tree():  # type: ignore[no-untyped-def]
     return success_response(data=_service.get_eid_itemcd_tree())
 
 
+@system_bp.get("/eid/<eid_val>")
+@login_required
+def get_eid_info(eid_val: str):  # type: ignore[no-untyped-def]
+    """查询单个EID的基本信息（含所在仓库）。"""
+    from app.models.master import Eid as EidModel
+    eid = db.session.query(EidModel).filter(EidModel.eid == eid_val).first()
+    if not eid:
+        return error_response("EID 不存在", 404)
+    return success_response(data={"eid": eid.eid, "itemcd": eid.itemcd, "whcd": eid.whcd})
+
+
 @system_bp.get("/eid")
 @login_required
 def list_eid():  # type: ignore[no-untyped-def]
-    """EID 设备列表（分页），支持分类筛选和搜索。"""
+    """EID 设备列表（分页），支持分类筛选、搜索和按仓库过滤。"""
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
     class_cd = request.args.get("class_cd")
     search = request.args.get("search")
-    result = _service.list_eid(page=page, per_page=per_page, class_cd=class_cd, search=search)
+    whcd = request.args.get("whcd")
+    result = _service.list_eid(page=page, per_page=per_page, class_cd=class_cd, search=search, whcd=whcd)
     return success_response(data={"items": result["items"], "total": result["total"]})
 
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 from flask import Blueprint, g, request
 
 from app.api.auth import login_required
+from app.extensions import db
 from app.schemas.warehouse import (
     OverLostCreate,
     OverLostDetailCreate,
@@ -94,10 +95,88 @@ def list_stock_in():  # type: ignore[no-untyped-def]
         whcd=params.whcd,
         invtyp=params.invtyp,
         auditflg=params.auditflg,
+        inbillid=params.inbillid,
+        indate_from=params.indate_from,
+        indate_to=params.indate_to,
         page=params.page,
         per_page=params.per_page,
     )
     return success_response(data=data)
+
+
+@warehouse_bp.get("/stock-in/transferable-orders")
+@login_required
+def list_transferable_orders():  # type: ignore[no-untyped-def]
+    """可调拨入库的调拨出库单列表（已审核且有未入库数量）。"""
+    return success_response(data=StockInService.list_transferable_orders())
+
+@warehouse_bp.get("/stock-in/receivable-orders")
+@login_required
+def list_receivable_orders():  # type: ignore[no-untyped-def]
+    """可入库的采购订单列表（已审核且仍有未入库数量）。"""
+    return success_response(data=StockInService.list_receivable_orders())
+
+
+@warehouse_bp.get("/stock-in/service-returnable")
+@login_required
+def list_service_returnable():  # type: ignore[no-untyped-def]
+    """ITSM 工单中可返还的自有资产旧配件（asset_owner != 客户资产）。"""
+    return success_response(data=StockInService.list_service_returnable())
+
+
+@warehouse_bp.get("/stock-in/service-skip-info/<maintenance_id>")
+@login_required
+def get_service_skip_info(maintenance_id: str):  # type: ignore[no-untyped-def]
+    """查询某ITSM工单的不入库明细。"""
+    from app.models.itsm import AccessoriesUpdate
+    rows = (
+        db.session.query(AccessoriesUpdate)
+        .filter(
+            AccessoriesUpdate.maintenance_id == maintenance_id,
+            AccessoriesUpdate.in_wh == "2",
+        )
+        .all()
+    )
+    return success_response(data=[
+        {"eid": r.old_accessories_id, "reason": (r.description or "").replace("[不入库: ", "").rstrip("]")}
+        for r in rows
+    ])
+
+
+@warehouse_bp.post("/stock-in/service-return-confirm")
+@login_required
+def confirm_service_return():  # type: ignore[no-untyped-def]
+    """确认ITSM配件变更并生成服务返还入库草稿。"""
+    json_data = request.get_json(silent=True) or {}
+    maintenance_ids: list[str] = json_data.get("maintenance_ids", [])
+    if not maintenance_ids:
+        return error_response(message="请选择要确认的ITSM工单", code=400)
+    user_cd: str = g.current_user
+    result = StockInService.confirm_service_return(maintenance_ids, user_cd)
+    return success_response(data=result, message=f"已确认 {result['created']} 个工单")
+
+
+@warehouse_bp.post("/stock-in/service-return-skip")
+@login_required
+def skip_service_return():  # type: ignore[no-untyped-def]
+    """按EID标记ITSM配件变更为不入库（耗材、实物不符等）。"""
+    json_data = request.get_json(silent=True) or {}
+    maintenance_id: str = json_data.get("maintenance_id", "")
+    eids: list[str] = json_data.get("eids", [])
+    reason: str = json_data.get("reason", "")
+    if not maintenance_id or not reason:
+        return error_response(message="缺少工单号或不入库原因", code=400)
+    result = StockInService.skip_service_return(maintenance_id, reason, eids if eids else None)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result, message="已标记不入库")
+
+
+@warehouse_bp.get("/stock-in/receivable-order-lines/<rgstbillid>")
+@login_required
+def get_receivable_order_lines(rgstbillid: str):  # type: ignore[no-untyped-def]
+    """某采购订单的可入库明细行。"""
+    return success_response(data=StockInService.get_receivable_order_lines(rgstbillid))
 
 
 @warehouse_bp.get("/stock-in/<inbillid>")
@@ -117,24 +196,75 @@ def create_stock_in():  # type: ignore[no-untyped-def]
     json_data = request.get_json(silent=True) or {}
     body = StockInCreate.model_validate(json_data)
     raw_details = json_data.get("details", [])
-    details = [StockInDetailCreate.model_validate(d).model_dump() for d in raw_details]
+    details = [StockInDetailCreate.model_validate(d).model_dump(exclude_none=True) for d in raw_details]
+    body_dict = body.model_dump(exclude_none=True)
+    custom_auditflg = body_dict.pop("auditflg", None)
     user_cd: str = g.current_user
-    data = StockInService.create(body.model_dump(exclude_none=True), details, user_cd)
+    data = StockInService.create(body_dict, details, user_cd)
+    if not data.get("success", True):
+        return error_response(message=str(data.get("error", "创建失败")), code=400)
+    # 如果传了自定义 auditflg（如全部不入库标记 S），覆盖
+    if custom_auditflg:
+        from app.models.warehouse import StockIn as StockInModel
+        record = db.session.get(StockInModel, data.get("inbillid"))
+        if record:
+            record.auditflg = custom_auditflg
+            db.session.commit()
     return success_response(data=data, message="创建成功", code=201)
 
 
 @warehouse_bp.post("/stock-in/<inbillid>/audit")
 @login_required
 def audit_stock_in(inbillid: str):  # type: ignore[no-untyped-def]
-    """审核入库单（审核后更新库存）。支持传入 whcd 覆盖入库仓库。"""
+    """审核入库单。auditflg: 2=审核通过, 8=审核退回"""
     json_data = request.get_json(silent=True) or {}
     whcd: str = json_data.get("whcd", "")
     checkmemo: str = json_data.get("checkmemo", "")
+    auditflg: str = json_data.get("auditflg", "2")
     user_cd: str = g.current_user
-    result = StockInService.audit(inbillid, user_cd, whcd=whcd, checkmemo=checkmemo)
+    result = StockInService.audit(inbillid, user_cd, whcd=whcd, checkmemo=checkmemo, auditflg=auditflg)
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
     return success_response(data=result)
+
+
+@warehouse_bp.post("/stock-in/<inbillid>/unaudit")
+@login_required
+def unaudit_stock_in(inbillid: str):  # type: ignore[no-untyped-def]
+    """反审核入库单：回退库存、作废下游 OV 草稿、重置为草稿状态。"""
+    user_cd: str = g.current_user
+    result = StockInService.unaudit(inbillid, user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result)
+
+
+@warehouse_bp.put("/stock-in/<inbillid>")
+@login_required
+def update_stock_in(inbillid: str):  # type: ignore[no-untyped-def]
+    """编辑入库单（仅未审核/已退回可编辑）。"""
+    json_data = request.get_json(silent=True) or {}
+    raw_details = json_data.get("details", [])
+    details = [StockInDetailCreate.model_validate(d).model_dump(exclude_none=True) for d in raw_details]
+    whcd: str = json_data.get("whcd", "")
+    memo: str = json_data.get("memo", "")
+    indate: str = json_data.get("indate", "")
+    user_cd: str = g.current_user
+    result = StockInService.update(inbillid, user_cd, whcd=whcd, memo=memo, indate=indate, details=details)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result, message="更新成功")
+
+
+@warehouse_bp.post("/stock-in/<inbillid>/void")
+@login_required
+def void_stock_in(inbillid: str):  # type: ignore[no-untyped-def]
+    """作废入库单（仅未审核/已退回可作废）。"""
+    user_cd: str = g.current_user
+    result = StockInService.void(inbillid, user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result, message="已作废")
 
 
 # ---- 出库单 ----
@@ -149,10 +279,25 @@ def list_stock_out():  # type: ignore[no-untyped-def]
         whcd=params.whcd,
         invtyp=params.invtyp,
         auditflg=params.auditflg,
+        outbillid=params.outbillid,
         page=params.page,
         per_page=params.per_page,
     )
     return success_response(data=data)
+
+
+@warehouse_bp.get("/stock-out/returnable-orders")
+@login_required
+def list_returnable_orders():  # type: ignore[no-untyped-def]
+    """可退货出库的采购退货单列表（已审核且有未退数量）。"""
+    return success_response(data=StockOutService.list_returnable_orders())
+
+
+@warehouse_bp.get("/stock-out/returnable-order-lines/<pcbillid>")
+@login_required
+def get_returnable_order_lines(pcbillid: str):  # type: ignore[no-untyped-def]
+    """某退货单的可退货出库明细行。"""
+    return success_response(data=StockOutService.get_returnable_order_lines(pcbillid))
 
 
 @warehouse_bp.get("/stock-out/<outbillid>")
@@ -173,12 +318,14 @@ def create_stock_out():  # type: ignore[no-untyped-def]
     body = StockOutCreate.model_validate(json_data)
     raw_eid = json_data.get("details_eid", [])
     raw_prd = json_data.get("details_prd", [])
-    details_eid = [StockOutDetailCreate.model_validate(d).model_dump() for d in raw_eid]
-    details_prd = [StockOutDetailCreate.model_validate(d).model_dump() for d in raw_prd]
+    details_eid = [StockOutDetailCreate.model_validate(d).model_dump(exclude_none=True) for d in raw_eid]
+    details_prd = [StockOutDetailCreate.model_validate(d).model_dump(exclude_none=True) for d in raw_prd]
     user_cd: str = g.current_user
     data = StockOutService.create(
         body.model_dump(exclude_none=True), details_eid, details_prd, user_cd
     )
+    if not data.get("success", True):
+        return error_response(message=str(data.get("error", "创建失败")), code=400)
     return success_response(data=data, message="创建成功", code=201)
 
 
@@ -194,6 +341,164 @@ def audit_stock_out(outbillid: str):  # type: ignore[no-untyped-def]
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
     return success_response(data=result)
+
+
+@warehouse_bp.put("/stock-out/<outbillid>")
+@login_required
+def update_stock_out(outbillid: str):  # type: ignore[no-untyped-def]
+    """编辑出库单（仅未审核/已退回可编辑）。"""
+    json_data = request.get_json(silent=True) or {}
+    raw_eid = json_data.get("details_eid", [])
+    raw_prd = json_data.get("details_prd", [])
+    details_eid = [StockOutDetailCreate.model_validate(d).model_dump(exclude_none=True) for d in raw_eid]
+    details_prd = [StockOutDetailCreate.model_validate(d).model_dump(exclude_none=True) for d in raw_prd]
+    whcd: str = json_data.get("whcd", "")
+    memo: str = json_data.get("memo", "")
+    outdate: str = json_data.get("outdate", "")
+    user_cd: str = g.current_user
+    result = StockOutService.update(outbillid, user_cd, whcd=whcd, memo=memo, outdate=outdate,
+                                     details_eid=details_eid, details_prd=details_prd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result, message="更新成功")
+
+
+@warehouse_bp.post("/stock-out/<outbillid>/void")
+@login_required
+def void_stock_out(outbillid: str):  # type: ignore[no-untyped-def]
+    """作废出库单（仅未审核/已退回可作废）。"""
+    user_cd: str = g.current_user
+    result = StockOutService.void(outbillid, user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result, message="已作废")
+
+
+@warehouse_bp.post("/stock-out/<outbillid>/close-lines")
+@login_required
+def close_stock_out_lines(outbillid: str):  # type: ignore[no-untyped-def]
+    """出库单行级结案（标记指定明细行不再等待入库）。"""
+    json_data = request.get_json(silent=True) or {}
+    lines = json_data.get("lines", [])
+    reason = json_data.get("reason", "")
+    if not lines:
+        return error_response(message="请选择要结案的明细行", code=400)
+    if not reason:
+        return error_response(message="请填写结案原因", code=400)
+    user_cd: str = g.current_user
+    result = StockOutService.close_lines(outbillid, lines, reason, user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result, message="结案成功")
+
+
+# ---- 单据选择器 (Phase B) ----
+
+@warehouse_bp.get("/stock-in/lendable-orders")
+@login_required
+def list_lendable_orders():  # type: ignore[no-untyped-def]
+    """可归还的借出出库单列表（已审核且未完全归还）。"""
+    from app.repositories.warehouse_repository import StockInRepository
+    rows = StockInRepository.find_lendable_orders()
+    return success_response(data=rows)
+
+
+@warehouse_bp.get("/stock-in/lendable-order-lines/<outbillid>")
+@login_required
+def get_lendable_order_lines(outbillid: str):  # type: ignore[no-untyped-def]
+    """某借出出库单中尚未归还的明细行。"""
+    return success_response(data=StockInService.get_lendable_order_lines(outbillid))
+
+
+@warehouse_bp.get("/stock-in/qc-returnable")
+@login_required
+def list_qc_returnable():  # type: ignore[no-untyped-def]
+    """可质检入库的质检出库单列表（OV=5 已审核且未完全入库，供 IV=11 选单）。"""
+    return success_response(data=StockInService.list_qc_returnable())
+
+
+@warehouse_bp.get("/stock-in/qc-returnable-lines/<outbillid>")
+@login_required
+def get_qc_returnable_lines(outbillid: str):  # type: ignore[no-untyped-def]
+    """某质检出库单中尚未入库的明细行（供 IV=11 选择）。"""
+    return success_response(data=StockInService.get_qc_returnable_lines(outbillid))
+
+
+@warehouse_bp.get("/stock-out/qc-pending")
+@login_required
+def list_qc_pending():  # type: ignore[no-untyped-def]
+    """已审核采购入库单列表（供质检出库 OV=5 选单）。"""
+    return success_response(data=StockInService.list_qc_out_pending())
+
+@warehouse_bp.get("/stock-out/ov5-qc-pending")
+@login_required
+def list_ov5_for_qc():  # type: ignore[no-untyped-def]
+    """未完全QC的 OV=5 质检出库单列表（供质检录入选单）。"""
+    return success_response(data=StockInService.list_ov5_for_qc())
+
+
+@warehouse_bp.get("/stock-out/qc-pending-lines/<inbillid>")
+@login_required
+def get_qc_pending_lines(inbillid: str):  # type: ignore[no-untyped-def]
+    """某采购入库单的物料明细（供 OV=5 质检出库选择）。"""
+    return success_response(data=StockInService.get_qc_pending_lines(inbillid))
+
+
+@warehouse_bp.get("/stock-in/sales-returnable")
+@login_required
+def list_sales_returnable():  # type: ignore[no-untyped-def]
+    """可销售退货入库的销售出库单列表（OV=1 已审核且未完全退货，供 IV=2 选单）。"""
+    return success_response(data=StockInService.list_sales_returnable())
+
+
+@warehouse_bp.get("/stock-in/sales-returnable-lines/<outbillid>")
+@login_required
+def get_sales_returnable_lines(outbillid: str):  # type: ignore[no-untyped-def]
+    """某销售出库单中尚未退货的明细行（供 IV=2 选择）。"""
+    return success_response(data=StockInService.get_sales_returnable_lines(outbillid))
+
+
+@warehouse_bp.get("/stock-in/renovation-returnable")
+@login_required
+def list_renovation_returnable():  # type: ignore[no-untyped-def]
+    """可翻新入库的翻新出库单列表（OV=10 已审核且未完全入库，供 IV=6 选单）。"""
+    return success_response(data=StockInService.list_renovation_returnable())
+
+
+@warehouse_bp.get("/stock-in/renovation-returnable-lines/<outbillid>")
+@login_required
+def get_renovation_returnable_lines(outbillid: str):  # type: ignore[no-untyped-def]
+    """某翻新出库单中尚未入库的明细行（供 IV=6 选择）。"""
+    return success_response(data=StockInService.get_renovation_returnable_lines(outbillid))
+
+
+@warehouse_bp.get("/stock-in/repair-returnable")
+@login_required
+def list_repair_returnable():  # type: ignore[no-untyped-def]
+    """可返修入库的返修出库单列表（已审核且未完全入库）。"""
+    rows = StockInService.list_repair_returnable()
+    return success_response(data=rows)
+
+
+@warehouse_bp.get("/stock-in/production-returnable")
+@login_required
+def list_production_returnable():  # type: ignore[no-untyped-def]
+    """可生产入库的生产出库单列表（已审核且未完全入库）。"""
+    return success_response(data=StockInService.list_production_returnable())
+
+
+@warehouse_bp.get("/stock-in/production-returnable-lines/<outbillid>")
+@login_required
+def get_production_returnable_lines(outbillid: str):  # type: ignore[no-untyped-def]
+    """某生产出库单中尚未入库的明细行。"""
+    return success_response(data=StockInService.get_production_returnable_lines(outbillid))
+
+
+@warehouse_bp.get("/stock-in/repair-returnable-lines/<outbillid>")
+@login_required
+def get_repair_returnable_lines(outbillid: str):  # type: ignore[no-untyped-def]
+    """某返修出库单中尚未入库的明细行。"""
+    return success_response(data=StockInService.get_repair_returnable_lines(outbillid))
 
 
 # ---- 库存查询 ----
@@ -408,8 +713,8 @@ def create_overlost():  # type: ignore[no-untyped-def]
     body = OverLostCreate.model_validate(json_data)
     raw_details = json_data.get("details", [])
     raw_eid_details = json_data.get("eid_details", [])
-    details = [OverLostDetailCreate.model_validate(d).model_dump() for d in raw_details]
-    eid_details = [OverLostEidDetailCreate.model_validate(d).model_dump() for d in raw_eid_details]
+    details = [OverLostDetailCreate.model_validate(d).model_dump(exclude_none=True) for d in raw_details]
+    eid_details = [OverLostEidDetailCreate.model_validate(d).model_dump(exclude_none=True) for d in raw_eid_details]
     user_cd: str = g.current_user
     data = OverLostService.create(body.model_dump(exclude_none=True), details, eid_details, user_cd)
     return success_response(data=data, message="创建成功", code=201)

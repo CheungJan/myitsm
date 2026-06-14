@@ -27,6 +27,7 @@
         <el-table-column label="状态" width="90">
           <template #default="{row}">
             <el-tag :type="statusTag(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
+            <el-tag v-if="(row as any).has_replenish" type="warning" size="small" style="margin-left:4px">补料中</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="目标仓库" width="90"><template #default="{row}">{{ whnm(row.warehouse_cd) }}</template></el-table-column>
@@ -141,91 +142,93 @@
         <template v-if="detailMaterials.length > 0">
           <el-divider style="margin:16px 0 12px"/>
           <h4 style="font-size:13px;color:#303133;margin:0 0 8px">物料消耗（TMS04）</h4>
-          <el-table :data="detailMaterials" size="small" stripe>
-            <el-table-column prop="item_cd" label="物料" width="100"/>
-            <el-table-column prop="actual_qty" label="实耗" width="70" align="right"/>
-            <el-table-column prop="plan_qty" label="计划" width="70" align="right"/>
-            <el-table-column prop="warehouse_cd" label="仓库" width="80"/>
-            <el-table-column prop="consume_date" label="日期" width="100"/>
+          <el-table :data="detailMaterials" size="small" stripe :row-class-name="({row}: any) => row._sep ? 'consume-sep-row' : ''">
+            <el-table-column prop="item_cd" label="物料" width="90"><template #default="{row}"><span v-if="row._sep" style="color:#1677ff;font-weight:600">{{ row._label }}</span><span v-else>{{ row.item_cd }}</span></template></el-table-column>
+            <el-table-column label="类型" width="80"><template #default="{row}"><span v-if="!row._sep">{{ consumeTypeLabel(row.consume_type) }}</span></template></el-table-column>
+            <el-table-column prop="actual_qty" label="实耗" width="60" align="right"><template #default="{row}"><span v-if="!row._sep">{{ row.actual_qty }}</span></template></el-table-column>
+            <el-table-column prop="plan_qty" label="计划" width="60" align="right"><template #default="{row}"><span v-if="!row._sep">{{ row.plan_qty }}</span></template></el-table-column>
+            <el-table-column label="仓库" width="70"><template #default="{row}"><span v-if="!row._sep">{{ whnm(row.warehouse_cd) }}</span></template></el-table-column>
+            <el-table-column label="关联号" width="100"><template #default="{row}"><span v-if="!row._sep">{{ row.ref_bill_id || '-' }}</span></template></el-table-column>
+            <el-table-column prop="consume_date" label="日期" width="90"><template #default="{row}"><span v-if="!row._sep">{{ row.consume_date }}</span></template></el-table-column>
           </el-table>
         </template>
 
         <!-- 物料更换 -->
-        <template v-if="detail.status==='QC_PENDING'||detail.status==='IN_PROGRESS'">
+        <template v-if="detail.status==='QC_PENDING'||detail.status==='IN_PROGRESS'||detail.status==='COMPLETED'">
           <el-divider style="margin:16px 0 12px"/>
           <div style="display:flex;align-items:center;gap:8px">
             <h4 style="font-size:13px;color:#303133;margin:0">物料更换</h4>
-            <el-button size="small" type="primary" @click="openReplaceDialog">更换</el-button>
+            <el-button v-if="detail.status!=='COMPLETED'" size="small" type="primary" @click="openReplaceDialog" :disabled="!fqcDefectiveItems.length">更换</el-button>
           </div>
-
-          <!-- FQC不良品待更换 -->
-          <div v-if="fqcDefectiveItems.length > 0" style="margin-top:12px">
-            <div style="font-size:12px;color:#606266;margin-bottom:8px">FQC不良品待更换（点击可快速填充）</div>
-            <div v-for="item in fqcDefectiveItems" :key="item.eid"
-              style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fef0f0;border:1px solid #fbc4c4;border-radius:4px;margin-bottom:4px">
-              <span style="font-size:12px;color:#303133">{{ item.itemcd }}</span>
-              <span style="font-size:12px;color:#909399">|</span>
-              <span style="font-size:12px;color:#303133">{{ item.eid }}</span>
-              <el-tag size="small" :type="item.judgment === 'BF' ? 'danger' : item.judgment === 'BH' ? 'warning' : 'info'">{{ item.judgment }}</el-tag>
-              <el-button size="small" link type="primary" @click="quickReplace(item)">快速更换</el-button>
+          <div v-if="replenishItems.length" style="margin-top:8px;font-size:12px;color:#606266">
+            补料单 {{ replenishOvBillid }}：<span v-for="(ri,i) in replenishItems" :key="ri.itemcd">{{ i>0?'、':'' }}{{ ri.itemcd }}×{{ ri.qty }}</span>，合计{{ replenishTotalQty }}件
+          </div>
+          <div v-if="fqcDefectiveItems.length" style="margin-top:8px">
+            <div style="font-size:12px;color:#606266;margin-bottom:4px">FQC不良品明细</div>
+            <div v-for="item in fqcDefectiveItems" :key="item._key" style="display:flex;align-items:center;gap:8px;padding:3px 8px;background:#fef0f0;border:1px solid #fbc4c4;border-radius:4px;margin-bottom:2px;font-size:12px">
+              <span style="color:#606266">{{ item.label }}</span>
+              <el-tag size="small" :type="item.judgment==='BF'?'danger':item.judgment==='BH'?'warning':'info'">{{ item.judgment }}</el-tag>
             </div>
           </div>
-
-          <!-- 更换历史 -->
-          <div v-if="replaceHistory.length > 0" style="margin-top:12px">
-            <div style="font-size:12px;color:#606266;margin-bottom:8px">更换历史</div>
-            <div v-for="rec in replaceHistory" :key="rec.replace_date"
-              style="padding:6px 8px;background:#f5f7fa;border-radius:4px;margin-bottom:4px;font-size:12px">
-              <div style="color:#909399">{{ rec.replace_date }}</div>
-              <div style="color:#303133;margin-top:2px">
-                {{ rec.itemcd || '-' }} | 
-                <span v-if="rec.old_eid">{{ rec.old_eid }}</span>
-                <span v-else-if="rec.old_batch_no">批次:{{ rec.old_batch_no }}</span>
-                <span v-else>-</span>
-                → 
-                <span v-if="rec.new_eid">{{ rec.new_eid }}</span>
-                <span v-else-if="rec.new_batch_no">批次:{{ rec.new_batch_no }}</span>
-                <span v-else>-</span>
-                | {{ rec.operator_name }}
+          <div v-if="replaceHistory.length" style="margin-top:12px">
+            <div style="font-size:12px;color:#606266;margin-bottom:4px">更换历史</div>
+            <template v-for="(rec, ri) in replaceHistory" :key="rec.id ?? ri">
+              <el-divider v-if="ri>0 && rec.replace_date?.substring(0,10) !== replaceHistory[ri-1]?.replace_date?.substring(0,10)" style="margin:6px 0" content-position="left"><span style="font-size:11px;color:#909399">{{ rec.replace_date?.substring(0,10) }}</span></el-divider>
+              <div style="padding:3px 8px;background:#f5f7fa;border-radius:4px;margin-bottom:2px;font-size:12px">
+                <span style="color:#909399">{{ (rec.replace_date||'').substring(11,16) }}</span>
+                {{ rec.old_eid||rec.old_batch_no||'-' }} → {{ rec.new_eid||rec.new_batch_no||'-' }} | {{ rec.operator_name }}
+                <span v-if="rec.memo" style="color:#606266"> — {{ rec.memo }}</span>
               </div>
-              <div v-if="rec.memo" style="color:#606266;margin-top:2px">{{ rec.memo }}</div>
-            </div>
+            </template>
           </div>
         </template>
 
-        <!-- 更换对话框 -->
-        <el-dialog v-model="replaceDialogVisible" title="物料更换" width="480px">
-          <el-form :model="replaceForm" label-width="90px" size="small">
-            <el-form-item label="物料类型">
-              <el-radio-group v-model="replaceForm.materialType" @change="onMaterialTypeChange">
-                <el-radio value="eid">EID类型</el-radio>
-                <el-radio value="batch">批次类型</el-radio>
-              </el-radio-group>
-            </el-form-item>
-            <el-form-item v-if="replaceForm.materialType === 'eid'" label="旧物料EID"><el-input v-model="replaceForm.old_eid" placeholder="被更换的EID"/></el-form-item>
-            <el-form-item v-if="replaceForm.materialType === 'batch'" label="旧批次号"><el-input v-model="replaceForm.old_batch_no" placeholder="被更换的批次号"/></el-form-item>
-            <el-form-item v-if="replaceForm.materialType === 'eid'" label="新物料EID"><el-input v-model="replaceForm.new_eid" placeholder="更换后的EID"/></el-form-item>
-            <el-form-item v-if="replaceForm.materialType === 'batch'" label="新批次号"><el-input v-model="replaceForm.new_batch_no" placeholder="更换后的批次号"/></el-form-item>
-            <el-form-item label="物料编码"><el-input v-model="replaceForm.itemcd" placeholder="必填"/></el-form-item>
-            <el-form-item label="备注"><el-input v-model="replaceForm.memo" type="textarea" :rows="2" placeholder="更换原因"/></el-form-item>
-          </el-form>
+        <!-- 更换对话框：逐行匹配旧→新，批量提交 -->
+        <el-dialog v-model="replaceDialogVisible" title="物料更换" width="700px">
+          <el-table :data="replaceRows" size="small" border>
+            <el-table-column prop="itemcd" label="物料" width="90"/>
+            <el-table-column label="旧(不良品)" min-width="180">
+              <template #default="{row}"><el-select v-model="row._old" filterable clearable size="small" style="width:100%" placeholder="选择不良品EID/批次"><el-option v-for="d in fqcDefectiveItems.filter(d => d.itemcd === row.itemcd)" :key="d._key" :label="d.label" :value="d._key"/></el-select></template>
+            </el-table-column>
+            <el-table-column label="新(补料)" width="240">
+              <template #default="{row}"><el-select v-model="row._new" filterable clearable size="small" style="width:100%" placeholder="选择补料批次"><el-option v-for="d in replenishDetails.filter(r => r.itemcd === row.itemcd)" :key="d._key" :label="d.eid ? `${d.itemcd} EID:${d.eid}` : `${d.itemcd} 批次${(d.prddate||'').substring(0,10)}`" :value="d._key"/></el-select></template>
+            </el-table-column>
+            <el-table-column label="备注" width="120">
+              <template #default="{row}"><el-input v-model="row._memo" size="small" placeholder="原因"/></template>
+            </el-table-column>
+            <el-table-column width="50"><template #default="{$index}"><el-button size="small" link type="danger" @click="replaceRows.splice($index,1)">✕</el-button></template></el-table-column>
+          </el-table>
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <el-button size="small" @click="autoFillReplaceRows">自动填充不良品</el-button>
+            <span style="font-size:12px;color:#909399;line-height:24px">共 {{ replaceRows.length }} 行</span>
+          </div>
           <template #footer>
             <el-button @click="replaceDialogVisible=false">取消</el-button>
-            <el-button type="primary" :loading="replaceSaving" @click="doReplace">确认更换</el-button>
+            <el-button type="primary" :loading="replaceSaving" @click="doBatchReplace">批量更换</el-button>
           </template>
         </el-dialog>
 
         <!-- FQC 结果 -->
         <template v-if="detail.fqc_qcstatus">
-          <h4 style="font-size:13px;color:#303133;margin:12px 0 8px">FQC 结果 — {{ (qcMap as any)[(detail as any).fqc_qcstatus]||(detail as any).fqc_qcstatus }}</h4>
-          <div v-for="(item, idx) in ((detail as any).fqc_products||[])" :key="idx"
-            style="display:flex;gap:12px;align-items:flex-start;padding:4px 8px;background:#f5f7fa;border-radius:4px;margin-bottom:4px">
-            <div style="min-width:120px">
-              <el-tag size="small" type="success">{{ (item as any).product || '配件' }}</el-tag>
+          <el-divider style="margin:16px 0 12px"/>
+          <h4 style="font-size:13px;color:#303133;margin:0 0 8px">FQC 结果 — {{ (qcMap as any)[(detail as any).fqc_qcstatus]||(detail as any).fqc_qcstatus }}</h4>
+          <div v-for="(item, idx) in ((detail as any).fqc_products||[])" :key="idx" style="margin-bottom:4px">
+            <div v-if="item.product" style="display:flex;flex-wrap:wrap;gap:4px">
+              <el-tag v-for="eid in item.product.split(', ')" :key="eid" size="small" type="success">{{ eid }}</el-tag>
             </div>
-            <div style="flex:1;display:flex;flex-wrap:wrap;gap:4px">
-              <el-tag v-for="eid in (item as any).parts" :key="eid" size="small" type="info">{{ eid }}</el-tag>
-            </div>
+          </div>
+        </template>
+
+        <!-- 最终出入库单据 -->
+        <template v-if="finalWhDocs.length">
+          <el-divider style="margin:16px 0 12px"/>
+          <h4 style="font-size:13px;color:#303133;margin:0 0 8px">最终出入库单据</h4>
+          <div v-for="doc in finalWhDocs" :key="doc.billid" style="display:flex;gap:8px;align-items:center;padding:3px 8px;background:#f5f7fa;margin-bottom:2px;font-size:12px">
+            <el-tag :type="doc.invtyp==='8'?'success':doc.invtyp==='7'?'danger':doc.invtyp==='9'?'warning':'info'" size="small">{{ doc.typeLabel }}</el-tag>
+            <span style="font-family:monospace;color:#409eff">#{{ doc.index }}</span>
+            <span style="font-family:monospace">{{ doc.billid }}</span>
+            <span>{{ doc.items }}</span>
+            <span style="margin-left:auto">{{ doc.memo||'' }}</span>
           </div>
         </template>
       </template>
@@ -234,11 +237,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { useListPage } from '@/composables/useListPage'
-import { fetchWorkOrders, createWorkOrder, transitionWorkOrder, deleteWorkOrder, fetchMaterialConsumes, replaceWorkOrderAsset, fetchReplaceRecords } from '@/api/mes'
+import { fetchWorkOrders, createWorkOrder, transitionWorkOrder, deleteWorkOrder, fetchMaterialConsumes, replaceWorkOrderAsset, fetchReplaceRecords, fetchAvailableReplenish } from '@/api/mes'
 import request from '@/api/request'
 import { fetchWarehouses, fetchBomClassTree, fetchBom, type ItemClassNode } from '@/api/master'
 import { useDict } from '@/composables/useDict'
@@ -303,13 +306,15 @@ async function openDetail(row: WoRecord) {
     try { const r = await request.get(`/mes/work-orders/${row.wo_id}`) as any; detail.value = r?.data || row } catch { detail.value = row }
     detailMaterials.value = []
     detailBom.value = []
-    try { const r = await fetchMaterialConsumes(row.wo_id as string); detailMaterials.value = (r.data as any) || [] } catch { /* */ }
+    try { const r = await fetchMaterialConsumes(row.wo_id as string); const raw = ((r.data as any)||[]).filter((d:any) => !['3','4','5'].includes(d.consume_type)).sort((a:any,b:any) => (a.consume_type||0)-(b.consume_type||0)); const grouped: any[] = []; let lastType = ''; raw.forEach((d:any) => { if (d.consume_type !== lastType) { grouped.push({ _sep: true, _label: consumeTypeLabel(d.consume_type) }); lastType = d.consume_type } grouped.push(d) }); detailMaterials.value = grouped } catch { /* */ }
     // 加载 BOM
     if (row.item_cd) { try { const r = await fetchBom(row.item_cd as string); const bom = r.data as any; detailBom.value = bom?.details || []; detailBomNm.value = bom?.bomnm || '' } catch { detailBomNm.value = '' } }
-    // 加载FQC不良品和更换历史
-    await loadFqcDefectiveItems()
+    // 加载更换历史（补料信息依赖它判断是否用完）
     await loadReplaceHistory()
-}
+    await loadFqcDefectiveItems()
+    await loadReplenishInfo()
+    await loadFinalWhDocs()
+  }
 
 async function handleTransition(row: WoRecord, target: string) {
     if (target === 'DELETE') {
@@ -384,70 +389,112 @@ async function handleCreate() {
 
 const replaceDialogVisible = ref(false)
 const replaceSaving = ref(false)
-const replaceForm = reactive({ old_eid: '', new_eid: '', itemcd: '', memo: '', materialType: 'eid', old_batch_no: '', new_batch_no: '' })
-const fqcDefectiveItems = ref<Array<{ itemcd: string; item_nm: string; eid: string; judgment: string }>>([])
-const replaceHistory = ref<Array<{ wo_id: string; old_eid: string; new_eid: string; itemcd: string; old_batch_no: string; new_batch_no: string; memo: string; replace_date: string; operator_cd: string; operator_name: string }>>([])
+const fqcDefectiveItems = ref<Array<{ itemcd: string; item_nm: string; eid: string; judgment: string; _key: string; label: string }>>([])
+const replaceHistory = ref<Array<{ id?: number; wo_id: string; old_eid: string; new_eid: string; itemcd: string; old_batch_no: string; new_batch_no: string; memo: string; replace_date: string; operator_cd: string; operator_name: string }>>([])
+const replenishItems = ref<Array<{ itemcd: string; qty: number; prddate?: string; itemtyp?: string }>>([])
+const replenishDetails = ref<Array<{ itemcd: string; qty: number; prddate: string; itemtyp: string; _key: string; eid?: string }>>([])
+const replenishOvBillid = ref('')
+const replenishTotalQty = computed(() => replenishItems.value.reduce((s, i) => s + i.qty, 0))
+const replacedKeys = ref(new Set<string>())
+const finalWhDocs = ref<Array<{ billid: string; invtyp: string; typeLabel: string; items: string; memo: string; index: number }>>([])
+const replaceRows = ref<Array<{ itemcd: string; _old: string; _new: string; _memo: string }>>([])
 
 function openReplaceDialog() {
-  replaceForm.old_eid = ''
-  replaceForm.new_eid = ''
-  replaceForm.itemcd = ''
-  replaceForm.memo = ''
-  replaceForm.materialType = 'eid'
-  replaceForm.old_batch_no = ''
-  replaceForm.new_batch_no = ''
+  replaceRows.value = []
   replaceDialogVisible.value = true
 }
-
-function onMaterialTypeChange() {
-  // 切换物料类型时清空对应字段
-  if (replaceForm.materialType === 'eid') {
-    replaceForm.old_batch_no = ''
-    replaceForm.new_batch_no = ''
-  } else {
-    replaceForm.old_eid = ''
-    replaceForm.new_eid = ''
+function autoFillReplaceRows() {
+  const rows: typeof replaceRows.value = []
+  const usedRp = new Set<string>()
+  fqcDefectiveItems.value.forEach(d => {
+    if (replacedKeys.value.has(d._key)) return  // 已更换，跳过
+    const match = replenishDetails.value.find(r => r.itemcd === d.itemcd && !usedRp.has(r._key))
+    if (match) {
+      usedRp.add(match._key)
+      rows.push({ itemcd: d.itemcd, _old: d._key, _new: match._key, _memo: '' })
+    }
+  })
+  if (!rows.length) {
+    if (replenishPendingBillids.value.length > 0) {
+      ElMessage.warning(`补料单 ${replenishPendingBillids.value.join('、')} 尚未审核，暂无可用补料`)
+    } else {
+      ElMessage.warning('所有不良品已更换或无匹配补料')
+    }
+    return
   }
+  replaceRows.value = rows
 }
-
-function quickReplace(item: { itemcd: string; eid: string }) {
-  replaceForm.old_eid = item.eid
-  replaceForm.itemcd = item.itemcd
-  replaceDialogVisible.value = true
-}
-
-async function doReplace() {
-  if (!replaceForm.itemcd) {
-    ElMessage.warning('请填写物料编码'); return
-  }
-  if (replaceForm.materialType === 'eid' && (!replaceForm.old_eid || !replaceForm.new_eid)) {
-    ElMessage.warning('请填写旧EID和新EID'); return
-  }
-  if (replaceForm.materialType === 'batch' && (!replaceForm.old_batch_no || !replaceForm.new_batch_no)) {
-    ElMessage.warning('请填写旧批次号和新批次号'); return
-  }
-  if (!detail.value?.wo_id) {
-    ElMessage.error('工单信息无效'); return
-  }
+async function doBatchReplace() {
+  if (!replaceRows.value.length) { ElMessage.warning('请添加更换行'); return }
+  if (!detail.value?.wo_id) { ElMessage.error('工单信息无效'); return }
   replaceSaving.value = true
   try {
-    const body: any = {
-      itemcd: replaceForm.itemcd,
-      memo: replaceForm.memo
+    for (const row of replaceRows.value) {
+      if (!row._old || !row._new) continue
+      const oldItem = fqcDefectiveItems.value.find(d => d._key === row._old)
+      const newItem = replenishDetails.value.find(d => d._key === row._new)
+      const hasEid = !!(oldItem?.eid)
+      const newEid = newItem?.eid || ''
+      const prodLabel = (oldItem?.label||'').match(/成品#\d+/)?.[0] || ''
+      await replaceWorkOrderAsset(detail.value.wo_id, {
+        itemcd: row.itemcd,
+        old_eid: hasEid ? oldItem!.eid : '',
+        new_eid: newEid,
+        old_batch_no: hasEid ? '' : `${oldItem!.itemcd}(${oldItem!.judgment})`,
+        new_batch_no: newEid ? '' : `${newItem!.itemcd} ${(newItem!.prddate||'').substring(0,10)}`,
+        memo: row._memo || (prodLabel ? `${prodLabel}` : '')
+      })
     }
-    if (replaceForm.materialType === 'eid') {
-      body.old_eid = replaceForm.old_eid
-      body.new_eid = replaceForm.new_eid
-    } else {
-      body.old_batch_no = replaceForm.old_batch_no
-      body.new_batch_no = replaceForm.new_batch_no
-    }
-    await replaceWorkOrderAsset(detail.value.wo_id, body)
-    ElMessage.success('更换记录已保存')
+    ElMessage.success('更换完成')
+    replaceRows.value.forEach(r => replacedKeys.value.add(r._old))
     replaceDialogVisible.value = false
-    await loadReplaceHistory()
+    loadReplaceHistory()
   } catch (e: any) { ElMessage.error(e?.response?.data?.message || '更换失败') }
   finally { replaceSaving.value = false }
+}
+
+const replenishPendingBillids = ref<string[]>([])
+async function loadReplenishInfo() {
+  replenishItems.value = []; replenishDetails.value = []; replenishOvBillid.value = ''
+  replenishPendingBillids.value = []
+  if (!detail.value?.wo_id) return
+  try {
+    // 获取 FQC 不良品关联的、且已审核的补料明细
+    const res = await fetchAvailableReplenish(detail.value.wo_id as string)
+    const data = res?.data || { items: [], audited_billids: [], pending_billids: [] }
+
+    // 记录未审核补料单（供自动填充时提示）
+    replenishPendingBillids.value = data.pending_billids || []
+
+    if (data.audited_billids.length > 0) {
+      replenishOvBillid.value = data.audited_billids[0]
+    }
+
+    // 转换明细格式
+    const expanded: typeof replenishDetails.value = []
+    const seen = new Set<string>(); let di = 0
+
+    data.items.forEach((item: any) => {
+      const uk = `${item.itemcd}|${item.eid || ''}|${item.prddate || ''}`
+      if (seen.has(uk)) return; seen.add(uk)
+      expanded.push({
+        itemcd: item.itemcd,
+        qty: 1,
+        prddate: item.prddate ? item.prddate.substring(0, 10) : '',
+        itemtyp: item.itemtyp || '',
+        _key: `rp_${di++}`,
+        eid: item.eid || ''
+      })
+    })
+    replenishDetails.value = expanded
+
+    // 构建汇总信息（按物料统计）
+    const itemMap = new Map<string, number>()
+    data.items.forEach((item: any) => {
+      itemMap.set(item.itemcd, (itemMap.get(item.itemcd) || 0) + 1)
+    })
+    replenishItems.value = Array.from(itemMap.entries()).map(([itemcd, qty]) => ({ itemcd, qty }))
+  } catch { /* */ }
 }
 
 async function loadFqcDefectiveItems() {
@@ -456,20 +503,67 @@ async function loadFqcDefectiveItems() {
     return
   }
   try {
-    const res = await request.get(`/qc/batches?refbillid=${detail.value.wo_id}&status=DRAFT`) as any
+    const res = await request.get(`/qc/batches?search=${detail.value.wo_id}`) as any
     const batches = res?.data?.items || []
-    const defective: Array<{ itemcd: string; item_nm: string; eid: string; judgment: string }> = []
+    let seq = 0
+    const defective: Array<{ itemcd: string; item_nm: string; eid: string; judgment: string; _key: string; label: string }> = []
     for (const batch of batches) {
-      const detailRes = await request.get(`/qc/batches/${batch.batch_id}/details`) as any
-      const details = detailRes?.data || []
-      details.forEach((d: any) => {
-        if (['BF', 'BH', 'TH'].includes(d.judgment) && d.eid) {
-          defective.push({ itemcd: d.itemcd, item_nm: d.item_nm, eid: d.eid, judgment: d.judgment })
+      if (batch.auditflg !== '0' && batch.auditflg !== '8') continue
+      const detailRes = await request.get(`/qc/batches/${batch.batch_id}`) as any
+      const records = detailRes?.data?.records || []
+      for (const rec of records) {
+        const eids = rec.eid_details || []
+        const dts = rec.details || []
+        for (const d of eids) {
+          if (['BF', 'BH', 'TH'].includes(d.qcstatus)) {
+            const pn = d.prod_seq ? `成品#${d.prod_seq}` : `#${seq+1}`
+            seq++; defective.push({ itemcd: d.itemcd, item_nm: d.item_nm||'', eid: d.eid||'', judgment: d.qcstatus, _key: `v_${seq}`, label: `${pn} ${d.itemcd} ${d.eid||''} (${d.qcstatus})` })
+          }
         }
-      })
+        for (const d of dts) {
+          if (['BF', 'BH', 'TH'].includes(d.qcstatus)) {
+            const pn = d.prod_seq ? `成品#${d.prod_seq}` : `#${seq+1}`
+            seq++; defective.push({ itemcd: d.itemcd, item_nm: d.item_nm||'', eid: '', judgment: d.qcstatus, _key: `v_${seq}`, label: `${pn} ${d.itemcd} (${d.qcstatus})` })
+          }
+        }
+      }
     }
     fqcDefectiveItems.value = defective
   } catch { fqcDefectiveItems.value = [] }
+}
+
+async function loadFinalWhDocs() {
+  finalWhDocs.value = []
+  if (!detail.value?.wo_id) return
+  try {
+    const typeMap: Record<string,string> = {'8':'成品入库','7':'报废出库','9':'返修出库','6':'退货出库'}
+    // 查 FQC QC 单号，再查其关联的 IV/OV
+    const qcRes = await request.get(`/qc?per_page=10`) as any
+    const qcBills = (qcRes?.data?.items||[]).filter((q: any) => q.refbillid === detail.value?.wo_id && q.auditflg === '1')
+    const docs: typeof finalWhDocs.value = []
+    let idx = 0
+    for (const qc of qcBills) {
+      const [ivRes, ovRes] = await Promise.all([
+        request.get(`/warehouse/stock-in?per_page=50`),
+        request.get(`/warehouse/stock-out?per_page=50`)
+      ])
+      const related = [
+        ...(ivRes?.data?.items||[]).filter((d: any) => d.refbillid === qc.qcbillid && d.auditflg !== 'V'),
+        ...(ovRes?.data?.items||[]).filter((d: any) => d.refbillid === qc.qcbillid && d.auditflg !== 'V')
+      ]
+      for (const d of related) {
+        const detailRes = d.inbillid
+          ? await request.get(`/warehouse/stock-in/${d.inbillid}`)
+          : await request.get(`/warehouse/stock-out/${d.outbillid}`)
+        const detail = detailRes?.data || {}
+        const prds = (detail.details_prd||[]).map((i: any) => `${i.itemcd}×${i.outqty||i.inqty}`).join(' + ')
+        const eids = (detail.details_eid||[]).map((i: any) => `${i.itemcd}(${i.eid})`).join(' + ')
+        const items = [prds, eids].filter(Boolean).join(' + ') || '-'
+        docs.push({ billid: d.inbillid||d.outbillid, invtyp: d.invtyp, typeLabel: typeMap[d.invtyp]||d.invtyp, items, memo: detail.memo||d.memo||'', index: ++idx })
+      }
+    }
+    finalWhDocs.value = docs
+  } catch { /* */ }
 }
 
 async function loadReplaceHistory() {
@@ -480,9 +574,17 @@ async function loadReplaceHistory() {
   try {
     const res = await fetchReplaceRecords(detail.value.wo_id) as any
     replaceHistory.value = res?.data || []
+    // 从历史记录重建已更换标记
+    replacedKeys.value = new Set()
+    fqcDefectiveItems.value.forEach(d => {
+      const found = replaceHistory.value.some(r => r.itemcd === d.itemcd && r.old_batch_no?.includes(d.judgment))
+      if (found) replacedKeys.value.add(d._key)
+    })
   } catch { replaceHistory.value = [] }
 }
 
+const ctLabels: Record<string, string> = { '1':'定额领料','2':'不良补料','3':'报废出库','4':'返修出库','5':'退料入库' }
+function consumeTypeLabel(t: string) { return ctLabels[t] || t || '-' }
 function formatDate(d: any) { if (!d) return '-'; const s = String(d); return s.replace('T', ' ').substring(0, 19) }
 function doSearch() {
     const p: Record<string, string> = {}
@@ -498,4 +600,5 @@ function doSearch() {
 .search-bar { display: flex; gap: 12px; align-items: center }
 .field { display: flex; align-items: center; gap: 6px }
 .field label { font-size: 13px; color: #606266 }
+.consume-sep-row td { background: #e6f7ff !important; font-weight: 600; color: #1677ff; border-bottom: 1px solid #91d5ff !important; }
 </style>

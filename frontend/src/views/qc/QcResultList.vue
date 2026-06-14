@@ -23,7 +23,7 @@
         <template v-if="row._records[0].draft_type==='S'||(!row._records[0].draft_type&&row._records[0].auditflg==='0')">
           <div v-for="(t, idx) in buildDetailTree(row._records[0], row.refbillid, false).tree" :key="`st_${idx}`" style="margin-bottom:6px;border:1px solid #e4e7ed;border-radius:4px;overflow:hidden">
             <div style="display:flex;gap:8px;align-items:center;padding:6px 10px;background:#e6f7ff;font-weight:600">
-              <span style="color:#1677ff;width:40px;flex-shrink:0">{{t.typeLabel}}</span><span style="width:90px;flex-shrink:0">{{t.itemcd}}</span>
+              <span style="color:#1677ff;width:55px;flex-shrink:0">{{ t.prodSeq ? '#'+t.prodSeq+' ' : '' }}{{t.typeLabel}}</span><span style="width:90px;flex-shrink:0">{{t.itemcd}}</span>
               <span v-if="t.item_nm" style="color:#606266;font-size:12px;width:130px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{t.item_nm}}</span>
               <span v-if="t.eid" style="font-family:monospace;color:#52c41a;width:130px;flex-shrink:0">{{t.eid}}</span>
               <el-tag :type="qcTagType(t.qcstatus)" size="small">{{qcLabel(t.qcstatus)}}</el-tag>
@@ -43,7 +43,7 @@
           <template v-for="(t, idx) in buildDetailTree(row._records[0], row.refbillid).tree" :key="`t_${idx}`">
             <div style="margin-bottom:6px;border:1px solid #e4e7ed;border-radius:4px;overflow:hidden">
               <div style="display:flex;gap:8px;align-items:center;padding:6px 10px;background:#e6f7ff;font-weight:600">
-                <span style="color:#1677ff;width:40px;flex-shrink:0">{{t.typeLabel}}</span><span style="width:90px;flex-shrink:0">{{t.itemcd}}</span>
+                <span style="color:#1677ff;width:55px;flex-shrink:0">{{ t.prodSeq ? '#'+t.prodSeq+' ' : '' }}{{t.typeLabel}}</span><span style="width:90px;flex-shrink:0">{{t.itemcd}}</span>
                 <span v-if="t.item_nm" style="color:#606266;font-size:12px;width:130px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{t.item_nm}}</span>
                 <span v-if="t.eid" style="font-family:monospace;color:#52c41a;width:130px;flex-shrink:0">{{t.eid}}</span>
                 <el-tag :type="qcTagType(t.qcstatus)" size="small">{{qcLabel(t.qcstatus)}}</el-tag>
@@ -69,6 +69,27 @@
               </div>
             </div>
           </template>
+        </template>
+        <!-- 更换与出库对照 -->
+        <template v-if="row._replaceInfo">
+          <el-divider style="margin:12px 0 8px" content-position="left"><span style="font-size:12px;color:#1677ff;font-weight:600">更换与出库对照</span></el-divider>
+          <div v-if="row._replaceInfo.summary" style="margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap">
+            <span v-for="s in row._replaceInfo.summary" :key="s.type" style="padding:4px 12px;background:#e6f7ff;border:1px solid #91d5ff;border-radius:4px;font-size:13px">
+              <b style="color:#1677ff">{{ s.type }}</b>: <span style="color:#303133">{{ s.items }}</span> 共<b>{{ s.count }}</b>件
+            </span>
+          </div>
+          <div v-if="row._replaceInfo.items.length" style="font-size:12px;max-height:200px;overflow-y:auto">
+            <div v-for="(ri, rIdx) in row._replaceInfo.items" :key="'ri_'+rIdx" style="display:flex;gap:8px;align-items:center;padding:3px 8px;background:#fafafa;margin-bottom:2px">
+              <span style="min-width:100px;font-family:monospace;font-size:11px">{{ ri.old_val }}</span>
+              <span style="color:#1677ff">→</span>
+              <span style="min-width:100px;font-family:monospace;font-size:11px">{{ ri.new_val }}</span>
+              <el-tag size="small" :type="ri.old_judgment==='BF'?'danger':ri.old_judgment==='BH'?'warning':'info'">{{ ri.old_judgment }}</el-tag>
+              <span style="color:#909399;font-size:11px">{{ ri.ov_type }}</span>
+              <span v-if="ri.ov_billid" style="color:#52c41a;font-family:monospace;font-size:11px">{{ ri.ov_billid }}</span>
+              <span v-else style="color:#fa8c16;font-size:11px">待审核</span>
+              <span style="color:#909399;font-size:11px;margin-left:auto">{{ ri.memo }}</span>
+            </div>
+          </div>
         </template>
       </div>
       <!-- 多条子记录：每张卡片 = 一个 QC 子记录，展示 details 和 eid_details -->
@@ -130,6 +151,7 @@
 
 <script setup lang="ts">import {ref,reactive,onMounted,watch,computed} from 'vue';import {ElMessage,ElMessageBox} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useUserNames} from '@/composables/useUserNames';import {listQcBatches,getQcBatch,auditQcBatch,voidQcBatch,unauditQcResult,fetchQcStats,fetchQcCompletion,type QcBatchItem} from '@/api/qc';
 import {fetchStockOut,fetchStockIn,fetchQcOutOrders} from '@/api/warehouse';import {useDict} from '@/composables/useDict'
+import request from '@/api/request'
 const{userName}=useUserNames();const{dictLabel:qcLabel}=useDict('QC')
 const items=ref<(QcBatchItem&{_records?:any[]})[]>([]);const loading=ref(false)
 const page=ref(1);const perPage=ref(20);const total=ref(0)
@@ -147,8 +169,8 @@ function getItemTypeLabel(item: any): string {
     return '配件'
 }
 // 将扁平明细重建为成品→配件树形结构
-interface DetailNode { itemcd: string; item_nm?: string; qcstatus: string; qcqty?: number; inqty?: number; eid?: string; typeLabel: string; prddate?: string; fault_desc?: string; replenish_ov_billid?: string }
-interface TreeNode { itemcd: string; item_nm?: string; qcstatus: string; eid?: string; typeLabel: string; children: DetailNode[] }
+interface DetailNode { itemcd: string; item_nm?: string; qcstatus: string; qcqty?: number; inqty?: number; eid?: string; typeLabel: string; prddate?: string; fault_desc?: string; replenish_ov_billid?: string; prod_seq?: number }
+interface TreeNode { itemcd: string; item_nm?: string; qcstatus: string; eid?: string; typeLabel: string; children: DetailNode[]; prodSeq?: number }
 function buildDetailTree(record: any, batchRefbillid: string, splitOutbound: boolean = true): { tree: TreeNode[]; outbound: DetailNode[] } {
   const details: DetailNode[] = (record.details||[]).map((d:any)=>({...d,typeLabel:getItemTypeLabel(d)}))
   const eidDetails: DetailNode[] = (record.eid_details||[]).map((d:any)=>({...d,typeLabel:getItemTypeLabel(d)}))
@@ -156,41 +178,25 @@ function buildDetailTree(record: any, batchRefbillid: string, splitOutbound: boo
   const tree: TreeNode[] = []
   const outbound: DetailNode[] = []
 
-  // 按物码分桶（dt + eid）
-  const dtByCd: Record<string, DetailNode[]> = {}; const eidByCd: Record<string, DetailNode[]> = {}
-  details.forEach(d => { if (!dtByCd[d.itemcd]) dtByCd[d.itemcd] = []; dtByCd[d.itemcd].push(d) })
-  eidDetails.forEach(d => { if (!eidByCd[d.itemcd]) eidByCd[d.itemcd] = []; eidByCd[d.itemcd].push(d) })
+  // 按 prod_seq 分组，每组 = 一个产品
+  const seqGroups: Record<number, DetailNode[]> = {}
+  const addToSeq = (d: DetailNode, seq: number) => { if (!seqGroups[seq]) seqGroups[seq] = []; seqGroups[seq].push(d) }
+  details.forEach((d: any) => addToSeq(d, d.prod_seq || 0))
+  eidDetails.forEach((d: any) => addToSeq(d, d.prod_seq || 0))
+  const sortedSeqs = Object.keys(seqGroups).map(Number).sort((a,b) => a - b)
 
-  // 取产品数量 = dt 中成品行数 + eid 中成品行数
-  const productDtCount = (dtByCd[productCd] || []).length
-  const productEidCount = (eidByCd[productCd] || []).length
-  const totalProducts = Math.max(productDtCount + productEidCount, 1)
-
-  for (let pi = 0; pi < totalProducts; pi++) {
-    // 取成品行：eid + dt 合并（eid 取值、dt 取判定，避免 eid 行判定过时）
-    const pEid = (eidByCd[productCd] || [])[0]
-    const pDt = (dtByCd[productCd] || [])[0]
-    if (!pEid && !pDt) continue
-    const pRow = { ...(pEid || pDt), eid: pEid?.eid || pDt?.eid }
-    if (pEid) eidByCd[productCd]!.shift()
-    else if (pDt) dtByCd[productCd]!.shift()
-
+  for (const seq of sortedSeqs) {
+    const rows = seqGroups[seq]
+    // 找成品行
+    const pRow = rows.find(r => r.itemcd === productCd) || rows[0]
+    if (!pRow) continue
     const isOutbound = splitOutbound && ['BF','BH','TH'].includes(pRow.qcstatus||'')
-    const node: TreeNode = { itemcd: pRow.itemcd, item_nm: pRow.item_nm, qcstatus: pRow.qcstatus||'', eid: pRow.eid, typeLabel: pRow.typeLabel, children: [] }
-
-    // 取配件/耗材子行：eid+dt 合并（即使成品是出库型，子行也要消费避免遗留）
-    const childCds = Object.keys({...dtByCd, ...eidByCd}).filter(cd => cd !== productCd)
-    for (const cd of childCds) {
-      const cEid = (eidByCd[cd] || [])[0]
-      const cDt = (dtByCd[cd] || [])[0]
-      if (!cEid && !cDt) continue
-      const cRow = { ...(cEid || cDt), eid: cEid?.eid || cDt?.eid }
-      if (cEid) eidByCd[cd]!.shift()
-      else if (cDt) dtByCd[cd]!.shift()
-
-      const childOutbound = splitOutbound && ['BF','BH','TH'].includes(cRow.qcstatus||'')
-      if (childOutbound || isOutbound) { outbound.push(cRow); continue }
-      node.children.push(cRow)
+    const node: TreeNode = { itemcd: pRow.itemcd, item_nm: pRow.item_nm, qcstatus: pRow.qcstatus||'', eid: pRow.eid, typeLabel: pRow.typeLabel, children: [], prodSeq: seq || undefined }
+    for (const r of rows) {
+      if (r === pRow) continue
+      const childOutbound = splitOutbound && ['BF','BH','TH'].includes(r.qcstatus||'')
+      if (childOutbound || isOutbound) { outbound.push(r); continue }
+      node.children.push(r)
     }
     if (isOutbound) { outbound.push(pRow) }
     else { tree.push(node) }
@@ -230,7 +236,59 @@ const comp=ref<{total_ov5:number;done_ov5:number;pending_ov5:number;iv11_count:n
 onMounted(async()=>{load();try{const r=await fetchQcStats();stats.value=r.data||[]}catch{};try{const r=await fetchQcCompletion();comp.value=r.data||comp.value}catch{}})
 
 // 展开批次 → 加载子记录（含明细）
-async function onExpand(row:any,_rows:any[]){if(!row._records){try{const r=await getQcBatch(row.batch_id);const recs=(r.data as any)?.records||[];row._records=recs}catch{row._records=[]}}}
+async function onExpand(row:any,_rows:any[]){
+  if(!row._records){try{const r=await getQcBatch(row.batch_id);const recs=(r.data as any)?.records||[];row._records=recs}catch{row._records=[]}}
+  // 加载更换与出库对照
+  if(!row._replaceInfo && row.refbillid){
+    try{
+      const woId = row.refbillid
+      // 确保 _records 已加载（获取各个 QC 单号 qcbillid）
+      if(!row._records){try{const r=await getQcBatch(row.batch_id);row._records=(r.data as any)?.records||[]}catch{row._records=[]}}
+      const fqcQcIds = (row._records||[]).map((r:any) => r.qcbillid)
+      // 查这些 QC 单号关联的 OV=6/7/9 出库单
+      let allOv: any[] = []
+      if (fqcQcIds.length){
+        const ovRes = await request.get(`/warehouse/stock-out?per_page=100`)
+        const ovItems = (ovRes?.data?.items || []) as any[]
+        const qcIdSet = new Set(fqcQcIds)
+        allOv = ovItems.filter((o:any) => ['6','7','9'].includes(o.invtyp) && qcIdSet.has(o.refbillid))
+      }
+      const repRes = await request.get(`/mes/work-orders/${woId}/replace-records`)
+      const repList = (repRes?.data || []) as any[]
+      const items: any[] = []
+      const ovTypeMap: Record<string,string> = {BF:'OV=7报废',BH:'OV=9返修',TH:'OV=6退货'}
+      const ovInvMap: Record<string,string> = {BF:'7',BH:'9',TH:'6'}
+      for(const rec of repList){
+        const judgment = rec.old_batch_no?.match(/\((\w+)\)/)?.[1] || (rec.old_eid?'BF':'')
+        const ovType = ovTypeMap[judgment] || ''
+        const targetInv = ovInvMap[judgment] || ''
+        const matchedOv = allOv.find((o:any) => o.invtyp === targetInv)
+        items.push({
+          old_val: rec.old_eid || rec.old_batch_no || '-',
+          new_val: rec.new_eid || rec.new_batch_no || '-',
+          itemcd: rec.itemcd,
+          old_judgment: judgment,
+          ov_type: ovType,
+          ov_billid: matchedOv?.outbillid || '',
+          memo: rec.memo || ''
+        })
+      }
+      // 汇总
+      const agg: Record<string, { cdMap: Record<string, number>; count: number }> = {}
+      items.forEach(i => {
+        if (!agg[i.ov_type]) agg[i.ov_type] = { cdMap: {}, count: 0 }
+        if (i.itemcd) agg[i.ov_type].cdMap[i.itemcd] = (agg[i.ov_type].cdMap[i.itemcd]||0) + 1
+        agg[i.ov_type].count++
+      })
+      const summary = Object.entries(agg).map(([type, v]) => ({
+        type,
+        items: Object.entries(v.cdMap).map(([cd, n]) => `${cd}×${n}`).join(' + '),
+        count: v.count
+      }))
+      row._replaceInfo = { items, summary }
+    }catch{row._replaceInfo = { items: [] }}
+  }
+}
 // 子记录详情已在 _records 返回时包含，无需额外加载
 
 // 审核操作

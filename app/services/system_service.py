@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from app.extensions import db
+from app.models.master import Item
 from app.repositories.system_repository import SystemRepository
 
 
@@ -165,10 +167,10 @@ class SystemService:
         parm = self._repo.get_sysparm_by_cd(parm_cd)
         return parm.to_dict() if parm else None
 
-    def update_sysparm(self, parm_cd: str, data: dict[str, Any]) -> dict[str, Any] | None:
-        """更新系统参数。"""
+    def update_sysparm(self, parm_cd: str, data: dict[str, Any]) -> dict[str, Any]:
+        """更新或创建系统参数。"""
         r = self._repo.update_sysparm(parm_cd, data)
-        return r.to_dict() if r else None
+        return r.to_dict()
 
     # ——— 物料分类 ———
 
@@ -243,6 +245,10 @@ class SystemService:
     def list_suppliers(self, keyword: str = "", class_cd: str = "", page: int = 1, per_page: int = 20) -> dict[str, Any]:
         return self._repo.list_suppliers_paginated(keyword, class_cd, page, per_page)
 
+    def list_suppliers_all(self) -> list:
+        """全量供应商简表，用于下拉选择。"""
+        return self._repo.list_suppliers_all()
+
     def create_supplier(self, data: dict[str, Any]) -> dict[str, Any]:
         supp_cd = data.get("supp_cd", "").strip()
         if supp_cd:
@@ -297,6 +303,8 @@ class SystemService:
         item_cd = data.get("itemcd", "")
         if not item_cd:
             raise ValueError("物料编码不能为空")
+        if not db.session.query(Item.item_cd).filter(Item.item_cd == item_cd).first():
+            raise ValueError(f"物料 {item_cd} 不存在")
         existing = self._repo.get_supplier_item(supp_cd, item_cd)
         if existing:
             raise ValueError(f"物料 {item_cd} 已关联")
@@ -315,7 +323,7 @@ class SystemService:
         for k, v in data.items():
             if k in updatable and hasattr(obj, k):
                 setattr(obj, k, v)
-        db.session.flush()
+        db.session.commit()
         return obj.to_dict()
 
     def delete_supplier_item(self, supp_cd: str, item_cd: str) -> None:
@@ -332,12 +340,32 @@ class SystemService:
     def get_supplier_prices(self, supp_cd: str, item_cd: str = "", current_only: bool = False) -> list[dict[str, Any]]:
         return self._repo.get_supplier_prices(supp_cd, item_cd, current_only)
 
-    def create_supplier_price(self, supp_cd: str, data: dict[str, Any]) -> dict[str, Any]:
+    def _validate_supplier_price(self, item_cd: str, price: float | Decimal) -> str | None:
+        """校验供应商报价是否低于标准采购价的 80%。返回警告文本或 None。"""
+        std = self._repo.get_item_standard_price(item_cd, busityp="20")
+        if not std or not std.itemprice:
+            return None
+        threshold = Decimal("0.8")
+        if Decimal(str(price)) < std.itemprice * threshold:
+            return f"报价 {price} 低于物料标准采购价 {float(std.itemprice)} 的 80%，是否确认保存？"
+        return None
+
+    def create_supplier_price(self, supp_cd: str, data: dict[str, Any], force: bool = False) -> dict[str, Any]:
         item_cd = data.get("itemcd", "")
         if not item_cd:
             raise ValueError("物料编码不能为空")
         if not self._repo.check_custitems_exists(supp_cd, item_cd):
             raise ValueError("该供应商未关联此商品，请先维护供应商品关系")
+        # 日期清理：空字符串转为 None
+        for field in ("effective_date", "expire_date"):
+            if data.get(field) == "" or data.get(field) == None:
+                data[field] = None
+        if not data.get("effective_date"):
+            raise ValueError("生效日期不能为空")
+        if not force:
+            warning = self._validate_supplier_price(item_cd, data.get("itemprice", 0))
+            if warning:
+                return {"warning": warning, "requires_confirmation": True}
         data["supp_cd"] = supp_cd
         return self._repo.create_supplier_price(data).to_dict()
 
@@ -345,6 +373,10 @@ class SystemService:
         obj = self._repo.get_supplier_price(price_id)
         if not obj:
             raise ValueError("报价记录不存在")
+        # 日期清理：空字符串转为 None
+        for field in ("effective_date", "expire_date"):
+            if field in data and (data[field] == "" or data[field] == None):
+                data[field] = None
         return self._repo.update_supplier_price(obj, data).to_dict()
 
     def delete_supplier_price(self, price_id: int) -> None:
@@ -352,6 +384,43 @@ class SystemService:
         if not obj:
             raise ValueError("报价记录不存在")
         self._repo.delete_supplier_price(obj)
+
+    # ========== 价格解析 ==========
+
+    def resolve_price(self, item_cd: str, supp_cd: str, qty: float = 1) -> dict[str, Any]:
+        """按优先级解析最优价格，供采购订单自动取价。
+
+        优先级：
+        1. 供应商当前有效报价（满足起订量，取最低价）
+        2. 物料标准采购价（TIP01 busityp='20'）
+        3. 无可用价格，返回空由用户手动填写
+        """
+        # 1. 供应商报价
+        sp = self._repo.get_supplier_price_current(item_cd, supp_cd, qty)
+        if sp:
+            return {
+                "price": float(sp.itemprice) if sp.itemprice else None,
+                "source": "supplier",
+                "source_name": "供应商报价",
+                "effective_date": sp.effective_date.isoformat() if sp.effective_date else None,
+                "expire_date": sp.expire_date.isoformat() if sp.expire_date else None,
+                "min_qty": float(sp.min_qty) if sp.min_qty else 0,
+            }
+
+        # 2. 物料标准采购价
+        std = self._repo.get_item_standard_price(item_cd, busityp="20")
+        if std and std.itemprice:
+            return {
+                "price": float(std.itemprice),
+                "source": "standard",
+                "source_name": "标准采购价",
+                "effective_date": std.effective_date.isoformat() if std.effective_date else None,
+                "expire_date": std.expire_date.isoformat() if std.expire_date else None,
+                "min_qty": 0,
+            }
+
+        # 3. 无可用价格
+        return {"price": None, "source": "manual", "source_name": "手动填写", "min_qty": 0}
 
     def create_item_class(self, data: dict[str, Any]) -> dict[str, Any]:
         """新增物料分类。"""
@@ -531,8 +600,9 @@ class SystemService:
         return self._repo.get_eid_itemcd_tree()
 
     def list_eid(self, page: int = 1, per_page: int = 20,
-                 search: str | None = None, class_cd: str | None = None) -> dict[str, Any]:
-        items, total = self._repo.get_eid_list(page=page, per_page=per_page, search=search, class_cd=class_cd)
+                 search: str | None = None, class_cd: str | None = None,
+                 whcd: str | None = None) -> dict[str, Any]:
+        items, total = self._repo.get_eid_list(page=page, per_page=per_page, search=search, class_cd=class_cd, whcd=whcd)
         # 解析物料名称 + 仓库名称
         item_map: dict[str, str] = {}
         wh_map: dict[str, str] = {}
@@ -603,11 +673,51 @@ class SystemService:
     # ——— CRUD ———
 
     def create_item(self, data: dict[str, Any]) -> dict[str, Any]:
+        item_cd = data.get("item_cd", "")
+        if item_cd:
+            self._validate_item_cd(item_cd)
         return self._repo.create_item(data).to_dict()
 
     def update_item(self, item_cd: str, data: dict[str, Any]) -> dict[str, Any] | None:
         r = self._repo.get_item(item_cd)
-        return self._repo.update_item(r, data).to_dict() if r else None
+        if not r:
+            return None
+        new_cd = data.get("item_cd", "")
+        if new_cd and new_cd != item_cd:
+            # 检查新编码是否与分类编码冲突
+            self._validate_item_cd(new_cd)
+        result = self._repo.update_item(r, data).to_dict()
+        if new_cd and new_cd != item_cd:
+            # 告知调用方受影响的引用记录数（FK CASCADE 已自动同步）
+            affected = self._get_item_ref_counts(item_cd)
+            if affected:
+                result["_affected_refs"] = affected
+        return result
+
+    @staticmethod
+    def _validate_item_cd(item_cd: str) -> None:
+        """检查物料编码是否与物料分类编码冲突。"""
+        from app.models.master import ItemClass
+        if db.session.get(ItemClass, item_cd):
+            raise ValueError(f"编码 {item_cd} 已被物料分类占用，请使用其他编码")
+
+    @staticmethod
+    def _get_item_ref_counts(item_cd: str) -> dict[str, int]:
+        """查询物料编码被引用的记录数。"""
+        from app.models.inventory import SupplierPrice
+        from app.models.master import CustItems
+        from app.models.procurement import PurchasePlanDt, PurchaseRegisterDt
+        result: dict[str, int] = {}
+        for model, key in [
+            (PurchasePlanDt, "采购需求明细"),
+            (PurchaseRegisterDt, "采购订单明细"),
+            (CustItems, "供应商商品关联"),
+            (SupplierPrice, "供应商报价"),
+        ]:
+            count = db.session.query(model).filter(model.itemcd == item_cd).count()
+            if count:
+                result[key] = count
+        return result
 
     def delete_item(self, item_cd: str) -> bool:
         r = self._repo.get_item(item_cd)
@@ -763,10 +873,19 @@ class SystemService:
     def get_supplier_classes(self) -> list[dict[str, Any]]:
         return self._repo.get_supplier_classes()
 
+    def get_supplier_class_tree(self) -> list[dict[str, Any]]:
+        return self._repo.get_supplier_class_tree()
+
     def create_supplier_class(self, data: dict[str, Any]) -> dict[str, Any]:
-        existing = self._repo.get_supplier_class(data["class_cd"])
-        if existing:
-            raise ValueError(f"分类编码 {data['class_cd']} 已存在")
+        """新增供应商分类，编码自动生成（2位数字，不足补零）。"""
+        # 自动生成编码
+        max_cd = self._repo.get_max_supplier_class_cd()
+        if max_cd and max_cd.isdigit():
+            next_num = int(max_cd) + 1
+        else:
+            next_num = 1
+        class_cd = str(next_num).zfill(2)
+        data["class_cd"] = class_cd
         return self._repo.create_supplier_class(data).to_dict()
 
     def update_supplier_class(self, class_cd: str, data: dict[str, Any]) -> dict[str, Any]:

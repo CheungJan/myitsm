@@ -59,6 +59,383 @@ class WorkOrderService:
                 result["fqc_products"].append({"product": "", "parts": part_eids})
         return result
 
+    # ------------------------------------------------------------------
+    # 工单全生命周期聚合（供详情页一次性展现：下达→领料→生产→质检→补料→入库）
+    # ------------------------------------------------------------------
+
+    # 出库类型标签（TWH15_OUT.invtyp）
+    _OUT_TYPE_LABELS = {
+        "1": "销售出库", "2": "服务领用", "3": "调拨出库", "4": "借出出库",
+        "5": "质检出库", "6": "退货出库", "7": "报废出库", "8": "其他出库",
+        "9": "返修出库", "10": "翻新领料",
+    }
+    # 入库类型标签（TWH13_IN.invtyp）
+    _IN_TYPE_LABELS = {
+        "1": "采购入库", "2": "销售退货", "3": "服务返还", "4": "调拨入库",
+        "5": "借出归还", "6": "翻新入库", "7": "回收入库", "8": "成品入库",
+    }
+    # 审核标签（出入库 0=草稿 1/2=已审核 V=作废 8=退回）
+    _AUDIT_LABELS = {
+        "0": "草稿", "1": "已审核", "2": "已审核", "V": "已作废", "8": "已退回",
+    }
+    # 消耗类型标签（TMS04.consume_type）
+    _CONSUME_TYPE_LABELS = {
+        "1": "定额领料", "2": "不良补料", "3": "报废出库", "4": "返修出库", "5": "退料入库",
+    }
+    # 不良品判定状态
+    _DEFECT_STATUS = ("BF", "BH", "TH")
+
+    @staticmethod
+    def get_lifecycle(wo_id: str) -> dict[str, Any] | None:
+        """聚合工单全生命周期数据，供详情页一次性展现。
+
+        返回结构::
+
+            {
+              "work_order": {...},          # 工单头 + 产品名 + FQC概要
+              "bom": [...],                 # BOM 物料清单（含需求总量）
+              "material_consumes": [...],   # 物料消耗 TMS04（含类型标签）
+              "replace_records": [...],     # 配件更换历史（按时间倒序）
+              "qc": {                       # 质检概要
+                "fqc_status": str|None,
+                "defective_items": [...],   # 不良品明细
+                "products": [...]           # 合格成品/配件
+              },
+              "documents": [...]            # 统一出入库单据流水（按日期排序）
+            }
+        """
+        from app.models.master import BomDt, Item
+        from app.models.mes import ReplaceRecord
+        from app.models.system import User as SysUser
+        from app.models.warehouse import (
+            QcResult,
+            QcResultDt,
+            QcResultEid,
+            Warehouse,
+        )
+
+        wo = WorkOrderRepository.get_by_id(wo_id)
+        if wo is None:
+            return None
+
+        # ---- 名称映射缓存 ----
+        item_nm_map: dict[str, str] = {}
+
+        def _fill_item_names(codes: set[str]) -> None:
+            missing = {c for c in codes if c and c not in item_nm_map}
+            if not missing:
+                return
+            rows = (
+                db.session.query(Item.item_cd, Item.item_nm)
+                .filter(Item.item_cd.in_(missing))
+                .all()
+            )
+            for r in rows:
+                item_nm_map[r.item_cd] = r.item_nm or ""
+
+        wh_nm_map: dict[str, str] = {
+            w.whcd: (w.whnm or "")
+            for w in db.session.query(Warehouse.whcd, Warehouse.whnm).all()
+        }
+        user_nm_map: dict[str, str] = {
+            u.user_cd: (u.user_nm or "")
+            for u in db.session.query(SysUser.user_cd, SysUser.user_nm).all()
+        }
+
+        # ---- 1. 工单头（复用 get 的产品名/FQC 概要补充） ----
+        work_order = WorkOrderService.get(wo_id) or wo.to_dict()
+
+        # ---- 2. BOM 物料清单 ----
+        plan_qty = int(wo.plan_qty or 1)
+        bom_rows = db.session.query(BomDt).filter(BomDt.bomcd == wo.item_cd).all()
+        _fill_item_names({r.itemcd for r in bom_rows})
+        bom = [
+            {
+                "itemcd": r.itemcd,
+                "item_nm": item_nm_map.get(r.itemcd, ""),
+                "bomqty": float(r.bomqty) if r.bomqty is not None else 0,
+                "required_qty": float(r.bomqty or 0) * plan_qty,
+                "itemtyp": r.itemtyp,
+            }
+            for r in bom_rows
+        ]
+
+        # ---- 3. 物料消耗 TMS04 ----
+        consumes = MaterialConsumeRepository.list_by_wo(wo_id)
+        _fill_item_names({c.item_cd for c in consumes})
+        material_consumes = []
+        for c in consumes:
+            cd = c.to_dict()
+            cd["item_nm"] = item_nm_map.get(c.item_cd, "")
+            cd["consume_type_label"] = WorkOrderService._CONSUME_TYPE_LABELS.get(
+                c.consume_type or "1", c.consume_type or ""
+            )
+            cd["warehouse_nm"] = wh_nm_map.get(c.warehouse_cd or "", "")
+            material_consumes.append(cd)
+
+        # ---- 4. 配件更换历史 ----
+        replace_rows = (
+            db.session.query(ReplaceRecord)
+            .filter(ReplaceRecord.wo_id == wo_id)
+            .order_by(
+                ReplaceRecord.replace_date.desc().nullslast(),
+                ReplaceRecord.id.desc(),
+            )
+            .all()
+        )
+        _fill_item_names({r.itemcd for r in replace_rows})
+        replace_records = []
+        for r in replace_rows:
+            rd = r.to_dict()
+            rd["item_nm"] = item_nm_map.get(r.itemcd, "")
+            rd["operator_name"] = user_nm_map.get(r.opercd or "", r.opercd or "")
+            replace_records.append(rd)
+
+        # ---- 5. 质检概要（FQC 不良品 + 合格成品） ----
+        fqc_bills = (
+            db.session.query(QcResult)
+            .filter(QcResult.refbillid == wo_id, QcResult.optyp == "FQ")
+            .all()
+        )
+        fqc_ids = [b.qcbillid for b in fqc_bills]
+        defective_items: list[dict[str, Any]] = []
+        if fqc_ids:
+            eid_defects = (
+                db.session.query(QcResultEid)
+                .filter(
+                    QcResultEid.qcbillid.in_(fqc_ids),
+                    QcResultEid.qcstatus.in_(WorkOrderService._DEFECT_STATUS),
+                )
+                .all()
+            )
+            prd_defects = (
+                db.session.query(QcResultDt)
+                .filter(
+                    QcResultDt.qcbillid.in_(fqc_ids),
+                    QcResultDt.qcstatus.in_(WorkOrderService._DEFECT_STATUS),
+                )
+                .all()
+            )
+            _fill_item_names(
+                {d.itemcd for d in eid_defects} | {d.itemcd for d in prd_defects}
+            )
+            for d in eid_defects:
+                defective_items.append({
+                    "qcbillid": d.qcbillid,
+                    "itemcd": d.itemcd,
+                    "item_nm": item_nm_map.get(d.itemcd, ""),
+                    "eid": d.eid,
+                    "batch_no": None,
+                    "qcstatus": d.qcstatus,
+                    "prod_seq": d.prod_seq,
+                    "replenish_ov_billid": d.replenish_ov_billid or None,
+                    "replenish_status": d.replenish_status or None,
+                })
+            for d in prd_defects:
+                defective_items.append({
+                    "qcbillid": d.qcbillid,
+                    "itemcd": d.itemcd,
+                    "item_nm": item_nm_map.get(d.itemcd, ""),
+                    "eid": None,
+                    "batch_no": d.prddate.isoformat()[:10] if d.prddate else None,
+                    "qcstatus": d.qcstatus,
+                    "prod_seq": d.prod_seq,
+                    "replenish_ov_billid": d.replenish_ov_billid or None,
+                    "replenish_status": d.replenish_status or None,
+                })
+
+        qc_summary = {
+            "fqc_status": work_order.get("fqc_qcstatus"),
+            "fqc_billids": fqc_ids,
+            "defective_items": defective_items,
+            "products": work_order.get("fqc_products", []),
+        }
+
+        # ---- 6. 统一出入库单据流水 ----
+        documents = WorkOrderService._build_document_flow(
+            wo_id=wo_id,
+            fqc_ids=fqc_ids,
+            item_nm_map=item_nm_map,
+            wh_nm_map=wh_nm_map,
+            user_nm_map=user_nm_map,
+            fill_item_names=_fill_item_names,
+        )
+
+        return {
+            "work_order": work_order,
+            "bom": bom,
+            "material_consumes": material_consumes,
+            "replace_records": replace_records,
+            "qc": qc_summary,
+            "documents": documents,
+        }
+
+    @staticmethod
+    def _build_document_flow(
+        wo_id: str,
+        fqc_ids: list[str],
+        item_nm_map: dict[str, str],
+        wh_nm_map: dict[str, str],
+        user_nm_map: dict[str, str],
+        fill_item_names: Any,
+    ) -> list[dict[str, Any]]:
+        """构建工单关联的统一出入库单据流水（按日期升序）。
+
+        包含：
+        - 领料/补料出库：StockOut.refbillid == wo_id
+        - 成品入库：StockIn.refbillid IN FQC单号
+        - 报废/返修出库：StockOut.refbillid IN FQC单号
+        """
+        from app.models.warehouse import (
+            StockIn,
+            StockInDetail,
+            StockOut,
+            StockOutDetailEid,
+            StockOutDetailPrd,
+        )
+
+        documents: list[dict[str, Any]] = []
+        ref_ids = [wo_id, *fqc_ids]
+
+        # 出库单（领料/补料/报废/返修），排除作废
+        out_bills = (
+            db.session.query(StockOut)
+            .filter(StockOut.refbillid.in_(ref_ids), StockOut.useflg == "1", StockOut.auditflg != "V")
+            .all()
+        )
+        out_ids = [o.outbillid for o in out_bills]
+        out_eid_map: dict[str, list[Any]] = {}
+        out_prd_map: dict[str, list[Any]] = {}
+        if out_ids:
+            for d in (
+                db.session.query(StockOutDetailEid)
+                .filter(StockOutDetailEid.outbillid.in_(out_ids))
+                .all()
+            ):
+                out_eid_map.setdefault(d.outbillid, []).append(d)
+            for d in (
+                db.session.query(StockOutDetailPrd)
+                .filter(StockOutDetailPrd.outbillid.in_(out_ids))
+                .all()
+            ):
+                out_prd_map.setdefault(d.outbillid, []).append(d)
+
+        # 入库单（成品入库），排除作废
+        in_bills = (
+            db.session.query(StockIn)
+            .filter(StockIn.refbillid.in_(ref_ids), StockIn.auditflg != "V")
+            .all()
+            if ref_ids
+            else []
+        )
+        in_ids = [i.inbillid for i in in_bills]
+        in_dt_map: dict[str, list[Any]] = {}
+        if in_ids:
+            for d in (
+                db.session.query(StockInDetail)
+                .filter(StockInDetail.inbillid.in_(in_ids))
+                .all()
+            ):
+                in_dt_map.setdefault(d.inbillid, []).append(d)
+
+        # 补全物料名称
+        all_codes: set[str] = set()
+        for dts in out_eid_map.values():
+            all_codes |= {d.itemcd for d in dts}
+        for dts in out_prd_map.values():
+            all_codes |= {d.itemcd for d in dts}
+        for dts in in_dt_map.values():
+            all_codes |= {d.itemcd for d in dts}
+        fill_item_names(all_codes)
+
+        # 组装出库单
+        for o in out_bills:
+            invtyp = o.invtyp or ""
+            details: list[dict[str, Any]] = []
+            for d in out_eid_map.get(o.outbillid, []):
+                details.append({
+                    "itemcd": d.itemcd,
+                    "item_nm": item_nm_map.get(d.itemcd, ""),
+                    "qty": int(d.outqty or 0),
+                    "eid": d.eid,
+                    "batch_no": None,
+                    "prddate": d.prddate.isoformat()[:10] if d.prddate else None,
+                    "itemtyp": d.itemtyp,
+                })
+            for d in out_prd_map.get(o.outbillid, []):
+                details.append({
+                    "itemcd": d.itemcd,
+                    "item_nm": item_nm_map.get(d.itemcd, ""),
+                    "qty": int(d.outqty or 0),
+                    "eid": None,
+                    "batch_no": d.prddate.isoformat()[:10] if d.prddate else None,
+                    "prddate": d.prddate.isoformat()[:10] if d.prddate else None,
+                    "itemtyp": d.itemtyp,
+                })
+            # 业务标签：区分定额领料 / 不良补料
+            memo = o.memo or ""
+            if invtyp == "10":
+                biz_label = "翻新领料"
+            elif invtyp == "8":
+                biz_label = "不良补料" if "补料" in memo else "定额领料"
+            else:
+                biz_label = WorkOrderService._OUT_TYPE_LABELS.get(invtyp, invtyp)
+            doc_date = o.outdate or o.gendate
+            documents.append({
+                "billid": o.outbillid,
+                "direction": "out",
+                "invtyp": invtyp,
+                "type_label": WorkOrderService._OUT_TYPE_LABELS.get(invtyp, invtyp),
+                "biz_label": biz_label,
+                "ref_billid": o.refbillid,
+                "audit_flg": o.auditflg,
+                "audit_label": WorkOrderService._AUDIT_LABELS.get(o.auditflg or "0", o.auditflg),
+                "date": doc_date.isoformat() if doc_date else None,
+                "warehouse_cd": o.whcd,
+                "warehouse_nm": wh_nm_map.get(o.whcd or "", ""),
+                "operator_cd": o.opercd,
+                "operator_name": user_nm_map.get(o.opercd or "", o.opercd or ""),
+                "memo": memo,
+                "details": details,
+            })
+
+        # 组装入库单
+        for i in in_bills:
+            invtyp = i.invtyp or ""
+            details = []
+            for d in in_dt_map.get(i.inbillid, []):
+                details.append({
+                    "itemcd": d.itemcd,
+                    "item_nm": item_nm_map.get(d.itemcd, ""),
+                    "qty": int(d.inqty or 0),
+                    "eid": d.eid,
+                    "batch_no": d.batchid,
+                    "prddate": d.prddate.isoformat()[:10] if d.prddate else None,
+                    "itemtyp": d.itemtyp,
+                })
+            doc_date = i.indate or getattr(i, "gendate", None)
+            documents.append({
+                "billid": i.inbillid,
+                "direction": "in",
+                "invtyp": invtyp,
+                "type_label": WorkOrderService._IN_TYPE_LABELS.get(invtyp, invtyp),
+                "biz_label": WorkOrderService._IN_TYPE_LABELS.get(invtyp, invtyp),
+                "ref_billid": i.refbillid,
+                "audit_flg": i.auditflg,
+                "audit_label": WorkOrderService._AUDIT_LABELS.get(i.auditflg or "0", i.auditflg),
+                "date": doc_date.isoformat() if doc_date else None,
+                "warehouse_cd": i.whcd,
+                "warehouse_nm": wh_nm_map.get(i.whcd or "", ""),
+                "operator_cd": i.opercd,
+                "operator_name": user_nm_map.get(i.opercd or "", i.opercd or ""),
+                "memo": i.memo or "",
+                "details": details,
+            })
+
+        # 按日期升序排序（无日期排最后）
+        documents.sort(key=lambda d: (d["date"] is None, d["date"] or ""))
+        return documents
+
     @staticmethod
     def list_all(
         status: str | None = None,
@@ -67,6 +444,7 @@ class WorkOrderService:
     ) -> dict[str, Any]:
         items, total = WorkOrderRepository.list_all(status=status, page=page, per_page=per_page)
         data = [r.to_dict() for r in items]
+        wo_ids = [d["wo_id"] for d in data]
         # 批量补充产品名称
         item_cds = list({d.get("item_cd") for d in data if d.get("item_cd")})
         if item_cds:
@@ -76,6 +454,18 @@ class WorkOrderService:
             for d in data:
                 if d.get("item_cd"):
                     d["item_nm"] = nm_map.get(d["item_cd"], "")
+        # 批量查询补料状态
+        if wo_ids:
+            from app.models.warehouse import StockOut
+            replenishing = set(r[0] for r in db.session.query(StockOut.refbillid).filter(
+                StockOut.refbillid.in_(wo_ids),
+                StockOut.invtyp == "8",
+                StockOut.auditflg == "0",
+                StockOut.memo.like("%补料%"),
+                StockOut.useflg == "1",
+            ).all())
+            for d in data:
+                d["has_replenish"] = d["wo_id"] in replenishing
         return {
             "items": data,
             "total": total,
@@ -280,7 +670,7 @@ class WorkOrderService:
                     db.session.query(StockIn).filter(
                         StockIn.refbillid == qc.qcbillid,
                         StockIn.auditflg == "0",
-                    ).update({"auditflg": "V", "upddate": now}, synchronize_session=False)
+                    ).update({"auditflg": "V"}, synchronize_session=False)
                     db.session.query(_SOut).filter(
                         _SOut.refbillid == qc.qcbillid,
                         _SOut.auditflg == "0",
@@ -441,6 +831,8 @@ class WorkOrderService:
     @staticmethod
     def replace_asset(wo_id: str, old_eid: str, new_eid: str, itemcd: str, memo: str, creator: str, old_batch_no: str = "", new_batch_no: str = "") -> dict[str, Any]:
         """工单物料更换：记录旧→新 EID 或批次号映射，更新 EID 状态。"""
+        from datetime import UTC, datetime as _dt
+
         from app.models.master import Eid as EidModel
         from app.models.mes import ReplaceRecord
 
@@ -467,6 +859,7 @@ class WorkOrderService:
             new_batch_no=new_batch_no or None,
             opercd=creator,
             memo=memo,
+            replace_date=_dt.now(UTC),
         )
         db.session.add(rec)
 
