@@ -1463,21 +1463,28 @@ class StockDetailRepository:
             query = query.filter(func.date(StockDetail.prddate) == func.date(prddate))
 
         rows = query.order_by(StockDetail.seqno).all()
-        total_qty = sum((r.itemqty or 0) for r in rows)
 
         if rows:
-            # 聚合同维度多行，保留第一行，删除其余
-            if len(rows) > 1:
+            # 仅当指定了 itemtyp 且有多行时才聚合同维度
+            if itemtyp and len(rows) > 1:
+                total_qty = sum((r.itemqty or 0) for r in rows)
                 for r in rows[1:]:
                     db.session.delete(r)
-            record = rows[0]
-            new_qty = total_qty + qty_delta
-            if new_qty == 0:
-                db.session.delete(record)
-                return record
-            else:
-                record.itemqty = new_qty
+                record = rows[0]
+                record.itemqty = total_qty + qty_delta
                 record.upddate = now
+                if record.itemqty == 0:
+                    db.session.delete(record)
+                    return record
+            else:
+                record = rows[0]
+                new_qty = (record.itemqty or 0) + qty_delta
+                if new_qty == 0:
+                    db.session.delete(record)
+                    return record
+                else:
+                    record.itemqty = new_qty
+                    record.upddate = now
         elif qty_delta > 0:
             record = StockDetail(
                 whcd=whcd, itemcd=itemcd, itemtyp=itemtyp, prddate=prddate,
