@@ -1474,10 +1474,7 @@ class StockDetailRepository:
             new_qty = total_qty + qty_delta
             if new_qty == 0:
                 db.session.delete(record)
-                record = StockDetail(
-                    whcd=whcd, itemcd=itemcd, itemtyp=itemtyp, prddate=prddate,
-                    itemqty=0, opercd=operator, gendate=now, upddate=now,
-                )
+                return record
             else:
                 record.itemqty = new_qty
                 record.upddate = now
