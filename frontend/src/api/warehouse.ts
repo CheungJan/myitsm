@@ -92,6 +92,7 @@ export function createStockOut(body: Record<string,unknown>) { return request.po
 export function auditStockOut(id:string, auditflg?:string, checkmemo?:string) { return request.post<never,unknown>(`/warehouse/stock-out/${id}/audit`, { auditflg: auditflg || '2', ...(checkmemo ? {checkmemo} : {}) }) }
 export function updateStockOut(id:string, body: Record<string,unknown>) { return request.put<never,{data:StockOutRecord}>(`/warehouse/stock-out/${id}`, body) }
 export function voidStockOut(id:string) { return request.post<never,unknown>(`/warehouse/stock-out/${id}/void`) }
+export function unauditStockOut(id:string) { return request.post<never,unknown>(`/warehouse/stock-out/${id}/unaudit`) }
 export function closeStockOutLines(id:string, lines: {lineno:number; type:string}[], reason:string) { return request.post<never,unknown>(`/warehouse/stock-out/${id}/close-lines`, { lines, reason }) }
 
 // ---- 可退货出库 ----

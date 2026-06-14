@@ -363,6 +363,17 @@ def update_stock_out(outbillid: str):  # type: ignore[no-untyped-def]
     return success_response(data=result, message="更新成功")
 
 
+@warehouse_bp.post("/stock-out/<outbillid>/unaudit")
+@login_required
+def unaudit_stock_out(outbillid: str):  # type: ignore[no-untyped-def]
+    """反审核出库单：回退库存、清理TMS04、重置为草稿。"""
+    user_cd: str = g.current_user
+    result = StockOutService.unaudit(outbillid, user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "")), code=400)
+    return success_response(data=result)
+
+
 @warehouse_bp.post("/stock-out/<outbillid>/void")
 @login_required
 def void_stock_out(outbillid: str):  # type: ignore[no-untyped-def]

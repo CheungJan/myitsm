@@ -1402,6 +1402,68 @@ class StockOutService:
         db.session.commit()
         return {"success": True, "outbillid": record.outbillid}
 
+
+    @staticmethod
+    def unaudit(outbillid: str, auditor: str) -> dict[str, object]:
+        """反审核出库单：回退库存、清理TMS04、重置EID状态。"""
+        record = StockOutRepository.get_by_id(outbillid)
+        if record is None:
+            return {"success": False, "error": "出库单不存在"}
+        if record.auditflg != "2":
+            return {"success": False, "error": "仅已审核单据可反审核"}
+
+        # 回退库存 eid
+        for detail in record.details_eid:
+            StockDetailRepository.update_balance(
+                whcd=record.whcd, itemcd=detail.itemcd,
+                qty_delta=(detail.outqty or 0), operator=auditor,
+                itemtyp=getattr(detail, 'itemtyp', None),
+                prddate=getattr(detail, 'prddate', None),
+            )
+            if detail.eid:
+                from app.models.master import Eid
+                db.session.query(Eid).filter(
+                    Eid.itemcd == detail.itemcd, Eid.eid == detail.eid,
+                ).update({"whcd": record.whcd, "sflg": "1", "qcflg": None}, synchronize_session=False)
+        # 回退库存 prd
+        for detail in record.details_prd:
+            StockDetailRepository.update_balance(
+                whcd=record.whcd, itemcd=detail.itemcd,
+                qty_delta=(detail.outqty or 0), operator=auditor,
+                itemtyp=getattr(detail, 'itemtyp', None),
+                prddate=getattr(detail, 'prddate', None),
+            )
+            eid_val = getattr(detail, 'eid', None)
+            if eid_val:
+                from app.models.master import Eid
+                db.session.query(Eid).filter(
+                    Eid.itemcd == detail.itemcd, Eid.eid == eid_val,
+                ).update({"whcd": record.whcd, "sflg": "1", "qcflg": None}, synchronize_session=False)
+
+        # 清除 TMS04
+        from app.models.mes import MaterialConsume
+        db.session.query(MaterialConsume).filter(
+            MaterialConsume.ref_bill_id == outbillid,
+        ).delete(synchronize_session=False)
+
+        # OV=8 清除补料标记
+        if record.invtyp == "8":
+            from app.models.warehouse import QcResultDt, QcResultEid
+            db.session.query(QcResultDt).filter(
+                QcResultDt.replenish_ov_billid == outbillid,
+            ).update({"replenish_status": "", "replenish_ov_billid": ""}, synchronize_session=False)
+            db.session.query(QcResultEid).filter(
+                QcResultEid.replenish_ov_billid == outbillid,
+            ).update({"replenish_status": "", "replenish_ov_billid": ""}, synchronize_session=False)
+
+        record.auditflg = "0"
+        record.auditman = None
+        record.auditdate = None
+        record.opercd = auditor
+        record.upddate = dt_parse.now(UTC)
+        db.session.commit()
+        return {"success": True, "outbillid": record.outbillid}
+
     @staticmethod
     def void(outbillid: str, operator: str) -> dict[str, object]:
         """作废出库单（仅未审核/已退回可作废）。
