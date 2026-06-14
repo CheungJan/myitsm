@@ -831,6 +831,15 @@ class StockOutService:
         """OV=8/OV=10 审核后写入 TMS04，同物料多次出库累加 actual_qty。"""
         from app.models.mes import MaterialConsume
         wo_id = getattr(record, "refbillid", None) or record.outbillid
+        # OV=6/7/9 的 refbillid 是 QC 单号，需追溯到工单
+        if record.invtyp in ("6", "7", "9") and wo_id and (wo_id or "").startswith("QC"):
+            try:
+                from app.models.warehouse import QcResult as _Qc
+                _qc = db.session.get(_Qc, wo_id)
+                if _qc and _qc.refbillid and (_qc.refbillid or "").startswith("WO"):
+                    wo_id = _qc.refbillid
+            except Exception:
+                pass
         now_ts = dt_parse.now(UTC)
         for detail_list in [getattr(record, "details_eid", []), getattr(record, "details_prd", [])]:
             for d in detail_list:  # type: ignore[var-annotated]
