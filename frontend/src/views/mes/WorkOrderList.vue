@@ -323,7 +323,7 @@ async function openDetail(row: WoRecord) {
     try { const r = await request.get(`/mes/work-orders/${row.wo_id}`) as any; detail.value = r?.data || row } catch { detail.value = row }
     detailMaterials.value = []
     detailBom.value = []
-    try { const r = await fetchMaterialConsumes(row.wo_id as string); const all: any[] = (r.data as any)||[]; const raw = all.filter((d:any) => !['3','4','5','6'].includes(d.consume_type)).sort((a:any,b:any) => (a.consume_type||0)-(b.consume_type||0)); const grouped: any[] = []; let lastType = ''; raw.forEach((d:any) => { if (d.consume_type !== lastType) { grouped.push({ _sep: true, _label: consumeTypeLabel(d.consume_type) }); lastType = d.consume_type } grouped.push(d) }); detailMaterials.value = grouped; const loss = all.filter((d:any) => ['3','4','5','6'].includes(d.consume_type)).sort((a:any,b:any) => (a.consume_type||0)-(b.consume_type||0)); const lossGrouped: any[] = []; lastType = ''; loss.forEach((d:any) => { if (d.consume_type !== lastType) { lossGrouped.push({ _sep: true, _label: consumeTypeLabel(d.consume_type) }); lastType = d.consume_type } lossGrouped.push(d) }); detailLosses.value = lossGrouped } catch { /* */ }
+    try { const r = await fetchMaterialConsumes(row.wo_id as string); const all: any[] = (r.data as any)||[]; const raw = all.filter((d:any) => !['3','4','5','6'].includes(String(d.consume_type||''))).sort((a:any,b:any) => (a.consume_type||0)-(b.consume_type||0)); const grouped: any[] = []; let lastType = ''; raw.forEach((d:any) => { if (d.consume_type !== lastType) { grouped.push({ _sep: true, _label: consumeTypeLabel(d.consume_type) }); lastType = d.consume_type } grouped.push(d) }); detailMaterials.value = grouped; const loss = all.filter((d:any) => ['3','4','5','6'].includes(String(d.consume_type||''))).sort((a:any,b:any) => (a.consume_type||0)-(b.consume_type||0)); const lossGrouped: any[] = []; lastType = ''; loss.forEach((d:any) => { if (d.consume_type !== lastType) { lossGrouped.push({ _sep: true, _label: consumeTypeLabel(d.consume_type) }); lastType = d.consume_type } lossGrouped.push(d) }); detailLosses.value = lossGrouped } catch { /* */ }
     // 加载 BOM
     if (row.item_cd) { try { const r = await fetchBom(row.item_cd as string); const bom = r.data as any; detailBom.value = bom?.details || []; detailBomNm.value = bom?.bomnm || '' } catch { detailBomNm.value = '' } }
     // 加载更换历史（补料信息依赖它判断是否用完）
@@ -601,7 +601,7 @@ async function loadReplaceHistory() {
 }
 
 const ctLabels: Record<string, string> = { '1':'定额领料','2':'不良补料','3':'报废出库','4':'返修出库','5':'退料入库','6':'退货出库' }
-function consumeTypeLabel(t: string) { return ctLabels[t] || t || '-' }
+function consumeTypeLabel(t: string|number) { return ctLabels[String(t)] || String(t) || '-' }
 function formatDate(d: any) { if (!d) return '-'; const s = String(d); return s.replace('T', ' ').substring(0, 19) }
 function doSearch() {
     const p: Record<string, string> = {}
