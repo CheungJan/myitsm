@@ -1462,7 +1462,7 @@ class StockDetailRepository:
         if prddate:
             query = query.filter(func.date(StockDetail.prddate) == func.date(prddate))
 
-        rows = query.order_by(StockDetail.id).all()
+        rows = query.order_by(StockDetail.seqno).all()
         total_qty = sum((r.itemqty or 0) for r in rows)
 
         if rows:
