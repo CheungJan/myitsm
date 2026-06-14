@@ -718,8 +718,14 @@ class StockInService:
             return {"success": False, "error": "仅已审核单据可反审核"}
 
         from app.models.warehouse import StockOut
+        # IV=11 自动生成的 OV 其 refbillid 指向 QC 单号，memo 含 IV 单号
+        ov_filter = (
+            (StockOut.refbillid == record.refbillid)
+            if record.invtyp == "11"
+            else (StockOut.refbillid == record.inbillid)
+        )
         audited_ov = db.session.query(StockOut).filter(
-            StockOut.refbillid == record.inbillid,
+            ov_filter,
             StockOut.auditflg == "2",
         ).first()
         if audited_ov:
@@ -749,10 +755,17 @@ class StockInService:
                     Eid.itemcd == itemcd_val, Eid.eid == eid_val,
                 ).update(vals, synchronize_session=False)
 
-        db.session.query(StockOut).filter(
-            StockOut.refbillid == record.inbillid,
-            StockOut.auditflg == "0",
-        ).update({"auditflg": "V"})
+        # IV=11 的 OV refbillid 指向 QC 单号，反审核时一并作废下游草稿 OV
+        if record.invtyp == "11":
+            db.session.query(StockOut).filter(
+                StockOut.refbillid == record.refbillid,
+                StockOut.auditflg == "0",
+            ).update({"auditflg": "V"})
+        else:
+            db.session.query(StockOut).filter(
+                StockOut.refbillid == record.inbillid,
+                StockOut.auditflg == "0",
+            ).update({"auditflg": "V"})
 
         record.auditflg = "0"
         record.auditman = None
