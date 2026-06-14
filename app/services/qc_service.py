@@ -243,7 +243,7 @@ class QcService:
                                 wh = None
                         db.session.add(EidModel(
                             itemcd=row.itemcd, eid=row.eid,
-                            sflg="1", qcflg=rq, whcd=wh,
+                            sflg="8" if is_fqc else "1", qcflg=rq, whcd=wh,
                             new_old="1", etyp="1",
                         ))
                     else:
