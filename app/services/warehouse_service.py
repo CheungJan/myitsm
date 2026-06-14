@@ -851,13 +851,9 @@ class StockOutService:
                         ).first()
                         if bom_row:
                             plan_qty = int((bom_row.bomqty or 0)) * int(wo.plan_qty or 1)
-                    # 仅补料出库时计划用量为0（定额领料保留BOM计划用量）
-                    cur_bill = getattr(record, "outbillid", "")
+                    # 补料出库计划用量为0（不在BOM计划内）
                     memo = getattr(record, "memo", "") or ""
-                    if "补料" in memo and plan_qty and db.session.query(MaterialConsume).filter(
-                        MaterialConsume.wo_id == wo_id, MaterialConsume.item_cd == item_cd,
-                        MaterialConsume.ref_bill_id != cur_bill,
-                    ).first():
+                    if "补料" in memo:
                         plan_qty = 0
                 except Exception:
                     pass
