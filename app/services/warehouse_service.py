@@ -874,7 +874,7 @@ class StockOutService:
                 memo = getattr(record, "memo", "") or ""
                 _ct_map = {"7": "3", "9": "4", "6": "6"}  # OV→consume_type
                 consume_type = _ct_map.get(invtyp, "2" if "补料" in memo else "1")
-                # 查价格
+                # 查价格：优先采购价(20)，兜底任意有效价格
                 unit_cost = None
                 try:
                     from app.models.inventory import Price
@@ -882,6 +882,11 @@ class StockOutService:
                         Price.itemcd == item_cd, Price.busityp == "20",
                         Price.is_current == True, Price.useflg == "1",
                     ).first()
+                    if not price_rec:
+                        price_rec = db.session.query(Price).filter(
+                            Price.itemcd == item_cd,
+                            Price.is_current == True, Price.useflg == "1",
+                        ).first()
                     unit_cost = price_rec.itemprice if price_rec else None
                 except Exception:
                     pass
