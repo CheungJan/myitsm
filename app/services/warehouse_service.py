@@ -897,12 +897,21 @@ class StockOutService:
                     MaterialConsume.ref_bill_id == cur_bill,
                     MaterialConsume.item_cd == item_cd,
                 ).first()
+                # 补料关联 QC：从 memo 提取批次号或查 replenish_ov_billid
+                ref_qc_id = None
+                if "补料" in memo:
+                    import re
+                    m = re.search(r'批次(\w+)', memo)
+                    if m:
+                        ref_qc_id = m.group(1)
                 if existing:
                     existing.actual_qty = (existing.actual_qty or 0) + qty
                     existing.consume_type = consume_type
                     existing.unit_cost = unit_cost
                     existing.total_cost = (existing.total_cost or 0) + (total_cost or 0)
                     existing.plan_qty = plan_qty
+                    if ref_qc_id:
+                        existing.ref_qc_id = ref_qc_id
                     existing.upddate = now_ts
                 else:
                     db.session.add(MaterialConsume(
@@ -910,7 +919,7 @@ class StockOutService:
                         unit=unit, warehouse_cd=record.whcd, consume_date=now_ts.date(),
                         consume_type=consume_type, unit_cost=unit_cost, total_cost=total_cost,
                         opercd=auditor, upddate=now_ts,
-                        ref_bill_type="OV", ref_bill_id=cur_bill,
+                        ref_bill_type="OV", ref_bill_id=cur_bill, ref_qc_id=ref_qc_id,
                     ))
 
     @staticmethod
