@@ -588,6 +588,16 @@ class QcService:
             if label and label.useflg == "0":
                 label.useflg = "1"
 
+        # 回退 FQC 更换记录的旧 EID 状态（sflg=2→1, qcflg=BF→None）
+        if qc.optyp == "FQ" and qc.refbillid and (qc.refbillid or "").startswith("WO"):
+            from app.models.mes import ReplaceRecord as _RR
+            old_recs = db.session.query(_RR).filter(_RR.wo_id == qc.refbillid).all()
+            for rec in old_recs:
+                if rec.old_eid:
+                    db.session.query(EidModel).filter(
+                        EidModel.eid == rec.old_eid, EidModel.itemcd == rec.itemcd,
+                    ).update({"sflg": "1", "qcflg": None}, synchronize_session=False)
+
         # 回退 FQC 工单状态（如为工单质检且无其他已审QC记录）
         _qc_ref = qc.refbillid or ""
         if _qc_ref.startswith("WO"):
