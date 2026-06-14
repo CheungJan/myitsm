@@ -892,9 +892,10 @@ class StockOutService:
                     MaterialConsume.item_cd == item_cd,
                 ).first()
                 if existing:
+                    existing.actual_qty = (existing.actual_qty or 0) + qty
                     existing.consume_type = consume_type
                     existing.unit_cost = unit_cost
-                    existing.total_cost = total_cost
+                    existing.total_cost = (existing.total_cost or 0) + (total_cost or 0)
                     existing.plan_qty = plan_qty
                     existing.upddate = now_ts
                 else:
