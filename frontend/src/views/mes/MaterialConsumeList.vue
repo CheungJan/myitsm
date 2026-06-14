@@ -142,18 +142,18 @@ function applyFilters() {
   groupItems()
 }
 
-// 消耗类型（出自 OV/IV 字典：3=OV7报废出库 4=OV9返修出库 1=OV11定额领料 2=OV12不良补料 5=IV12退料入库）
+// 消耗类型映射
 const { dictMap: ovMap } = useDict('OV')
 const { dictMap: ivMap } = useDict('IV')
-const ctTagTypeMap: Record<string, string> = { '1': 'success', '2': 'warning', '3': 'danger', '4': 'info', '5': 'info' }
+const ctTagTypeMap: Record<string, string> = { '1': 'success', '2': 'warning', '3': 'danger', '4': 'info', '5': 'info', '6': 'info' }
 function consumeTypeLabel(type: string): string {
-  const code = { '1':'11','2':'12','3':'7','4':'9','5':'12' }[type] || type
+  const code = { '1':'11','2':'12','3':'7','4':'9','5':'12','6':'6' }[type] || type
   const map = type === '5' ? ivMap.value : ovMap.value
   return map[code] || type || '未知'
 }
 function consumeTypeTag(type: string): string { return ctTagTypeMap[type] || '' }
 const consumeTypes = computed(() => {
-  return ['1','2','3','4','5'].map(v => ({
+  return ['1','2','3','4','5','6'].map(v => ({
     value: v,
     label: consumeTypeLabel(v),
     tagType: ctTagTypeMap[v] || '',
