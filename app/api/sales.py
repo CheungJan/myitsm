@@ -13,6 +13,8 @@ from app.api.auth import login_required
 from app.schemas.sales import (
     PlanCustCreate,
     PlanCustUpdate,
+    PlanTransition,
+    PlanVoid,
     SalesBillCreate,
     SalesExtendCreate,
     SalesExtendDetailCreate,
@@ -64,8 +66,10 @@ def create_plan():  # type: ignore[no-untyped-def]
     """创建预计划。"""
     body = PlanCustCreate.model_validate(request.get_json(silent=True) or {})
     user_cd: str = g.current_user
-    data = PlanCustService.create(body.model_dump(exclude_none=True), user_cd)
-    return success_response(data=data, message="创建成功", code=201)
+    result = PlanCustService.create(body.model_dump(exclude_none=True), user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "创建失败")), code=400)
+    return success_response(data=result, message="创建成功", code=201)
 
 
 @sales_bp.put("/plans/<planno>")
@@ -73,10 +77,44 @@ def create_plan():  # type: ignore[no-untyped-def]
 def update_plan(planno: str):  # type: ignore[no-untyped-def]
     """更新预计划。"""
     body = PlanCustUpdate.model_validate(request.get_json(silent=True) or {})
-    data = PlanCustService.update(planno, body.model_dump(exclude_unset=True))
-    if data is None:
+    result = PlanCustService.update(planno, body.model_dump(exclude_unset=True))
+    if result is None:
         return error_response(message="预计划不存在", code=404)
-    return success_response(data=data)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "更新失败")), code=400)
+    return success_response(data=result)
+
+
+# ---- 预计划状态管理 ----
+
+
+@sales_bp.post("/plans/<planno>/transition")
+@login_required
+def transition_plan(planno: str):  # type: ignore[no-untyped-def]
+    """预计划状态流转。"""
+    body = PlanTransition.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = g.current_user
+    result = PlanCustService.transition(
+        planno,
+        to_status=body.to_status,
+        operator=user_cd,
+        remark=body.remark,
+    )
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "状态流转失败")), code=400)
+    return success_response(data=result)
+
+
+@sales_bp.post("/plans/<planno>/void")
+@login_required
+def void_plan(planno: str):  # type: ignore[no-untyped-def]
+    """作废预计划。"""
+    body = PlanVoid.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = g.current_user
+    result = PlanCustService.void(planno, operator=user_cd, remark=body.remark)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "作废失败")), code=400)
+    return success_response(data=result, message="已作废")
 
 
 # ---- 销售单据 ----

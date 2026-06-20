@@ -11,12 +11,6 @@
           <el-radio value="work_order">生产工单</el-radio>
         </el-radio-group>
       </el-form-item>
-      <el-form-item v-if="sourceType==='work_order'" label="质检类型">
-        <el-radio-group v-model="qcType" @change="onQcTypeChange">
-          <el-radio value="FQC">最终检(FQC)</el-radio>
-          <el-radio value="IPQC">过程检(IPQC)</el-radio>
-        </el-radio-group>
-      </el-form-item>
       <el-form-item label="来源单据">
         <el-select v-model="selectedBillId" filterable placeholder="选择单据" @change="onBillSelect" style="width:300px">
           <template v-if="sourceType==='qc_out'">
@@ -168,12 +162,17 @@ const { dictMap: qcMap } = useDict('QC')
 const woStatusMap: Record<string, string> = { DRAFT: '草稿', RELEASED: '已下达', PICKING: '领料中', IN_PROGRESS: '生产中', QC_PENDING: '待最终检', COMPLETED: '已完工', CANCELLED: '已取消' }
 
 const sourceType = ref<'qc_out' | 'work_order'>('qc_out')
-const qcType = ref<'FQC' | 'IPQC'>('FQC')
 const selectedBillId = ref('')
 const stockOutOptions = ref<any[]>([])
 const woOptions = ref<any[]>([])
-// IPQC 只显示 IN_PROGRESS，FQC 只显示 QC_PENDING
-const filteredWoOptions = computed(() => woOptions.value.filter((w:any) => qcType.value === 'FQC' ? w.status === 'QC_PENDING' : w.status === 'IN_PROGRESS'))
+// 生产质检：IN_PROGRESS（过程检）和 QC_PENDING（最终检）均可选，后端按工单状态自动区分 IPQC/FQC
+const filteredWoOptions = computed(() => woOptions.value.filter((w:any) => w.status === 'QC_PENDING' || w.status === 'IN_PROGRESS'))
+// 当前选中工单是否为 FQC（QC_PENDING），用于替代已删除的 qcType ref
+const isFqcMode = computed(() => {
+  if (sourceType.value !== 'work_order' || !selectedBillId.value) return false
+  const wo = woOptions.value.find(w => w.wo_id === selectedBillId.value)
+  return wo?.status === 'QC_PENDING'
+})
 const globalMemo = ref('')
 const batchNo = ref('')
 const saving = ref(false)
@@ -221,10 +220,6 @@ onMounted(async () => {
 })
 
 function onSourceTypeChange() {
-  selectedBillId.value = ''
-  detailRows.value = []
-}
-function onQcTypeChange() {
   selectedBillId.value = ''
   detailRows.value = []
 }
@@ -321,7 +316,7 @@ async function overlaySavedQcData(refbillid: string) {
       }
     }
     // FQC：复用当前树形结构，仅回填判定/EID/补料信息
-    if (qcType.value === 'FQC') {
+    if (isFqcMode.value) {
       // 构建已存数据的物码→数据映射（按出现顺序消费）
       const savedDt: any[] = []
       const savedEid: any[] = []
@@ -442,8 +437,9 @@ async function loadWoMaterials(woId: string) {
   try {
     const wo = woOptions.value.find(w => w.wo_id === woId)
     const rows: QcRow[] = []
-    if (qcType.value === 'FQC') {
-      // FQC: 每成品一行父行 + BOM配件作为子行（树形层级）
+    const isFqc = wo?.status === 'QC_PENDING'
+    if (isFqc) {
+      // FQC（QC_PENDING）: 每成品一行父行 + BOM配件作为子行（树形层级）
       if (wo?.item_cd) {
         const today = new Date().toISOString().substring(0, 10)
         let itemName = wo.item_cd
@@ -529,7 +525,7 @@ async function loadWoMaterials(woId: string) {
         }
       }
     } else {
-      // IPQC: BOM 明细 + expand 取最新批次信息（不拆分FIFO，一行一物料）
+      // IPQC（IN_PROGRESS）: BOM 明细 + expand 取最新批次信息（不拆分FIFO，一行一物料）
       if (wo?.item_cd) {
         try {
           const whcd = wo.pick_whcd || wo.warehouse_cd || '01'
@@ -982,10 +978,10 @@ async function doBatchSubmit(mode: 'submit' | 'save' = 'submit') {
 
   // 扁平化树形数据
   const groups = new Map<string, QcRow[]>()
-  if (qcType.value === 'FQC') {
+  if (isFqcMode.value || sourceType.value === 'work_order') {
     groups.set('FQ', allRows)
   } else {
-    // IPQC / 质检出库: 按判定分组
+    // 质检出库: 按判定分组
     detailRows.value.forEach(r => {
       const k = r.judgment
       if (!groups.has(k)) groups.set(k, [])
@@ -1027,7 +1023,7 @@ async function doBatchSubmit(mode: 'submit' | 'save' = 'submit') {
         // FQC 用成品物料编码和判定作为主记录
         let primaryItemCd = rows[0]?.itemcd || ''
         let primaryJudgment = rows[0]?.judgment || 'GA'
-        if (qcType.value === 'FQC') {
+        if (isFqcMode.value) {
           const productRow = rows.find((r: QcRow) => r.isBom)
           if (productRow) {
             primaryItemCd = productRow.itemcd

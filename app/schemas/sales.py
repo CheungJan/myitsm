@@ -78,6 +78,19 @@ class SalesExtendDetailCreate(BaseModel):
     planqty: int | None = Field(None, description="计划数量")
 
 
+class PlanTransition(BaseModel):
+    """预计划状态流转。"""
+
+    to_status: str = Field(..., max_length=2, description="目标状态码")
+    remark: str | None = Field(None, max_length=200, description="备注")
+
+
+class PlanVoid(BaseModel):
+    """预计划作废。"""
+
+    remark: str | None = Field(None, max_length=200, description="作废原因")
+
+
 class SalesQuery(BaseModel):
     """销售查询参数。"""
 

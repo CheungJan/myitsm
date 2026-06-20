@@ -73,6 +73,25 @@ class PlanCustRepository:
             setattr(record, key, value)
         return record
 
+    @staticmethod
+    def update_status(record: PlanCust, new_status: str) -> PlanCust:
+        """更新计划状态。"""
+        record.plan_status = new_status
+        return record
+
+    @staticmethod
+    def find_by_custcard(custcard: str) -> PlanCust | None:
+        """按磁卡号查找预计划（用于重复检查）。"""
+        if not custcard:
+            return None
+        return (
+            db.session.query(PlanCust)
+            .filter(
+                PlanCust.custcard == custcard,
+            )
+            .first()
+        )
+
 
 class SalesBillRepository:
     """销售单据数据访问。"""
