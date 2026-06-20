@@ -105,6 +105,19 @@ def transition_work_order(wo_id: str):  # type: ignore[no-untyped-def]
     return success_response(data=result, message=f"已流转至 {target}")
 
 
+@mes_bp.get("/work-orders/<wo_id>/lifecycle")
+@login_required
+def get_work_order_lifecycle(wo_id: str):  # type: ignore[no-untyped-def]
+    """工单全生命周期聚合：一次性返回工单头、BOM、物料消耗、更换历史、质检概要、出入库单据流水。
+
+    供工单详情页按「下达→领料→生产→质检→补料→入库」时间轴展现。
+    """
+    data = WorkOrderService.get_lifecycle(wo_id)
+    if data is None:
+        return error_response(message="工单不存在", code=404)
+    return success_response(data=data)
+
+
 @mes_bp.post("/work-orders/<wo_id>/replace")
 @login_required
 def replace_work_order_asset(wo_id: str):  # type: ignore[no-untyped-def]
@@ -135,11 +148,13 @@ def replace_work_order_asset(wo_id: str):  # type: ignore[no-untyped-def]
 @login_required
 def get_replace_records(wo_id: str):  # type: ignore[no-untyped-def]
     """查询工单的物料更换历史记录。"""
+    from app.extensions import db
     from app.models.mes import ReplaceRecord
-    from app.models.master import SysUser
+    from app.models.system import User as SysUser
     from sqlalchemy import func
-    
+
     records = db.session.query(
+        ReplaceRecord.id,
         ReplaceRecord.wo_id,
         ReplaceRecord.old_eid,
         ReplaceRecord.new_eid,
@@ -155,11 +170,13 @@ def get_replace_records(wo_id: str):  # type: ignore[no-untyped-def]
     ).filter(
         ReplaceRecord.wo_id == wo_id
     ).order_by(
-        ReplaceRecord.replace_date.desc()
+        ReplaceRecord.replace_date.desc().nullslast(),
+        ReplaceRecord.id.desc()
     ).all()
-    
+
     data = [
         {
+            "id": r.id,
             "wo_id": r.wo_id,
             "old_eid": r.old_eid,
             "new_eid": r.new_eid,
@@ -173,8 +190,136 @@ def get_replace_records(wo_id: str):  # type: ignore[no-untyped-def]
         }
         for r in records
     ]
-    
+
     return success_response(data=data)
+
+
+@mes_bp.get("/work-orders/<wo_id>/replenish-available")
+@login_required
+def get_available_replenish(wo_id: str):  # type: ignore[no-untyped-def]
+    """查询工单 FQC 不良品关联的、且已审核的补料明细（用于物料更换自动填充）。
+
+    业务逻辑：
+    1. FQC 录入时，每个不良品(BF/BH/TH)会关联一个补料出库单(replenish_ov_billid)。
+    2. 物料更换自动填充时，只能使用这些关联补料单中【已审核】的单据明细。
+    3. 若关联补料单全部未审核，返回空明细并提示未审核单号，避免误填其他批次补料。
+    """
+    from app.extensions import db
+    from app.models.warehouse import (
+        QcResult,
+        QcResultDt,
+        QcResultEid,
+        StockOut,
+        StockOutDetailEid,
+        StockOutDetailPrd,
+    )
+
+    # 1. 找该工单的 FQC 质检单（optyp='FQ'，未审核/已退回草稿）
+    fqc_bills = (
+        db.session.query(QcResult.qcbillid)
+        .filter(
+            QcResult.refbillid == wo_id,
+            QcResult.optyp == "FQ",
+        )
+        .all()
+    )
+    fqc_ids = [b.qcbillid for b in fqc_bills]
+    if not fqc_ids:
+        return success_response(data={"items": [], "audited_billids": [], "pending_billids": []})
+
+    # 2. 收集 FQC 不良品(BF/BH/TH)关联的补料出库单号
+    defect_status = ("BF", "BH", "TH")
+    eid_ov = (
+        db.session.query(QcResultEid.replenish_ov_billid)
+        .filter(
+            QcResultEid.qcbillid.in_(fqc_ids),
+            QcResultEid.qcstatus.in_(defect_status),
+            QcResultEid.replenish_ov_billid.isnot(None),
+            QcResultEid.replenish_ov_billid != "",
+        )
+        .all()
+    )
+    prd_ov = (
+        db.session.query(QcResultDt.replenish_ov_billid)
+        .filter(
+            QcResultDt.qcbillid.in_(fqc_ids),
+            QcResultDt.qcstatus.in_(defect_status),
+            QcResultDt.replenish_ov_billid.isnot(None),
+            QcResultDt.replenish_ov_billid != "",
+        )
+        .all()
+    )
+    related_ovs = {r.replenish_ov_billid for r in eid_ov} | {r.replenish_ov_billid for r in prd_ov}
+    if not related_ovs:
+        return success_response(data={"items": [], "audited_billids": [], "pending_billids": []})
+
+    # 3. 区分关联补料单的审核状态（auditflg='2' 为已审核）
+    ov_rows = (
+        db.session.query(StockOut.outbillid, StockOut.auditflg)
+        .filter(StockOut.outbillid.in_(list(related_ovs)))
+        .all()
+    )
+    audited = [r.outbillid for r in ov_rows if r.auditflg == "2"]
+    pending = [r.outbillid for r in ov_rows if r.auditflg != "2"]
+
+    if not audited:
+        # 关联补料单全部未审核：返回空明细 + 未审核单号供前端提示
+        return success_response(data={"items": [], "audited_billids": [], "pending_billids": pending})
+
+    # 4. 取已审核补料单的明细（EID + 批次）
+    available_items: list[dict[str, object]] = []
+
+    eid_details = (
+        db.session.query(
+            StockOutDetailEid.outbillid,
+            StockOutDetailEid.itemcd,
+            StockOutDetailEid.eid,
+            StockOutDetailEid.prddate,
+            StockOutDetailEid.itemtyp,
+            StockOutDetailEid.outqty,
+        )
+        .filter(StockOutDetailEid.outbillid.in_(audited))
+        .all()
+    )
+    for d in eid_details:
+        eid_val = d.eid.strip() if d.eid else ""
+        for _ in range(d.outqty or 1):
+            available_items.append({
+                "outbillid": d.outbillid,
+                "itemcd": d.itemcd,
+                "eid": eid_val or None,
+                "prddate": d.prddate.isoformat() if d.prddate else None,
+                "itemtyp": d.itemtyp,
+                "typ": "eid",
+            })
+
+    prd_details = (
+        db.session.query(
+            StockOutDetailPrd.outbillid,
+            StockOutDetailPrd.itemcd,
+            StockOutDetailPrd.prddate,
+            StockOutDetailPrd.itemtyp,
+            StockOutDetailPrd.outqty,
+        )
+        .filter(StockOutDetailPrd.outbillid.in_(audited))
+        .all()
+    )
+    for d in prd_details:
+        for _ in range(d.outqty or 1):
+            available_items.append({
+                "outbillid": d.outbillid,
+                "itemcd": d.itemcd,
+                "eid": None,
+                "prddate": d.prddate.isoformat() if d.prddate else None,
+                "itemtyp": d.itemtyp,
+                "typ": "batch",
+            })
+
+    return success_response(data={
+        "items": available_items,
+        "audited_billids": audited,
+        "pending_billids": pending,
+    })
 
 
 # ---- 工序定义 ----

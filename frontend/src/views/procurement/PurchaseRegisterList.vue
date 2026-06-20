@@ -5,6 +5,7 @@
     <el-card shadow="never" style="margin-bottom:16px">
       <div class="search-bar">
         <div class="field"><label>订单号</label><el-input v-model="searchRgstbillid" size="small" style="width:130px" clearable placeholder="模糊搜索" @keyup.enter="doSearch" @clear="doSearch"/></div>
+        <div class="field"><label>需求号</label><el-input v-model="searchRefPcplanid" size="small" style="width:130px" clearable placeholder="模糊搜索" @keyup.enter="doSearch" @clear="doSearch"/></div>
         <div class="field"><label>审批状态</label><el-select v-model="searchAuditflg" size="small" style="width:130px" clearable @change="doSearch"><el-option v-for="(nm,cd) in afMap" :key="cd" :label="nm" :value="cd"/></el-select></div>
         <div class="field"><label>执行状态</label><el-select v-model="searchExecStatus" size="small" style="width:130px" clearable @change="doSearch"><el-option label="未入库" value="未入库"/><el-option label="部分入库" value="部分入库"/><el-option label="已完成" value="已完成"/></el-select></div>
         <el-button size="small" @click="searchShowVoided = !searchShowVoided; doSearch()" :type="searchShowVoided ? 'danger' : ''">{{ searchShowVoided ? '返回正常单据' : '作废单据' }}</el-button>
@@ -15,6 +16,7 @@
     <el-card shadow="never">
       <el-table :data="items" v-loading="loading" stripe size="small" highlight-current-row @row-click="open">
         <el-table-column prop="rgstbillid" label="订单号" width="110"/>
+        <el-table-column prop="ref_pcplanids" label="需求号" width="140" show-overflow-tooltip/>
         <el-table-column label="采购员" width="80"><template #default="{row}">{{ userName(row.pcrep) }}</template></el-table-column>
         <el-table-column prop="rgstamt" label="金额" width="100" align="right"/>
         <el-table-column label="审批" width="80"><template #default="{row}"><el-tag v-if="row.useflg==='9'" type="danger" size="small">已作废</el-tag><el-tag v-else :type="row.auditflg==='2'?'success':'warning'" size="small">{{ afLabel(row.auditflg) }}</el-tag></template></el-table-column>
@@ -52,7 +54,7 @@
           <el-table-column prop="itemcd" label="物料编码" width="100"/>
           <el-table-column prop="item_nm" label="物料名称" min-width="150" show-overflow-tooltip/>
           <el-table-column prop="rgsqty" label="采购数量" width="80" align="right"/>
-          <el-table-column prop="auditqty" label="审核数量" width="80" align="right"/>
+          <el-table-column label="审核数量" width="80" align="right"><template #default="{row}">{{ (row.auditqty > 0) ? row.auditqty : '-' }}</template></el-table-column>
           <el-table-column prop="rgstprice" label="单价" width="90" align="right"/>
           <el-table-column prop="units" label="单位" width="60"/>
           <el-table-column label="来源需求单" min-width="120"><template #default="{row}"><span v-if="row.ref_pcplanid" style="color:#409eff;font-size:12px">{{ row.ref_pcplanid }}-{{ row.ref_pclineno }}</span><span v-else style="color:#c0c4cc">-</span></template></el-table-column>
@@ -69,7 +71,7 @@
           <el-table-column prop="itemcd" label="物料编码" width="100"/>
           <el-table-column prop="item_nm" label="物料名称" min-width="150" show-overflow-tooltip/>
           <el-table-column prop="rgsqty" label="采购数量" width="80" align="right"/>
-          <el-table-column prop="auditqty" label="审核数量" width="80" align="right"/>
+<el-table-column label="审核数量" width="100" align="right"><template #default="{row}"><el-input-number v-model="row.auditqty" :min="0" :max="row.rgsqty" size="small" controls-position="right" style="width:90px"/></template></el-table-column>
           <el-table-column prop="rgstprice" label="单价" width="80" align="right"/>
           <el-table-column prop="units" label="单位" width="60"/>
         </el-table>
@@ -106,7 +108,7 @@
           <el-table-column prop="itemcd" label="物料编码" width="100"/>
           <el-table-column prop="itemnm" label="物料名称" min-width="120"/>
           <el-table-column label="数量" width="120"><template #default="{$index}"><el-input-number v-model="editDetails[$index].rgsqty" :min="1" :max="editDetails[$index]._origQty" size="small" style="width:100px" @change="(v:number|undefined)=>onEditQtyChange($index, v||1)"/></template></el-table-column>
-          <el-table-column prop="auditqty" label="审核数量" width="80" align="right"/>
+          <el-table-column label="审核数量" width="80" align="right"><template #default="{row}">{{ (row.auditqty > 0) ? row.auditqty : '-' }}</template></el-table-column>
           <el-table-column label="单价" width="140"><template #default="{$index}"><el-input-number v-model="editDetails[$index].rgstprice" :min="0" :precision="2" size="small" style="width:130px" @change="(v:number|undefined)=>onEditPriceChange($index, v||0)"/></template></el-table-column>
           <el-table-column prop="units" label="单位" width="60"/>
         </el-table>
@@ -158,7 +160,7 @@
                   <span style="font-size:12px;color:#909399;white-space:nowrap;">├ 拆分: {{ row.itemnm }}</span>
                   <el-input-number v-model="line.rgsqty" :min="1" size="small" style="width:100px;" controls-position="right" @change="async (v:number|undefined)=>{if(v&&v>0)line.unitprice=await resolveSplitPrice(line.itemcd,line.suppliercd||form.suppliercd,v)}" />
                   <el-select v-model="line.suppliercd" size="small" style="width:160px;" placeholder="选择供应商" filterable @change="async (v:string)=>{if(v)line.unitprice=await resolveSplitPrice(line.itemcd,v,line.rgsqty||1)}">
-                    <el-option v-for="s in filteredSuppliers" :key="s.supp_cd" :label="s.supp_nm" :value="s.supp_cd" />
+                    <el-option v-for="s in (itemSuppliersMap.get(line.itemcd) || [])" :key="s.supp_cd" :label="s.supp_nm" :value="s.supp_cd" />
                   </el-select>
                   <el-input-number v-model="line.unitprice" :min="0" :precision="2" size="small" style="width:100px;" controls-position="right" placeholder="单价" @change="(v:number|undefined)=>onPriceChange({_resolvedPrice:line._resolvedPrice||line.unitprice,_priceSource:'系统解析'},v||0)"/>
                   <el-button link type="danger" size="small" @click="removeSplitLine(detailKey(row), line.id)">删除</el-button>
@@ -225,7 +227,7 @@
     </el-dialog>
   </div>
 </template>
-<script setup lang="ts">import {ref,reactive,watch} from 'vue';import {ElMessage,ElMessageBox} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchOrders,fetchAvailableItems,fetchRequisitions,fetchOrderDetail} from '@/api/procurement';import type {ProcRecord} from '@/api/procurement';import {fetchSuppliersByRequisition,batchCreateOrders,validateBatchOrders,fetchPriceResolve,getMergePreview} from '@/api/master';import request from '@/api/request'
+<script setup lang="ts">import {ref,reactive,watch} from 'vue';import {ElMessage,ElMessageBox} from 'element-plus';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {useUserNames} from '@/composables/useUserNames';import {useDict} from '@/composables/useDict';import {fetchOrders,fetchAvailableItems,fetchRequisitions,fetchOrderDetail} from '@/api/procurement';import type {ProcRecord} from '@/api/procurement';import {fetchSuppliersByRequisition,fetchItemSuppliers,batchCreateOrders,validateBatchOrders,fetchPriceResolve,getMergePreview} from '@/api/master';import request from '@/api/request'
 
 const{userName}=useUserNames()
 const{dictLabel:afLabel,dictMap:afMap}=useDict('AF')
@@ -240,12 +242,14 @@ async function open(row:ProcRecord){
 function quickFilter(flg:string){onSearch({auditflg:flg})}
 
 const searchRgstbillid = ref('')
+const searchRefPcplanid = ref('')
 const searchAuditflg = ref('')
 const searchExecStatus = ref('')
 const searchShowVoided = ref(false)
 function doSearch() {
   const p: Record<string,string> = {}
   if (searchRgstbillid.value) p.rgstbillid = searchRgstbillid.value
+  if (searchRefPcplanid.value) p.ref_pcplanid = searchRefPcplanid.value
   if (searchAuditflg.value) p.auditflg = searchAuditflg.value
   if (searchExecStatus.value) p.execution_status = searchExecStatus.value
   if (searchShowVoided.value) p.show_voided = 'true'
@@ -253,8 +257,10 @@ function doSearch() {
 }
 function doReset() {
   searchRgstbillid.value = ''
+  searchRefPcplanid.value = ''
   searchAuditflg.value = ''
   searchExecStatus.value = ''
+  searchShowVoided.value = false
   onSearch({})
 }
 
@@ -264,6 +270,9 @@ const auditMemo=ref('')
 async function openAudit(row:ProcRecord){
   auditTarget.value=row;auditMemo.value=''
   try{const r=await fetchOrderDetail(row.rgstbillid as string);auditTarget.value=r.data}catch{/* use row */}
+  // 审核数量默认填充采购数量（后端返回的auditqty=0时）
+  const details = (auditTarget.value as any)?.details || []
+  details.forEach((d: any) => { if (!d.auditqty || d.auditqty <= 0) d.auditqty = d.rgsqty || 0 })
   auditing.value=true
 }
 async function doSubmit(row:ProcRecord){
@@ -361,7 +370,7 @@ async function handleEditSave() {
 const creating=ref(false);const saving=ref(false)
 const today=()=>new Date().toISOString().split('T')[0]
 const form=reactive({suppliercd:'',pcrep:'',rgstdate:today(),memo:'',ref_pcplanid:'',ref_pclineno:0})
-const formDetails=reactive<{itemcd:string;itemnm:string;rgsqty:number;rgstprice:number;units:string;ref_pcplanid:string;ref_pclineno:number}[]>([])
+const formDetails=reactive<{itemcd:string;itemnm:string;rgsqty:number;rgstprice:number;units:string;ref_pcplanid:string;ref_pclineno:number;_resolvedPrice?:number}[]>([])
 
 // ---- 拆单数据结构与辅助 ----
 interface SplitLine {
@@ -373,8 +382,11 @@ interface SplitLine {
   ref_pcplanid: string
   ref_pclineno: number
   itemcd: string
+  _resolvedPrice?: number
+  _priceSource?: string
 }
 const splitGroups = ref<Map<string, SplitLine[]>>(new Map())
+const itemSuppliersMap = ref<Map<string, {supp_cd:string;supp_nm:string}[]>>(new Map())
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2) }
 function detailKey(row: Record<string,any>) { return `${row.ref_pcplanid}_${row.ref_pclineno}_${row.itemcd}` }
 function isSplit(key: string): boolean { const lines = splitGroups.value.get(key); return !!lines && lines.length > 1 }
@@ -391,6 +403,13 @@ async function handleSplit(detail: Record<string,any>) {
   const half1 = Math.ceil(total / 2)
   const half2 = total - half1
   const suppCd = form.suppliercd
+  // 加载该物料专属供应商
+  if (!itemSuppliersMap.value.has(detail.itemcd)) {
+    try {
+      const r = await fetchItemSuppliers(detail.itemcd)
+      itemSuppliersMap.value.set(detail.itemcd, (r.data || []).map((s: any) => ({ supp_cd: s.custcd || s.supp_cd, supp_nm: s.supp_nm })))
+    } catch { itemSuppliersMap.value.set(detail.itemcd, []) }
+  }
   const [p1, p2] = await Promise.all([
     resolveSplitPrice(detail.itemcd, suppCd, half1),
     resolveSplitPrice(detail.itemcd, suppCd, half2)
@@ -405,6 +424,13 @@ async function addSplitLine(key: string) {
   if (!lines || lines.length === 0) return
   const first = lines[0]
   const suppCd = form.suppliercd
+  // 确保物料供应商已加载
+  if (!itemSuppliersMap.value.has(first.itemcd)) {
+    try {
+      const r = await fetchItemSuppliers(first.itemcd)
+      itemSuppliersMap.value.set(first.itemcd, (r.data || []).map((s: any) => ({ supp_cd: s.custcd || s.supp_cd, supp_nm: s.supp_nm })))
+    } catch { itemSuppliersMap.value.set(first.itemcd, []) }
+  }
   const price = await resolveSplitPrice(first.itemcd, suppCd, 1)
   lines.push({ id: generateId(), suppliercd: suppCd, suppliernm: '', rgsqty: 0, unitprice: price, ref_pcplanid: first.ref_pcplanid, ref_pclineno: first.ref_pclineno, itemcd: first.itemcd })
 }
@@ -535,6 +561,7 @@ function clearReq(){
   formDetails.length=0
   availItems.value=[]
   splitGroups.value.clear()
+  itemSuppliersMap.value.clear()
 }
 // 根据需求单号加载供应商（老PB逻辑）
 async function loadSuppliersByRequisition(pcplanid:string){
@@ -590,18 +617,6 @@ async function loadAvailableItems(){
   }catch{ElMessage.error('加载可采购商品失败')}finally{availLoading.value=false}
 }
 
-function onAvailSelect(_rows:any[]){/* 由checkbox自动处理 */}
-async function onQtyChange(row: any, qty: number){
-  if(!form.suppliercd||qty<=0)return
-  try{
-    const pr=await fetchPriceResolve(row.itemcd, form.suppliercd, qty)
-    if((pr as any).data?.price){
-      row._price = (pr as any).data.price
-      row._resolvedPrice = (pr as any).data.price
-      row._priceSource = (pr as any).data.source_name
-    }
-  }catch(e:any){console.warn('价格重查失败',row.itemcd,e?.message)}
-}
 function onPriceChange(row: any, newPrice: number){
   const refPrice = row._resolvedPrice
   if(!refPrice||refPrice<=0||newPrice<=0)return
@@ -671,7 +686,7 @@ function openCreate(){creating.value=true}
 // 选择供应商后自动加载可采购商品
 watch(()=>form.suppliercd,(val)=>{if(val&&form.ref_pcplanid)loadAvailableItems()})
 
-function resetForm(){form.suppliercd='';form.pcrep='';form.rgstdate=today();form.memo='';form.ref_pcplanid='';form.ref_pclineno=0;formDetails.length=0;availItems.value=[];selectedReqName.value='';filteredSuppliers.value=[];splitGroups.value.clear()}
+function resetForm(){form.suppliercd='';form.pcrep='';form.rgstdate=today();form.memo='';form.ref_pcplanid='';form.ref_pclineno=0;formDetails.length=0;availItems.value=[];selectedReqName.value='';filteredSuppliers.value=[];splitGroups.value.clear();itemSuppliersMap.value.clear()}
 async function handleBatchSubmit(){
   if (formDetails.length === 0 || formDetails.every(d => !d.rgsqty || d.rgsqty <= 0)) {
     ElMessage.warning('请添加采购明细并设置数量'); return

@@ -699,6 +699,9 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | GET | `/work-orders/<wo_id>` | 工单详情（含工序） | - |
 | POST | `/work-orders` | 创建工单 | Body: `WorkOrderCreate` |
 | PUT | `/work-orders/<wo_id>` | 更新工单 | Body: `WorkOrderUpdate` |
+| POST | `/work-orders/<wo_id>/transition` | 状态流转 | Body: `{"target": "RELEASED\|PICKING\|..."}` |
+
+> **注意**：`target="RELEASED"` 时系统自动生成 OV=8 生产领料出库草稿，并直接跳至 `PICKING`。API 返回 `status="PICKING"` 而非 `RELEASED`。
 
 #### 工序定义
 

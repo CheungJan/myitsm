@@ -175,6 +175,7 @@ class PurchaseBill(BaseModel):
     installment_no = db.Column(db.Integer, comment="分期序号")
     total_installments = db.Column(db.Integer, comment="分期总期数")
     due_date = db.Column(db.Date, comment="付款到期日")
+    pay_type_override = db.Column(db.String(1), default="N", comment="是否强制覆盖付款方式一致性(Y/N)，说明追加至memo，操作人/时间复用opercd/gendate")
 
     details = db.relationship("PurchaseBillDt", back_populates="bill", lazy="dynamic")
 

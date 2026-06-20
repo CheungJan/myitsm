@@ -12,6 +12,8 @@ import sqlalchemy as sa
 
 from app.extensions import db
 from app.models.finance import Payable
+from app.models.master import Supplier
+
 from app.models.procurement import (
     PurchaseBill,
     PurchaseBillDt,
@@ -928,6 +930,65 @@ class PurchaseBillService:
         record.auditflg = "V"
         db.session.commit()
         return {"success": True, "pcbillid": pcbillid}
+
+    @staticmethod
+    def list_settleable_suppliers(pay_type: str = "COD") -> list[dict[str, Any]]:
+        """查询有可结算订单的供应商列表（仅返回实际有可结算余额的）。"""
+        from app.models.procurement import PurchaseRegister, PurchaseRegisterDt
+
+        # 汇总每个订单已结算总量
+        settled_sub = (
+            db.session.query(
+                PurchaseBillDt.ref_rgstbillid,
+                sa.func.coalesce(sa.func.sum(PurchaseBillDt.settle_qty), 0).label("total_settled"),
+            )
+            .join(PurchaseBill, PurchaseBill.pcbillid == PurchaseBillDt.pcbillid)
+            .filter(PurchaseBill.useflg != "9")
+            .group_by(PurchaseBillDt.ref_rgstbillid)
+            .subquery()
+        )
+
+        base_filters = [
+            PurchaseRegister.auditflg == "2",
+            ~PurchaseRegister.useflg.in_(["9", "V"]),
+        ]
+        # COD/MON: 入库量 > 已结算量; PIA/DEP/INS: 订购量 > 已结算量
+        if pay_type.upper() in ("COD", "MON"):
+            settle_condition = sa.func.sum(PurchaseRegisterDt.inqty) > sa.func.coalesce(
+                sa.func.max(settled_sub.c.total_settled), 0
+            )
+        else:
+            settle_condition = sa.func.sum(PurchaseRegisterDt.rgsqty) > sa.func.coalesce(
+                sa.func.max(settled_sub.c.total_settled), 0
+            )
+
+        rows = (
+            db.session.query(
+                PurchaseRegister.suppliercd,
+                Supplier.supp_nm,
+                sa.func.count(sa.func.distinct(PurchaseRegister.rgstbillid)).label("order_count"),
+            )
+            .join(PurchaseRegisterDt, PurchaseRegister.rgstbillid == PurchaseRegisterDt.rgstbillid)
+            .outerjoin(Supplier, PurchaseRegister.suppliercd == Supplier.supp_cd)
+            .outerjoin(
+                settled_sub,
+                settled_sub.c.ref_rgstbillid == PurchaseRegister.rgstbillid,
+            )
+            .filter(*base_filters)
+            .group_by(PurchaseRegister.rgstbillid, PurchaseRegister.suppliercd, Supplier.supp_nm)
+            .having(settle_condition)
+            .order_by(Supplier.supp_nm)
+            .all()
+        )
+
+        # 去重（同供应商多个订单）
+        seen: set[str] = set()
+        result: list[dict[str, Any]] = []
+        for r in rows:
+            if r.suppliercd not in seen:
+                seen.add(r.suppliercd)
+                result.append({"suppliercd": r.suppliercd, "supp_nm": r.supp_nm, "order_count": r.order_count})
+        return result
 
     @staticmethod
     def get_settleable_items(rgstbillid: str) -> list[dict[str, Any]]:

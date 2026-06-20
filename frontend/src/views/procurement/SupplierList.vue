@@ -8,22 +8,41 @@
       </div>
     </div>
     <div style="display:flex;gap:12px;">
-      <div style="width:180px;flex-shrink:0;">
+      <div class="tree-panel">
         <el-card shadow="never">
-          <template #header><span style="font-size:14px;font-weight:600;">供应商分类</span></template>
-          <el-menu :default-active="activeClass" @select="handleClassSelect" style="border-right:none;">
-            <el-menu-item index=""><span style="color:#909399;">全部</span></el-menu-item>
-            <el-menu-item v-for="c in classList" :key="c.class_cd" :index="c.class_cd" style="display:flex;justify-content:space-between;align-items:center;">
-              <span>{{ c.class_nm }}</span>
-              <span style="display:flex;gap:2px;margin-left:4px;" @click.stop>
-                <el-button link size="small" @click="openClassDialog(c)"><el-icon><EditPen /></el-icon></el-button>
-                <el-button link size="small" @click="handleDeleteClass(c)"><el-icon><Delete /></el-icon></el-button>
-              </span>
-            </el-menu-item>
-          </el-menu>
-          <div style="padding:8px;border-top:1px solid #ebeef5;margin-top:8px;">
-            <el-button link size="small" @click="openClassDialog(null)">+ 新增分类</el-button>
+          <template #header>
+            <div class="tree-header">
+              <span>供应商分类</span>
+              <el-button type="primary" size="small" @click="openClassDialog(null)">新增</el-button>
+            </div>
+          </template>
+          <el-input v-model="treeFilterText" placeholder="输入关键字过滤" clearable size="small" style="margin-bottom:4px" />
+          <div class="tree-actions">
+            <el-button link size="small" @click="handleClassSelect('')">全部</el-button>
+            <el-button link size="small" @click="expandAll">全部展开</el-button>
+            <el-button link size="small" @click="collapseAll">全部收缩</el-button>
           </div>
+          <el-tree
+            ref="treeRef"
+            :data="treeData"
+            :props="{ label: 'class_nm', children: 'children' }"
+            node-key="class_cd"
+            highlight-current
+            :filter-node-method="filterTreeNode"
+            @node-click="onTreeClick"
+          >
+            <template #default="{ data }">
+              <span class="tree-node">
+                <span class="tree-node-label">{{ data.class_nm }}</span>
+                <span class="tree-node-code">({{ data.class_cd }})</span>
+                <span v-if="data.supp_count > 0" class="tree-node-count">{{ data.supp_count }}</span>
+                <span class="tree-node-actions">
+                  <el-button link size="small" @click.stop="openClassDialog(data)">编辑</el-button>
+                  <el-button link size="small" type="danger" @click.stop="handleDeleteClass(data)">删除</el-button>
+                </span>
+              </span>
+            </template>
+          </el-tree>
         </el-card>
       </div>
       <div style="flex:1;">
@@ -178,8 +197,8 @@
             <el-table-column prop="item_nm" label="名称" min-width="120" show-overflow-tooltip />
             <el-table-column prop="min_qty" label="最小起订" width="80" />
             <el-table-column prop="itemprice" label="单价" width="100" />
-            <el-table-column prop="effective_date" label="生效" width="100" />
-            <el-table-column prop="expire_date" label="失效" width="100" />
+            <el-table-column label="生效" width="100"><template #default="{row}">{{ row.effective_date || '-' }}</template></el-table-column>
+            <el-table-column label="失效" width="100"><template #default="{row}">{{ row.expire_date || '-' }}</template></el-table-column>
             <el-table-column label="操作" width="120"><template #default="{row}">
               <el-button link type="primary" size="small" @click="openEditPrice(row)">编辑</el-button>
               <el-button link type="danger" size="small" @click="handleDeletePrice(row)">删除</el-button>
@@ -193,14 +212,24 @@
     <el-dialog :title="itemIsEdit?'编辑供应商品':'新增供应商品'" v-model="itemDialogVisible" width="400px">
       <el-form :model="itemForm" label-width="80px" size="small">
         <el-form-item label="物料" required>
-          <el-select v-model="itemForm.itemcd" :disabled="itemIsEdit" style="width:100%" filterable placeholder="搜索物料编码/名称">
-            <el-option v-for="it in allItems" :key="it.item_cd as string" :label="`${it.item_cd} ${it.item_nm}`" :value="it.item_cd" />
-          </el-select>
+          <template v-if="itemIsEdit">
+            <el-input :model-value="itemForm.itemcd" disabled />
+          </template>
+          <template v-else>
+            <el-tree-select v-model="selectedItemCds" :data="itemTreeData" multiple collapse-tags collapse-tags-tooltip
+              :props="{ label: 'label', children: 'children', disabled: 'disabled' }"
+              node-key="value" filterable clearable placeholder="搜索物料编码/名称" style="width:100%" />
+          </template>
         </el-form-item>
         <el-form-item label="默认"><el-switch v-model="itemForm.dfltflg" active-value="Y" inactive-value="N" /></el-form-item>
-        <el-form-item label="配送周期(天)"><el-input-number v-model="itemForm.delivercycle" :min="0" controls-position="right" style="width:100%" /></el-form-item>
-        <el-form-item label="服务周期(天)"><el-input-number v-model="itemForm.servicecycle" :min="0" controls-position="right" style="width:100%" /></el-form-item>
-        <el-form-item label="保修期(天)"><el-input-number v-model="itemForm.guaranteeperiod" :min="0" controls-position="right" style="width:100%" /></el-form-item>
+        <el-form-item v-for="field in CYCLE_FIELDS_CONFIG" :key="field.key">
+          <template #label>
+            <el-tooltip :content="field.tooltip" placement="top">
+              <span>{{ field.label }}</span>
+            </el-tooltip>
+          </template>
+          <el-input-number v-model="(itemForm as unknown as Record<string,number>)[field.key]" :min="field.min" controls-position="right" style="width:100%" />
+        </el-form-item>
       </el-form>
       <template #footer><el-button size="small" @click="itemDialogVisible=false">取消</el-button><el-button type="primary" size="small" @click="handleSaveItem">保存</el-button></template>
     </el-dialog>
@@ -224,14 +253,22 @@
     <!-- 分类管理弹窗 -->
     <el-dialog :title="classDialogTitle" v-model="classDialogVisible" width="400px">
       <el-form :model="classForm" label-width="80px" size="small">
-        <el-form-item label="编码" required><el-input v-model="classForm.class_cd" :disabled="classIsEdit" /></el-form-item>
+        <el-form-item label="编码">
+          <el-input v-model="classForm.class_cd" disabled />
+        </el-form-item>
         <el-form-item label="名称" required><el-input v-model="classForm.class_nm" /></el-form-item>
         <el-form-item label="上级">
           <el-select v-model="classForm.parent" style="width:100%" clearable>
             <el-option v-for="c in classList" :key="c.class_cd" :label="c.class_nm" :value="c.class_cd" />
           </el-select>
         </el-form-item>
-        <el-form-item label="类型"><el-input v-model="classForm.classtyp" /></el-form-item>
+        <el-form-item label="类型">
+          <el-select v-model="classForm.classtyp" style="width:100%" clearable placeholder="选择分类类型（可选）">
+            <el-option label="本地供应商" value="1" />
+            <el-option label="外地供应商" value="2" />
+            <el-option label="海外供应商" value="3" />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button size="small" @click="classDialogVisible=false">取消</el-button>
@@ -243,16 +280,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { EditPen, Delete } from '@element-plus/icons-vue'
 import {
   fetchSuppliersPaginated, createSupplier, updateSupplier, deleteSupplier,
-  fetchSupplierClasses, createSupplierClass, updateSupplierClass, deleteSupplierClass,
+  fetchSupplierClasses, fetchSupplierClassTree, createSupplierClass, updateSupplierClass, deleteSupplierClass,
   fetchSupplierItems, addSupplierItem, updateSupplierItem, deleteSupplierItem,
   fetchSupplierPrices, createSupplierPrice, updateSupplierPrice, deleteSupplierPrice,
-  fetchItems,
+  fetchItems, fetchItemClassTree,
 } from '@/api/master'
+import type { ItemClassNode, ItemRecord } from '@/api/master'
+import { CYCLE_FIELDS_CONFIG } from '@/constants/custitemFields'
 
 const searchKeyword = ref('')
 const activeClass = ref('')
@@ -262,12 +300,19 @@ const total = ref(0)
 const items = ref<Record<string,unknown>[]>([])
 const loading = ref(false)
 const saving = ref(false)
-const classList = ref<Record<string,unknown>[]>([])
+
+// 树形分类相关
+const treeRef = ref()
+const treeData = ref<Record<string,unknown>[]>([])
+const treeFilterText = ref('')
+const classList = ref<Record<string,unknown>[]>([])  // 扁平列表，供 classMap 和表单下拉使用
 const classMap = computed(() => {
   const m: Record<string,string> = {}
   classList.value.forEach((c: any) => { m[c.class_cd] = c.class_nm })
   return m
 })
+
+watch(treeFilterText, (v) => treeRef.value?.filter(v))
 
 // 新增/编辑表单
 const formVisible = ref(false)
@@ -299,7 +344,15 @@ const itemDialogVisible = ref(false)
 const itemIsEdit = ref(false)
 const currentItemCd = ref('')
 const itemForm = reactive({ itemcd: '', dfltflg: 'N', delivercycle: 0, servicecycle: 0, guaranteeperiod: 0 })
-const allItems = ref<Record<string,unknown>[]>([])
+const selectedItemCds = ref<string[]>([])
+const itemTreeData = ref<ItemTreeNode[]>([])
+
+interface ItemTreeNode {
+  value: string
+  label: string
+  children?: ItemTreeNode[]
+  disabled?: boolean
+}
 
 // Prices
 const suppPrices = ref<Record<string,unknown>[]>([])
@@ -307,7 +360,7 @@ const suppPricesLoading = ref(false)
 const priceDialogVisible = ref(false)
 const priceIsEdit = ref(false)
 const currentPriceId = ref(0)
-const priceForm = reactive({ itemcd: '', min_qty: 0, itemprice: 0, effective_date: '', expire_date: '' })
+const priceForm = reactive({ itemcd: '', min_qty: 0, itemprice: 0, effective_date: null as string | null, expire_date: null as string | null })
 
 async function handleTabChange(tab: string) {
   if (tab === 'items' && suppItems.value.length === 0) {
@@ -331,6 +384,7 @@ async function handleTabChange(tab: string) {
 // Item CRUD
 function openAddItem() {
   itemIsEdit.value = false; currentItemCd.value = ''
+  selectedItemCds.value = []
   itemForm.itemcd = ''; itemForm.dfltflg = 'N'; itemForm.delivercycle = 0; itemForm.servicecycle = 0; itemForm.guaranteeperiod = 0
   itemDialogVisible.value = true
 }
@@ -342,16 +396,23 @@ function openEditItem(row: any) {
   itemDialogVisible.value = true
 }
 async function handleSaveItem() {
-  if (!itemForm.itemcd) { ElMessage.warning('请选择物料'); return }
   try {
     if (itemIsEdit.value) {
+      if (!itemForm.itemcd) { ElMessage.warning('请选择物料'); return }
       await updateSupplierItem(detailData.value?.supp_cd as string, currentItemCd.value, { ...itemForm, itemcd: undefined })
+      ElMessage.success('修改成功')
     } else {
-      await addSupplierItem(detailData.value?.supp_cd as string, { ...itemForm })
+      if (selectedItemCds.value.length === 0) { ElMessage.warning('请选择物料'); return }
+      const suppCd = detailData.value?.supp_cd as string
+      if (!suppCd) { ElMessage.error('供应商编码缺失'); return }
+      for (const itemcd of selectedItemCds.value) {
+        await addSupplierItem(suppCd, { itemcd, dfltflg: itemForm.dfltflg, delivercycle: itemForm.delivercycle, servicecycle: itemForm.servicecycle, guaranteeperiod: itemForm.guaranteeperiod })
+      }
+      ElMessage.success(`已添加 ${selectedItemCds.value.length} 个商品`)
     }
     itemDialogVisible.value = false
     suppItems.value = []; await handleTabChange('items')
-  } catch (e: any) { ElMessage.error(e?.response?.data?.message || '保存失败') }
+  } catch (e: any) { ElMessage.error(e?.message || '保存失败') }
 }
 async function handleDeleteItem(row: any) {
   try { await ElMessageBox.confirm(`确定移除商品 ${row.item_nm}？`, '确认', { type: 'warning' }) } catch { return }
@@ -363,29 +424,50 @@ async function handleDeleteItem(row: any) {
 }
 
 // Price CRUD
-function openAddPrice() {
+async function openAddPrice() {
   priceIsEdit.value = false; currentPriceId.value = 0
-  priceForm.itemcd = ''; priceForm.min_qty = 0; priceForm.itemprice = 0; priceForm.effective_date = ''; priceForm.expire_date = ''
+  priceForm.itemcd = ''; priceForm.min_qty = 0; priceForm.itemprice = 0; priceForm.effective_date = null; priceForm.expire_date = null
+  // 若关联商品尚未加载，先补载（物料下拉依赖此数据）
+  if (suppItems.value.length === 0) {
+    await handleTabChange('items')
+  }
   priceDialogVisible.value = true
 }
 function openEditPrice(row: any) {
   priceIsEdit.value = true; currentPriceId.value = row.id as number
   priceForm.itemcd = row.itemcd; priceForm.min_qty = Number(row.min_qty) || 0; priceForm.itemprice = Number(row.itemprice) || 0
-  priceForm.effective_date = row.effective_date || ''; priceForm.expire_date = row.expire_date || ''
+  priceForm.effective_date = row.effective_date || null; priceForm.expire_date = row.expire_date || null
   priceDialogVisible.value = true
 }
 async function handleSavePrice() {
   if (!priceForm.itemcd) { ElMessage.warning('请选择物料'); return }
   try {
-    const data = { ...priceForm, itemcd: priceForm.itemcd }
+    const rawData = { ...priceForm, itemcd: priceForm.itemcd }
+    const data = { ...rawData, effective_date: rawData.effective_date || null, expire_date: rawData.expire_date || null }
     if (priceIsEdit.value) {
       await updateSupplierPrice(detailData.value?.supp_cd as string, currentPriceId.value, data)
+      ElMessage.success('修改成功')
     } else {
-      await createSupplierPrice(detailData.value?.supp_cd as string, data)
+      const suppCd = detailData.value?.supp_cd as string
+      let result = await createSupplierPrice(suppCd, data)
+      // 检查是否需要价格确认
+      if ((result as any)?.data?.requires_confirmation) {
+        try {
+          await ElMessageBox.confirm(
+            (result as any).data.warning,
+            '价格警告',
+            { type: 'warning', confirmButtonText: '强制保存', cancelButtonText: '取消' }
+          )
+          result = await createSupplierPrice(suppCd, { ...data, force: true })
+        } catch {
+          return // 用户取消，不保存
+        }
+      }
+      ElMessage.success('新增成功')
     }
     priceDialogVisible.value = false
     suppPrices.value = []; await handleTabChange('prices')
-  } catch (e: any) { ElMessage.error(e?.response?.data?.message || '保存失败') }
+  } catch (e: any) { ElMessage.error(e?.message || '保存失败') }
 }
 async function handleDeletePrice(row: any) {
   try { await ElMessageBox.confirm('确定删除此报价？', '确认', { type: 'warning' }) } catch { return }
@@ -396,8 +478,39 @@ async function handleDeletePrice(row: any) {
   } catch (e: any) { ElMessage.error(e?.response?.data?.message || '删除失败') }
 }
 
+function buildItemTree(classes: ItemClassNode[], itemsByClass: Map<string, ItemRecord[]>): ItemTreeNode[] {
+  const result: ItemTreeNode[] = []
+  for (const cls of classes) {
+    const directItems = itemsByClass.get(cls.class_cd) || []
+    const childCats = buildItemTree(cls.children || [], itemsByClass)
+    const children: ItemTreeNode[] = []
+    for (const it of directItems) {
+      children.push({ value: it.item_cd, label: `${it.item_cd} ${it.item_nm}`, disabled: false })
+    }
+    children.push(...childCats)
+    if (children.length > 0) {
+      result.push({ value: cls.class_cd, label: cls.class_nm, children, disabled: true })
+    }
+  }
+  return result
+}
+
 async function loadAllItems() {
-  try { const r = await fetchItems({ per_page: 9999 } as any); allItems.value = (r.data as any)?.items || [] } catch { /* */ }
+  try {
+    const [itemRes, treeRes] = await Promise.all([
+      fetchItems({ per_page: 9999 } as any),
+      fetchItemClassTree(),
+    ])
+    const items: ItemRecord[] = (itemRes.data as any)?.items || []
+    const tree: ItemClassNode[] = (treeRes.data as any) || []
+    const byClass = new Map<string, ItemRecord[]>()
+    for (const it of items) {
+      const cd = it.class_cd || ''
+      if (!byClass.has(cd)) byClass.set(cd, [])
+      byClass.get(cd)!.push(it)
+    }
+    itemTreeData.value = buildItemTree(tree, byClass)
+  } catch { /* */ }
 }
 
 async function load() {
@@ -412,7 +525,33 @@ async function load() {
 }
 
 async function loadClasses() {
-  try { const r = await fetchSupplierClasses(); classList.value = (r.data as any[]) || [] } catch { /* empty */ }
+  try {
+    const [flatRes, treeRes] = await Promise.all([fetchSupplierClasses(), fetchSupplierClassTree()])
+    classList.value = (flatRes.data as any[]) || []
+    treeData.value = (treeRes.data as any[]) || []
+  } catch { /* empty */ }
+}
+
+function filterTreeNode(value: string, data: any): boolean {
+  if (!value) return true
+  const kw = value.toLowerCase()
+  return String(data.class_nm || '').toLowerCase().includes(kw) || String(data.class_cd || '').toLowerCase().includes(kw)
+}
+
+function onTreeClick(node: any) {
+  activeClass.value = node.class_cd
+  page.value = 1
+  load()
+}
+
+function expandAll() {
+  const nodes = (treeRef.value as any)?.store?.nodesMap as Record<string, { expand: () => void }> | undefined
+  if (nodes) Object.values(nodes).forEach((n) => n.expand?.())
+}
+
+function collapseAll() {
+  const nodes = (treeRef.value as any)?.store?.nodesMap as Record<string, { collapse: () => void }> | undefined
+  if (nodes) Object.values(nodes).forEach((n) => n.collapse?.())
 }
 
 function handleSearch() { page.value = 1; load() }
@@ -423,7 +562,7 @@ function resetForm() {
   isEdit.value = false
 }
 
-function openCreate() { resetForm(); formVisible.value = true }
+function openCreate() { resetForm(); if (activeClass.value) form.class_cd = activeClass.value; formVisible.value = true }
 
 function openEdit(row: any) {
   isEdit.value = true
@@ -453,7 +592,7 @@ async function handleSave() {
     }
     formVisible.value = false
     await load()
-  } catch (e: any) { ElMessage.error(e?.response?.data?.message || '保存失败') }
+  } catch (e: any) { ElMessage.error(e?.message || '保存失败') }
   finally { saving.value = false }
 }
 
@@ -477,9 +616,18 @@ function openClassDialog(row?: any) {
     classForm.classtyp = row.classtyp || ''
   } else {
     classIsEdit.value = false
-    classForm.class_cd = ''; classForm.class_nm = ''; classForm.parent = ''; classForm.classtyp = ''
+    classForm.class_cd = getNextClassCd(); classForm.class_nm = ''; classForm.parent = ''; classForm.classtyp = ''
   }
   classDialogVisible.value = true
+}
+
+function getNextClassCd() {
+  const numericCodes = classList.value
+    .map((c: any) => String(c.class_cd || '').trim())
+    .filter(cd => /^\d{1,2}$/.test(cd))
+    .map(cd => Number(cd))
+  const nextNum = numericCodes.length ? Math.max(...numericCodes) + 1 : 1
+  return String(nextNum).padStart(2, '0')
 }
 
 async function handleSaveClass() {
@@ -494,7 +642,8 @@ async function handleSaveClass() {
     }
     classDialogVisible.value = false
     await loadClasses()
-  } catch (e: any) { ElMessage.error(e?.response?.data?.message || '保存失败') }
+    await load()
+  } catch (e: any) { ElMessage.error(e?.message || '保存失败') }
 }
 
 async function handleDeleteClass(row?: any) {
@@ -502,8 +651,11 @@ async function handleDeleteClass(row?: any) {
   try { await ElMessageBox.confirm(`确定删除分类 ${target.class_nm}？`, '确认', { type: 'warning' }) } catch { return }
   try {
     await deleteSupplierClass(target.class_cd)
+    if (activeClass.value === target.class_cd) { activeClass.value = '' }
     ElMessage.success('删除成功')
-    if (row) { await loadClasses() } else { classDialogVisible.value = false; await loadClasses() }
+    if (!row) { classDialogVisible.value = false }
+    await loadClasses()
+    await load()
   } catch (e: any) { ElMessage.error(e?.response?.data?.message || '删除失败') }
 }
 
@@ -514,4 +666,17 @@ onMounted(() => { loadClasses(); load(); loadAllItems() })
 .page { padding: 0; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .page-header h2 { font-size: 18px; font-weight: 600; margin: 0; }
+.tree-panel {
+    width: 260px; flex-shrink: 0; overflow-y: auto;
+    :deep(.el-card__body) { padding: 8px; }
+    :deep(.el-tree-node__content) { height: auto; min-height: 28px; padding-right: 4px; }
+}
+.tree-header { display: flex; justify-content: space-between; align-items: center; }
+.tree-actions { display: flex; gap: 4px; margin-bottom: 4px; }
+.tree-node { display: flex; align-items: center; width: 100%; gap: 4px; }
+.tree-node-label { font-size: 13px; }
+.tree-node-code { font-size: 11px; color: #909399; }
+.tree-node-count { font-size: 11px; color: #fff; background: #909399; border-radius: 8px; padding: 0 5px; line-height: 16px; }
+.tree-node-actions { margin-left: auto; display: none; gap: 2px; }
+:deep(.el-tree-node__content:hover) .tree-node-actions { display: flex; }
 </style>

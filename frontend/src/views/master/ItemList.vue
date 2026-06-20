@@ -96,6 +96,7 @@
                         <el-form-item label="单位"><el-input v-model="itemForm.unit" /></el-form-item>
                         <el-form-item label="规格"><el-input v-model="itemForm.spec" /></el-form-item>
                         <el-form-item label="类型"><el-select v-model="itemForm.typflg" style="width:100%"><el-option label="成品/整机" value="1" /><el-option label="配件" value="0" /></el-select></el-form-item>
+<el-form-item label="耗材"><el-switch v-model="itemForm.consume" active-value="1" inactive-value="0" active-text="是" inactive-text="否" /></el-form-item>
                     </el-form>
                 </el-tab-pane>
                 <el-tab-pane label="库存周期" name="stock">
@@ -116,14 +117,8 @@
                         <el-table-column label="默认" width="70"><template #default="{row}">
                             <el-switch :model-value="row.dfltflg==='Y'" size="small" @change="(v:boolean) => handleSetDefaultSupplier(row, v)" />
                         </template></el-table-column>
-                        <el-table-column label="保修期(天)" width="110"><template #default="{row}">
-                            <el-input-number v-model="row.guaranteeperiod" :min="0" size="small" controls-position="right" style="width:90px" @change="(v:number|undefined) => handleUpdateSupplier(row, 'guaranteeperiod', v)" />
-                        </template></el-table-column>
-                        <el-table-column label="配送周期" width="100"><template #default="{row}">
-                            <el-input-number v-model="row.delivercycle" :min="0" size="small" controls-position="right" style="width:80px" @change="(v:number|undefined) => handleUpdateSupplier(row, 'delivercycle', v)" />
-                        </template></el-table-column>
-                        <el-table-column label="服务周期" width="100"><template #default="{row}">
-                            <el-input-number v-model="row.servicecycle" :min="0" size="small" controls-position="right" style="width:80px" @change="(v:number|undefined) => handleUpdateSupplier(row, 'servicecycle', v)" />
+                        <el-table-column v-for="config in CYCLE_FIELDS_CONFIG" :key="config.key" :label="config.label" :width="config.key === 'guaranteeperiod' ? 110 : 100"><template #default="{row}">
+                            <el-input-number v-model="row[config.key]" :min="0" size="small" controls-position="right" :style="{ width: config.key === 'guaranteeperiod' ? '90px' : '80px' }" @change="(v:number|undefined) => handleUpdateSupplier(row, config.key, v)" />
                         </template></el-table-column>
                         <el-table-column label="操作" width="70"><template #default="{row}"><el-button link type="danger" size="small" @click="handleRemoveSupplier(row)">移除</el-button></template></el-table-column>
                     </el-table>
@@ -194,6 +189,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { watch } from 'vue'
 import type { ElTree } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
+import { CYCLE_FIELDS_CONFIG } from '@/constants/custitemFields'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
     fetchItems, createItem, updateItem, deleteItem,
@@ -219,19 +215,19 @@ const total = ref(0)
 
 // ---- 物料弹窗 ----
 const itemDialogVisible = ref(false); const itemActiveTab = ref('base')
-const itemSuppliers = ref<Record<string,unknown>[]>([]); const itemBoms = ref<Record<string,unknown>[]>([]); const itemPrices = ref<Record<string,unknown>[]>([])
+const itemSuppliers = ref<Record<string,unknown>[]>([]); const itemBoms = ref<unknown[]>([]); const itemPrices = ref<Record<string,unknown>[]>([])
 const priceTypes = ref<{code_cd:string;code_nm:string}[]>([])
 const supplierDialogVisible = ref(false); const selectedSuppCd = ref('')
 const allSuppliers = ref<{supp_cd:string;supp_nm:string}[]>([])
 const itemEditing = ref<ItemRecord | null>(null)
 const itemSaving = ref(false)
-const itemForm = reactive<Record<string, unknown>>({ item_cd: '', item_nm: '', class_cd: '', itemanm: '', unit: '', spec: '', typflg: '0', upperlimit: undefined, lowerlimit: undefined, minorder: undefined, newperiod: undefined, oldperiod: undefined, pcrep: '' })
+const itemForm = reactive<Record<string, unknown>>({ item_cd: '', item_nm: '', class_cd: '', itemanm: '', unit: '', spec: '', typflg: '0', consume: '0', upperlimit: undefined, lowerlimit: undefined, minorder: undefined, newperiod: undefined, oldperiod: undefined, pcrep: '' })
 
 // ---- 分类弹窗 ----
 const classDialogVisible = ref(false)
 const classEditing = ref<ItemClassNode | null>(null)
 const classSaving = ref(false)
-const classForm = reactive({ class_cd: '', class_nm: '', parent_cd: '' })
+const classForm = reactive({ class_cd: '', class_nm: '', parent_cd: '', useflg: '1' })
 
 watch(page, () => loadItems())
 watch(perPage, () => { page.value = 1; loadItems() })
@@ -349,7 +345,7 @@ async function handleDeleteClass(data: ItemClassNode) {
 async function loadItems() {
     loading.value = true
     try {
-        const params: { page: string; per_page: string; class_cd?: string; recursive?: string; search?: string } = {
+        const params: { page: string; per_page: string; class_cd?: string; recursive?: boolean; search?: string } = {
             page: String(page.value),
             per_page: String(perPage.value),
         }
@@ -358,7 +354,7 @@ async function loadItems() {
             params.search = searchText.value
         } else if (selectedClassCd.value) {
             params.class_cd = selectedClassCd.value
-            params.recursive = '1'
+            params.recursive = true
         }
         const res = await fetchItems(params)
         const data = res.data as ItemsPage
@@ -432,7 +428,7 @@ function handleCancelEditPrice(row: Record<string,unknown>) {
 async function openAddSupplier() {
     supplierDialogVisible.value = true; selectedSuppCd.value = ''
     if (!allSuppliers.value.length) {
-        try { const { fetchSuppliers } = await import('@/api/master'); const r = await fetchSuppliers(); allSuppliers.value = r.data || [] } catch { /**/ }
+        try { const { fetchSuppliersSimple } = await import('@/api/master'); const r = await fetchSuppliersSimple(); allSuppliers.value = r.data || [] } catch { /**/ }
     }
 }
 async function handleAddSupplier() {
@@ -471,14 +467,16 @@ async function handleRemoveSupplier(row: Record<string,unknown>) {
 async function openItemDialog(row?: ItemRecord) {
     if (row) {
         // 从树节点点击时只有 item_cd/item_nm，需补全字段
-        if (!row.class_cd) {
+        let rowData: ItemRecord = row
+        if (!rowData.class_cd) {
             try {
-                const params: Record<string,unknown> = { per_page: 1, search: row.item_cd }
+                const params: Record<string,unknown> = { per_page: 1, search: rowData.item_cd }
                 const r = await fetchItems(params as any)
-                const full = (r.data as ItemsPage).items?.find((i: ItemRecord) => i.item_cd === row.item_cd)
-                if (full) row = full
+                const full = (r.data as ItemsPage).items?.find((i: ItemRecord) => i.item_cd === rowData.item_cd)
+                if (full) rowData = full
             } catch { /* fallback to partial */ }
         }
+        row = rowData
         itemEditing.value = row
         itemForm.item_cd = row.item_cd || ''
         itemForm.item_nm = row.item_nm || ''
@@ -492,14 +490,16 @@ async function openItemDialog(row?: ItemRecord) {
         itemForm.oldperiod = (row as Record<string,unknown>).oldperiod
         itemForm.spec = (row as Record<string,unknown>).spec || ''
         itemForm.typflg = (row as Record<string,unknown>).typflg || '0'
+        itemForm.consume = (row as Record<string,unknown>).consume || '0'
         itemForm.pcrep = (row as Record<string,unknown>).pcrep || ''
         itemActiveTab.value = 'base'
+        const currentRow = row!
         import('@/api/master').then(m => {
-            m.fetchItemSuppliers(row!.item_cd).then(r => itemSuppliers.value = r.data || []).catch(() => itemSuppliers.value = [])
-            if (row.typflg === '0') {
-                m.fetchRelatedBoms(row!.item_cd).then(r => itemBoms.value = r.data || []).catch(() => itemBoms.value = [])
+            m.fetchItemSuppliers(currentRow.item_cd).then(r => itemSuppliers.value = r.data || []).catch(() => itemSuppliers.value = [])
+            if (currentRow.typflg === '0') {
+                m.fetchRelatedBoms(currentRow.item_cd).then(r => itemBoms.value = r.data || []).catch(() => itemBoms.value = [])
             } else {
-                m.fetchBom(row!.item_cd.toUpperCase()).then(r => itemBoms.value = (r.data && r.data.bomcd) ? [r.data] : []).catch(() => itemBoms.value = [])
+                m.fetchBom(currentRow.item_cd.toUpperCase()).then(r => itemBoms.value = (r.data && r.data.bomcd) ? [r.data] : []).catch(() => itemBoms.value = [])
             }
             m.fetchItemPrices(row!.item_cd).then(r => { itemPrices.value = (r.data || []).map(p => ({ ...p, _orig_busityp: p.busityp })) }).catch(() => itemPrices.value = [])
         })

@@ -34,27 +34,31 @@
         </el-card>
         <el-card shadow="never">
             <el-table :data="items" v-loading="loading" stripe size="small">
-                <el-table-column prop="gendate" label="时间" width="160" />
-                <el-table-column prop="billid" label="单据号" width="120" />
-                <el-table-column label="仓库" width="120">
+                <el-table-column label="时间" width="150">
+                    <template #default="{ row }">{{ formatDate(row.gendate as string) }}</template>
+                </el-table-column>
+                <el-table-column prop="billid" label="单据号" width="110" />
+                <el-table-column label="仓库" width="110">
                     <template #default="{ row }">{{ row.whnm || row.whcd }}</template>
                 </el-table-column>
                 <el-table-column prop="itemcd" label="物料编码" width="100" />
-                <el-table-column prop="item_nm" label="物料名称" min-width="140" show-overflow-tooltip />
-                <el-table-column label="变动量" width="100" align="right">
+                <el-table-column prop="item_nm" label="物料名称" min-width="120" show-overflow-tooltip />
+                <el-table-column label="变动量" width="80" align="right">
                     <template #default="{ row }">{{ row.itemqty }}</template>
                 </el-table-column>
-                <el-table-column label="方向" width="70" align="center">
+                <el-table-column label="方向" width="60" align="center">
                     <template #default="{ row }">
                         <el-tag :type="row.iotyp === '1' ? 'success' : 'danger'" size="small" effect="plain">
                             {{ row.iotyp === '1' ? '入库' : '出库' }}
                         </el-tag>
                     </template>
                 </el-table-column>
-                <el-table-column label="类型" width="80" align="center">
-                    <template #default="{ row }">{{ row.invtyp }}</template>
+                <el-table-column label="类型" width="110" align="center">
+                    <template #default="{ row }">{{ typeLabel(row) }}</template>
                 </el-table-column>
-                <el-table-column prop="storeqty" label="库存余量" width="100" align="right" />
+                <el-table-column label="库存余量" width="90" align="right">
+                    <template #default="{ row }">{{ row.storeqty }}</template>
+                </el-table-column>
             </el-table>
             <AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total"
                 style="margin-top:12px;justify-content:flex-end" />
@@ -66,9 +70,12 @@
 import { ref, reactive, onMounted } from 'vue'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { useListPage } from '@/composables/useListPage'
+import { useDict } from '@/composables/useDict'
 import { fetchStockMovements, fetchWarehouses, type StockMovement } from '@/api/warehouse'
 
 const { items, loading, page, perPage, total, onSearch } = useListPage<StockMovement>(fetchStockMovements)
+const { dictLabel: ivLabel } = useDict('IV')
+const { dictLabel: ovLabel } = useDict('OV')
 const search = reactive({ whcd: '', itemcd: '', start_date: '', end_date: '', billid: '' })
 const whOptions = ref<{ whcd: string; whnm: string }[]>([])
 
@@ -78,6 +85,27 @@ onMounted(async () => {
         whOptions.value = r.data || []
     } catch { /* ignore */ }
 })
+
+function formatDate(val: string | undefined): string {
+    if (!val) return '-'
+    return val.replace('T', ' ').substring(0, 19)
+}
+
+function typeLabel(row: StockMovement): string {
+    const invtyp = (row as any).invtyp || ''
+    const iotyp = (row as any).iotyp || ''
+    if (iotyp === '1') {
+        const label = ivLabel(invtyp)
+        return label !== invtyp ? label : ovLabel(invtyp)  // IV没命中试OV
+    }
+    if (iotyp === '2' || iotyp === '0') {
+        const label = ovLabel(invtyp)
+        return label !== invtyp ? label : ivLabel(invtyp)  // OV没命中试IV
+    }
+    // 未知iotyp：两个字典都试试
+    const label = ivLabel(invtyp)
+    return label !== invtyp ? label : ovLabel(invtyp)
+}
 
 function doSearch() {
     const p: Record<string, string> = {}

@@ -13,6 +13,8 @@
 - 若出现目录命名歧义，先在 `docs` 内补充映射说明，再开展代码迁移。
 
 ## 关键参考产物约定
+- **文档权威版本**: `docs/core/` 为唯一权威来源。`docs/myitsm/`、`CJdocs/` 为工作副本。
+- **功能完成后必须**: 同步更新 `docs/core/` 中的对应文档，不能只在工作副本修改。
 - 核心文档统一入口：`docs/core/CORE_DOCS_INDEX.md`（先看索引，再按索引打开原文档）。
 - 涉及数据库表结构、字段语义、字段说明、口径对齐时，优先参考 `docs/core/数据库字典_精简后_最终版.md`。
 - 涉及代码重构优化方案、业务模型改进时，优先参考 `docs/core/PB_TO_PYTHON_OPTIMIZATION_REQUIREMENTS.md`。
@@ -25,7 +27,7 @@
    `docs/core/ITSM重构项目需求设计文档.md`（确认 PB 源码分析结论、P0-P4 优化方案与重构路线图）。
 3. `docs/core/PB_TO_PYTHON_OPTIMIZATION_REQUIREMENTS.md`（**确认优化需求**：业务流程改进、数据模型优化方案，如客户生命周期、资产属性等）。
 4. `docs/core/系统功能对比分析与扩展规划.md`（**确认功能范围**：已有功能映射、缺失功能优先级分类、Tier-1/2/3 扩展规划，避免遗漏已确认需求）。
-5. `docs/core/数据库字典_精简后_最终版.md`（确认表结构、字段语义与口径）。
+5. `docs/core/数据库字典_PostgreSQL当前版.md`（确认表结构、字段语义与口径）。
 6. `docs/core/PB_TO_PYTHON_MODULE_MAPPING.csv`（确认模块边界与责任归属）。
 7. `docs/core/PB_TO_PYTHON_SQL_MAPPING.csv`（确认关键 SQL 映射与一致性校验口径）。
 8. `docs/core/PB_TO_PYTHON_DOD_CHECKLIST.md` 与 `docs/core/PB_TO_PYTHON_RELEASE_ROLLBACK_CHECKLIST.md`（确认交付验收与回滚要求）。

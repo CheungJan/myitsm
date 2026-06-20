@@ -33,6 +33,6 @@ export function getQcEidsByRefbillid(refbillid: string) {
 }
 
 // 批量质检录入明细
-export interface QcDetailItem { itemcd: string; qcqty: number; qcstatus?: string; inqty?: number; itemtyp?: string; prddate?: string; fault_desc?: string; remark?: string; lineno?: number }
+export interface QcDetailItem { itemcd: string; qcqty: number; qcstatus?: string; inqty?: number; itemtyp?: string; prddate?: string; fault_desc?: string; remark?: string; lineno?: number; prod_seq?: number }
 export interface QcEidDetailItem extends QcDetailItem { eid: string; manuf_seq?: string }
 export interface QcBatchCreate { refbillid: string; optyp: string; itemcd: string; qcstatus: string; memo?: string; details?: QcDetailItem[]; eid_details?: QcEidDetailItem[] }

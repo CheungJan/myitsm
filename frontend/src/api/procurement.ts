@@ -81,6 +81,11 @@ export function fetchSettleableItems(rgstbillid:string){
     return request.get<never,{data:ProcRecord[]}>('/procurement/orders/'+rgstbillid+'/settleable-items')
 }
 
+export interface SettleableSupplier { suppliercd: string; supp_nm: string; order_count: number }
+export function fetchSettleableSuppliers(payType?: string){
+    return request.get<never,{data:SettleableSupplier[]}>('/procurement/settlements/settleable-suppliers', { params: payType ? { pay_type: payType } : {} })
+}
+
 /** 查询某供应商某月的入库订单汇总（月结用） */
 export function fetchMonthlyReceiving(suppliercd:string,period:string){
     return request.get<never,{data:{rgstbillid:string;whcd:string;indate:string}[]}>('/procurement/orders/monthly-receiving',{params:{suppliercd,period}})

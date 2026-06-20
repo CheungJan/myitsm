@@ -76,19 +76,19 @@
         highlight-current-row
         @row-click="handleRowClick"
       >
-        <el-table-column prop="pcbillid" label="退货单号" width="120" />
-        <el-table-column prop="ref_rgstbillid" label="来源订单" width="100" />
-        <el-table-column label="退货原因" width="110">
+        <el-table-column prop="pcbillid" label="退货单号" width="110" />
+        <el-table-column prop="ref_rgstbillid" label="来源订单" width="95" />
+        <el-table-column label="退货原因" width="100">
           <template #default="{ row }">
             {{ reasonMap[row.return_reason as string] || row.return_reason || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="退货金额" width="110" align="right">
+        <el-table-column label="退货金额" width="95" align="right">
           <template #default="{ row }">
             {{ row.pcamt != null ? Number(row.pcamt).toLocaleString() : '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="审批" width="80">
+        <el-table-column label="审批" width="75">
           <template #default="{ row }">
             <el-tag
               :type="row.auditflg === '2' ? 'success' : row.auditflg === 'V' ? 'danger' : 'warning'"
@@ -98,19 +98,38 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="退货日期" width="110">
+        <el-table-column label="出库状态" width="90">
+          <template #default="{ row }">
+            <template v-if="row.linked_out_id">
+              <el-tooltip :content="row.linked_out_id" placement="top">
+                <el-tag
+                  :type="row.linked_out_auditflg === '2' ? 'success' : row.linked_out_auditflg === '9' ? 'danger' : 'warning'"
+                  size="small"
+                >
+                  {{ row.linked_out_auditflg === '2' ? '已出库' : row.linked_out_auditflg === '9' ? '已退回' : '待出库' }}
+                </el-tag>
+              </el-tooltip>
+            </template>
+            <span v-else style="color:#c0c4cc;font-size:12px">未生成</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="退货日期" width="100">
           <template #default="{ row }">
             {{ formatDate(row.pcdate || row.gendate) }}
           </template>
         </el-table-column>
-        <el-table-column prop="memo" label="备注" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="whcd" label="仓库" width="70" />
-        <el-table-column label="操作员" width="80">
+        <el-table-column prop="memo" label="备注" min-width="80" show-overflow-tooltip />
+        <el-table-column label="仓库" width="120">
+          <template #default="{ row }">
+            {{ getWarehouseNames(row.whcd as string) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作员" width="100">
           <template #default="{ row }">
             {{ userName(row.opercd) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="90" fixed="right">
           <template #default="{ row }">
             <template v-if="row.auditflg !== 'V'">
               <el-button
@@ -179,7 +198,7 @@
             {{ detail.pcamt != null ? Number(detail.pcamt).toLocaleString() : '-' }}
           </el-descriptions-item>
           <el-descriptions-item label="退货日期">
-            {{ formatDate(detail.pcdate || detail.gendate) }}
+            {{ formatDate((detail.pcdate || detail.gendate) as string) }}
           </el-descriptions-item>
           <el-descriptions-item label="仓库">{{ getWarehouseNames(detail.whcd as string) }}</el-descriptions-item>
           <el-descriptions-item label="审批人">{{ detail.auditman || '-' }}</el-descriptions-item>
@@ -313,12 +332,12 @@
         <el-table :data="editDetails" size="small" stripe>
           <el-table-column prop="itemcd" label="物料" width="80"/>
           <el-table-column label="退货数量" width="130">
-            <template #default="{ row, $index }">
+            <template #default="{ $index }">
               <el-input-number v-model="editDetails[$index].rpcqty" :min="1" size="small" style="width:110px" controls-position="right"/>
             </template>
           </el-table-column>
           <el-table-column label="退货单价" width="130">
-            <template #default="{ row, $index }">
+            <template #default="{ $index }">
               <el-input-number v-model="editDetails[$index].return_price" :min="0" :precision="2" size="small" style="width:110px" controls-position="right"/>
             </template>
           </el-table-column>
@@ -326,7 +345,7 @@
             <template #default="{ $index }">{{ ((editDetails[$index].rpcqty||0) * (editDetails[$index].return_price||0)).toFixed(2) }}</template>
           </el-table-column>
           <el-table-column label="行级原因" width="140">
-            <template #default="{ row, $index }">
+            <template #default="{ $index }">
               <el-input v-model="editDetails[$index].line_reason" size="small" placeholder="可选" maxlength="100"/>
             </template>
           </el-table-column>
@@ -455,7 +474,7 @@
                 </template>
               </el-table-column>
               <el-table-column label="退货单价" width="120">
-                <template #default="{ row, $index }">
+                <template #default="{ $index }">
                   <el-input-number
                     :model-value="createDetails[$index]?.return_price"
                     @update:model-value="
@@ -583,8 +602,11 @@ function doSearch() {
     const p: Record<string, string> = {}
     if (searchOrder.value) p.ref_rgstbillid = searchOrder.value
     if (searchReason.value) p.return_reason = searchReason.value
-    if (searchAuditflg.value) p.auditflg = searchAuditflg.value
-    if (searchShowVoided.value) p.show_voided = 'true'
+    if (searchAuditflg.value === 'V' || searchShowVoided.value) {
+        p.show_voided = 'true'
+    } else if (searchAuditflg.value) {
+        p.auditflg = searchAuditflg.value
+    }
     onSearch(p)
 }
 

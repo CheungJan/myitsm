@@ -11,6 +11,7 @@ class InventorySnapshotQuery(BaseModel):
     whcd: str | None = Field(default=None, description="仓库编码")
     itemtyp: str | None = Field(default=None, description="物料类型")
     itemcd: str | None = Field(default=None, description="物料编码")
+    alert_only: str | None = Field(default=None, description="仅看预警: 1=是")
     page: int = Field(default=1, ge=1, description="页码")
     per_page: int = Field(default=20, ge=1, le=100, description="每页数量")
 

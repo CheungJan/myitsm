@@ -382,6 +382,14 @@ def void_settlement(pcbillid: str):  # type: ignore[no-untyped-def]
     return success_response(data=result, message="已作废")
 
 
+@procurement_bp.get("/settlements/settleable-suppliers")
+@login_required
+def list_settleable_suppliers():  # type: ignore[no-untyped-def]
+    """有可结算订单的供应商列表。pay_type=COD/MON 过滤已入库，其他不过滤。"""
+    pay_type = request.args.get("pay_type", "COD").strip().upper()
+    return success_response(data=PurchaseBillService.list_settleable_suppliers(pay_type))
+
+
 @procurement_bp.get("/orders/<rgstbillid>/settleable-items")
 @login_required
 def get_settleable_items(rgstbillid: str):  # type: ignore[no-untyped-def]

@@ -19,6 +19,7 @@
                             </el-select>
                         </div>
                         <el-button type="primary" size="small" @click="doSummarySearch">查询</el-button>
+                        <el-button size="small" @click="exportCsv('/warehouse/reports/inventory-summary', summarySearchParams, '收发存汇总')">导出 CSV</el-button>
                     </div>
                     <el-table :data="summaryItems" v-loading="summaryLoading" stripe size="small" style="margin-top:12px">
                         <el-table-column label="仓库" width="120">
@@ -52,6 +53,7 @@
                             </el-select>
                         </div>
                         <el-button type="primary" size="small" @click="doDailySearch">查询</el-button>
+                        <el-button size="small" @click="exportCsv('/warehouse/reports/daily-snapshot', dailySearchParams, '库存日报')">导出 CSV</el-button>
                     </div>
                     <el-table :data="dailyItems" v-loading="dailyLoading" stripe size="small" style="margin-top:12px">
                         <el-table-column label="仓库" width="120">
@@ -79,6 +81,7 @@
                             </el-select>
                         </div>
                         <el-button type="primary" size="small" @click="doAgingSearch">查询</el-button>
+                        <el-button size="small" @click="exportCsv('/warehouse/reports/aging', agingSearchParams, '库龄分析')">导出 CSV</el-button>
                     </div>
                     <el-table :data="agingItems" v-loading="agingLoading" stripe size="small" style="margin-top:12px">
                         <el-table-column label="仓库" width="120">
@@ -112,6 +115,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import AppPagination from '@/components/common/AppPagination.vue'
+import request from '@/api/request'
 import { fetchInventorySummary, fetchDailySnapshot, fetchInventoryAging, fetchWarehouses } from '@/api/warehouse'
 
 const activeTab = ref('summary')
@@ -221,6 +225,18 @@ onMounted(async () => {
     } catch { /* ignore */ }
     loadSummary()
 })
+async function exportCsv(url: string, params: Record<string,string>, name: string) {
+    try {
+        const r = await request.get(url, { params: { ...params, per_page: '99999' } } as any)
+        const items = (r as any)?.data?.items || []
+        if (!items.length) { ElMessage.warning('暂无数据'); return }
+        const XLSX = await import('xlsx')
+        const ws = XLSX.utils.json_to_sheet(items)
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, name)
+        XLSX.writeFile(wb, `${name}_${new Date().toISOString().slice(0,10)}.xlsx`)
+        ElMessage.success(`导出 ${items.length} 条`)
+    } catch { ElMessage.error('导出失败') }
+}
 </script>
 
 <style scoped>

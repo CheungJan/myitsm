@@ -26,6 +26,7 @@ class BomUpdateRequest(BaseModel):
 
     bomnm: str | None = Field(None, max_length=50, description="BOM名称")
     useflg: str | None = Field(None, max_length=1, description="有效标志")
+    redundancy_ratio: Decimal | None = Field(None, ge=0, le=1, description="补料冗余比例（0-1，0.2表示20%）")
 
 
 class BomDtCreateRequest(BaseModel):

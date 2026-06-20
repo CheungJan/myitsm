@@ -3031,8 +3031,9 @@
 | 18 | ref_rgstbillid | VARCHAR(30) |  | 来源入库单号 |
 | 19 | replenish_status | VARCHAR(10) |  | 补料状态 |
 | 20 | replenish_ov_billid | VARCHAR(12) |  | 补料出库单号 |
-| 21 | created_at | TIMESTAMP | NOT NULL |  |
-| 22 | updated_at | TIMESTAMP | NOT NULL |  |
+| 21 | prod_seq | INTEGER |  | 产品序号（FQC树形对应） |
+| 22 | created_at | TIMESTAMP | NOT NULL |  |
+| 23 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 3. tqc11_resulteid
 
@@ -3060,8 +3061,9 @@
 | 20 | ref_rgstbillid | VARCHAR(30) |  | 来源入库单号 |
 | 21 | replenish_status | VARCHAR(10) |  | 补料状态 |
 | 22 | replenish_ov_billid | VARCHAR(12) |  | 补料出库单号 |
-| 23 | created_at | TIMESTAMP | NOT NULL |  |
-| 24 | updated_at | TIMESTAMP | NOT NULL |  |
+| 23 | prod_seq | INTEGER |  | 产品序号（FQC树形对应） |
+| 24 | created_at | TIMESTAMP | NOT NULL |  |
+| 25 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
 ### 调拨 (ttx) — 1 张表

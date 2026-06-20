@@ -67,6 +67,23 @@ def create_bom():  # type: ignore[no-untyped-def]
     return success_response(data=BomService.create_bom(req.model_dump()), code=201)
 
 
+@bom_bp.get("/<bomcd>/expand")
+@login_required
+def expand_bom(bomcd: str):  # type: ignore[no-untyped-def]
+    """展开 BOM，返回物料需求明细及库存余量（供 OV=8 生产出库 BOM 导入弹窗）。
+
+    Query params:
+        qty  - 生产数量（默认 1）
+        whcd - 出库仓库编码（传入则返回 stock_qty/enough 字段）
+    """
+    qty = request.args.get("qty", 1, type=int)
+    whcd = request.args.get("whcd") or None
+    result = BomService.expand(bomcd, qty=qty, whcd=whcd)
+    if result is None:
+        return error_response("BOM不存在", 404)
+    return success_response(data=result)
+
+
 @bom_bp.get("/<bomcd>")
 @login_required
 def get_bom(bomcd: str):  # type: ignore[no-untyped-def]

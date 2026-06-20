@@ -166,13 +166,19 @@ class InventoryDetailDt(BaseModel):
 
 
 class Label(BaseModel):
-    """标签管理（TMM40_LABEL）。"""
+    """标签库存池（TMM40_LABEL）。
+
+    预录入的设备标签号（LABELID），激活后在 TMM43_EID 建立 EID 记录。
+    useflg: '1'=未激活可用, '0'=已激活
+    classcd: 物料中类编码（TMM11_ITEMCLASS），限定该标签适用的设备类型
+    """
 
     __tablename__ = "tmm40_label"
+    __table_args__ = (db.PrimaryKeyConstraint("labelid", "classcd"),)
 
-    labelid = db.Column(db.String(20), primary_key=True, comment="标签ID")
-    classcd = db.Column(db.String(10), comment="分类编码")
+    labelid = db.Column(db.String(13), nullable=False, comment="标签号（即激活后的EID）")
+    classcd = db.Column(db.String(6), nullable=False, comment="物料中类编码")
     opercd = db.Column(db.String(6), comment="操作员")
     gendate = db.Column(db.DateTime, comment="创建日期")
     upddate = db.Column(db.DateTime, comment="更新日期")
-    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志：1=未激活，0=已激活")

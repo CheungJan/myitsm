@@ -54,7 +54,7 @@
                         <template #default="{ row }">{{ stLabel(row.sflg) }}</template>
                     </el-table-column>
                     <el-table-column prop="qcflg" label="质检" width="80">
-                        <template #default="{ row }">{{ codeMaps.QS?.[row.qcflg] || row.qcflg }}</template>
+                        <template #default="{ row }">{{ codeMaps.QC?.[row.qcflg] || row.qcflg }}</template>
                     </el-table-column>
                     <el-table-column label="仓库" width="100">
                         <template #default="{ row }">{{ (row as Record<string,unknown>).wh_nm || row.whcd || '-' }}</template>
@@ -133,8 +133,8 @@
                 </el-table-column>
                 <el-table-column label="质检" width="100">
                     <template #default="{ row }">
-                        <template v-if="row.type === 'i'">{{ codeMaps.QS?.[row.qcflg] || row.qcflg }}</template>
-                        <template v-else>{{ codeMaps.QS?.[row.qcflg] || row.qcflg }}→{{ codeMaps.QS?.[row.n_qcflg] || row.n_qcflg }}</template>
+                        <template v-if="row.type === 'i'">{{ codeMaps.QC?.[row.qcflg] || row.qcflg }}</template>
+                        <template v-else>{{ codeMaps.QC?.[row.qcflg] || row.qcflg }}→{{ codeMaps.QC?.[row.n_qcflg] || row.n_qcflg }}</template>
                     </template>
                 </el-table-column>
                 <el-table-column label="仓库" width="100">
@@ -195,27 +195,27 @@ const etypOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const sflgOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const qcflgOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const codeMaps = ref<Record<string, Record<string, string>>>({})
-const { dictLabel: stLabel } = useDict('ST')
+const { dictLabel: stLabel } = useDict('ES')
 
 watch(page, () => loadData())
 watch(perPage, () => { page.value = 1; loadData() })
 watch(treeFilterText, (v) => treeRef.value?.filter(v))
 onMounted(async () => {
     await loadTree()
-    const [et, es, qs, no, iu, od] = await Promise.all([
-        fetchSyscodes('ET'), fetchSyscodes('ES'), fetchSyscodes('QS'),
+    const [et, es, qc, no, iu, od] = await Promise.all([
+        fetchSyscodes('ET'), fetchSyscodes('ES'), fetchSyscodes('QC'),
         fetchSyscodes('NO'), fetchSyscodes('IU'), fetchSyscodes('OD'),
     ])
     etypOptions.value = et.data || []
     sflgOptions.value = es.data || []
-    qcflgOptions.value = qs.data || []
+    qcflgOptions.value = qc.data || []
     noOptions.value = no.data || []
     iuOptions.value = iu.data || []
     odOptions.value = od.data || []
     codeMaps.value = {
         ET: Object.fromEntries((et.data||[]).map(t => [t.code_cd, t.code_nm])),
         ES: Object.fromEntries((es.data||[]).map(t => [t.code_cd, t.code_nm])),
-        QS: Object.fromEntries((qs.data||[]).map(t => [t.code_cd, t.code_nm])),
+        QC: Object.fromEntries((qc.data||[]).map(t => [t.code_cd, t.code_nm])),
         NO: Object.fromEntries((no.data||[]).map(t => [t.code_cd, t.code_nm])),
         IU: Object.fromEntries((iu.data||[]).map(t => [t.code_cd, t.code_nm])),
         OD: Object.fromEntries((od.data||[]).map(t => [t.code_cd, t.code_nm])),

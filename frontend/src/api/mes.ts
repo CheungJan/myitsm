@@ -53,5 +53,9 @@ export function replaceWorkOrderAsset(woId: string, body: { old_eid?: string; ne
 }
 /** 查询工单物料更换历史 */
 export function fetchReplaceRecords(woId: string) {
-    return request.get<never, { data: Array<{ wo_id: string; old_eid: string; new_eid: string; itemcd: string; old_batch_no: string; new_batch_no: string; memo: string; replace_date: string; operator_cd: string; operator_name: string }> }>(`/mes/work-orders/${woId}/replace-records`)
+    return request.get<never, { data: Array<{ id?: number; wo_id: string; old_eid: string; new_eid: string; itemcd: string; old_batch_no: string; new_batch_no: string; memo: string; replace_date: string; operator_cd: string; operator_name: string }> }>(`/mes/work-orders/${woId}/replace-records`)
+}
+/** 查询工单 FQC 不良品关联的、且已审核的补料明细 */
+export function fetchAvailableReplenish(woId: string) {
+    return request.get<never, { data: { items: Array<{ outbillid: string; itemcd: string; eid: string | null; prddate: string | null; itemtyp: string; typ: 'eid' | 'batch' }>; audited_billids: string[]; pending_billids: string[] } }>(`/mes/work-orders/${woId}/replenish-available`)
 }

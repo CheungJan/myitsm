@@ -83,7 +83,7 @@
         @row-click="handleRowClick"
       >
         <el-table-column prop="pcbillid" label="结算单号" width="120" />
-        <el-table-column label="供应商" width="140">
+        <el-table-column label="供应商" width="160">
           <template #default="{ row }">
             {{ getSupplierName(row.suppliercd) }}
           </template>
@@ -494,12 +494,12 @@
             v-model="createForm.suppliercd"
             style="width:100%"
             filterable
-            placeholder="选择供应商"
+            placeholder="选择供应商（仅显示有待结算订单的）"
           >
             <el-option
-              v-for="s in supplierOptions"
+              v-for="s in createSupplierOptions"
               :key="s.supp_cd"
-              :label="s.supp_nm"
+              :label="`${s.supp_nm}`"
               :value="s.supp_cd"
             />
           </el-select>
@@ -749,6 +749,7 @@ import {
 import type { SettlementRecord, SettlementDetail, PayableRecord } from '@/api/procurement'
 import { useDict } from '@/composables/useDict'
 import { fetchSuppliersSimple, fetchWarehouses } from '@/api/master'
+import { fetchSettleableSuppliers } from '@/api/procurement'
 
 // ---- 字典映射 ----
 const { dictMap: payTypeMap } = useDict('PYMT')
@@ -1098,7 +1099,7 @@ function onQuickOrderSelect(oid: string) {
     if (!table) return
     table.clearSelection()
     if (!oid) return
-    settleableItems.value.forEach((row, i) => {
+    settleableItems.value.forEach((row) => {
         if (row.ref_rgstbillid === oid) table.toggleRowSelection(row, true)
     })
 }
@@ -1165,6 +1166,8 @@ function checkPayTypeConflict() {
 
 // 切换付款方式时重新检测冲突
 watch(() => createForm.pay_type, () => {
+    loadCreateSuppliers()
+    createForm.suppliercd = ''
     if (selectedSettleableRows.value.length > 0) {
         checkPayTypeConflict()
     }
@@ -1373,8 +1376,19 @@ watch(
     }
 )
 
+const createSupplierOptions = ref<{ supp_cd: string; supp_nm: string }[]>([])
+
+async function loadCreateSuppliers() {
+    const payType = createForm.pay_type || 'COD'
+    try {
+        const r = await fetchSettleableSuppliers(payType)
+        createSupplierOptions.value = (r.data || []).map(s => ({ supp_cd: s.suppliercd, supp_nm: s.supp_nm }))
+    } catch { createSupplierOptions.value = [] }
+}
+
 function openCreate() {
     creating.value = true
+    loadCreateSuppliers()
 }
 
 function resetCreateForm() {
