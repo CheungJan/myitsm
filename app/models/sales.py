@@ -79,6 +79,33 @@ class PlanCust(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# 呼出单 / 服务计划
+# ---------------------------------------------------------------------------
+
+
+class PlanServe(BaseModel):
+    """预计划呼出单 / 服务计划（PLAN_SERVE）。
+
+    话务台针对预计划呼出客户、确认安装意向并收集反馈意见的记录单，
+    是实施确认的前置依赖。对应 PB sale.pbl 中 ``INSERT INTO PLAN_SERVE`` 逻辑。
+    """
+
+    __tablename__ = "plan_serve"
+
+    dtlid = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="明细ID")
+    planno = db.Column(db.String(10), nullable=False, comment="关联预计划单号")
+    plantyp = db.Column(db.String(2), comment="计划类型")
+    servetyp = db.Column(db.String(2), comment="服务类型（0客户确认/1预计划呼出/2实施任务）")
+    serve_task = db.Column(db.String(200), comment="服务任务")
+    serve_back = db.Column(db.String(200), comment="客户反馈/呼出结果")
+    serve_mark = db.Column(db.String(200), comment="服务备注")
+    commmode = db.Column(db.String(4), comment="通讯方式")
+    status = db.Column(db.String(2), default="00", comment="状态（00待呼出/01已呼出/09作废）")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    genercd = db.Column(db.String(6), comment="操作员")
+
+
+# ---------------------------------------------------------------------------
 # 销售单据
 # ---------------------------------------------------------------------------
 

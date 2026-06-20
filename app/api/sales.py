@@ -117,6 +117,28 @@ def void_plan(planno: str):  # type: ignore[no-untyped-def]
     return success_response(data=result, message="已作废")
 
 
+@sales_bp.post("/plans/<planno>/implement")
+@login_required
+def implement_plan(planno: str):  # type: ignore[no-untyped-def]
+    """实施确认：按 plantyp 生成下游 ITSM 单据。"""
+    user_cd: str = g.current_user
+    result = PlanCustService.implement(planno, operator=user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "实施确认失败")), code=400)
+    return success_response(data=result, message="实施确认成功")
+
+
+@sales_bp.post("/plans/<planno>/complete")
+@login_required
+def complete_plan(planno: str):  # type: ignore[no-untyped-def]
+    """完成预计划（设备出库后调用）。"""
+    user_cd: str = g.current_user
+    result = PlanCustService.complete(planno, operator=user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "完成失败")), code=400)
+    return success_response(data=result, message="已完成")
+
+
 # ---- 销售单据 ----
 
 

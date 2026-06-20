@@ -133,6 +133,7 @@ from app.models.procurement import (
 )
 from app.models.sales import (
     PlanCust,
+    PlanServe,
     SalesBill,
     SalesExtend,
     SalesExtendDt,
@@ -293,6 +294,7 @@ __all__ = [
     "PurchaseCheckInDt",
     # 销售管理
     "PlanCust",
+    "PlanServe",
     "SalesBill",
     "SalesExtend",
     "SalesExtendDt",

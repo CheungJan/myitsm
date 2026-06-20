@@ -55,12 +55,17 @@ def _enrich_class_nm(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 class PlanStatus(str, Enum):
-    """预计划状态码（plan_status 字段，2位码）。"""
+    """预计划状态码（对齐 PB plan_cust.status 字段，2位码）。
 
-    DRAFT = "00"  # 草稿
-    SUBMITTED = "01"  # 已提交
-    IMPLEMENTING = "02"  # 实施中
-    COMPLETED = "03"  # 已完成
+    PB 原值分布：00=计划中 01=已确认 02=实施中 04=已完成 09=作废。
+    plan_cust.plan_status 在 PB 中存储呼出结果(N/Y/O)，我们统一简化：
+    plan_status 即工作流状态，呼出结果放 PLAN_SERVE.serve_back。
+    """
+
+    PLANNING = "00"  # 计划中（初始）
+    CONFIRMED = "01"  # 已确认（呼出完成）
+    IMPLEMENTING = "02"  # 实施中（实施计划已制定）
+    COMPLETED = "04"  # 已完成（设备出库 + 客户转正）
     VOIDED = "09"  # 已作废
 
     @classmethod
@@ -73,21 +78,21 @@ class PlanStatus(str, Enum):
     @property
     def display_name(self) -> str:
         names: dict[str, str] = {
-            "00": "草稿",
-            "01": "已提交",
+            "00": "计划中",
+            "01": "已确认",
             "02": "实施中",
-            "03": "已完成",
+            "04": "已完成",
             "09": "已作废",
         }
         return names.get(self.value, self.value)
 
 
 class PlanStatusMachine:
-    """预计划状态机 —— 复用统一 StateMachine 模式。"""
+    """预计划状态机 —— 对齐 PB 实际状态流转。"""
 
     TRANSITIONS: dict[PlanStatus, list[PlanStatus]] = {
-        PlanStatus.DRAFT: [PlanStatus.SUBMITTED, PlanStatus.VOIDED],
-        PlanStatus.SUBMITTED: [PlanStatus.IMPLEMENTING, PlanStatus.VOIDED],
+        PlanStatus.PLANNING: [PlanStatus.CONFIRMED, PlanStatus.VOIDED],
+        PlanStatus.CONFIRMED: [PlanStatus.IMPLEMENTING, PlanStatus.VOIDED],
         PlanStatus.IMPLEMENTING: [PlanStatus.COMPLETED, PlanStatus.VOIDED],
     }
     TERMINAL_STATES: set[PlanStatus] = {
@@ -286,7 +291,7 @@ def _cascade_void_downstream(plantyp: str, downstream_id: str, operator: str) ->
 
 
 class PlanCustService:
-    """预计划服务 —— 含下游 ITSM 单据自动生成 + 客户生命周期。"""
+    """预计划服务 —— 按 PB 流程编排：计划中→呼出确认→实施生成下游→出库完成。"""
 
     @staticmethod
     def get(planno: str) -> dict[str, Any] | None:
@@ -319,15 +324,14 @@ class PlanCustService:
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
-        """创建预计划。
+        """创建预计划（plan_status=00 计划中）。
 
-        包含三道业务编排：
-        1. 磁卡号唯一性检查
-        2. 客户生命周期：craft_temp_customer（如果提供了客户信息）
-        3. plantyp 路由 → 自动生成下游 ITSM 单据草稿
-        事务保护：任一步骤失败，整体回滚。
+        仅做两件事：
+        1. 磁卡号唯一性检查 + 创建预计划记录
+        2. 客户生命周期：创建 TEMP 客户（如果提供了客户信息）
+        下游 ITSM 单据在 implement() 阶段才生成。
         """
-        # --- 0. 磁卡号唯一性检查 ---
+        # 磁卡号唯一性检查
         custcard = data.get("custcard")
         if custcard:
             existing_customer = CustomerService.check_card_exists(custcard)
@@ -346,12 +350,11 @@ class PlanCustService:
                     "error": f"磁卡号 {custcard} 已存在于预计划 {existing_plan.planno}",
                 }
 
-        # --- 1. 创建预计划记录 ---
+        # 创建预计划（plan_status=00 计划中）
         record = PlanCustRepository.create(data, creator)
 
-        # --- 2. 客户生命周期：创建 TEMP 客户 ---
+        # 客户生命周期：创建 TEMP 客户
         custcd = data.get("custcd")
-        downstream_id = None
         if custcd:
             try:
                 CustomerService.create_temp_customer(
@@ -369,31 +372,104 @@ class PlanCustService:
                 )
             except Exception as exc:
                 db.session.rollback()
-                return {
-                    "success": False,
-                    "error": f"创建临时客户失败: {exc}",
-                }
-
-        # --- 3. plantyp 路由 → 生成下游 ITSM 单据 ---
-        plantyp = data.get("plantyp")
-        if plantyp and plantyp in _PLANTYP_SERVICE_MAP:
-            try:
-                payload = _build_downstream_payload(record, plantyp, creator)
-                ds_result = _call_downstream_service(plantyp, payload, creator)
-                downstream_id = ds_result.get("id")
-            except Exception as exc:
-                db.session.rollback()
-                return {
-                    "success": False,
-                    "error": f"创建下游单据失败: {exc}",
-                }
+                return {"success": False, "error": f"创建临时客户失败: {exc}"}
 
         db.session.commit()
-
         result = record.to_dict()
         result["success"] = True
-        result["downstream_id"] = downstream_id
         return result
+
+    @staticmethod
+    def implement(
+        planno: str,
+        operator: str,
+        remark: str | None = None,
+    ) -> dict[str, object]:
+        """实施确认：按 plantyp 生成下游 ITSM 单据 + 写押金 + 客户 TEMP→PENDING。
+
+        前置条件：plan_status 必须为 '01'（已确认/呼出完成）。
+        幂等校验：已生成过则拒绝。
+        """
+        record = PlanCustRepository.get_by_id(planno)
+        if record is None:
+            return {"success": False, "error": "预计划不存在"}
+
+        current = record.plan_status or "00"
+        if current != "01":
+            return {
+                "success": False,
+                "error": f"预计划状态为 {current}，需要 01（已确认）才能实施",
+            }
+
+        plantyp = record.plantyp
+        if not plantyp or plantyp not in _PLANTYP_SERVICE_MAP:
+            return {"success": False, "error": f"未知的计划类型 plantyp={plantyp}"}
+
+        # 幂等检查
+        if record.imple_status:
+            return {
+                "success": False,
+                "error": f"下游单据已生成（{record.imple_status}），不可重复实施",
+            }
+
+        # plantyp 路由 → 生成下游 ITSM 单据
+        downstream_id = None
+        try:
+            payload = _build_downstream_payload(record, plantyp, operator)
+            ds_result = _call_downstream_service(plantyp, payload, operator)
+            downstream_id = ds_result.get("id")
+        except Exception as exc:
+            db.session.rollback()
+            return {"success": False, "error": f"创建下游单据失败: {exc}"}
+
+        # 回写下游单据 ID 到预计划
+        record.imple_status = downstream_id
+
+        # 状态流转：01（已确认）→ 02（实施中）
+        record.plan_status = "02"
+
+        # 客户：TEMP → PENDING
+        if record.custcd:
+            CustomerService.promote_to_pending(record.custcd)
+
+        db.session.commit()
+        return {
+            "success": True,
+            "planno": planno,
+            "to_status": "02",
+            "downstream_id": downstream_id,
+        }
+
+    @staticmethod
+    def complete(
+        planno: str,
+        operator: str,
+        remark: str | None = None,
+    ) -> dict[str, object]:
+        """完成预计划：设备出库后调用，客户 PENDING→ACTIVE。
+
+        前置条件：plan_status='02'（实施中）。
+        """
+        record = PlanCustRepository.get_by_id(planno)
+        if record is None:
+            return {"success": False, "error": "预计划不存在"}
+
+        current = record.plan_status or "00"
+        if current != "02":
+            return {
+                "success": False,
+                "error": f"预计划状态为 {current}，需要 02（实施中）才能完成",
+            }
+
+        # 状态：02 → 04
+        record.plan_status = "04"
+
+        # 客户：PENDING → ACTIVE
+        if record.custcd:
+            CustomerService.promote_to_active(record.custcd, operator)
+
+        db.session.commit()
+        return {"success": True, "planno": planno, "to_status": "04"}
 
     @staticmethod
     def update(planno: str, data: dict[str, Any]) -> dict[str, Any] | None:
@@ -436,7 +512,13 @@ class PlanCustService:
         operator: str,
         remark: str | None = None,
     ) -> dict[str, object]:
-        """预计划状态流转 —— 含状态机校验 + 客户生命周期推进。"""
+        """预计划状态流转 —— 含状态机校验 + 客户生命周期推进。
+
+        业务动作绑定：
+        - 00→01（呼出完成）：客户 TEMP → PENDING
+        - 02→04（设备出库）：客户 PENDING → ACTIVE
+        其他流转仅校验状态机规则。
+        """
         record = PlanCustRepository.get_by_id(planno)
         if record is None:
             return {"success": False, "error": "预计划不存在"}
@@ -448,17 +530,23 @@ class PlanCustService:
         if not validation.get("valid"):
             return {"success": False, "error": str(validation.get("error", "状态流转校验失败"))}
 
-        # ---- 业务推进 ----
-        # 提交(01)：客户 TEMP → PENDING
+        # 业务推进
+        # 01（已确认/呼出完成）：客户 TEMP → PENDING
         if to_status == "01" and record.custcd:
             CustomerService.promote_to_pending(record.custcd)
 
-        # 完成(03)：客户 PENDING → ACTIVE
-        if to_status == "03" and record.custcd:
+        # 04（已完成/设备出库）：客户 PENDING → ACTIVE
+        if to_status == "04" and record.custcd:
             CustomerService.promote_to_active(record.custcd, operator)
 
-        # 更新状态
         record.plan_status = to_status
+        db.session.commit()
+        return {
+            "success": True,
+            "from_status": from_status,
+            "to_status": to_status,
+            "allowed_next": PlanStatusMachine.get_allowed_transitions(to_status),
+        }
         db.session.commit()
 
         return {
@@ -489,7 +577,7 @@ class PlanCustService:
         current_status = record.plan_status or "00"
 
         # 终态不可作废
-        if current_status == "03":
+        if current_status == "04":
             return {"success": False, "error": "已完成的预计划不可作废"}
         if current_status == "09":
             return {"success": False, "error": "预计划已作废"}
