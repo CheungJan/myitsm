@@ -579,14 +579,6 @@ class PlanCustService:
             "to_status": to_status,
             "allowed_next": PlanStatusMachine.get_allowed_transitions(to_status),
         }
-        db.session.commit()
-
-        return {
-            "success": True,
-            "from_status": from_status,
-            "to_status": to_status,
-            "allowed_next": PlanStatusMachine.get_allowed_transitions(to_status),
-        }
 
     @staticmethod
     def void(
@@ -635,6 +627,70 @@ class PlanCustService:
         db.session.commit()
 
         return {"success": True, "planno": planno, "to_status": "09"}
+
+    @staticmethod
+    def create_outbound(
+        planno: str,
+        whcd: str,
+        operator: str,
+    ) -> dict[str, object]:
+        """生成 OV=1 销售出库草稿 —— 仓库实施部领机时调用。
+
+        前置条件：plan_status='02'（实施中）。
+        创建 OV=1 草稿（refbillid=planno），仓库人工审核后出库。
+        """
+        record = PlanCustRepository.get_by_id(planno)
+        if record is None:
+            return {"success": False, "error": "预计划不存在"}
+
+        current = record.plan_status or "00"
+        if current != "02":
+            return {
+                "success": False,
+                "error": f"预计划状态为 {current}，需要 02（实施中）才能生成出库单",
+            }
+
+        # 去重检查
+        from app.models.warehouse import StockOut
+
+        existing = (
+            db.session.query(StockOut)
+            .filter(
+                StockOut.refbillid == planno,
+                StockOut.invtyp == "1",
+                StockOut.auditflg != "V",
+            )
+            .first()
+        )
+        if existing:
+            return {
+                "success": False,
+                "error": f"已存在出库单 {existing.outbillid}",
+            }
+
+        # 创建 OV=1 销售出库草稿
+        from app.services.warehouse_service import StockOutService
+
+        out_data: dict[str, Any] = {
+            "invtyp": "1",
+            "whcd": whcd,
+            "refbillid": planno,
+            "memo": f"预计划 {planno} 销售出库",
+        }
+        result = StockOutService.create(data=out_data, creator=operator)
+        if not result.get("success") and result.get("error"):
+            return {"success": False, "error": str(result["error"])}
+
+        outbillid = result.get("outbillid", "")
+        # 记录出库单号到预计划
+        record.is_outflag = "1"
+
+        db.session.commit()
+        return {
+            "success": True,
+            "planno": planno,
+            "outbillid": outbillid,
+        }
 
 
 # ============================================================================

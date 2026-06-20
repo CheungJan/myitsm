@@ -142,6 +142,19 @@ def complete_plan(planno: str):  # type: ignore[no-untyped-def]
     return success_response(data=result, message="已完成")
 
 
+@sales_bp.post("/plans/<planno>/outbound")
+@login_required
+def create_outbound(planno: str):  # type: ignore[no-untyped-def]
+    """生成 OV=1 销售出库草稿（仓库实施部领机）。"""
+    json_data = request.get_json(silent=True) or {}
+    whcd = json_data.get("whcd", "04")
+    user_cd: str = g.current_user
+    result = PlanCustService.create_outbound(planno, whcd=whcd, operator=user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "出库单创建失败")), code=400)
+    return success_response(data=result, message="出库单已创建", code=201)
+
+
 # ---- 呼出单 ----
 @sales_bp.get("/plan-serve")
 @login_required
