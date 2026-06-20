@@ -14,6 +14,7 @@ from app.extensions import db
 from app.models.master import CustClass
 from app.repositories.sales_repository import (
     PlanCustRepository,
+    PlanServeRepository,
     SalesBillRepository,
     SalesExtendRepository,
 )
@@ -353,6 +354,18 @@ class PlanCustService:
         # 创建预计划（plan_status=00 计划中）
         record = PlanCustRepository.create(data, creator)
 
+        # 自动创建呼出单（PLAN_SERVE）— 话务台呼出确认是后续流程的前置
+        plantyp = data.get("plantyp")
+        PlanServeRepository.create(
+            {
+                "planno": record.planno,
+                "plantyp": plantyp,
+                "servetyp": "0",
+                "serve_task": f"预计划呼出-{record.planno}",
+            },
+            creator,
+        )
+
         # 客户生命周期：创建 TEMP 客户
         custcd = data.get("custcd")
         if custcd:
@@ -424,6 +437,25 @@ class PlanCustService:
 
         # 回写下游单据 ID 到预计划
         record.imple_status = downstream_id
+
+        # 押金联动：预计划有押金金额时写入 tmm61_deposit_dtl
+        deposit_amount = record.deposit
+        if deposit_amount and float(deposit_amount) != 0 and record.custcd:
+            try:
+                from app.services.deposit_service import DepositDetailService
+
+                DepositDetailService.create(
+                    {
+                        "custcd": record.custcd,
+                        "c_type": "预计划押金",
+                        "change_a": float(deposit_amount),
+                        "new_a": float(deposit_amount),
+                        "r_billid": record.planno,
+                        "remark": f"预计划 {record.planno} 实施确认",
+                    }
+                )
+            except Exception:
+                pass  # 押金写入失败不阻塞实施确认
 
         # 状态流转：01（已确认）→ 02（实施中）
         record.plan_status = "02"
@@ -603,6 +635,72 @@ class PlanCustService:
         db.session.commit()
 
         return {"success": True, "planno": planno, "to_status": "09"}
+
+
+# ============================================================================
+# PlanServeService（呼出单）
+# ============================================================================
+
+
+class PlanServeService:
+    """呼出单服务 —— 话务台呼出客户确认安装意向并收集反馈。"""
+
+    @staticmethod
+    def get(dtlid: int) -> dict[str, Any] | None:
+        record = PlanServeRepository.get_by_id(dtlid)
+        if record is None:
+            return None
+        return record.to_dict()
+
+    @staticmethod
+    def list_by_plan(planno: str) -> list[dict[str, Any]]:
+        items = PlanServeRepository.list_by_plan(planno)
+        return [item.to_dict() for item in items]
+
+    @staticmethod
+    def list_records(
+        planno: str | None = None,
+        status: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> dict[str, Any]:
+        items, total = PlanServeRepository.list_by_filters(
+            planno=planno, status=status, page=page, per_page=per_page
+        )
+        return {
+            "items": [item.to_dict() for item in items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        record = PlanServeRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def transition(dtlid: int, to_status: str, operator: str) -> dict[str, object]:
+        """呼出单状态流转：00待呼出→01已呼出→09作废。"""
+        record = PlanServeRepository.get_by_id(dtlid)
+        if record is None:
+            return {"success": False, "error": "呼出单不存在"}
+
+        allowed: dict[str, list[str]] = {
+            "00": ["01", "09"],
+            "01": ["09"],
+        }
+        current = record.status or "00"
+        if to_status not in allowed.get(current, []):
+            return {
+                "success": False,
+                "error": f"不允许从 {current} 流转到 {to_status}",
+            }
+
+        PlanServeRepository.update_status(record, to_status)
+        db.session.commit()
+        return {"success": True, "dtlid": dtlid, "to_status": to_status}
 
 
 # ============================================================================

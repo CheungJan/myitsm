@@ -13,6 +13,8 @@ from app.api.auth import login_required
 from app.schemas.sales import (
     PlanCustCreate,
     PlanCustUpdate,
+    PlanServeCreate,
+    PlanServeUpdate,
     PlanTransition,
     PlanVoid,
     SalesBillCreate,
@@ -22,6 +24,7 @@ from app.schemas.sales import (
 )
 from app.services.sales_service import (
     PlanCustService,
+    PlanServeService,
     SalesBillService,
     SalesExtendService,
 )
@@ -137,6 +140,70 @@ def complete_plan(planno: str):  # type: ignore[no-untyped-def]
     if not result.get("success"):
         return error_response(message=str(result.get("error", "完成失败")), code=400)
     return success_response(data=result, message="已完成")
+
+
+# ---- 呼出单 ----
+@sales_bp.get("/plan-serve")
+@login_required
+def list_plan_serve():  # type: ignore[no-untyped-def]
+    """呼出单列表。"""
+    params = SalesQuery.model_validate(request.args.to_dict())
+    data = PlanServeService.list_records(
+        planno=params.plantyp,  # 复用 plantyp 查询参数作为 planno
+        page=params.page,
+        per_page=params.per_page,
+    )
+    return success_response(data=data)
+
+
+@sales_bp.get("/plans/<planno>/serve")
+@login_required
+def list_plan_serves(planno: str):  # type: ignore[no-untyped-def]
+    """指定预计划的呼出记录。"""
+    data = PlanServeService.list_by_plan(planno)
+    return success_response(data=data)
+
+
+@sales_bp.post("/plans/<planno>/serve")
+@login_required
+def create_plan_serve(planno: str):  # type: ignore[no-untyped-def]
+    """创建呼出单。"""
+    body = PlanServeCreate.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = g.current_user
+    data = PlanServeService.create(
+        {**body.model_dump(exclude_none=True), "planno": planno},
+        creator=user_cd,
+    )
+    return success_response(data=data, message="呼出单已创建", code=201)
+
+
+@sales_bp.put("/plan-serve/<int:dtlid>")
+@login_required
+def update_plan_serve(dtlid: int):  # type: ignore[no-untyped-def]
+    """更新呼出单（反馈呼出结果）。"""
+    body = PlanServeUpdate.model_validate(request.get_json(silent=True) or {})
+    record = PlanServeService.get(dtlid)
+    if record is None:
+        return error_response(message="呼出单不存在", code=404)
+    from app.repositories.sales_repository import PlanServeRepository
+
+    PlanServeRepository.update(
+        PlanServeRepository.get_by_id(dtlid),
+        body.model_dump(exclude_unset=True),
+    )
+    return success_response(data=record)
+
+
+@sales_bp.post("/plan-serve/<int:dtlid>/transition")
+@login_required
+def transition_plan_serve(dtlid: int):  # type: ignore[no-untyped-def]
+    """呼出单状态流转（00→01 标记已呼出）。"""
+    body = PlanTransition.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = g.current_user
+    result = PlanServeService.transition(dtlid, to_status=body.to_status, operator=user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "流转失败")), code=400)
+    return success_response(data=result)
 
 
 # ---- 销售单据 ----

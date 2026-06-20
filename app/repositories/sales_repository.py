@@ -11,6 +11,7 @@ from sqlalchemy import desc
 from app.extensions import db
 from app.models.sales import (
     PlanCust,
+    PlanServe,
     SalesBill,
     SalesExtend,
     SalesExtendDt,
@@ -91,6 +92,64 @@ class PlanCustRepository:
             )
             .first()
         )
+
+
+class PlanServeRepository:
+    """呼出单数据访问（PLAN_SERVE）。"""
+
+    @staticmethod
+    def get_by_id(dtlid: int) -> PlanServe | None:
+        return db.session.get(PlanServe, dtlid)
+
+    @staticmethod
+    def list_by_filters(
+        planno: str | None = None,
+        status: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list[PlanServe], int]:
+        query = db.session.query(PlanServe)
+        if planno:
+            query = query.filter(PlanServe.planno == planno)
+        if status:
+            query = query.filter(PlanServe.status == status)
+        query = query.order_by(desc(PlanServe.gendate))
+        total: int = query.count()
+        items: list[PlanServe] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
+    def list_by_plan(planno: str) -> list[PlanServe]:
+        """获取指定预计划的所有呼出记录。"""
+        return (
+            db.session.query(PlanServe)
+            .filter(PlanServe.planno == planno)
+            .order_by(desc(PlanServe.gendate))
+            .all()
+        )
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> PlanServe:
+        now = datetime.now(UTC)
+        record = PlanServe(
+            genercd=creator,
+            gendate=now,
+            status="00",
+            **data,
+        )
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: PlanServe, data: dict[str, Any]) -> PlanServe:
+        for key, value in data.items():
+            setattr(record, key, value)
+        return record
+
+    @staticmethod
+    def update_status(record: PlanServe, new_status: str) -> PlanServe:
+        record.status = new_status
+        return record
 
 
 class SalesBillRepository:

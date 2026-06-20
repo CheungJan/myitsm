@@ -91,6 +91,26 @@ class PlanVoid(BaseModel):
     remark: str | None = Field(None, max_length=200, description="作废原因")
 
 
+class PlanServeCreate(BaseModel):
+    """创建呼出单。"""
+
+    planno: str = Field(..., max_length=10, description="关联预计划单号")
+    plantyp: str | None = Field(None, max_length=2)
+    servetyp: str = Field("0", max_length=2, description="服务类型")
+    serve_task: str | None = Field(None, max_length=200, description="服务任务")
+    serve_back: str | None = Field(None, max_length=200, description="客户反馈/呼出结果")
+    serve_mark: str | None = Field(None, max_length=200, description="服务备注")
+    commmode: str | None = Field(None, max_length=4, description="通讯方式")
+
+
+class PlanServeUpdate(BaseModel):
+    """更新呼出单（反馈呼出结果）。"""
+
+    serve_back: str | None = Field(None, max_length=200, description="客户反馈")
+    serve_mark: str | None = Field(None, max_length=200, description="服务备注")
+    status: str | None = Field(None, max_length=2, description="状态")
+
+
 class SalesQuery(BaseModel):
     """销售查询参数。"""
 
