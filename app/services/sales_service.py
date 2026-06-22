@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
@@ -19,6 +20,8 @@ from app.repositories.sales_repository import (
     SalesExtendRepository,
 )
 from app.services.customer_service import CustomerService
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_class_cd(custcd: str) -> str:
@@ -405,10 +408,6 @@ class PlanCustService:
         通过 ITSM Repository 直接创建（不经过 Service 的独立 commit），
         保证与客户状态推进在同一事务内。
         """
-        import logging
-
-        _logger = logging.getLogger(__name__)
-
         record = PlanCustRepository.get_by_id(planno)
         if record is None:
             return {"success": False, "error": "预计划不存在"}
@@ -470,7 +469,7 @@ class PlanCustService:
                     }
                 )
             except Exception as exc:
-                _logger.warning("押金写入失败 planno=%s: %s", planno, exc)
+                logger.warning("押金写入失败 planno=%s: %s", planno, exc)
 
         # 状态流转：01（已确认）→ 02（实施中）
         record.plan_status = "02"
