@@ -72,6 +72,65 @@ class TestPlanCust:
         assert "items" in resp.get_json()["data"]
 
 
+class TestPlanOrchestration:
+    """预计划编排测试。"""
+
+    def test_create_with_plantyp_00(self, app: Flask, client: FlaskClient) -> None:
+        """plantyp=00 新机开通不抛 TypeError。"""
+        headers = _auth_header(app)
+        resp = _post(
+            client,
+            "/api/v1/sales/plans",
+            {"plantyp": "00", "custnm": "新机测试", "custcd": "T001"},
+            headers,
+        )
+        assert resp.status_code == 201
+        data = resp.get_json()["data"]
+        assert data["plantyp"] == "00"
+        assert data["plan_status"] == "00"
+
+    def test_transition_00_to_01(self, app: Flask, client: FlaskClient) -> None:
+        """状态流转 00→01。"""
+        headers = _auth_header(app)
+        resp = _post(client, "/api/v1/sales/plans", {"plantyp": "10", "custnm": "流转测试"}, headers)
+        planno = resp.get_json()["data"]["planno"]
+
+        resp2 = _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "01"}, headers)
+        assert resp2.status_code == 200
+        data = resp2.get_json()["data"]
+        assert data["to_status"] == "01"
+
+    def test_implement_without_serve_blocks(self, app: Flask, client: FlaskClient) -> None:
+        """无已呼出记录时实施被拒绝。"""
+        headers = _auth_header(app)
+        resp = _post(client, "/api/v1/sales/plans", {"plantyp": "10", "custnm": "无呼出测试", "custcd": "T002"}, headers)
+        planno = resp.get_json()["data"]["planno"]
+        _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "01"}, headers)
+
+        resp3 = _post(client, f"/api/v1/sales/plans/{planno}/implement", {}, headers)
+        assert resp3.status_code == 400
+        assert "呼出" in resp3.get_json()["message"]
+
+    def test_void_cascade(self, app: Flask, client: FlaskClient) -> None:
+        """作废 00 状态预计划。"""
+        headers = _auth_header(app)
+        resp = _post(client, "/api/v1/sales/plans", {"plantyp": "20", "custnm": "作废测试", "custcd": "T003"}, headers)
+        planno = resp.get_json()["data"]["planno"]
+
+        resp2 = _post(client, f"/api/v1/sales/plans/{planno}/void", {"remark": "测试作废"}, headers)
+        assert resp2.status_code == 200
+        assert resp2.get_json()["data"]["to_status"] == "09"
+
+    def test_complete_requires_02(self, app: Flask, client: FlaskClient) -> None:
+        """00状态不能直接完成。"""
+        headers = _auth_header(app)
+        resp = _post(client, "/api/v1/sales/plans", {"plantyp": "10", "custnm": "完成测试"}, headers)
+        planno = resp.get_json()["data"]["planno"]
+
+        resp2 = _post(client, f"/api/v1/sales/plans/{planno}/complete", {}, headers)
+        assert resp2.status_code == 400
+
+
 class TestSalesBill:
     """销售单据测试。"""
 

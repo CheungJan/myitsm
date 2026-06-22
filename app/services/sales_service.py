@@ -215,7 +215,6 @@ def _build_downstream_payload(record: Any, plantyp: str, creator: str) -> dict[s
             {
                 "store_id": record.custcd or "",
                 "device_id": record.posid or "",
-                "open_type": record.busityp or "1",
                 "from_custcard": record.custcard or "",
                 "from_custcd": record.custcd or "",
                 "count": 1,
@@ -422,6 +421,20 @@ class PlanCustService:
         plantyp = record.plantyp
         if not plantyp or plantyp not in _PLANTYP_SERVICE_MAP:
             return {"success": False, "error": f"未知的计划类型 plantyp={plantyp}"}
+
+        # 呼出前置校验：至少一条呼出单已回访(status=01)
+        from app.models.sales import PlanServe as _PS
+
+        served_count = (
+            db.session.query(_PS)
+            .filter(_PS.planno == planno, _PS.status == "01")
+            .count()
+        )
+        if served_count == 0:
+            return {
+                "success": False,
+                "error": "该预计划尚无已完成呼出的记录，请先在话务台完成呼出确认",
+            }
 
         # 幂等检查
         if record.imple_billid:
