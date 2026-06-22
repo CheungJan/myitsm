@@ -130,6 +130,52 @@ class TestPlanOrchestration:
         resp2 = _post(client, f"/api/v1/sales/plans/{planno}/complete", {}, headers)
         assert resp2.status_code == 400
 
+    def test_implement_happy_path(self, app: Flask, client: FlaskClient) -> None:
+        """正向链路：创建→呼出→实施→下游工单生成且imple_billid回写。"""
+        headers = _auth_header(app)
+
+        # 1. 创建预计划 plantyp=00 (新机开通)
+        resp = _post(
+            client, "/api/v1/sales/plans",
+            {"plantyp": "00", "custnm": "正向测试", "custcd": "T010", "custcard": "HP001"},
+            headers,
+        )
+        assert resp.status_code == 201
+        planno = resp.get_json()["data"]["planno"]
+
+        # 2. 查呼出单列表，将第一条呼出单置为已呼出(status=01)
+        serve_resp = client.get(f"/api/v1/sales/plans/{planno}/serve", headers=headers)
+        assert serve_resp.status_code == 200
+        serves = serve_resp.get_json()["data"]
+        assert len(serves) >= 1
+        dtlid = serves[0]["dtlid"]
+
+        _post(client, f"/api/v1/sales/plan-serve/{dtlid}/transition", {"to_status": "01"}, headers)
+        # 验证呼出单已更新
+        serve2 = client.get(f"/api/v1/sales/plans/{planno}/serve", headers=headers)
+        assert serve2.get_json()["data"][0]["status"] == "01"
+
+        # 3. 状态流转 00→01
+        _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "01"}, headers)
+
+        # 4. 实施确认
+        impl_resp = _post(client, f"/api/v1/sales/plans/{planno}/implement", {}, headers)
+        assert impl_resp.status_code == 200
+        impl_data = impl_resp.get_json()["data"]
+        assert impl_data["to_status"] == "02"
+        downstream_id = impl_data["downstream_id"]
+        assert downstream_id, "下游单据ID不应为空"
+
+        # 5. 验证预计划上 imple_billid 已回写
+        detail = client.get(f"/api/v1/sales/plans/{planno}", headers=headers)
+        assert detail.get_json()["data"]["imple_billid"] == downstream_id
+        assert detail.get_json()["data"]["plan_status"] == "02"
+
+        # 6. 验证下游工单真实存在
+        itsm_resp = client.get(f"/api/v1/itsm/maintenance-open/{downstream_id}", headers=headers)
+        assert itsm_resp.status_code == 200
+        assert itsm_resp.get_json()["data"]["store_id"] == "T010"
+
 
 class TestSalesBill:
     """销售单据测试。"""
