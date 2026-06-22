@@ -1,6 +1,6 @@
 # 完整数据库字典（myitsm）
 
-> 生成时间：2026-05-13 | 更新：2026-06-13 | 数据库：myitsm | PostgreSQL | v1.3 tqc/tms/tmm 列变更
+> 生成时间：2026-05-13 | 更新：2026-06-22 | 数据库：myitsm | PostgreSQL | v1.4 +plan_serve表 +plan_cust.imple_billid
 > 🟢=自动生成（information_schema）| 🟡=手动维护 | 🔗=引用ER文档
 > 配套：`数据库ER关系文档.md`（ER关联）| `数据库变更追踪_迁移后.md`（变更历史）
 
@@ -10,7 +10,7 @@
 
 | 指标 | 值 |
 |------|----|
-| 业务表总数 | 145 |
+| 业务表总数 | 146 |
 | 非主键索引 | 16 |
 | 数据库大小 | 715 MB |
 
@@ -3142,8 +3142,8 @@
 | 11 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-### 预计划 (plan) — 1 张表
-> 预计划客户
+### 预计划 (plan) — 2 张表
+> 预计划客户 + 呼出单
 
 #### 1. plan_cust
 
@@ -3182,6 +3182,7 @@
 | 31 | servetyp | VARCHAR(2) |  | 服务类型 |
 | 32 | pl_serve_task | VARCHAR(200) |  | 服务任务 |
 | 33 | imple_status | VARCHAR(2) |  | 实施状态 |
+| 33.1 | imple_billid | VARCHAR(20) |  | **新增** 下游单据ID（实施确认时写入，如 new_opening_id） |
 | 34 | commmode | VARCHAR(4) |  | 通讯方式 |
 | 35 | serve_status | VARCHAR(2) |  | 服务状态 |
 | 36 | plan_require | VARCHAR(200) |  | 计划需求 |
@@ -3203,6 +3204,31 @@
 | 52 | upload_type | VARCHAR(2) |  | 上传类型 |
 | 53 | created_at | TIMESTAMP | NOT NULL |  |
 | 54 | updated_at | TIMESTAMP | NOT NULL |  |
+
+
+#### 2. plan_serve（**新增** — 呼出单/服务计划）
+
+> 话务台呼出客户确认安装意向并收集反馈。对应 PB PLAN_SERVE 表。
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | dtlid | INTEGER | PK NOT NULL AUTO | 明细ID |
+| 2 | planno | VARCHAR(10) | NOT NULL | 关联预计划单号 |
+| 3 | plantyp | VARCHAR(2) |  | 计划类型 |
+| 4 | servetyp | VARCHAR(2) |  | 服务类型（0客户确认/1预计划呼出/2实施任务） |
+| 5 | serve_task | VARCHAR(200) |  | 服务任务 |
+| 6 | serve_back | VARCHAR(200) |  | 客户反馈/呼出结果 |
+| 7 | serve_mark | VARCHAR(200) |  | 服务备注 |
+| 8 | commmode | VARCHAR(4) |  | 通讯方式 |
+| 9 | status | VARCHAR(2) |  | 状态（00待呼出/01已呼出/09作废） |
+| 10 | gendate | TIMESTAMP |  | 创建日期 |
+| 11 | genercd | VARCHAR(6) |  | 操作员 |
+| 12 | created_at | TIMESTAMP | NOT NULL |  |
+| 13 | updated_at | TIMESTAMP | NOT NULL |  |
+
+**状态流转**：00 待呼出 → 01 已呼出 → 09 作废。呼出完成后需更新对应 plan_cust.plan_status 为 01。
+
+**关联关系**：`plan_serve.planno → plan_cust.planno`
 
 
 ### 采购验收 (tmp) — 1 张表
