@@ -162,7 +162,7 @@ def list_plan_serve():  # type: ignore[no-untyped-def]
     """呼出单列表。"""
     params = SalesQuery.model_validate(request.args.to_dict())
     data = PlanServeService.list_records(
-        planno=params.plantyp,  # 复用 plantyp 查询参数作为 planno
+        planno=params.planno,
         page=params.page,
         per_page=params.per_page,
     )

@@ -402,7 +402,13 @@ class PlanCustService:
 
         前置条件：plan_status 必须为 '01'（已确认/呼出完成）。
         幂等校验：已生成过则拒绝。
+        通过 ITSM Repository 直接创建（不经过 Service 的独立 commit），
+        保证与客户状态推进在同一事务内。
         """
+        import logging
+
+        _logger = logging.getLogger(__name__)
+
         record = PlanCustRepository.get_by_id(planno)
         if record is None:
             return {"success": False, "error": "预计划不存在"}
@@ -419,26 +425,35 @@ class PlanCustService:
             return {"success": False, "error": f"未知的计划类型 plantyp={plantyp}"}
 
         # 幂等检查
-        if record.imple_status:
+        if record.imple_billid:
             return {
                 "success": False,
-                "error": f"下游单据已生成（{record.imple_status}），不可重复实施",
+                "error": f"下游单据已生成（{record.imple_billid}），不可重复实施",
             }
 
-        # plantyp 路由 → 生成下游 ITSM 单据
+        # plantyp 路由 → 通过 ITSM Repository 直接创建（同一事务）
+        repo_name = _PLANTYP_REPO_MAP.get(plantyp)
         downstream_id = None
         try:
+            from app.repositories import itsm_repository as _itsm_repo
+
+            repo = getattr(_itsm_repo, repo_name)
             payload = _build_downstream_payload(record, plantyp, operator)
-            ds_result = _call_downstream_service(plantyp, payload, operator)
-            downstream_id = ds_result.get("id")
+            ds_record = repo.create(payload, operator)
+            pk_field = _PLANTYP_SERVICE_MAP[plantyp][1]
+            downstream_id = getattr(ds_record, pk_field, "")
         except Exception as exc:
             db.session.rollback()
             return {"success": False, "error": f"创建下游单据失败: {exc}"}
 
-        # 回写下游单据 ID 到预计划
-        record.imple_status = downstream_id
+        if not downstream_id:
+            db.session.rollback()
+            return {"success": False, "error": "下游单据创建成功但未获取到ID"}
 
-        # 押金联动：预计划有押金金额时写入 tmm61_deposit_dtl
+        # 回写下游单据 ID
+        record.imple_billid = downstream_id
+
+        # 押金联动
         deposit_amount = record.deposit
         if deposit_amount and float(deposit_amount) != 0 and record.custcd:
             try:
@@ -454,8 +469,8 @@ class PlanCustService:
                         "remark": f"预计划 {record.planno} 实施确认",
                     }
                 )
-            except Exception:
-                pass  # 押金写入失败不阻塞实施确认
+            except Exception as exc:
+                _logger.warning("押金写入失败 planno=%s: %s", planno, exc)
 
         # 状态流转：01（已确认）→ 02（实施中）
         record.plan_status = "02"
@@ -589,7 +604,7 @@ class PlanCustService:
         """作废预计划 —— 级联作废下游草稿 + 客户失效。
 
         规则：
-        - COMPLETED(03) 不可作废，IMPLEMENTING(02) 需先回退
+        - COMPLETED(04) 不可作废
         - 下游单据已终态（status=3/5/9）则阻止
         - 下游草稿 → 标记作废
         - 客户 TEMP/PENDING → INVALID
@@ -608,8 +623,8 @@ class PlanCustService:
 
         # 级联作废下游 ITSM 草稿
         plantyp = record.plantyp
-        # 下游单据 ID 存储在 imple_status 字段中（由 create 时写入）
-        downstream_id = record.imple_status
+        # 下游单据 ID（implement() 写入 imple_billid）
+        downstream_id = record.imple_billid
         if downstream_id and plantyp and plantyp in _PLANTYP_REPO_MAP:
             try:
                 _cascade_void_downstream(plantyp, downstream_id, operator)

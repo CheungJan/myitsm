@@ -117,6 +117,7 @@ class SalesQuery(BaseModel):
     plantyp: str | None = Field(None, max_length=2)
     plan_status: str | None = Field(None, max_length=2)
     sltyp: str | None = Field(None, max_length=2)
+    planno: str | None = Field(None, max_length=10, description="计划单号（plan_serve查询用）")
     custcd: str | None = Field(None, max_length=8)
     auditflg: str | None = Field(None, max_length=1)
     page: int = Field(1, ge=1)

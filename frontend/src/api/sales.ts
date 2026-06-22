@@ -7,7 +7,7 @@ export interface PlanRecord {
     opercd: string; gendate: string
     is_rent?: string; deposit?: number; yun_type?: string
     pos_item?: string; is_contract?: string; is_outflag?: string
-    imple_status?: string; serve_status?: string
+    imple_status?: string; imple_billid?: string; serve_status?: string
     address?: string; contactor?: string; phoneno?: string; busityp?: string
     [key: string]: unknown
 }

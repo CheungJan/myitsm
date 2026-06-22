@@ -57,6 +57,7 @@ class PlanCust(BaseModel):
     servetyp = db.Column(db.String(2), comment="服务类型")
     pl_serve_task = db.Column(db.String(200), comment="服务任务")
     imple_status = db.Column(db.String(2), comment="实施状态")
+    imple_billid = db.Column(db.String(20), comment="下游单据ID（实施确认时写入）")
     commmode = db.Column(db.String(4), comment="通讯方式")
     serve_status = db.Column(db.String(2), comment="服务状态")
     plan_require = db.Column(db.String(200), comment="计划需求")

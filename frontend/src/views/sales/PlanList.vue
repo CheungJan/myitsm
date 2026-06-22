@@ -62,7 +62,7 @@
           <el-descriptions-item label="机型">{{ detail.pos_item || '-' }}</el-descriptions-item>
           <el-descriptions-item label="押金">{{ detail.deposit ? '¥'+Number(detail.deposit).toLocaleString() : '-' }}</el-descriptions-item>
           <el-descriptions-item label="租赁">{{ detail.is_rent==='Y'?'租赁':'购买' }}</el-descriptions-item>
-          <el-descriptions-item label="下游单据">{{ detail.imple_status || '未生成' }}</el-descriptions-item>
+          <el-descriptions-item label="下游单据">{{ detail.imple_billid || '未生成' }}</el-descriptions-item>
           <el-descriptions-item label="出库标志">{{ detail.is_outflag==='1'?'已出库':'未出库' }}</el-descriptions-item>
         </el-descriptions>
 
