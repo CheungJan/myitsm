@@ -3222,9 +3222,11 @@
 | 8 | commmode | VARCHAR(4) |  | 通讯方式 |
 | 9 | status | VARCHAR(2) |  | 状态（00待呼出/01已呼出/09作废） |
 | 10 | gendate | TIMESTAMP |  | 创建日期 |
-| 11 | genercd | VARCHAR(6) |  | 操作员 |
-| 12 | created_at | TIMESTAMP | NOT NULL |  |
-| 13 | updated_at | TIMESTAMP | NOT NULL |  |
+| 11 | genercd | VARCHAR(6) |  | 创建操作员 |
+| 12 | opdate | TIMESTAMP |  | **新增** 最后操作日期 |
+| 13 | opercd | VARCHAR(6) |  | **新增** 最后操作员 |
+| 14 | created_at | TIMESTAMP | NOT NULL |  |
+| 15 | updated_at | TIMESTAMP | NOT NULL |  |
 
 **状态流转**：00 待呼出 → 01 已呼出 → 09 作废。呼出完成后需更新对应 plan_cust.plan_status 为 01。
 

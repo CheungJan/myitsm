@@ -134,6 +134,8 @@ class PlanServeRepository:
         record = PlanServe(
             genercd=creator,
             gendate=now,
+            opercd=creator,
+            opdate=now,
             status="00",
             **data,
         )
@@ -144,6 +146,8 @@ class PlanServeRepository:
     def update(record: PlanServe, data: dict[str, Any]) -> PlanServe:
         for key, value in data.items():
             setattr(record, key, value)
+        record.opercd = data.get("opercd", record.opercd)
+        record.opdate = datetime.now(UTC)
         return record
 
     @staticmethod
