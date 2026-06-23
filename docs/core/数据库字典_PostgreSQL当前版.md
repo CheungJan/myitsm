@@ -3213,7 +3213,7 @@
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | dtlid | INTEGER | PK NOT NULL AUTO | 明细ID |
-| 2 | planno | VARCHAR(10) | NOT NULL | 关联预计划单号 |
+| 2 | planno | VARCHAR(10) |  | 关联预计划单号（兼容历史NULL） |
 | 3 | plantyp | VARCHAR(2) |  | 计划类型 |
 | 4 | servetyp | VARCHAR(2) |  | 服务类型（0客户确认/1预计划呼出/2实施任务） |
 | 5 | serve_task | VARCHAR(200) |  | 服务任务 |
@@ -3225,8 +3225,8 @@
 | 11 | genercd | VARCHAR(6) |  | 创建操作员 |
 | 12 | opdate | TIMESTAMP |  | **新增** 最后操作日期 |
 | 13 | opercd | VARCHAR(6) |  | **新增** 最后操作员 |
-| 14 | created_at | TIMESTAMP | NOT NULL |  |
-| 15 | updated_at | TIMESTAMP | NOT NULL |  |
+| 14 | created_at | TIMESTAMP | NOT NULL DEFAULT NOW() | 系统创建时间 |
+| 15 | updated_at | TIMESTAMP | NOT NULL DEFAULT NOW() | 系统更新时间 |
 
 **状态流转**：00 待呼出 → 01 已呼出 → 09 作废。呼出完成后需更新对应 plan_cust.plan_status 为 01。
 

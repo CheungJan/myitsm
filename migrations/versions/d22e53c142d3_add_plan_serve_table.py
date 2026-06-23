@@ -19,7 +19,7 @@ depends_on = None
 def upgrade():
     op.create_table('plan_serve',
         sa.Column('dtlid', sa.Integer(), autoincrement=True, nullable=False, comment='明细ID'),
-        sa.Column('planno', sa.String(length=10), nullable=False, comment='关联预计划单号'),
+        sa.Column('planno', sa.String(length=10), nullable=True, comment='关联预计划单号（兼容历史NULL）'),
         sa.Column('plantyp', sa.String(length=2), nullable=True, comment='计划类型'),
         sa.Column('servetyp', sa.String(length=2), nullable=True, comment='服务类型'),
         sa.Column('serve_task', sa.String(length=200), nullable=True, comment='服务任务'),
@@ -28,9 +28,11 @@ def upgrade():
         sa.Column('commmode', sa.String(length=4), nullable=True, comment='通讯方式'),
         sa.Column('status', sa.String(length=2), nullable=True, comment='状态（00待呼出/01已呼出/09作废）'),
         sa.Column('gendate', sa.DateTime(), nullable=True, comment='创建日期'),
-        sa.Column('genercd', sa.String(length=6), nullable=True, comment='操作员'),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(), nullable=False),
+        sa.Column('genercd', sa.String(length=6), nullable=True, comment='创建操作员'),
+        sa.Column('opdate', sa.DateTime(), nullable=True, comment='最后操作日期'),
+        sa.Column('opercd', sa.String(length=6), nullable=True, comment='最后操作员'),
+        sa.Column('created_at', sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column('updated_at', sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
         sa.PrimaryKeyConstraint('dtlid')
     )
 
