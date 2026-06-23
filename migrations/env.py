@@ -14,6 +14,10 @@ config = context.config
 fileConfig(config.config_file_name)
 logger = logging.getLogger('alembic.env')
 
+# 抑制 autogenerate 的 INFO 噪音（SERIAL 序列检测、注释比较等）
+logging.getLogger('alembic.autogenerate').setLevel(logging.WARNING)
+logging.getLogger('alembic.ddl.postgresql').setLevel(logging.WARNING)
+
 
 def get_engine():
     try:
@@ -93,6 +97,9 @@ def run_migrations_online():
     conf_args = current_app.extensions['migrate'].configure_args
     if conf_args.get("process_revision_directives") is None:
         conf_args["process_revision_directives"] = process_revision_directives
+
+    # 关闭注释比较，避免 modify_comment 噪音
+    conf_args.setdefault("include_comments", False)
 
     connectable = get_engine()
 
