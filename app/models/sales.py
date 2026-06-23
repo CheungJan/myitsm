@@ -94,7 +94,7 @@ class PlanServe(BaseModel):
     __tablename__ = "plan_serve"
 
     dtlid = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="明细ID")
-    planno = db.Column(db.String(10), nullable=False, comment="关联预计划单号")
+    planno = db.Column(db.String(10), nullable=True, comment="关联预计划单号（兼容历史NULL数据）")
     plantyp = db.Column(db.String(2), comment="计划类型")
     servetyp = db.Column(db.String(2), comment="服务类型（0客户确认/1预计划呼出/2实施任务）")
     serve_task = db.Column(db.String(200), comment="服务任务")
@@ -103,7 +103,9 @@ class PlanServe(BaseModel):
     commmode = db.Column(db.String(4), comment="通讯方式")
     status = db.Column(db.String(2), default="00", comment="状态（00待呼出/01已呼出/09作废）")
     gendate = db.Column(db.DateTime, comment="创建日期")
-    genercd = db.Column(db.String(6), comment="操作员")
+    genercd = db.Column(db.String(6), comment="创建操作员")
+    opdate = db.Column(db.DateTime, comment="最后操作日期")
+    opercd = db.Column(db.String(6), comment="最后操作员")
 
 
 # ---------------------------------------------------------------------------
