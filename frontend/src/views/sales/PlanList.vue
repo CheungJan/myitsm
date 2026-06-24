@@ -50,7 +50,7 @@
         <el-table-column label="操作" width="210" fixed="right">
           <template #default="{row}">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="row.plan_status==='00'" link type="info" size="small" @click="doRequestServe(row)">请求呼出</el-button>
+            <el-button v-if="['00','01','02','04'].includes(row.plan_status)" link type="info" size="small" @click="doRequestServe(row)">请求呼出</el-button>
             <el-button v-if="row.plan_status==='00'" link type="success" size="small" @click="doTransition(row,'02')">确认</el-button>
             <el-button v-if="row.plan_status==='02'" link type="warning" size="small" @click="doImplement(row)">实施</el-button>
             <el-button v-if="row.plan_status==='04'" link type="primary" size="small" @click="doOutbound(row)">出库</el-button>
