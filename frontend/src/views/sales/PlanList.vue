@@ -50,6 +50,7 @@
         <el-table-column label="操作" width="210" fixed="right">
           <template #default="{row}">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
+            <el-button v-if="row.plan_status==='00'" link type="info" size="small" @click="doRequestServe(row)">请求呼出</el-button>
             <el-button v-if="row.plan_status==='00'" link type="success" size="small" @click="doTransition(row,'02')">确认</el-button>
             <el-button v-if="row.plan_status==='02'" link type="warning" size="small" @click="doImplement(row)">实施</el-button>
             <el-button v-if="row.plan_status==='04'" link type="primary" size="small" @click="doOutbound(row)">出库</el-button>
@@ -144,14 +145,6 @@
           </el-tab-pane>
         </el-tabs>
 
-        <!-- 操作区 -->
-        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
-          <el-button v-if="detail.plan_status==='00'" type="success" size="small" @click="doTransition(detail,'02')">确认呼出</el-button>
-          <el-button v-if="detail.plan_status==='02'" type="warning" size="small" @click="doImplement(detail)">实施确认（生成下游单据）</el-button>
-          <el-button v-if="detail.plan_status==='04'" type="primary" size="small" @click="doOutbound(detail)">生成出库单(OV=1)</el-button>
-          <el-button v-if="detail.plan_status==='04'" type="success" size="small" @click="doComplete(detail)">完成（客户转正）</el-button>
-          <el-button v-if="vCan(detail)" type="danger" size="small" @click="doVoid(detail)">作废</el-button>
-        </div>
       </template>
     </el-drawer>
 
@@ -184,7 +177,7 @@ import { useDict } from '@/composables/useDict'
 import {
   fetchPlans, createPlan, updatePlan,
   transitionPlan, implementPlan, completePlan, voidPlan, createOutbound,
-  fetchPlanServes,
+  fetchPlanServes, createPlanServe,
 } from '@/api/sales'
 import type { PlanRecord, ServeRecord } from '@/api/sales'
 import request from '@/api/request'
@@ -347,6 +340,13 @@ async function openDetail(row: PlanRecord) {
 }
 
 // 状态操作
+async function doRequestServe(row: PlanRecord) {
+  try {
+    const res = await createPlanServe(row.planno, { servetyp: '1', serve_task: `预计划呼出-${row.planno}` })
+    ElMessage.success(`呼出单已创建`)
+    loadData()
+  } catch { ElMessage.error('请求呼出失败') }
+}
 async function doTransition(row: PlanRecord, to: string) {
   try {
     await transitionPlan(row.planno, to)

@@ -164,6 +164,12 @@ const router = createRouter({
                     path: 'sales/extends', name: 'SalesExtendList', component: () => import('@/views/sales/SalesExtendList.vue'), meta: { title: '延期管理' }
                 },
                 {
+                    path: 'sales/serves', name: 'ServeList', component: () => import('@/views/sales/ServeList.vue'), meta: { title: '呼出管理' }
+                },
+                {
+                    path: 'sales/imple-plans', name: 'ServeImple', component: () => import('@/views/sales/ServeImple.vue'), meta: { title: '计划实施管理' }
+                },
+                {
                     path: 'sales/calls', name: 'CallConsole', component: () => import('@/views/sales/CallConsole.vue'), meta: { title: '话务台' }
                 },
                 {
