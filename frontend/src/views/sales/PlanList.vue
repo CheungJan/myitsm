@@ -113,20 +113,20 @@
           <el-tab-pane label="当前设备" name="device">
             <el-table :data="custDevices" size="small" v-loading="deviceLoading" empty-text="暂无设备信息"
               row-key="_id" :tree-props="{ children: 'children', hasChildren: 'hasChildren' }" :indent="24" default-expand-all>
-              <el-table-column prop="eid" label="EID/物料编码" width="230">
+              <el-table-column prop="eid" label="EID" width="130" />
+              <el-table-column label="物料编码/名称" min-width="220">
                 <template #default="{row}">
-                  <span>{{ row.eid }}</span>
-                  <span v-if="row.itemcd" style="color:#909399;margin-left:8px">{{ row.itemcd }}</span>
-                  <span v-if="row.itemnm" style="color:#909399;margin-left:4px">{{ row.itemnm }}</span>
+                  <span>{{ row.itemcd }}</span>
+                  <span style="color:#909399;margin-left:8px">{{ row.itemnm || '' }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="POS状态" width="80">
-                <template #default="{row}"><el-tag v-if="row.isPos" size="small" :type="row.useflg==='1'?'success':'danger'">{{ row.useflg==='1'?'在用':'已失效' }}</el-tag></template>
+              <el-table-column label="状态" width="80">
+                <template #default="{row}">
+                  <el-tag v-if="row.isPos" size="small" :type="row.useflg==='1'?'success':'danger'">{{ row.useflg==='1'?'在用':'已失效' }}</el-tag>
+                  <el-tag v-else size="small" :type="row.useflg==='1'?'success':'danger'">{{ row.useflg==='1'?'有效':'失效' }}</el-tag>
+                </template>
               </el-table-column>
-              <el-table-column label="配件状态" width="80">
-                <template #default="{row}"><el-tag v-if="!row.isPos" size="small" :type="row.useflg==='1'?'success':'danger'">{{ row.useflg==='1'?'有效':'失效' }}</el-tag></template>
-              </el-table-column>
-              <el-table-column prop="upddate" label="更新日期" width="90" />
+              <el-table-column prop="upddate" label="更新日期" width="100" />
             </el-table>
           </el-tab-pane>
 
@@ -315,8 +315,8 @@ async function openDetail(row: PlanRecord) {
           accessories: [],
         })
       }
-      if (d.acc_eid) {
-        posMap.get(key)!.accessories.push({ eid: d.acc_eid, itemcd: d.acc_itemcd, itemnm: '', useflg: d.acc_useflg, upddate: d.upddate })
+      if (d.acc_eid && d.acc_useflg === '1') {
+        posMap.get(key)!.accessories.push({ eid: d.acc_eid, itemcd: d.acc_itemcd, itemnm: d.acc_itemnm || '', useflg: d.acc_useflg, upddate: d.upddate })
       }
     }
     // 构建树形数据

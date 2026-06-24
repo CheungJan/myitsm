@@ -182,6 +182,8 @@ def list_plan_devices_current(planno: str):  # type: ignore[no-untyped-def]
 
     取 tmm35_cust_pos_rl.useflg='1' 的整机，左联 tmm44_pos_r_eid 取其下所有配件。
     """
+    from sqlalchemy.orm import aliased
+
     from app.extensions import db
     from app.models.master import CustPosRl, Item, PosREid
 
@@ -192,11 +194,13 @@ def list_plan_devices_current(planno: str):  # type: ignore[no-untyped-def]
     if not custcd:
         return success_response(data=[])
 
+    AccItem = aliased(Item)
     rows = (
         db.session.query(
             CustPosRl.item_cd.label("pos_itemcd"),
             Item.item_nm.label("pos_itemnm"),
             PosREid.itemcd.label("acc_itemcd"),
+            AccItem.item_nm.label("acc_itemnm"),
             PosREid.eid.label("acc_eid"),
             CustPosRl.eid.label("pos_eid"),
             CustPosRl.useflg.label("pos_useflg"),
@@ -205,6 +209,7 @@ def list_plan_devices_current(planno: str):  # type: ignore[no-untyped-def]
         )
         .outerjoin(PosREid, CustPosRl.eid == PosREid.posid)
         .outerjoin(Item, CustPosRl.item_cd == Item.item_cd)
+        .outerjoin(AccItem, PosREid.itemcd == AccItem.item_cd)
         .filter(CustPosRl.cust_cd == custcd, CustPosRl.useflg == "1")
         .order_by(CustPosRl.eid.asc())
         .all()
@@ -216,11 +221,13 @@ def list_plan_devices_current(planno: str):  # type: ignore[no-untyped-def]
             "pos_eid": r.pos_eid,
             "pos_useflg": r.pos_useflg,
             "acc_itemcd": r.acc_itemcd,
+            "acc_itemnm": r.acc_itemnm or "",
             "acc_eid": r.acc_eid,
             "acc_useflg": r.acc_useflg,
             "upddate": str(r.posupddate) if r.posupddate else "",
         }
         for r in rows
+        if r.acc_eid is None or r.acc_useflg == "1"
     ]
     return success_response(data=result)
 
