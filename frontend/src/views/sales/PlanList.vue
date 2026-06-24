@@ -112,19 +112,19 @@
 
           <el-tab-pane label="当前设备" name="device">
             <el-table :data="custDevices" size="small" v-loading="deviceLoading" empty-text="暂无设备信息">
-              <el-table-column prop="eid" label="设备EID" width="120" />
-              <el-table-column prop="itemcd" label="物料编码" width="90" />
-              <el-table-column prop="startdate" label="安装日期" width="90" />
-              <el-table-column prop="status" label="状态" width="70" />
-              <el-table-column prop="sflg" label="EID状态" width="80" />
+              <el-table-column prop="eid" label="设备EID" width="130" />
+              <el-table-column prop="itemcd" label="物料编码" width="80" />
+              <el-table-column label="EID状态" width="70"><template #default="{row}">{{ {0:'新品',1:'已使用',2:'报废',3:'待检',5:'返修中',7:'生产中',8:'在库',S:'已售'}[row.sflg]||row.sflg }}</template></el-table-column>
+              <el-table-column label="质检" width="60"><template #default="{row}"><el-tag size="small" :type="row.qcflg==='GA'?'success':'info'">{{ row.qcflg||'-' }}</el-tag></template></el-table-column>
+              <el-table-column prop="whcd" label="仓库" width="60" />
             </el-table>
           </el-tab-pane>
 
           <el-tab-pane label="历史设备" name="history">
             <el-table :data="deviceHistory" size="small" v-loading="historyLoading" empty-text="暂无历史记录">
-              <el-table-column prop="change_type" label="变更类型" width="80" />
-              <el-table-column prop="old_eid" label="旧EID" width="120" />
-              <el-table-column prop="new_eid" label="新EID" width="120" />
+              <el-table-column prop="change_type" label="变更类型" width="90" />
+              <el-table-column prop="old_eid" label="旧值" min-width="100" show-overflow-tooltip />
+              <el-table-column prop="new_eid" label="新值" min-width="100" show-overflow-tooltip />
               <el-table-column prop="change_date" label="变更日期" width="90" />
             </el-table>
           </el-tab-pane>
@@ -286,25 +286,29 @@ async function openDetail(row: PlanRecord) {
   } catch { serveRecords.value = [] }
   finally { serveLoading.value = false }
 
-  // 当前设备
-  if (row.custcd) {
+  // 当前设备 & EID 追溯
+  const posid = row.posid
+  if (posid) {
     deviceLoading.value = true
     try {
-      const r = await request.get('/system/assets', { params: { cust_cd: row.custcd, per_page: 100 } }) as any
-      custDevices.value = r?.data?.items || []
-    } catch { custDevices.value = [] }
+      const r = await request.get(`/system/eid/${posid}`) as any
+      const eid = r?.data || {}
+      custDevices.value = [{ eid: posid, itemcd: eid.itemcd || row.pos_item, sflg: eid.sflg, qcflg: eid.qcflg, whcd: eid.whcd }]
+    } catch { custDevices.value = [{ eid: posid, itemcd: row.pos_item || '-', sflg: '-', qcflg: '-', whcd: '-' }] }
     finally { deviceLoading.value = false }
 
-    // 设备变更历史
+    // EID 变更历史
     historyLoading.value = true
     try {
-      const r = await request.get('/itsm/device-change', { params: { store_id: row.custcd, per_page: 100 } }) as any
-      deviceHistory.value = (r?.data?.items || []).map((d: any) => ({
-        change_type: d.change_type, old_eid: d.old_eid || d.device_id,
-        new_eid: d.new_device_id || d.new_store_card, change_date: d.gendate
+      const r = await request.get(`/system/eid/${posid}/track`) as any
+      deviceHistory.value = (r?.data || []).map((t: any) => ({
+        change_type: t.type, old_eid: t.old_eid || t.from_value,
+        new_eid: t.new_eid || t.to_value, change_date: t.update_time || t.gendate
       }))
     } catch { deviceHistory.value = [] }
     finally { historyLoading.value = false }
+  } else {
+    custDevices.value = []; deviceHistory.value = []
   }
 }
 
