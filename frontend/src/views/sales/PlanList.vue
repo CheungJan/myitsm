@@ -62,7 +62,7 @@
     </el-card>
 
     <!-- 详情抽屉 -->
-    <el-drawer v-model="drawerVisible" title="预计划详情" size="620px">
+    <el-drawer v-model="drawerVisible" title="预计划详情" size="780px">
       <template v-if="detail">
         <el-tabs v-model="detailTab">
           <el-tab-pane label="预计划单" name="info">
