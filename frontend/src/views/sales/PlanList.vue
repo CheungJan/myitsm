@@ -112,20 +112,26 @@
 
           <el-tab-pane label="当前设备" name="device">
             <el-table :data="custDevices" size="small" v-loading="deviceLoading" empty-text="暂无设备信息">
-              <el-table-column prop="eid" label="设备EID" width="130" />
-              <el-table-column prop="itemcd" label="物料编码" width="80" />
-              <el-table-column label="EID状态" width="70"><template #default="{row}">{{ {0:'新品',1:'已使用',2:'报废',3:'待检',5:'返修中',7:'生产中',8:'在库',S:'已售'}[row.sflg]||row.sflg }}</template></el-table-column>
-              <el-table-column label="质检" width="60"><template #default="{row}"><el-tag size="small" :type="row.qcflg==='GA'?'success':'info'">{{ row.qcflg||'-' }}</el-tag></template></el-table-column>
-              <el-table-column prop="whcd" label="仓库" width="60" />
+              <el-table-column prop="pos_eid" label="整机EID" width="130" />
+              <el-table-column prop="pos_itemcd" label="整机编码" width="80" />
+              <el-table-column prop="pos_itemnm" label="整机名称" min-width="120" show-overflow-tooltip />
+              <el-table-column prop="acc_eid" label="配件EID" width="130" />
+              <el-table-column prop="acc_itemcd" label="配件编码" width="80" />
+              <el-table-column label="配件状态" width="70"><template #default="{row}"><el-tag size="small" :type="row.useflg==='1'?'success':'danger'">{{ row.useflg==='1'?'有效':'失效' }}</el-tag></template></el-table-column>
+              <el-table-column prop="upddate" label="更新日期" width="90" />
             </el-table>
           </el-tab-pane>
 
           <el-tab-pane label="历史设备" name="history">
             <el-table :data="deviceHistory" size="small" v-loading="historyLoading" empty-text="暂无历史记录">
-              <el-table-column prop="change_type" label="变更类型" width="90" />
-              <el-table-column prop="old_eid" label="旧值" min-width="100" show-overflow-tooltip />
-              <el-table-column prop="new_eid" label="新值" min-width="100" show-overflow-tooltip />
-              <el-table-column prop="change_date" label="变更日期" width="90" />
+              <el-table-column prop="eid" label="设备EID" width="130" />
+              <el-table-column prop="itemcd" label="物料编码" width="80" />
+              <el-table-column prop="itemnm" label="物料名称" min-width="120" show-overflow-tooltip />
+              <el-table-column prop="sysinfo" label="系统信息" width="100" show-overflow-tooltip />
+              <el-table-column prop="softinfo" label="软件版本" width="100" show-overflow-tooltip />
+              <el-table-column prop="posinfo" label="POS信息" width="100" show-overflow-tooltip />
+              <el-table-column label="状态" width="70"><template #default="{row}"><el-tag size="small" :type="row.useflg==='1'?'success':'danger'">{{ row.useflg==='1'?'有效':'失效' }}</el-tag></template></el-table-column>
+              <el-table-column prop="upddate" label="更新日期" width="90" />
             </el-table>
           </el-tab-pane>
         </el-tabs>
@@ -286,35 +292,33 @@ async function openDetail(row: PlanRecord) {
   } catch { serveRecords.value = [] }
   finally { serveLoading.value = false }
 
-  // 当前设备：客户当前有效的门店设备 (cust_cd)
-  if (row.custcd) {
-    deviceLoading.value = true
-    try {
-      const r = await request.get('/assets', { params: { cust_cd: row.custcd, useflg: '1', per_page: 100 } }) as any
-      custDevices.value = (r?.data?.items || []).map((a: any) => ({
-        eid: a.eid, itemcd: a.item_cd || a.itemcd, sflg: a.sflg, qcflg: a.qcflg, whcd: a.whcd,
-      }))
-    } catch { custDevices.value = [] }
-    finally { deviceLoading.value = false }
+  // 当前设备：对齐 PB d_plan_bom_dtl（tmm35_cust_pos_rl useflg=1 + tmm44 BOM 配件）
+  deviceLoading.value = true
+  try {
+    const r = await request.get(`/sales/plans/${row.planno}/devices/current`) as any
+    custDevices.value = (r?.data || []).map((d: any) => ({
+      eid: d.acc_eid || d.pos_eid,
+      itemcd: d.acc_itemcd || d.pos_itemcd,
+      itemnm: d.pos_itemnm,
+      pos_eid: d.pos_eid,
+      pos_itemcd: d.pos_itemcd,
+      useflg: d.acc_useflg || d.pos_useflg,
+      upddate: d.upddate,
+    }))
+  } catch { custDevices.value = [] }
+  finally { deviceLoading.value = false }
 
-    // 历史设备：预计划关联的设备(取回/变更) + EID追溯
-    historyLoading.value = true
-    try {
-      const posid = row.posid
-      const posItem = row.pos_item || ''
-      if (posid && posItem) {
-        const t = await request.get(`/eid/${posItem}/${posid}/tracks`) as any
-        deviceHistory.value = (t?.data || []).map((tr: any) => ({
-          change_type: tr.type, old_eid: tr.from_value, new_eid: tr.to_value, change_date: tr.gendate || tr.update_time,
-        }))
-      } else {
-        deviceHistory.value = []
-      }
-    } catch { deviceHistory.value = [] }
-    finally { historyLoading.value = false }
-  } else {
-    custDevices.value = []; deviceHistory.value = []
-  }
+  // 历史设备：对齐 PB d_plan_bom_lst（tmm35_cust_pos_rl 所有记录含失效）
+  historyLoading.value = true
+  try {
+    const r = await request.get(`/sales/plans/${row.planno}/devices/history`) as any
+    deviceHistory.value = (r?.data || []).map((d: any) => ({
+      itemcd: d.itemcd, itemnm: d.itemnm, eid: d.eid,
+      sysinfo: d.sysinfo, softinfo: d.softinfo, posinfo: d.posinfo,
+      upddate: d.upddate, useflg: d.useflg,
+    }))
+  } catch { deviceHistory.value = [] }
+  finally { historyLoading.value = false }
 }
 
 // 状态操作

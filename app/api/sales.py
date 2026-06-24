@@ -175,6 +175,105 @@ def list_plan_serve():  # type: ignore[no-untyped-def]
     return success_response(data=data)
 
 
+@sales_bp.get("/plans/<planno>/devices/current")
+@login_required
+def list_plan_devices_current(planno: str):  # type: ignore[no-untyped-def]
+    """预计划当前设备 BOM（对齐 PB d_plan_bom_dtl）。
+
+    取 tmm35_cust_pos_rl.useflg='1' 的整机，左联 tmm44_pos_r_eid 取其下所有配件。
+    """
+    from app.extensions import db
+    from app.models.master import CustPosRl, Item, PosREid
+
+    plan = PlanCustService.get(planno)
+    if plan is None:
+        return error_response(message="预计划不存在", code=404)
+    custcd = plan.get("custcd") or ""
+    if not custcd:
+        return success_response(data=[])
+
+    rows = (
+        db.session.query(
+            CustPosRl.item_cd.label("pos_itemcd"),
+            Item.item_nm.label("pos_itemnm"),
+            PosREid.itemcd.label("acc_itemcd"),
+            PosREid.eid.label("acc_eid"),
+            CustPosRl.eid.label("pos_eid"),
+            CustPosRl.useflg.label("pos_useflg"),
+            PosREid.useflg.label("acc_useflg"),
+            CustPosRl.posupddate,
+        )
+        .outerjoin(PosREid, CustPosRl.eid == PosREid.posid)
+        .outerjoin(Item, CustPosRl.item_cd == Item.item_cd)
+        .filter(CustPosRl.cust_cd == custcd, CustPosRl.useflg == "1")
+        .order_by(CustPosRl.eid.asc())
+        .all()
+    )
+    result = [
+        {
+            "pos_itemcd": r.pos_itemcd,
+            "pos_itemnm": r.pos_itemnm or "",
+            "pos_eid": r.pos_eid,
+            "pos_useflg": r.pos_useflg,
+            "acc_itemcd": r.acc_itemcd,
+            "acc_eid": r.acc_eid,
+            "acc_useflg": r.acc_useflg,
+            "upddate": str(r.posupddate) if r.posupddate else "",
+        }
+        for r in rows
+    ]
+    return success_response(data=result)
+
+
+@sales_bp.get("/plans/<planno>/devices/history")
+@login_required
+def list_plan_devices_history(planno: str):  # type: ignore[no-untyped-def]
+    """预计划历史设备（对齐 PB d_plan_bom_lst）。
+
+    取 tmm35_cust_pos_rl 中该客户的所有记录（含 useflg=0 失效），联 tmm12_items。
+    """
+    from app.extensions import db
+    from app.models.master import CustPosRl, Item
+
+    plan = PlanCustService.get(planno)
+    if plan is None:
+        return error_response(message="预计划不存在", code=404)
+    custcd = plan.get("custcd") or ""
+    if not custcd:
+        return success_response(data=[])
+
+    rows = (
+        db.session.query(
+            CustPosRl.item_cd,
+            Item.item_nm,
+            CustPosRl.eid,
+            CustPosRl.sysinfo,
+            CustPosRl.softinfo,
+            CustPosRl.posinfo,
+            CustPosRl.posupddate,
+            CustPosRl.useflg,
+        )
+        .outerjoin(Item, CustPosRl.item_cd == Item.item_cd)
+        .filter(CustPosRl.cust_cd == custcd)
+        .order_by(CustPosRl.posupddate.asc())
+        .all()
+    )
+    result = [
+        {
+            "itemcd": r.item_cd,
+            "itemnm": r.item_nm or "",
+            "eid": r.eid,
+            "sysinfo": r.sysinfo or "",
+            "softinfo": r.softinfo or "",
+            "posinfo": r.posinfo or "",
+            "upddate": str(r.posupddate) if r.posupddate else "",
+            "useflg": r.useflg,
+        }
+        for r in rows
+    ]
+    return success_response(data=result)
+
+
 @sales_bp.get("/plans/<planno>/serve")
 @login_required
 def list_plan_serves(planno: str):  # type: ignore[no-untyped-def]
