@@ -111,13 +111,21 @@
           </el-tab-pane>
 
           <el-tab-pane label="当前设备" name="device">
-            <el-table :data="custDevices" size="small" v-loading="deviceLoading" empty-text="暂无设备信息">
-              <el-table-column prop="pos_eid" label="整机EID" width="130" />
-              <el-table-column prop="pos_itemcd" label="整机编码" width="80" />
-              <el-table-column prop="pos_itemnm" label="整机名称" min-width="120" show-overflow-tooltip />
-              <el-table-column prop="acc_eid" label="配件EID" width="130" />
-              <el-table-column prop="acc_itemcd" label="配件编码" width="80" />
-              <el-table-column label="配件状态" width="70"><template #default="{row}"><el-tag size="small" :type="row.useflg==='1'?'success':'danger'">{{ row.useflg==='1'?'有效':'失效' }}</el-tag></template></el-table-column>
+            <el-table :data="custDevices" size="small" v-loading="deviceLoading" empty-text="暂无设备信息"
+              row-key="_id" :tree-props="{ children: 'children', hasChildren: 'hasChildren' }" :indent="24" default-expand-all>
+              <el-table-column prop="eid" label="EID/物料编码" width="230">
+                <template #default="{row}">
+                  <span>{{ row.eid }}</span>
+                  <span v-if="row.itemcd" style="color:#909399;margin-left:8px">{{ row.itemcd }}</span>
+                  <span v-if="row.itemnm" style="color:#909399;margin-left:4px">{{ row.itemnm }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="POS状态" width="80">
+                <template #default="{row}"><el-tag v-if="row.isPos" size="small" :type="row.useflg==='1'?'success':'danger'">{{ row.useflg==='1'?'在用':'已失效' }}</el-tag></template>
+              </el-table-column>
+              <el-table-column label="配件状态" width="80">
+                <template #default="{row}"><el-tag v-if="!row.isPos" size="small" :type="row.useflg==='1'?'success':'danger'">{{ row.useflg==='1'?'有效':'失效' }}</el-tag></template>
+              </el-table-column>
               <el-table-column prop="upddate" label="更新日期" width="90" />
             </el-table>
           </el-tab-pane>
@@ -292,19 +300,36 @@ async function openDetail(row: PlanRecord) {
   } catch { serveRecords.value = [] }
   finally { serveLoading.value = false }
 
-  // 当前设备：对齐 PB d_plan_bom_dtl（tmm35_cust_pos_rl useflg=1 + tmm44 BOM 配件）
+  // 当前设备：对齐 PB d_plan_bom_dtl，按 pos_eid 分组成树形
   deviceLoading.value = true
   try {
     const r = await request.get(`/sales/plans/${row.planno}/devices/current`) as any
-    custDevices.value = (r?.data || []).map((d: any) => ({
-      eid: d.acc_eid || d.pos_eid,
-      itemcd: d.acc_itemcd || d.pos_itemcd,
-      itemnm: d.pos_itemnm,
-      pos_eid: d.pos_eid,
-      pos_itemcd: d.pos_itemcd,
-      useflg: d.acc_useflg || d.pos_useflg,
-      upddate: d.upddate,
-    }))
+    const rows = (r?.data || []) as any[]
+    // 按 pos_eid 分组，POS 为父行，配件为子行
+    const posMap = new Map<string, { pos: any; accessories: any[] }>()
+    for (const d of rows) {
+      const key = d.pos_eid || '__nopos__'
+      if (!posMap.has(key)) {
+        posMap.set(key, {
+          pos: { eid: d.pos_eid, itemcd: d.pos_itemcd, itemnm: d.pos_itemnm, useflg: d.pos_useflg, upddate: d.upddate },
+          accessories: [],
+        })
+      }
+      if (d.acc_eid) {
+        posMap.get(key)!.accessories.push({ eid: d.acc_eid, itemcd: d.acc_itemcd, itemnm: '', useflg: d.acc_useflg, upddate: d.upddate })
+      }
+    }
+    // 构建树形数据
+    const tree: any[] = []
+    let id = 0
+    for (const [, v] of posMap) {
+      const parent = { _id: ++id, eid: v.pos.eid, itemcd: v.pos.itemcd, itemnm: v.pos.itemnm, isPos: true, useflg: v.pos.useflg, upddate: v.pos.upddate, children: [] as any[], hasChildren: v.accessories.length > 0 }
+      for (const acc of v.accessories) {
+        parent.children.push({ _id: ++id, eid: acc.eid, itemcd: acc.itemcd, itemnm: acc.itemnm, isPos: false, useflg: acc.useflg, upddate: acc.upddate })
+      }
+      tree.push(parent)
+    }
+    custDevices.value = tree
   } catch { custDevices.value = [] }
   finally { deviceLoading.value = false }
 
