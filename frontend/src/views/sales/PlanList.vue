@@ -62,31 +62,73 @@
     </el-card>
 
     <!-- 详情抽屉 -->
-    <el-drawer v-model="drawerVisible" title="预计划详情" size="520px">
+    <el-drawer v-model="drawerVisible" title="预计划详情" size="620px">
       <template v-if="detail">
-        <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="计划单号">{{ detail.planno }}</el-descriptions-item>
-          <el-descriptions-item label="状态"><el-tag :type="statusTag(detail.plan_status)" size="small">{{ statusLabel(detail.plan_status) }}</el-tag></el-descriptions-item>
-          <el-descriptions-item label="客户名称">{{ detail.custnm }}</el-descriptions-item>
-          <el-descriptions-item label="磁卡号">{{ detail.custcard || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="联系人">{{ detail.contactor || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="电话">{{ detail.phoneno || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="计划类型">{{ plLabel(detail.plantyp) }}</el-descriptions-item>
-          <el-descriptions-item label="机型">{{ detail.pos_item || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="押金">{{ detail.deposit ? '¥'+Number(detail.deposit).toLocaleString() : '-' }}</el-descriptions-item>
-          <el-descriptions-item label="租赁">{{ detail.is_rent==='Y'?'租赁':'购买' }}</el-descriptions-item>
-          <el-descriptions-item label="下游单据">{{ detail.imple_billid || '未生成' }}</el-descriptions-item>
-          <el-descriptions-item label="出库标志">{{ detail.is_outflag==='1'?'已出库':'未出库' }}</el-descriptions-item>
-        </el-descriptions>
+        <el-tabs v-model="detailTab">
+          <el-tab-pane label="预计划单" name="info">
+            <el-descriptions :column="2" border size="small">
+              <el-descriptions-item label="计划单号">{{ detail.planno }}</el-descriptions-item>
+              <el-descriptions-item label="状态"><el-tag :type="statusTag(detail.plan_status)" size="small">{{ statusLabel(detail.plan_status) }}</el-tag></el-descriptions-item>
+              <el-descriptions-item label="客户名称">{{ detail.custnm }}</el-descriptions-item>
+              <el-descriptions-item label="客户实名">{{ detail.custrnm || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="客户编码">{{ detail.custcd || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="磁卡号">{{ detail.custcard || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="新磁卡号" v-if="detail.new_custcard">{{ detail.new_custcard }}</el-descriptions-item>
+              <el-descriptions-item label="新客户" v-if="detail.new_custcd">{{ detail.new_custcd }} {{ detail.new_custnm || '' }}</el-descriptions-item>
+              <el-descriptions-item label="地址">{{ detail.address || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="新地址" v-if="detail.new_address">{{ detail.new_address }}</el-descriptions-item>
+              <el-descriptions-item label="联系人">{{ detail.contactor || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="电话">{{ detail.phoneno || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="经理">{{ detail.jl_contactor || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="经理电话">{{ detail.jl_phoneno || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="计划类型">{{ plLabel(detail.plantyp) }}</el-descriptions-item>
+              <el-descriptions-item label="业务类型">{{ bsLabel(detail.busityp) || detail.busityp || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="设备来源">{{ detail.pos_from || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="机型">{{ detail.pos_item || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="押金">{{ detail.deposit ? '¥'+Number(detail.deposit).toLocaleString() : '-' }}</el-descriptions-item>
+              <el-descriptions-item label="租赁">{{ detail.is_rent==='Y'?'租赁':'购买' }}</el-descriptions-item>
+              <el-descriptions-item label="合同">{{ detail.is_contract==='1'?'是':'否' }}</el-descriptions-item>
+              <el-descriptions-item label="运营类型">{{ detail.yun_type || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="下游单据">{{ detail.imple_billid || '未生成' }}</el-descriptions-item>
+              <el-descriptions-item label="出库标志">{{ detail.is_outflag==='1'?'已出库':'未出库' }}</el-descriptions-item>
+              <el-descriptions-item label="服务工程师">{{ detail.serve_ercd || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="创建日期">{{ detail.gendate || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="操作员">{{ detail.opercd || '-' }}</el-descriptions-item>
+            </el-descriptions>
+          </el-tab-pane>
 
-        <!-- 呼出记录 -->
-        <h4 style="margin:16px 0 8px">呼出记录</h4>
-        <el-table :data="serveRecords" size="small" v-loading="serveLoading" empty-text="暂无呼出记录">
-          <el-table-column prop="servetyp" label="类型" width="70"><template #default="{row}">{{ ['客户确认','预计划呼出','实施任务'][Number(row.servetyp)]||row.servetyp }}</template></el-table-column>
-          <el-table-column prop="serve_task" label="任务" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="serve_back" label="反馈" min-width="100" show-overflow-tooltip />
-          <el-table-column label="状态" width="80"><template #default="{row}"><el-tag :type="row.status==='01'?'success':row.status==='09'?'danger':'info'" size="small">{{ {00:'待呼出',01:'已呼出',09:'已作废'}[row.status]||row.status }}</el-tag></template></el-table-column>
-        </el-table>
+          <el-tab-pane label="呼出记录" name="serve">
+            <el-table :data="serveRecords" size="small" v-loading="serveLoading" empty-text="暂无呼出记录">
+              <el-table-column prop="servetyp" label="类型" width="80"><template #default="{row}">{{ ['客户确认','预计划呼出','实施任务'][Number(row.servetyp)]||row.servetyp }}</template></el-table-column>
+              <el-table-column prop="serve_task" label="任务" min-width="100" show-overflow-tooltip />
+              <el-table-column prop="serve_back" label="呼出结果" width="80"><template #default="{row}"><el-tag :type="{Y:'success',N:'danger',O:'warning'}[row.serve_back]||'info'" size="small">{{ {Y:'同意',N:'不同意',O:'未接通'}[row.serve_back]||row.serve_back||'-' }}</el-tag></template></el-table-column>
+              <el-table-column prop="serve_mark" label="客户反馈" min-width="120" show-overflow-tooltip />
+              <el-table-column prop="commmode" label="通讯方式" width="80" />
+              <el-table-column label="状态" width="80"><template #default="{row}"><el-tag :type="row.status==='01'?'success':row.status==='09'?'danger':'info'" size="small">{{ {00:'待呼出',01:'已呼出',09:'已作废'}[row.status]||row.status }}</el-tag></template></el-table-column>
+              <el-table-column prop="gendate" label="日期" width="90" />
+              <el-table-column prop="genercd" label="操作员" width="70" />
+            </el-table>
+          </el-tab-pane>
+
+          <el-tab-pane label="当前设备" name="device">
+            <el-table :data="custDevices" size="small" v-loading="deviceLoading" empty-text="暂无设备信息">
+              <el-table-column prop="eid" label="设备EID" width="120" />
+              <el-table-column prop="itemcd" label="物料编码" width="90" />
+              <el-table-column prop="startdate" label="安装日期" width="90" />
+              <el-table-column prop="status" label="状态" width="70" />
+              <el-table-column prop="sflg" label="EID状态" width="80" />
+            </el-table>
+          </el-tab-pane>
+
+          <el-tab-pane label="历史设备" name="history">
+            <el-table :data="deviceHistory" size="small" v-loading="historyLoading" empty-text="暂无历史记录">
+              <el-table-column prop="change_type" label="变更类型" width="80" />
+              <el-table-column prop="old_eid" label="旧EID" width="120" />
+              <el-table-column prop="new_eid" label="新EID" width="120" />
+              <el-table-column prop="change_date" label="变更日期" width="90" />
+            </el-table>
+          </el-tab-pane>
+        </el-tabs>
 
         <!-- 操作区 -->
         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
@@ -131,6 +173,7 @@ import {
   fetchPlanServes,
 } from '@/api/sales'
 import type { PlanRecord, ServeRecord } from '@/api/sales'
+import request from '@/api/request'
 
 const { userName } = useUserNames()
 const { dictLabel: plLabel } = useDict('PL')
@@ -229,17 +272,40 @@ async function handleSave() {
 }
 
 // 详情抽屉
-const drawerVisible = ref(false); const detail = ref<PlanRecord | null>(null)
+const drawerVisible = ref(false); const detail = ref<PlanRecord | null>(null); const detailTab = ref('info')
 const serveRecords = ref<ServeRecord[]>([]); const serveLoading = ref(false)
+const custDevices = ref<any[]>([]); const deviceLoading = ref(false)
+const deviceHistory = ref<any[]>([]); const historyLoading = ref(false)
 
 async function openDetail(row: PlanRecord) {
-  detail.value = row; drawerVisible.value = true
+  detail.value = row; drawerVisible.value = true; detailTab.value = 'info'
   serveLoading.value = true
   try {
     const res = await fetchPlanServes(row.planno)
     serveRecords.value = (res.data as ServeRecord[]) || []
   } catch { serveRecords.value = [] }
   finally { serveLoading.value = false }
+
+  // 当前设备
+  if (row.custcd) {
+    deviceLoading.value = true
+    try {
+      const r = await request.get('/system/assets', { params: { cust_cd: row.custcd, per_page: 100 } }) as any
+      custDevices.value = r?.data?.items || []
+    } catch { custDevices.value = [] }
+    finally { deviceLoading.value = false }
+
+    // 设备变更历史
+    historyLoading.value = true
+    try {
+      const r = await request.get('/itsm/device-change', { params: { store_id: row.custcd, per_page: 100 } }) as any
+      deviceHistory.value = (r?.data?.items || []).map((d: any) => ({
+        change_type: d.change_type, old_eid: d.old_eid || d.device_id,
+        new_eid: d.new_device_id || d.new_store_card, change_date: d.gendate
+      }))
+    } catch { deviceHistory.value = [] }
+    finally { historyLoading.value = false }
+  }
 }
 
 // 状态操作
