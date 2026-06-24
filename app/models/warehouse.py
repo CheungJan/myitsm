@@ -287,7 +287,7 @@ class OverLostDt(BaseModel):
     whcd = db.Column(db.String(2), nullable=False, comment="仓库编码")
     olbillid = db.Column(
         db.String(8),
-        db.ForeignKey("twh17_overlost.olbillid"),
+        db.ForeignKey("twh17_overlost.olbillid", name="fk_twh18_overlostdt_olbillid"),
         nullable=False,
         comment="盘点单号",
     )
@@ -310,7 +310,7 @@ class OverLostEid(BaseModel):
     whcd = db.Column(db.String(2), nullable=False, comment="仓库编码")
     olbillid = db.Column(
         db.String(8),
-        db.ForeignKey("twh17_overlost.olbillid"),
+        db.ForeignKey("twh17_overlost.olbillid", name="fk_twh18_overlosteid_olbillid"),
         nullable=False,
         comment="盘点单号",
     )
@@ -459,6 +459,10 @@ class QcResult(BaseModel):
     qcstatus = db.Column(db.String(2), comment="质检状态")
     draft_type = db.Column(db.String(1), default="", comment="草稿类型：S=暂存 C=提交")
     memo = db.Column(db.String(200), comment="备注")
+
+    __table_args__ = (
+        db.Index("idx_qc_batch_id", "batch_id"),
+    )
 
     detail_items = db.relationship("QcResultDt", back_populates="qc_result", lazy="dynamic")
     detail_eids = db.relationship("QcResultEid", back_populates="qc_result", lazy="dynamic")

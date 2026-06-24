@@ -168,9 +168,13 @@ class ReplaceRecord(BaseModel):
     wo_id = db.Column(db.String(20), nullable=False, comment="工单号")
     old_eid = db.Column(db.String(20), comment="旧物料序列号（批次物料可为空）")
     new_eid = db.Column(db.String(20), comment="新物料序列号（批次物料可为空，FQC合格后生成）")
-    itemcd = db.Column(db.String(12), nullable=False, comment="物料编码")
+    itemcd = db.Column(db.String(12), nullable=True, comment="物料编码")
     old_batch_no = db.Column(db.String(20), comment="旧批次号（批次物料使用）")
     new_batch_no = db.Column(db.String(20), comment="新批次号（批次物料使用）")
     replace_date = db.Column(db.TIMESTAMP, comment="更换时间")
     opercd = db.Column(db.String(10), comment="操作人")
     memo = db.Column(db.String(200), comment="备注")
+
+    __table_args__ = (
+        db.Index("idx_tms05_wo", "wo_id"),
+    )

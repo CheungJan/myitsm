@@ -40,16 +40,48 @@ class PlanCustRepository:
         plantyp: str | None = None,
         plan_status: str | None = None,
         custcd: str | None = None,
+        planno: str | None = None,
+        custnm: str | None = None,
+        custcard: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        serve_status: str | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> tuple[list[PlanCust], int]:
+        from datetime import datetime as _dt
+        from sqlalchemy import exists, select as _select
+        from app.models.sales import PlanServe
+
         query = db.session.query(PlanCust)
+        if planno:
+            query = query.filter(PlanCust.planno.ilike(f"%{planno}%"))
         if plantyp:
             query = query.filter(PlanCust.plantyp == plantyp)
         if plan_status:
             query = query.filter(PlanCust.plan_status == plan_status)
         if custcd:
             query = query.filter(PlanCust.custcd == custcd)
+        if custnm:
+            query = query.filter(PlanCust.custnm.ilike(f"%{custnm}%"))
+        if custcard:
+            query = query.filter(PlanCust.custcard.ilike(f"%{custcard}%"))
+        if date_from:
+            try:
+                query = query.filter(PlanCust.gendate >= _dt.strptime(date_from, "%Y-%m-%d"))
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                query = query.filter(PlanCust.gendate < _dt.strptime(date_to, "%Y-%m-%d").replace(hour=23, minute=59, second=59))
+            except ValueError:
+                pass
+        if serve_status:
+            subq = _select(PlanServe.planno).where(
+                PlanServe.status == serve_status,
+                PlanServe.planno == PlanCust.planno,
+            )
+            query = query.filter(exists(subq))
         query = query.order_by(desc(PlanCust.gendate))
         total: int = query.count()
         items: list[PlanCust] = query.offset((page - 1) * per_page).limit(per_page).all()

@@ -41,7 +41,7 @@ def create_app(config_name: str | None = None) -> Flask:
 def _init_extensions(app: Flask) -> None:
     """初始化扩展。"""
     db.init_app(app)
-    migrate.init_app(app, db)
+    migrate.init_app(app, db, compare_type=True, include_comments=False)
     cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
 
 

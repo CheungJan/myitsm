@@ -6,13 +6,25 @@
     </div>
     <el-card shadow="never" style="margin-bottom:16px">
       <div class="search-bar">
-        <div class="field"><label>计划单号</label><el-input v-model="searchPlanno" placeholder="输入单号" size="small" style="width:140px" clearable @keyup.enter="onSearch" /></div>
-        <div class="field"><label>客户名称</label><el-input v-model="searchCustNm" placeholder="输入客户" size="small" style="width:160px" clearable @keyup.enter="onSearch" /></div>
-        <div class="field"><label>状态</label><el-select v-model="searchStatus" size="small" style="width:120px" clearable>
+        <div class="field"><label>计划单号</label><el-input v-model="searchPlanno" placeholder="输入单号" size="small" style="width:130px" clearable @keyup.enter="onSearch" /></div>
+        <div class="field"><label>磁卡号</label><el-input v-model="searchCustcard" placeholder="磁卡号模糊" size="small" style="width:130px" clearable @keyup.enter="onSearch" /></div>
+        <div class="field"><label>客户名称</label><el-input v-model="searchCustNm" placeholder="输入客户" size="small" style="width:130px" clearable @keyup.enter="onSearch" /></div>
+        <div class="field"><label>计划类型</label><el-select v-model="searchPlantyp" size="small" style="width:110px" clearable>
+          <el-option label="新机开通" value="00" /><el-option label="设备变更" value="10" />
+          <el-option label="旧机翻新" value="20" /><el-option label="设备取回" value="30" />
+          <el-option label="门店关闭" value="40" /></el-select></div>
+        <div class="field"><label>状态</label><el-select v-model="searchStatus" size="small" style="width:110px" clearable>
           <el-option label="计划中" value="00" /><el-option label="已确认" value="01" />
           <el-option label="实施中" value="02" /><el-option label="已完成" value="04" />
           <el-option label="已作废" value="09" /></el-select></div>
-        <el-button type="primary" size="small" @click="onSearch" style="margin-left:auto">查询</el-button>
+        <div class="field"><label>计划日期</label>
+          <el-date-picker v-model="searchDateFrom" type="date" placeholder="开始" size="small" style="width:120px" value-format="YYYY-MM-DD" clearable />
+          <span style="margin:0 4px">至</span>
+          <el-date-picker v-model="searchDateTo" type="date" placeholder="结束" size="small" style="width:120px" value-format="YYYY-MM-DD" clearable />
+        </div>
+        <div class="field"><el-checkbox v-model="searchServeStatus" true-value="01" false-value="">仅呼出中</el-checkbox></div>
+        <el-button type="primary" size="small" @click="onSearch">查询</el-button>
+        <el-button size="small" @click="onReset">重置</el-button>
       </div>
     </el-card>
     <el-card shadow="never">
@@ -161,9 +173,19 @@ function vCan(row: PlanRecord) { return ['00', '01', '02'].includes(row.plan_sta
 const plans = ref<PlanRecord[]>([]); const loading = ref(false)
 const page = ref(1); const perPage = ref(20); const total = ref(0)
 const searchPlanno = ref(''); const searchCustNm = ref(''); const searchStatus = ref('')
+const searchCustcard = ref(''); const searchPlantyp = ref('')
+const searchDateFrom = ref(''); const searchDateTo = ref('')
+const searchServeStatus = ref('')
 
 watch(page, () => loadData()); watch(perPage, () => { page.value = 1; loadData() })
 onMounted(() => loadData())
+
+function onReset() {
+  searchPlanno.value = ''; searchCustNm.value = ''; searchStatus.value = ''
+  searchCustcard.value = ''; searchPlantyp.value = ''
+  searchDateFrom.value = ''; searchDateTo.value = ''; searchServeStatus.value = ''
+  page.value = 1; loadData()
+}
 
 async function loadData() {
   loading.value = true
@@ -172,6 +194,11 @@ async function loadData() {
     if (searchPlanno.value) params.planno = searchPlanno.value
     if (searchCustNm.value) params.custnm = searchCustNm.value
     if (searchStatus.value) params.plan_status = searchStatus.value
+    if (searchCustcard.value) params.custcard = searchCustcard.value
+    if (searchPlantyp.value) params.plantyp = searchPlantyp.value
+    if (searchDateFrom.value) params.date_from = searchDateFrom.value
+    if (searchDateTo.value) params.date_to = searchDateTo.value
+    if (searchServeStatus.value) params.serve_status = searchServeStatus.value
     const res = await fetchPlans(params)
     plans.value = res.data.items || []; total.value = res.data.total || 0
   } catch { ElMessage.error('加载失败') }

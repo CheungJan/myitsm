@@ -256,6 +256,10 @@ class CustPosRl(BaseModel):
     source_id = db.Column(db.String(20), comment="来源单号")
     warranty_expire = db.Column(db.DateTime, comment="保修到期日")
 
+    __table_args__ = (
+        db.Index("idx_cust_pos_rl_eid_useflg", "eid", "useflg"),
+    )
+
     customer = db.relationship("Customer", back_populates="positions")
 
 
@@ -474,13 +478,18 @@ class EidTrack(BaseModel):
     asset_owner = db.Column(db.String(20), comment="资产所属方")
     n_asset_owner = db.Column(db.String(20), comment="新资产所属方")
 
+    __table_args__ = (
+        db.Index("idx_eid_track_eid_itemcd", "eid", "itemcd"),
+        db.Index("idx_eid_track_type_eid", "type", "eid"),
+    )
+
 
 class Bom(BaseModel):
     """BOM清单主表（TMM41_BOM）。"""
 
     __tablename__ = "tmm41_bom"
 
-    bomcd = db.Column(db.String(6), primary_key=True, comment="BOM编码")
+    bomcd = db.Column(db.String(20), primary_key=True, comment="BOM编码")
     bomnm = db.Column(db.String(50), comment="BOM名称")
     opercd = db.Column(db.String(6), comment="操作员")
     gendate = db.Column(db.DateTime, comment="创建日期")
@@ -498,7 +507,7 @@ class BomDt(BaseModel):
     __table_args__ = (db.PrimaryKeyConstraint("bomcd", "itemcd"),)
 
     bomcd = db.Column(
-        db.String(6),
+        db.String(20),
         db.ForeignKey("tmm41_bom.bomcd"),
         nullable=False,
         comment="BOM编码",
@@ -519,7 +528,12 @@ class CustItems(BaseModel):
     __tablename__ = "tmm24_custitems"
     __table_args__ = (db.PrimaryKeyConstraint("itemcd", "custcd"),)
 
-    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    itemcd = db.Column(
+        db.String(6),
+        db.ForeignKey("tmm12_items.item_cd", name="fk_custitems_item", onupdate="CASCADE"),
+        nullable=False,
+        comment="物料编码",
+    )
     custcd = db.Column(db.String(8), nullable=False, comment="客户编码")
     dfltflg = db.Column(db.String(1), comment="默认标志")
     opercd = db.Column(db.String(6), comment="操作员")
@@ -585,3 +599,8 @@ class PosREid(BaseModel):
     gendate = db.Column(db.DateTime, comment="创建日期")
     upddate = db.Column(db.DateTime, comment="更新日期")
     useflg = db.Column(db.String(1), default="1")
+
+    __table_args__ = (
+        db.Index("idx_pos_r_eid_eid", "eid"),
+        db.Index("idx_pos_r_eid_useflg", "useflg", "eid"),
+    )

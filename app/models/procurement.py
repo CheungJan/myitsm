@@ -13,6 +13,8 @@
 
 from __future__ import annotations
 
+from sqlalchemy import Index, UniqueConstraint, ForeignKeyConstraint
+
 from app.extensions import db
 from app.models.base import BaseModel
 
@@ -57,7 +59,12 @@ class PurchasePlanDt(BaseModel):
         comment="采购计划号",
     )
     lineno = db.Column(db.Integer, nullable=False, comment="行号")
-    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    itemcd = db.Column(
+        db.String(6),
+        db.ForeignKey("tmm12_items.item_cd", name="fk_pcplandt_item", onupdate="CASCADE"),
+        nullable=False,
+        comment="物料编码",
+    )
     rgstqty = db.Column(db.Integer, default=0, comment="登记数量")
     units = db.Column(db.String(4), comment="单位")
     storeqty = db.Column(db.Integer, default=0, comment="库存数量")
@@ -83,7 +90,7 @@ class PurchasePlanStatus(BaseModel):
     gendate = db.Column(db.DateTime, comment="创建日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     upddate = db.Column(db.DateTime, comment="更新日期")
-    refbillid = db.Column(db.String(8), comment="关联单号")
+    refbillid = db.Column(db.String(30), comment="关联单号")
 
 
 # ---------------------------------------------------------------------------
@@ -122,12 +129,17 @@ class PurchaseRegisterDt(BaseModel):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     rgstbillid = db.Column(
         db.String(8),
-        db.ForeignKey("tpc12_register.rgstbillid"),
+        db.ForeignKey("tpc12_register.rgstbillid", name="tpc13_registerdt_rgstbillid_fkey", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
         comment="登记单号",
     )
     lineno = db.Column(db.Integer, nullable=False, comment="行号")
-    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    itemcd = db.Column(
+        db.String(6),
+        db.ForeignKey("tmm12_items.item_cd", name="fk_registerdt_item", onupdate="CASCADE"),
+        nullable=False,
+        comment="物料编码",
+    )
     rgsqty = db.Column(db.Integer, default=0, comment="登记数量")
     memo = db.Column(db.String(255), comment="备注")
     units = db.Column(db.String(4), comment="单位")
@@ -137,6 +149,10 @@ class PurchaseRegisterDt(BaseModel):
     auditqty = db.Column(db.Integer, default=0, comment="审批数量")
     ref_pcplanid = db.Column(db.String(20), comment="来源需求单号")
     ref_pclineno = db.Column(db.Integer, comment="来源需求行号")
+
+    __table_args__ = (
+        UniqueConstraint("rgstbillid", "lineno", name="uq_tpc13_registerdt_bill_line"),
+    )
 
     register = db.relationship("PurchaseRegister", back_populates="details")
 
@@ -202,6 +218,19 @@ class PurchaseBillDt(BaseModel):
     settle_qty = db.Column(db.Numeric(12, 2), nullable=False, comment="本次结算数量")
     settle_price = db.Column(db.Numeric(16, 4), nullable=False, comment="结算单价")
     settle_amt = db.Column(db.Numeric(16, 4), nullable=False, comment="结算金额")
+
+    __table_args__ = (
+        UniqueConstraint("pcbillid", "lineno", name="tpc14_pcbilldt_pcbillid_lineno_key"),
+        Index("ix_tpc14_pcbilldt_pcbillid", "pcbillid"),
+        Index("ix_tpc14_pcbilldt_itemcd", "itemcd"),
+        Index("ix_tpc14_pcbilldt_ref_reg", "ref_rgstbillid", "ref_rgstlineno"),
+        ForeignKeyConstraint(
+            ["ref_rgstbillid", "ref_rgstlineno"],
+            ["tpc13_registerdt.rgstbillid", "tpc13_registerdt.lineno"],
+            name="fk_tpc14_pcbilldt_ref_registerdt",
+            ondelete="RESTRICT",
+        ),
+    )
 
     bill = db.relationship("PurchaseBill", back_populates="details")
 
@@ -322,7 +351,12 @@ class RequisitionOrderLink(BaseModel):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     pcplanid = db.Column(db.String(20), nullable=False, comment="来源需求单号")
     pclineno = db.Column(db.Integer, nullable=False, comment="来源需求行号")
-    rgstbillid = db.Column(db.String(20), nullable=False, comment="采购订单号")
+    rgstbillid = db.Column(
+        db.String(20),
+        db.ForeignKey("tpc12_register.rgstbillid", name="fk_tpc20_register", ondelete="CASCADE"),
+        nullable=False,
+        comment="采购订单号",
+    )
     rgstlineno = db.Column(db.Integer, nullable=False, comment="订单行号")
     linkqty = db.Column(db.Numeric(12, 2), default=0, comment="关联数量")
     linkstatus = db.Column(

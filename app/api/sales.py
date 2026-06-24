@@ -47,6 +47,12 @@ def list_plans():  # type: ignore[no-untyped-def]
         plantyp=params.plantyp,
         plan_status=params.plan_status,
         custcd=params.custcd,
+        planno=params.planno,
+        custnm=params.custnm,
+        custcard=params.custcard,
+        date_from=params.date_from,
+        date_to=params.date_to,
+        serve_status=params.serve_status,
         page=params.page,
         per_page=params.per_page,
     )
@@ -195,16 +201,20 @@ def create_plan_serve(planno: str):  # type: ignore[no-untyped-def]
 def update_plan_serve(dtlid: int):  # type: ignore[no-untyped-def]
     """更新呼出单（反馈呼出结果）。"""
     body = PlanServeUpdate.model_validate(request.get_json(silent=True) or {})
-    record = PlanServeService.get(dtlid)
-    if record is None:
-        return error_response(message="呼出单不存在", code=404)
+    user_cd: str = g.current_user
     from app.repositories.sales_repository import PlanServeRepository
 
+    record = PlanServeRepository.get_by_id(dtlid)
+    if record is None:
+        return error_response(message="呼出单不存在", code=404)
+
     PlanServeRepository.update(
-        PlanServeRepository.get_by_id(dtlid),
-        body.model_dump(exclude_unset=True),
+        record,
+        {**body.model_dump(exclude_unset=True), "opercd": user_cd},
     )
-    return success_response(data=record)
+    from app.extensions import db
+    db.session.commit()
+    return success_response(data=record.to_dict())
 
 
 @sales_bp.post("/plan-serve/<int:dtlid>/transition")

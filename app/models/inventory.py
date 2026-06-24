@@ -82,7 +82,12 @@ class SupplierPrice(BaseModel):
     __tablename__ = "tip02_supplier_price"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    itemcd = db.Column(
+        db.String(6),
+        db.ForeignKey("tmm12_items.item_cd", name="fk_supplier_price_item", onupdate="CASCADE"),
+        nullable=False,
+        comment="物料编码",
+    )
     supp_cd = db.Column(db.String(8), nullable=False, comment="供应商编码")
     min_qty = db.Column(db.Numeric, default=0, comment="起订量")
     itemprice = db.Column(db.Numeric(12, 2), nullable=False, comment="供应商报价")
@@ -176,8 +181,8 @@ class Label(BaseModel):
     __tablename__ = "tmm40_label"
     __table_args__ = (db.PrimaryKeyConstraint("labelid", "classcd"),)
 
-    labelid = db.Column(db.String(13), nullable=False, comment="标签号（即激活后的EID）")
-    classcd = db.Column(db.String(6), nullable=False, comment="物料中类编码")
+    labelid = db.Column(db.String(20), nullable=False, comment="标签号（即激活后的EID）")
+    classcd = db.Column(db.String(10), nullable=True, comment="物料中类编码")
     opercd = db.Column(db.String(6), comment="操作员")
     gendate = db.Column(db.DateTime, comment="创建日期")
     upddate = db.Column(db.DateTime, comment="更新日期")
