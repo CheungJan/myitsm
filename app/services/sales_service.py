@@ -59,18 +59,19 @@ def _enrich_class_nm(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 class PlanStatus(str, Enum):
-    """预计划状态码（对齐 PB plan_cust.status 字段，2位码）。
+    """预计划状态码（对齐 PB tmm31_syscodes codetyp='TS'）。
 
-    PB 原值分布：00=计划中 01=已确认 02=实施中 04=已完成 09=作废。
-    plan_cust.plan_status 在 PB 中存储呼出结果(N/Y/O)，我们统一简化：
-    plan_status 即工作流状态，呼出结果放 PLAN_SERVE.serve_back。
+    PB 码表定义：00=计划中 01=计划完成 02=分派中 03=实施完成
+    04=实施中 08=计划退回 09=计划作废。
     """
 
-    PLANNING = "00"  # 计划中（初始）
-    CONFIRMED = "01"  # 已确认（呼出完成）
-    IMPLEMENTING = "02"  # 实施中（实施计划已制定）
-    COMPLETED = "04"  # 已完成（设备出库 + 客户转正）
-    VOIDED = "09"  # 已作废
+    PLANNING = "00"         # 计划中
+    COMPLETED = "01"        # 计划完成（呼出确认+实施完成）
+    DISPATCHING = "02"      # 分派中
+    IMPL_DONE = "03"        # 实施完成（下游单据已生成）
+    IMPLEMENTING = "04"     # 实施中
+    RETURNED = "08"         # 计划退回
+    VOIDED = "09"           # 计划作废
 
     @classmethod
     def from_code(cls, code: str) -> "PlanStatus | None":
@@ -83,21 +84,26 @@ class PlanStatus(str, Enum):
     def display_name(self) -> str:
         names: dict[str, str] = {
             "00": "计划中",
-            "01": "已确认",
-            "02": "实施中",
-            "04": "已完成",
-            "09": "已作废",
+            "01": "计划完成",
+            "02": "分派中",
+            "03": "实施完成",
+            "04": "实施中",
+            "08": "计划退回",
+            "09": "计划作废",
         }
         return names.get(self.value, self.value)
 
 
 class PlanStatusMachine:
-    """预计划状态机 —— 对齐 PB 实际状态流转。"""
+    """预计划状态机 —— 对齐 PB TS 码表流转。"""
 
     TRANSITIONS: dict[PlanStatus, list[PlanStatus]] = {
-        PlanStatus.PLANNING: [PlanStatus.CONFIRMED, PlanStatus.VOIDED],
-        PlanStatus.CONFIRMED: [PlanStatus.IMPLEMENTING, PlanStatus.VOIDED],
-        PlanStatus.IMPLEMENTING: [PlanStatus.COMPLETED, PlanStatus.VOIDED],
+        PlanStatus.PLANNING:     [PlanStatus.COMPLETED, PlanStatus.DISPATCHING, PlanStatus.VOIDED],
+        PlanStatus.COMPLETED:    [PlanStatus.DISPATCHING, PlanStatus.VOIDED],
+        PlanStatus.DISPATCHING:  [PlanStatus.IMPL_DONE, PlanStatus.IMPLEMENTING, PlanStatus.RETURNED, PlanStatus.VOIDED],
+        PlanStatus.IMPL_DONE:    [PlanStatus.IMPLEMENTING, PlanStatus.COMPLETED],
+        PlanStatus.IMPLEMENTING: [PlanStatus.IMPL_DONE, PlanStatus.RETURNED, PlanStatus.VOIDED],
+        PlanStatus.RETURNED:     [PlanStatus.PLANNING, PlanStatus.VOIDED],
     }
     TERMINAL_STATES: set[PlanStatus] = {
         PlanStatus.COMPLETED,
@@ -414,7 +420,7 @@ class PlanCustService:
     ) -> dict[str, object]:
         """实施确认：按 plantyp 生成下游 ITSM 单据 + 写押金 + 客户 TEMP→PENDING。
 
-        前置条件：plan_status 必须为 '01'（已确认/呼出完成）。
+        前置条件：plan_status 必须为 '02'（分派中）。
         幂等校验：已生成过则拒绝。
         通过 ITSM Repository 直接创建（不经过 Service 的独立 commit），
         保证与客户状态推进在同一事务内。
@@ -424,10 +430,10 @@ class PlanCustService:
             return {"success": False, "error": "预计划不存在"}
 
         current = record.plan_status or "00"
-        if current != "01":
+        if current != "02":
             return {
                 "success": False,
-                "error": f"预计划状态为 {current}，需要 01（已确认）才能实施",
+                "error": f"预计划状态为 {current}，需要 02（分派中）才能实施",
             }
 
         plantyp = record.plantyp
@@ -496,8 +502,8 @@ class PlanCustService:
             except Exception as exc:
                 logger.warning("押金写入失败 planno=%s: %s", planno, exc)
 
-        # 状态流转：01（已确认）→ 02（实施中）
-        record.plan_status = "02"
+        # 状态流转：02（分派中）→ 03（实施完成）
+        record.plan_status = "03"
 
         # 客户：TEMP → PENDING
         if record.custcd:
@@ -507,7 +513,7 @@ class PlanCustService:
         return {
             "success": True,
             "planno": planno,
-            "to_status": "02",
+            "to_status": "03",
             "downstream_id": downstream_id,
         }
 
@@ -519,28 +525,28 @@ class PlanCustService:
     ) -> dict[str, object]:
         """完成预计划：设备出库后调用，客户 PENDING→ACTIVE。
 
-        前置条件：plan_status='02'（实施中）。
+        前置条件：plan_status='04'（实施中）。
         """
         record = PlanCustRepository.get_by_id(planno)
         if record is None:
             return {"success": False, "error": "预计划不存在"}
 
         current = record.plan_status or "00"
-        if current != "02":
+        if current != "04":
             return {
                 "success": False,
-                "error": f"预计划状态为 {current}，需要 02（实施中）才能完成",
+                "error": f"预计划状态为 {current}，需要 04（实施中）才能完成",
             }
 
-        # 状态：02 → 04
-        record.plan_status = "04"
+        # 状态：04 → 01（计划完成）
+        record.plan_status = "01"
 
         # 客户：PENDING → ACTIVE
         if record.custcd:
             CustomerService.promote_to_active(record.custcd, operator)
 
         db.session.commit()
-        return {"success": True, "planno": planno, "to_status": "04"}
+        return {"success": True, "planno": planno, "to_status": "01"}
 
     @staticmethod
     def update(planno: str, data: dict[str, Any]) -> dict[str, Any] | None:
@@ -586,8 +592,8 @@ class PlanCustService:
         """预计划状态流转 —— 含状态机校验 + 客户生命周期推进。
 
         业务动作绑定：
-        - 00→01（呼出完成）：客户 TEMP → PENDING
-        - 02→04（设备出库）：客户 PENDING → ACTIVE
+        - 00→02（分派中/呼出完成）：客户 TEMP → PENDING
+        - 04→01（计划完成/设备出库）：客户 PENDING → ACTIVE
         其他流转仅校验状态机规则。
         """
         record = PlanCustRepository.get_by_id(planno)
@@ -602,12 +608,12 @@ class PlanCustService:
             return {"success": False, "error": str(validation.get("error", "状态流转校验失败"))}
 
         # 业务推进
-        # 01（已确认/呼出完成）：客户 TEMP → PENDING
-        if to_status == "01" and record.custcd:
+        # 02（分派中/呼出完成）：客户 TEMP → PENDING
+        if to_status == "02" and record.custcd:
             CustomerService.promote_to_pending(record.custcd)
 
-        # 04（已完成/设备出库）：客户 PENDING → ACTIVE
-        if to_status == "04" and record.custcd:
+        # 01（计划完成/设备出库）：客户 PENDING → ACTIVE
+        if to_status == "01" and record.custcd:
             CustomerService.promote_to_active(record.custcd, operator)
 
         record.plan_status = to_status
@@ -628,7 +634,7 @@ class PlanCustService:
         """作废预计划 —— 级联作废下游草稿 + 客户失效。
 
         规则：
-        - COMPLETED(04) 不可作废
+        - 计划完成(01) 不可作废
         - 下游单据已终态（status=3/5/9）则阻止
         - 下游草稿 → 标记作废
         - 客户 TEMP/PENDING → INVALID
@@ -640,7 +646,7 @@ class PlanCustService:
         current_status = record.plan_status or "00"
 
         # 终态不可作废
-        if current_status == "04":
+        if current_status == "01":
             return {"success": False, "error": "已完成的预计划不可作废"}
         if current_status == "09":
             return {"success": False, "error": "预计划已作废"}
@@ -675,7 +681,7 @@ class PlanCustService:
     ) -> dict[str, object]:
         """生成 OV=1 销售出库草稿 —— 仓库实施部领机时调用。
 
-        前置条件：plan_status='02'（实施中）。
+        前置条件：plan_status='04'（实施中）。
         创建 OV=1 草稿（refbillid=planno），仓库人工审核后出库。
         """
         record = PlanCustRepository.get_by_id(planno)
@@ -683,10 +689,10 @@ class PlanCustService:
             return {"success": False, "error": "预计划不存在"}
 
         current = record.plan_status or "00"
-        if current != "02":
+        if current != "04":
             return {
                 "success": False,
-                "error": f"预计划状态为 {current}，需要 02（实施中）才能生成出库单",
+                "error": f"预计划状态为 {current}，需要 04（实施中）才能生成出库单",
             }
 
         # 去重检查

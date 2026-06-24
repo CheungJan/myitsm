@@ -89,23 +89,23 @@ class TestPlanOrchestration:
         assert data["plantyp"] == "00"
         assert data["plan_status"] == "00"
 
-    def test_transition_00_to_01(self, app: Flask, client: FlaskClient) -> None:
-        """状态流转 00→01。"""
+    def test_transition_00_to_02(self, app: Flask, client: FlaskClient) -> None:
+        """状态流转 00→02（计划中→分派中）。"""
         headers = _auth_header(app)
         resp = _post(client, "/api/v1/sales/plans", {"plantyp": "10", "custnm": "流转测试"}, headers)
         planno = resp.get_json()["data"]["planno"]
 
-        resp2 = _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "01"}, headers)
+        resp2 = _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
         assert resp2.status_code == 200
         data = resp2.get_json()["data"]
-        assert data["to_status"] == "01"
+        assert data["to_status"] == "02"
 
     def test_implement_without_serve_blocks(self, app: Flask, client: FlaskClient) -> None:
         """无已呼出记录时实施被拒绝。"""
         headers = _auth_header(app)
         resp = _post(client, "/api/v1/sales/plans", {"plantyp": "10", "custnm": "无呼出测试", "custcd": "T002"}, headers)
         planno = resp.get_json()["data"]["planno"]
-        _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "01"}, headers)
+        _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
 
         resp3 = _post(client, f"/api/v1/sales/plans/{planno}/implement", {}, headers)
         assert resp3.status_code == 400
@@ -155,21 +155,21 @@ class TestPlanOrchestration:
         serve2 = client.get(f"/api/v1/sales/plans/{planno}/serve", headers=headers)
         assert serve2.get_json()["data"][0]["status"] == "01"
 
-        # 3. 状态流转 00→01
-        _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "01"}, headers)
+        # 3. 状态流转 00→02（计划中→分派中）
+        _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
 
         # 4. 实施确认
         impl_resp = _post(client, f"/api/v1/sales/plans/{planno}/implement", {}, headers)
         assert impl_resp.status_code == 200
         impl_data = impl_resp.get_json()["data"]
-        assert impl_data["to_status"] == "02"
+        assert impl_data["to_status"] == "03"
         downstream_id = impl_data["downstream_id"]
         assert downstream_id, "下游单据ID不应为空"
 
         # 5. 验证预计划上 imple_billid 已回写
         detail = client.get(f"/api/v1/sales/plans/{planno}", headers=headers)
         assert detail.get_json()["data"]["imple_billid"] == downstream_id
-        assert detail.get_json()["data"]["plan_status"] == "02"
+        assert detail.get_json()["data"]["plan_status"] == "03"
 
         # 6. 验证下游工单真实存在
         itsm_resp = client.get(f"/api/v1/itsm/maintenance-open/{downstream_id}", headers=headers)

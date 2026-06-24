@@ -14,9 +14,10 @@
           <el-option label="旧机翻新" value="20" /><el-option label="设备取回" value="30" />
           <el-option label="门店关闭" value="40" /></el-select></div>
         <div class="field"><label>状态</label><el-select v-model="searchStatus" size="small" style="width:110px" clearable>
-          <el-option label="计划中" value="00" /><el-option label="已确认" value="01" />
-          <el-option label="实施中" value="02" /><el-option label="已完成" value="04" />
-          <el-option label="已作废" value="09" /></el-select></div>
+          <el-option label="计划中" value="00" /><el-option label="计划完成" value="01" />
+          <el-option label="分派中" value="02" /><el-option label="实施完成" value="03" />
+          <el-option label="实施中" value="04" /><el-option label="计划退回" value="08" />
+          <el-option label="计划作废" value="09" /></el-select></div>
         <div class="field"><label>计划日期</label>
           <el-date-picker v-model="searchDateFrom" type="date" placeholder="开始" size="small" style="width:120px" value-format="YYYY-MM-DD" clearable />
           <span style="margin:0 4px">至</span>
@@ -49,10 +50,10 @@
         <el-table-column label="操作" width="210" fixed="right">
           <template #default="{row}">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="row.plan_status==='00'" link type="success" size="small" @click="doTransition(row,'01')">确认</el-button>
-            <el-button v-if="row.plan_status==='01'" link type="warning" size="small" @click="doImplement(row)">实施</el-button>
-            <el-button v-if="row.plan_status==='02'" link type="primary" size="small" @click="doOutbound(row)">出库</el-button>
-            <el-button v-if="row.plan_status==='02'" link type="success" size="small" @click="doComplete(row)">完成</el-button>
+            <el-button v-if="row.plan_status==='00'" link type="success" size="small" @click="doTransition(row,'02')">确认</el-button>
+            <el-button v-if="row.plan_status==='02'" link type="warning" size="small" @click="doImplement(row)">实施</el-button>
+            <el-button v-if="row.plan_status==='04'" link type="primary" size="small" @click="doOutbound(row)">出库</el-button>
+            <el-button v-if="row.plan_status==='04'" link type="success" size="small" @click="doComplete(row)">完成</el-button>
             <el-button v-if="vCan(row)" link type="danger" size="small" @click="doVoid(row)">作废</el-button>
           </template>
         </el-table-column>
@@ -89,10 +90,10 @@
 
         <!-- 操作区 -->
         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
-          <el-button v-if="detail.plan_status==='00'" type="success" size="small" @click="doTransition(detail,'01')">确认呼出</el-button>
-          <el-button v-if="detail.plan_status==='01'" type="warning" size="small" @click="doImplement(detail)">实施确认（生成下游单据）</el-button>
-          <el-button v-if="detail.plan_status==='02'" type="primary" size="small" @click="doOutbound(detail)">生成出库单(OV=1)</el-button>
-          <el-button v-if="detail.plan_status==='02'" type="success" size="small" @click="doComplete(detail)">完成（客户转正）</el-button>
+          <el-button v-if="detail.plan_status==='00'" type="success" size="small" @click="doTransition(detail,'02')">确认呼出</el-button>
+          <el-button v-if="detail.plan_status==='02'" type="warning" size="small" @click="doImplement(detail)">实施确认（生成下游单据）</el-button>
+          <el-button v-if="detail.plan_status==='04'" type="primary" size="small" @click="doOutbound(detail)">生成出库单(OV=1)</el-button>
+          <el-button v-if="detail.plan_status==='04'" type="success" size="small" @click="doComplete(detail)">完成（客户转正）</el-button>
           <el-button v-if="vCan(detail)" type="danger" size="small" @click="doVoid(detail)">作废</el-button>
         </div>
       </template>
@@ -144,30 +145,30 @@ const plOptions = [
 
 // 状态标签映射 (对齐 PB plan_cust.status: 00/01/02/04/09)
 function statusLabel(s: string) {
-  const m: Record<string, string> = { '00': '计划中', '01': '已确认', '02': '实施中', '04': '已完成', '09': '已作废' }
+  const m: Record<string, string> = { '00': '计划中', '01': '计划完成', '02': '分派中', '03': '实施完成', '04': '实施中', '08': '计划退回', '09': '计划作废' }
   return m[s] || s
 }
 function statusTag(s: string) {
-  const m: Record<string, string> = { '00': 'info', '01': 'warning', '02': 'primary', '04': 'success', '09': 'danger' }
+  const m: Record<string, string> = { '00': 'info', '01': 'success', '02': 'warning', '03': 'primary', '04': '', '08': 'danger', '09': 'danger' }
   return m[s] || 'info'
 }
 // 客户生命周期标签
 function custLabel(row: PlanRecord) {
   const s = row.plan_status
   if (s === '09') return '已失效'
-  if (s === '04') return '正式'
+  if (s === '01') return '正式'
   if (s === '00') return '临时'
-  return '待确认'
+  return '进行中'
 }
 function custTag(row: PlanRecord) {
   const s = row.plan_status
   if (s === '09') return 'danger'
-  if (s === '04') return 'success'
+  if (s === '01') return 'success'
   if (s === '00') return 'info'
   return 'warning'
 }
 // 可作废的状态
-function vCan(row: PlanRecord) { return ['00', '01', '02'].includes(row.plan_status || '') }
+function vCan(row: PlanRecord) { return ['00', '02', '03', '04', '08'].includes(row.plan_status || '') }
 
 // 列表
 const plans = ref<PlanRecord[]>([]); const loading = ref(false)
