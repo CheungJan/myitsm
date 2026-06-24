@@ -81,6 +81,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         menu_cd: 'sales', menu_nm: '销售管理',
         children: [
             { menu_cd: 'plans', menu_nm: '预计划管理', path: '/sales/plans' },
+            { menu_cd: 'sales-serves', menu_nm: '呼出管理', path: '/sales/serves' },
+            { menu_cd: 'sales-imple', menu_nm: '计划实施管理', path: '/sales/imple-plans' },
             { menu_cd: 'sales-bills', menu_nm: '销售单据', path: '/sales/bills' },
             { menu_cd: 'sales-extend', menu_nm: '延期管理', path: '/sales/extends' },
             { menu_cd: 'calls', menu_nm: '话务台', path: '/sales/calls' }
