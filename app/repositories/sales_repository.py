@@ -50,8 +50,6 @@ class PlanCustRepository:
         per_page: int = 20,
     ) -> tuple[list[PlanCust], int]:
         from datetime import datetime as _dt
-        from sqlalchemy import exists, select as _select
-        from app.models.sales import PlanServe
 
         query = db.session.query(PlanCust)
         if planno:
@@ -77,11 +75,7 @@ class PlanCustRepository:
             except ValueError:
                 pass
         if serve_status:
-            subq = _select(PlanServe.planno).where(
-                PlanServe.status == serve_status,
-                PlanServe.planno == PlanCust.planno,
-            )
-            query = query.filter(exists(subq))
+            query = query.filter(PlanCust.serve_status == serve_status)
         query = query.order_by(desc(PlanCust.gendate))
         total: int = query.count()
         items: list[PlanCust] = query.offset((page - 1) * per_page).limit(per_page).all()
