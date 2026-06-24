@@ -286,25 +286,30 @@ async function openDetail(row: PlanRecord) {
   } catch { serveRecords.value = [] }
   finally { serveLoading.value = false }
 
-  // 当前设备 & EID 追溯
-  const posid = row.posid
-  if (posid) {
+  // 当前设备：客户当前有效的门店设备 (cust_cd)
+  if (row.custcd) {
     deviceLoading.value = true
     try {
-      const r = await request.get(`/system/eid/${posid}`) as any
-      const eid = r?.data || {}
-      custDevices.value = [{ eid: posid, itemcd: eid.itemcd || row.pos_item, sflg: eid.sflg, qcflg: eid.qcflg, whcd: eid.whcd }]
-    } catch { custDevices.value = [{ eid: posid, itemcd: row.pos_item || '-', sflg: '-', qcflg: '-', whcd: '-' }] }
+      const r = await request.get('/assets', { params: { cust_cd: row.custcd, useflg: '1', per_page: 100 } }) as any
+      custDevices.value = (r?.data?.items || []).map((a: any) => ({
+        eid: a.eid, itemcd: a.item_cd || a.itemcd, sflg: a.sflg, qcflg: a.qcflg, whcd: a.whcd,
+      }))
+    } catch { custDevices.value = [] }
     finally { deviceLoading.value = false }
 
-    // EID 变更历史
+    // 历史设备：预计划关联的设备(取回/变更) + EID追溯
     historyLoading.value = true
     try {
-      const r = await request.get(`/system/eid/${posid}/track`) as any
-      deviceHistory.value = (r?.data || []).map((t: any) => ({
-        change_type: t.type, old_eid: t.old_eid || t.from_value,
-        new_eid: t.new_eid || t.to_value, change_date: t.update_time || t.gendate
-      }))
+      const posid = row.posid
+      const posItem = row.pos_item || ''
+      if (posid && posItem) {
+        const t = await request.get(`/eid/${posItem}/${posid}/tracks`) as any
+        deviceHistory.value = (t?.data || []).map((tr: any) => ({
+          change_type: tr.type, old_eid: tr.from_value, new_eid: tr.to_value, change_date: tr.gendate || tr.update_time,
+        }))
+      } else {
+        deviceHistory.value = []
+      }
     } catch { deviceHistory.value = [] }
     finally { historyLoading.value = false }
   } else {
