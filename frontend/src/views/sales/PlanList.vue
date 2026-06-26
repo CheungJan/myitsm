@@ -194,7 +194,8 @@ import request from '@/api/request'
 const { userName } = useUserNames()
 const { dictLabel: plLabel } = useDict('PL')
 const { dictLabel: bsLabel } = useDict('BT')
-const { dictOptions: pfOptions } = useDict('PF')  // 设备来源: 00商用仓库/01门店移机/02烟草直调/03IT公司/04海晟公司
+const { dictMap: pfMap } = useDict('PF')  // 设备来源: 00商用仓库/01门店移机/02烟草直调/03IT公司/04海晟公司
+const pfOptions = computed(() => Object.entries(pfMap.value).map(([k, v]) => ({ value: k, label: v })))
 
 // PL 码表作为下拉选项（兜底硬编码）
 const plOptions = [
