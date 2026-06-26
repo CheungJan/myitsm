@@ -205,7 +205,7 @@ const plOptions = [
 // 机型下拉选项(从 DepositPosModel useflg='1' 读取)
 const modelOptions = ref<{ model_cd: string; model_nm: string; rent_money: number }[]>([])
 async function loadModels() {
-  try { const r = await request.get<never,{data:any[]}>('/deposit/pos-models'); modelOptions.value = (r?.data||[]).filter((m:any)=>m.useflg==='1') } catch { modelOptions.value = [] }
+  try { const r = await request.get<never,{data:any[]}>('/deposit/deposit-models'); modelOptions.value = (r?.data||[]).filter((m:any)=>m.useflg==='1') } catch { modelOptions.value = [] }
 }
 
 // 表单字段条件显隐（按 plantyp + pos_from 联动）

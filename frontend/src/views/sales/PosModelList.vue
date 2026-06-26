@@ -39,7 +39,7 @@ const items = ref<PosModel[]>([]); const loading = ref(false)
 async function load() {
   loading.value = true
   try {
-    const r = await request.get<never, { data: PosModel[] }>('/deposit/pos-models')
+    const r = await request.get<never, { data: PosModel[] }>('/deposit/deposit-models')
     items.value = r?.data || []
   } catch { ElMessage.error('加载失败') }
   finally { loading.value = false }
@@ -55,9 +55,9 @@ async function doSave() {
   try {
     const payload = { model_nm: form.value.model_nm, rent_money: form.value.rent_money, sale_money: form.value.sale_money, useflg: form.value.useflg }
     if (isEdit.value) {
-      await request.put(`/deposit/pos-models/${form.value.model_cd}`, payload)
+      await request.put(`/deposit/deposit-models/${form.value.model_cd}`, payload)
     } else {
-      await request.post('/deposit/pos-models', { model_cd: form.value.model_cd, ...payload })
+      await request.post('/deposit/deposit-models', { model_cd: form.value.model_cd, ...payload })
     }
     dlg.value = false; load(); ElMessage.success('保存成功')
   } catch { ElMessage.error('保存失败') }
