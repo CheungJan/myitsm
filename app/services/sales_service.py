@@ -105,7 +105,7 @@ class PlanStatusMachine:
             PlanStatus.RETURNED, PlanStatus.VOIDED,
         ],
         PlanStatus.IMPL_DONE:    [PlanStatus.IMPLEMENTING, PlanStatus.COMPLETED],
-        PlanStatus.IMPLEMENTING: [PlanStatus.IMPL_DONE, PlanStatus.RETURNED, PlanStatus.VOIDED],
+        PlanStatus.IMPLEMENTING: [PlanStatus.IMPL_DONE, PlanStatus.COMPLETED, PlanStatus.RETURNED, PlanStatus.VOIDED],
         PlanStatus.RETURNED:     [PlanStatus.PLANNING, PlanStatus.VOIDED],
     }
     TERMINAL_STATES: set[PlanStatus] = {
@@ -229,13 +229,23 @@ def _build_downstream_payload(record: Any, plantyp: str, creator: str) -> dict[s
                 "count": 1,
             }
         )
-    elif plantyp == "10":  # 设备变更
+    elif plantyp == "10":  # 磁卡号变更（含三种子类型）
+        # CK=仅磁卡号变更, BG=磁卡号+设备变更, BQ=信息变更
+        has_card_change = bool((record.new_custcard or "").strip())
+        has_device_change = bool((record.new_posid or "").strip())
+        if has_device_change:
+            change_type = "BG"  # 磁卡号+设备同时变更
+        elif has_card_change:
+            change_type = "CK"  # 仅磁卡号变更
+        else:
+            change_type = "BQ"  # 信息变更（地址/电话/联系人等）
         base.update(
             {
                 "store_id": record.custcd or "",
-                "change_type": "BG",
+                "change_type": change_type,
                 "new_store_card": record.new_custcard or "",
                 "new_store_id": record.new_custcd or "",
+                "device_id": record.new_posid or None,
             }
         )
     elif plantyp == "20":  # 旧机翻新
