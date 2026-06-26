@@ -5,6 +5,7 @@ export interface PlanRecord {
     planno: string; plantyp: string; custcd: string; custnm: string
     custcard: string; custrnm?: string; plandate: string; plan_status: string
     opercd: string; gendate: string
+    customer_status?: string
     is_rent?: string; deposit?: number; yun_type?: string
     pos_item?: string; is_contract?: string; is_outflag?: string
     imple_status?: string; imple_billid?: string; serve_status?: string

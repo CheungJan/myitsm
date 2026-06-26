@@ -69,13 +69,15 @@ class CustomerService:
         preplan_id: str,
         creator: str,
     ) -> Customer:
-        """从预计划创建临时客户（customer_status=TEMP）。
+        """从预计划创建/更新客户。
 
-        返回创建的 Customer 实例（未 commit，由调用方统一提交）。
+        新客户（客户表无记录）→ TEMP。
+        已有正式客户（ACTIVE）→ 仅更新信息，保持 ACTIVE。
+        已有临时/待确认客户 → 保持原状态。
         """
         custcd = data.get("custcd") or ""
-        # 检查是否已存在同编码客户
         existing = db.session.get(Customer, custcd) if custcd else None
+        is_new = existing is None
         customer = existing or Customer(cust_cd=custcd)
 
         # 基本信息
@@ -86,13 +88,21 @@ class CustomerService:
         customer.contactor = data.get("contactor") or customer.contactor
         customer.phone_no = data.get("phoneno") or customer.phone_no
 
-        # 生命周期字段
-        customer.customer_status = CustomerStatus.TEMP.value
-        customer.source_type = CustomerSourceType.PREPLAN.value
-        customer.preplan_id = preplan_id
-        customer.useflg = "1"
+        # 生命周期字段：新客户=TEMP，已有正式客户=保持ACTIVE
+        if is_new:
+            customer.customer_status = CustomerStatus.TEMP.value
+            customer.source_type = CustomerSourceType.PREPLAN.value
+            customer.preplan_id = preplan_id
+            customer.useflg = "1"
+        elif customer.customer_status in (
+            None, "", CustomerStatus.TEMP.value, CustomerStatus.PENDING.value
+        ):
+            customer.customer_status = CustomerStatus.TEMP.value
+            customer.source_type = CustomerSourceType.PREPLAN.value
+            customer.preplan_id = preplan_id
+        # else: ACTIVE or INVALID → keep as is (existing formal customer)
 
-        if not existing:
+        if is_new:
             db.session.add(customer)
         return customer
 

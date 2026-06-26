@@ -50,7 +50,7 @@
         <el-table-column label="操作" width="210" fixed="right">
           <template #default="{row}">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="['00','01','02','04'].includes(row.plan_status)" link type="info" size="small" @click="doRequestServe(row)">请求呼出</el-button>
+            <el-button v-if="row.plan_status==='00'" link type="info" size="small" @click="doRequestServe(row)">请求呼出</el-button>
             <el-button v-if="row.plan_status==='00'" link type="success" size="small" @click="doTransition(row,'02')">确认</el-button>
             <el-button v-if="row.plan_status==='02'" link type="warning" size="small" @click="doImplement(row)">实施</el-button>
             <el-button v-if="row.plan_status==='04'" link type="primary" size="small" @click="doOutbound(row)">出库</el-button>
@@ -202,20 +202,30 @@ function statusTag(s: string) {
   const m: Record<string, string> = { '00': 'info', '01': 'success', '02': 'warning', '03': 'primary', '04': '', '08': 'danger', '09': 'danger' }
   return m[s] || 'info'
 }
-// 客户生命周期标签
+// 客户生命周期标签 — 优先读 customer_status(后端API新增字段)
 function custLabel(row: PlanRecord) {
+  const cs = row.customer_status as string
+  if (cs === 'TEMP') return '临时'
+  if (cs === 'PENDING') return '待确认'
+  if (cs === 'ACTIVE') return '正式'
+  if (cs === 'INVALID') return '已失效'
+  // fallback: 从 plan_status 推断
   const s = row.plan_status
   if (s === '09') return '已失效'
   if (s === '01') return '正式'
-  if (s === '00') return '临时'
-  return '进行中'
+  if (s === '00') return '待确认'
+  return '正式'
 }
 function custTag(row: PlanRecord) {
+  const cs = row.customer_status as string
+  if (cs === 'TEMP') return 'info'
+  if (cs === 'PENDING') return 'warning'
+  if (cs === 'ACTIVE') return 'success'
+  if (cs === 'INVALID') return 'danger'
   const s = row.plan_status
   if (s === '09') return 'danger'
   if (s === '01') return 'success'
-  if (s === '00') return 'info'
-  return 'warning'
+  return 'info'
 }
 // 可作废的状态
 function vCan(row: PlanRecord) { return ['00', '02', '03', '04', '08'].includes(row.plan_status || '') }

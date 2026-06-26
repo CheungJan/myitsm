@@ -12,7 +12,7 @@ from enum import Enum
 from typing import Any
 
 from app.extensions import db
-from app.models.master import CustClass
+from app.models.master import CustClass, Customer
 from app.repositories.sales_repository import (
     PlanCustRepository,
     PlanServeRepository,
@@ -100,7 +100,10 @@ class PlanStatusMachine:
     TRANSITIONS: dict[PlanStatus, list[PlanStatus]] = {
         PlanStatus.PLANNING:     [PlanStatus.COMPLETED, PlanStatus.DISPATCHING, PlanStatus.VOIDED],
         PlanStatus.COMPLETED:    [PlanStatus.DISPATCHING, PlanStatus.VOIDED],
-        PlanStatus.DISPATCHING:  [PlanStatus.IMPL_DONE, PlanStatus.IMPLEMENTING, PlanStatus.RETURNED, PlanStatus.VOIDED],
+        PlanStatus.DISPATCHING:  [
+            PlanStatus.IMPL_DONE, PlanStatus.IMPLEMENTING,
+            PlanStatus.RETURNED, PlanStatus.VOIDED,
+        ],
         PlanStatus.IMPL_DONE:    [PlanStatus.IMPLEMENTING, PlanStatus.COMPLETED],
         PlanStatus.IMPLEMENTING: [PlanStatus.IMPL_DONE, PlanStatus.RETURNED, PlanStatus.VOIDED],
         PlanStatus.RETURNED:     [PlanStatus.PLANNING, PlanStatus.VOIDED],
@@ -307,7 +310,11 @@ class PlanCustService:
         record = PlanCustRepository.get_by_id(planno)
         if record is None:
             return None
-        return record.to_dict()
+        data = record.to_dict()
+        if record.custcd:
+            cust = db.session.get(Customer, record.custcd)
+            data["customer_status"] = cust.customer_status if cust else None
+        return data
 
     @staticmethod
     def list_records(
