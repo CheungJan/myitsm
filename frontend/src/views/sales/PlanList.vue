@@ -212,7 +212,7 @@ async function loadModels() {
 const showPosFrom = computed(() => ['00','10','20'].includes(form.plantyp))
 const showPosItem = computed(() => { if (['30','40'].includes(form.plantyp)) return true; if (form.plantyp==='10') return false; if (form.plantyp==='20') return true; return form.pos_from!=='00' })
 const showPosid = computed(() => showPosItem.value)
-const showModelSelect = computed(() => modelOptions.value.length>0 && (['30','40'].includes(form.plantyp) || (['00','20'].includes(form.plantyp) && form.pos_from!=='00')))
+const showModelSelect = computed(() => modelOptions.value.length>0 && showPosItem.value)
 const showNewFields = computed(() => { if (form.plantyp==='10') return true; if (['00','20'].includes(form.plantyp)) return form.pos_from==='01'||form.pos_from==='02'; return false })
 const showCustUseflg = computed(() => { if (form.plantyp==='30') return true; if (form.plantyp==='10') return false; if (['00','20'].includes(form.plantyp)) return form.pos_from==='01'||form.pos_from==='02'; return false })
 function onPlantypChange() { form.pos_from=''; form.cust_useflg='0' }
@@ -295,19 +295,43 @@ function onSearch() { page.value = 1; loadData() }
 
 // 对话框
 const dialogVisible = ref(false); const isEdit = ref(false)
-const form = reactive<PlanRecord & { deposit?: number; is_rent?: string; yun_type?: string; pos_item?: string }>({
+const form = reactive<PlanRecord & {
+  deposit?: number; is_rent?: string; yun_type?: string; pos_item?: string;
+  pos_from?: string; cust_useflg?: string; posid?: string;
+  new_custcard?: string; new_custcd?: string; new_custnm?: string;
+  new_address?: string; new_phoneno?: string;
+}>({
   planno: '', custnm: '', custcard: '', custcd: '', plantyp: '00', plan_status: '00',
   is_rent: 'N', deposit: 0, yun_type: '', pos_item: '',
+  pos_from: '', cust_useflg: '0', posid: '',
+  new_custcard: '', new_custcd: '', new_custnm: '', new_address: '', new_phoneno: '',
 })
 const saving = ref(false)
 
 function openEdit(row: PlanRecord) { isEdit.value = true; Object.assign(form, { ...row, deposit: Number(row.deposit) || 0 }); dialogVisible.value = true }
-function openCreate() { isEdit.value = false; Object.assign(form, { planno: '', custnm: '', custcard: '', custcd: '', plantyp: '00', plan_status: '00', is_rent: 'N', deposit: 0, yun_type: '', pos_item: '' }); dialogVisible.value = true }
+function openCreate() {
+  isEdit.value = false
+  Object.assign(form, {
+    planno: '', custnm: '', custcard: '', custcd: '', plantyp: '00', plan_status: '00',
+    is_rent: 'N', deposit: 0, yun_type: '', pos_item: '',
+    pos_from: '', cust_useflg: '0', posid: '',
+    new_custcard: '', new_custcd: '', new_custnm: '', new_address: '', new_phoneno: '',
+  })
+  dialogVisible.value = true
+}
 
 async function handleSave() {
   saving.value = true
   try {
-    const payload: Record<string, unknown> = { custnm: form.custnm, custcard: form.custcard, custrnm: form.custrnm, address: form.address, contactor: form.contactor, phoneno: form.phoneno, plantyp: form.plantyp, busityp: form.busityp, is_rent: form.is_rent, deposit: form.deposit, yun_type: form.yun_type, pos_item: form.pos_item }
+    const payload: Record<string, unknown> = {
+      custnm: form.custnm, custcard: form.custcard, custrnm: form.custrnm,
+      address: form.address, contactor: form.contactor, phoneno: form.phoneno,
+      plantyp: form.plantyp, busityp: form.busityp, is_rent: form.is_rent,
+      deposit: form.deposit, yun_type: form.yun_type, pos_item: form.pos_item,
+      pos_from: form.pos_from, cust_useflg: form.cust_useflg, posid: form.posid,
+      new_custcard: form.new_custcard, new_custcd: form.new_custcd,
+      new_custnm: form.new_custnm, new_address: form.new_address, new_phoneno: form.new_phoneno,
+    }
     if (isEdit.value) { await updatePlan(form.planno, payload) } else { await createPlan({ custcd: form.custcd, ...payload }) }
     dialogVisible.value = false; loadData(); ElMessage.success('保存成功')
   } catch { ElMessage.error('保存失败') }
