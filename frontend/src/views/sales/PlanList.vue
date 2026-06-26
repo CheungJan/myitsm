@@ -158,7 +158,7 @@
         <el-form-item label="联系人"><el-input v-model="form.contactor"/></el-form-item>
         <el-form-item label="电话"><el-input v-model="form.phoneno"/></el-form-item>
         <el-form-item label="地址"><el-input v-model="form.address"/></el-form-item>
-        <el-form-item v-if="showPosFrom" label="设备来源"><el-select v-model="form.pos_from" style="width:100%" @change="onPosFromChange"><el-option label="建议机型" value="00"/><el-option label="移机" value="01"/><el-option label="返修重开" value="02"/></el-select></el-form-item>
+        <el-form-item v-if="showPosFrom" label="设备来源"><el-select v-model="form.pos_from" style="width:100%" @change="onPosFromChange"><el-option v-for="o in pfOptions" :key="o.value" :label="o.label" :value="o.value"/></el-select></el-form-item>
         <el-form-item label="租赁/购买"><el-radio-group v-model="form.is_rent"><el-radio value="Y">租赁</el-radio><el-radio value="N">购买</el-radio></el-radio-group></el-form-item>
         <el-form-item v-if="showModelSelect" label="机型"><el-select v-model="form.pos_item" filterable clearable placeholder="选择机型" style="width:100%" @change="onModelSelect"><el-option v-for="m in modelOptions" :key="m.model_cd" :label="`${m.model_cd} ${m.model_nm}`" :value="m.model_cd"/></el-select></el-form-item>
         <el-form-item v-if="!showModelSelect && showPosItem" label="机型"><el-input v-model="form.pos_item" placeholder="POS物料编码"/></el-form-item>
@@ -194,6 +194,7 @@ import request from '@/api/request'
 const { userName } = useUserNames()
 const { dictLabel: plLabel } = useDict('PL')
 const { dictLabel: bsLabel } = useDict('BT')
+const { dictOptions: pfOptions } = useDict('PF')  // 设备来源: 00商用仓库/01门店移机/02烟草直调/03IT公司/04海晟公司
 
 // PL 码表作为下拉选项（兜底硬编码）
 const plOptions = [
