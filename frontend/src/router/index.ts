@@ -170,6 +170,9 @@ const router = createRouter({
                     path: 'sales/imple-plans', name: 'ServeImple', component: () => import('@/views/sales/ServeImple.vue'), meta: { title: '计划实施管理' }
                 },
                 {
+                    path: 'master/pos-models', name: 'PosModelList', component: () => import('@/views/sales/PosModelList.vue'), meta: { title: '机型押金标准' }
+                },
+                {
                     path: 'sales/calls', name: 'CallConsole', component: () => import('@/views/sales/CallConsole.vue'), meta: { title: '话务台' }
                 },
                 {

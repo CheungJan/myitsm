@@ -29,6 +29,7 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         children: [
             { menu_cd: 'items', menu_nm: '物料管理', path: '/master/items' },
             { menu_cd: 'bom', menu_nm: 'BOM管理', path: '/master/bom' },
+            { menu_cd: 'pos-models', menu_nm: '机型押金标准', path: '/master/pos-models' },
             { menu_cd: 'customers', menu_nm: '客户管理', path: '/master/customers' },
             { menu_cd: 'eid', menu_nm: 'EID 管理', path: '/master/eid' },
             { menu_cd: 'assets', menu_nm: '资产台账', path: '/master/assets' },

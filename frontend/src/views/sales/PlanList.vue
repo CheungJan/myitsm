@@ -149,19 +149,28 @@
     </el-drawer>
 
     <!-- 新建/编辑对话框 -->
-    <el-dialog :title="isEdit?'编辑预计划':'新建预计划'" v-model="dialogVisible" width="500px">
-      <el-form :model="form" label-width="80px">
+    <el-dialog :title="isEdit?'编辑预计划':'新建预计划'" v-model="dialogVisible" width="560px">
+      <el-form :model="form" label-width="90px">
+        <el-form-item label="计划类型"><el-select v-model="form.plantyp" style="width:100%" @change="onPlantypChange"><el-option v-for="o in plOptions" :key="o.value" :label="o.label" :value="o.value"/></el-select></el-form-item>
         <el-form-item label="客户名称"><el-input v-model="form.custnm"/></el-form-item>
         <el-form-item label="磁卡号"><el-input v-model="form.custcard"/></el-form-item>
         <el-form-item label="客户编码"><el-input v-model="form.custcd"/></el-form-item>
         <el-form-item label="联系人"><el-input v-model="form.contactor"/></el-form-item>
         <el-form-item label="电话"><el-input v-model="form.phoneno"/></el-form-item>
         <el-form-item label="地址"><el-input v-model="form.address"/></el-form-item>
-        <el-form-item label="计划类型"><el-select v-model="form.plantyp" style="width:100%"><el-option v-for="o in plOptions" :key="o.value" :label="o.label" :value="o.value"/></el-select></el-form-item>
+        <el-form-item v-if="showPosFrom" label="设备来源"><el-select v-model="form.pos_from" style="width:100%" @change="onPosFromChange"><el-option label="建议机型" value="00"/><el-option label="移机" value="01"/><el-option label="返修重开" value="02"/></el-select></el-form-item>
         <el-form-item label="租赁/购买"><el-radio-group v-model="form.is_rent"><el-radio value="Y">租赁</el-radio><el-radio value="N">购买</el-radio></el-radio-group></el-form-item>
-        <el-form-item label="机型"><el-input v-model="form.pos_item" placeholder="POS物料编码"/></el-form-item>
+        <el-form-item v-if="showModelSelect" label="机型"><el-select v-model="form.pos_item" filterable clearable placeholder="选择机型" style="width:100%" @change="onModelSelect"><el-option v-for="m in modelOptions" :key="m.model_cd" :label="`${m.model_cd} ${m.model_nm}`" :value="m.model_cd"/></el-select></el-form-item>
+        <el-form-item v-if="!showModelSelect && showPosItem" label="机型"><el-input v-model="form.pos_item" placeholder="POS物料编码"/></el-form-item>
+        <el-form-item v-if="showPosid" label="设备EID"><el-input v-model="form.posid" placeholder="设备EID"/></el-form-item>
         <el-form-item label="押金金额"><el-input-number v-model="form.deposit" :min="0" :precision="2" style="width:100%" controls-position="right"/></el-form-item>
         <el-form-item label="运营类型"><el-input v-model="form.yun_type" placeholder="运营类型编码"/></el-form-item>
+        <el-form-item v-if="showNewFields" label="新磁卡号"><el-input v-model="form.new_custcard"/></el-form-item>
+        <el-form-item v-if="showNewFields" label="新客户编码"><el-input v-model="form.new_custcd"/></el-form-item>
+        <el-form-item v-if="showNewFields" label="新客户名称"><el-input v-model="form.new_custnm"/></el-form-item>
+        <el-form-item v-if="showNewFields" label="新地址"><el-input v-model="form.new_address"/></el-form-item>
+        <el-form-item v-if="showNewFields" label="新电话"><el-input v-model="form.new_phoneno"/></el-form-item>
+        <el-form-item v-if="showCustUseflg" label="门店无效"><el-switch v-model="form.cust_useflg" active-value="1" inactive-value="0" active-text="是" inactive-text="否"/></el-form-item>
       </el-form>
       <template #footer><el-button @click="dialogVisible=false">取消</el-button><el-button type="primary" @click="handleSave" :loading="saving">保存</el-button></template>
     </el-dialog>
@@ -169,7 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { useUserNames } from '@/composables/useUserNames'
@@ -192,6 +201,23 @@ const plOptions = [
   { value: '20', label: '旧机翻新' }, { value: '30', label: '设备取回' },
   { value: '40', label: '门店关闭' },
 ]
+
+// 机型下拉选项(从 DepositPosModel useflg='1' 读取)
+const modelOptions = ref<{ model_cd: string; model_nm: string; rent_money: number }[]>([])
+async function loadModels() {
+  try { const r = await request.get<never,{data:any[]}>('/deposit/pos-models'); modelOptions.value = (r?.data||[]).filter((m:any)=>m.useflg==='1') } catch { modelOptions.value = [] }
+}
+
+// 表单字段条件显隐（按 plantyp + pos_from 联动）
+const showPosFrom = computed(() => ['00','10','20'].includes(form.plantyp))
+const showPosItem = computed(() => { if (['30','40'].includes(form.plantyp)) return true; if (form.plantyp==='10') return false; if (form.plantyp==='20') return true; return form.pos_from!=='00' })
+const showPosid = computed(() => showPosItem.value)
+const showModelSelect = computed(() => modelOptions.value.length>0 && (['30','40'].includes(form.plantyp) || (['00','20'].includes(form.plantyp) && form.pos_from!=='00')))
+const showNewFields = computed(() => { if (form.plantyp==='10') return true; if (['00','20'].includes(form.plantyp)) return form.pos_from==='01'||form.pos_from==='02'; return false })
+const showCustUseflg = computed(() => { if (form.plantyp==='30') return true; if (form.plantyp==='10') return false; if (['00','20'].includes(form.plantyp)) return form.pos_from==='01'||form.pos_from==='02'; return false })
+function onPlantypChange() { form.pos_from=''; form.cust_useflg='0' }
+function onPosFromChange() { if (form.pos_from==='00') form.cust_useflg='0' }
+function onModelSelect(val: string) { const m = modelOptions.value.find(x=>x.model_cd===val); if (m) form.deposit = m.rent_money||0 }
 
 // 状态标签映射 (对齐 PB plan_cust.status: 00/01/02/04/09)
 function statusLabel(s: string) {
@@ -239,7 +265,7 @@ const searchDateFrom = ref(''); const searchDateTo = ref('')
 const searchServeStatus = ref('')
 
 watch(page, () => loadData()); watch(perPage, () => { page.value = 1; loadData() })
-onMounted(() => loadData())
+onMounted(() => { loadData(); loadModels() })
 
 function onReset() {
   searchPlanno.value = ''; searchCustNm.value = ''; searchStatus.value = ''
