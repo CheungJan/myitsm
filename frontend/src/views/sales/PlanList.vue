@@ -193,40 +193,59 @@
           <el-col :span="10"><el-form-item label="计划机型"><el-select v-model="form.pos_item" filterable clearable placeholder="选择机型" style="width:100%" @change="onModelSelect"><el-option v-for="m in modelOptions" :key="m.model_cd" :label="`${m.model_cd} ${m.model_nm}`" :value="m.model_cd"/></el-select></el-form-item></el-col>
           <el-col :span="4"><el-form-item label="库存"><el-input :model-value="stockQty" disabled/></el-form-item></el-col>
         </el-row>
-        <!-- 门店移机/烟草直调(01/02): 源设备信息 + 新客户 + 无效化 -->
+        <!-- 门店移机/烟草直调(01/02): 源设备信息 + 目标客户 + 无效化 -->
         <template v-if="isPosFrom('01') || isPosFrom('02')">
           <el-row :gutter="16">
-            <el-col :span="6"><el-form-item label="源磁卡号"><el-input v-model="form.custcard"/></el-form-item></el-col>
-            <el-col :span="6"><el-form-item label="源设备ID"><el-input v-model="form.posid"/></el-form-item></el-col>
-            <el-col :span="6"><el-form-item label="机型"><el-input v-model="form.pos_item"/></el-form-item></el-col>
-            <el-col :span="6"><el-form-item label="门店无效"><el-switch v-model="form.cust_useflg" active-value="1" inactive-value="0"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源磁卡号"><el-input v-model="form.new_custcard"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源设备ID"><el-input v-model="form.new_posid"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源机型"><el-input v-model="form.new_positem"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="目标机型"><el-input v-model="form.pos_item"/></el-form-item></el-col>
           </el-row>
           <el-row :gutter="16">
-            <el-col :span="6"><el-form-item label="新磁卡号"><el-input v-model="form.new_custcard"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源门店名"><el-input v-model="form.new_custnm"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源电话"><el-input v-model="form.new_phoneno"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源地址"><el-input v-model="form.new_address"/></el-form-item></el-col>
             <el-col :span="6"><el-form-item label="新客户编码"><el-input v-model="form.new_custcd"/></el-form-item></el-col>
-            <el-col :span="6"><el-form-item label="新电话"><el-input v-model="form.new_phoneno"/></el-form-item></el-col>
-            <el-col :span="6"><el-form-item label="新地址"><el-input v-model="form.new_address"/></el-form-item></el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="6"><el-form-item label="旧机处理"><el-input v-model="form.solve_type" placeholder="翻新处理方式"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源门店无效"><el-switch v-model="form.cust_useflg" active-value="1" inactive-value="0"/></el-form-item></el-col>
           </el-row>
         </template>
-        <!-- 旧机翻新 pos_from=03/04: 旧设备信息 -->
-        <el-row v-if="form.plantyp==='20' && (isPosFrom('03')||isPosFrom('04'))" :gutter="16">
-          <el-col :span="6"><el-form-item label="旧设备ID"><el-input v-model="form.posid"/></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="旧机型"><el-input v-model="form.pos_item"/></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="设备来源"><el-input :model-value="pfMap[form.pos_from]" disabled/></el-form-item></el-col>
-        </el-row>
+        <!-- 旧机翻新 pos_from=03/04(IT公司/海晟): 源设备信息 -->
+        <template v-if="form.plantyp==='20' && (isPosFrom('03')||isPosFrom('04'))">
+          <el-row :gutter="16">
+            <el-col :span="6"><el-form-item label="源磁卡号"><el-input v-model="form.new_custcard"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源设备ID"><el-input v-model="form.new_posid"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源机型"><el-input v-model="form.new_positem"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="目标机型"><el-input v-model="form.pos_item"/></el-form-item></el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="6"><el-form-item label="源门店名"><el-input v-model="form.new_custnm"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="旧机处理"><el-input v-model="form.solve_type"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源门店无效"><el-switch v-model="form.cust_useflg" active-value="1" inactive-value="0"/></el-form-item></el-col>
+          </el-row>
+        </template>
         <!-- 取回/关门(30/40): 机型选择 -->
         <el-row v-if="['30','40'].includes(form.plantyp)" :gutter="16">
           <el-col :span="10"><el-form-item label="计划机型"><el-select v-model="form.pos_item" filterable clearable placeholder="选择机型" style="width:100%" @change="onModelSelect"><el-option v-for="m in modelOptions" :key="m.model_cd" :label="`${m.model_cd} ${m.model_nm}`" :value="m.model_cd"/></el-select></el-form-item></el-col>
           <el-col v-if="form.plantyp==='30'" :span="6"><el-form-item label="设备EID"><el-input v-model="form.posid"/></el-form-item></el-col>
           <el-col v-if="form.plantyp==='30'" :span="6"><el-form-item label="门店无效"><el-switch v-model="form.cust_useflg" active-value="1" inactive-value="0"/></el-form-item></el-col>
         </el-row>
-        <!-- 设备变更(10): 新磁卡号+设备 -->
-        <el-row v-if="form.plantyp==='10'" :gutter="16">
-          <el-col :span="6"><el-form-item label="新磁卡号"><el-input v-model="form.new_custcard"/></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="新设备ID"><el-input v-model="form.new_posid"/></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="新机型"><el-input v-model="form.new_positem"/></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="新客户"><el-input v-model="form.new_custcd"/></el-form-item></el-col>
-        </el-row>
+        <!-- 设备变更(10): 源磁卡号+源设备+新客户信息 -->
+        <template v-if="form.plantyp==='10'">
+          <el-row :gutter="16">
+            <el-col :span="6"><el-form-item label="源磁卡号"><el-input v-model="form.new_custcard"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源设备ID"><el-input v-model="form.new_posid"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="源机型"><el-input v-model="form.new_positem"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="新客户编码"><el-input v-model="form.new_custcd"/></el-form-item></el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="6"><el-form-item label="新客户名称"><el-input v-model="form.new_custnm"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="新电话"><el-input v-model="form.new_phoneno"/></el-form-item></el-col>
+            <el-col :span="6"><el-form-item label="新地址"><el-input v-model="form.new_address"/></el-form-item></el-col>
+          </el-row>
+        </template>
 
         <!-- 四、租售金额 -->
         <el-divider content-position="left">金额</el-divider>
@@ -375,12 +394,16 @@ const form = reactive<PlanRecord & {
   deposit?: number; is_rent?: string; yun_type?: string; pos_item?: string;
   pos_from?: string; cust_useflg?: string; posid?: string;
   new_custcard?: string; new_custcd?: string; new_custnm?: string;
-  new_address?: string; new_phoneno?: string;
+  new_address?: string; new_phoneno?: string; new_positem?: string; new_posid?: string;
+  solve_type?: string; jl_contactor?: string; jl_phoneno?: string;
+  classcd?: string; busityp?: string; is_contract?: string; pptcode?: string; commmode?: string;
 }>({
   planno: '', custnm: '', custcard: '', custcd: '', plantyp: '00', plan_status: '00',
   is_rent: 'N', deposit: 0, yun_type: '', pos_item: '',
   pos_from: '', cust_useflg: '0', posid: '',
   new_custcard: '', new_custcd: '', new_custnm: '', new_address: '', new_phoneno: '',
+  new_positem: '', new_posid: '', solve_type: '',
+  jl_contactor: '', jl_phoneno: '', classcd: '', busityp: '', is_contract: '0', pptcode: '', commmode: '',
 })
 const saving = ref(false)
 
@@ -407,6 +430,9 @@ async function handleSave() {
       pos_from: form.pos_from, cust_useflg: form.cust_useflg, posid: form.posid,
       new_custcard: form.new_custcard, new_custcd: form.new_custcd,
       new_custnm: form.new_custnm, new_address: form.new_address, new_phoneno: form.new_phoneno,
+      new_positem: form.new_positem, new_posid: form.new_posid, solve_type: form.solve_type,
+      jl_contactor: form.jl_contactor, jl_phoneno: form.jl_phoneno,
+      classcd: form.classcd, pptcode: form.pptcode, is_contract: form.is_contract, commmode: form.commmode,
     }
     if (isEdit.value) { await updatePlan(form.planno, payload) } else { await createPlan({ custcd: form.custcd, ...payload }) }
     dialogVisible.value = false; loadData(); ElMessage.success('保存成功')
