@@ -16,8 +16,10 @@
             </template>
             <el-table :data="warehouses" v-loading="loading" stripe>
                 <el-table-column prop="whcd" label="编码" width="80" />
-                <el-table-column prop="whnm" label="名称" width="160" />
-                <el-table-column prop="address" label="地址" min-width="160" />
+                <el-table-column prop="whnm" label="名称" width="140" />
+                <el-table-column label="分类" width="80"><template #default="{row}">{{ whtypLabel(row.whtyp) }}</template></el-table-column>
+                <el-table-column label="默认" width="55"><template #default="{row}"><el-tag size="small" :type="row.defaultflg==='1'?'success':'info'">{{ row.defaultflg==='1'?'是':'否' }}</el-tag></template></el-table-column>
+                <el-table-column prop="address" label="地址" min-width="140" />
                 <el-table-column prop="phoneno" label="电话" width="120" />
                 <el-table-column label="负责人" width="100">
                     <template #default="{ row }">{{ (row as Record<string,unknown>).leader_nm || row.leader || '-' }}</template>
@@ -47,6 +49,15 @@
                 <el-form-item label="地址"><el-input v-model="form.address" /></el-form-item>
                 <el-form-item label="电话"><el-input v-model="form.phoneno" /></el-form-item>
                 <el-form-item label="负责人"><el-input v-model="form.leader" /></el-form-item>
+                <el-form-item label="仓库分类">
+                    <el-select v-model="form.whtyp" style="width:100%" clearable>
+                        <el-option label="成品库" value="03" /><el-option label="新品库" value="01" />
+                        <el-option label="维护库" value="02" /><el-option label="待报废库" value="L0" />
+                        <el-option label="临时库" value="LS" /><el-option label="翻新仓" value="MH" />
+                        <el-option label="生产配件库" value="04" /><el-option label="其他" value="99" />
+                    </el-select>
+                </el-form-item>
+                <el-form-item label="默认仓库"><el-switch v-model="form.defaultflg" active-value="1" inactive-value="0" /></el-form-item>
                 <el-form-item label="状态">
                     <el-select v-model="form.useflg" style="width:100%">
                         <el-option label="有效" value="1" />
@@ -67,11 +78,14 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from '@/api/warehouse'
 
+const whtypMap: Record<string,string> = { '01':'新品库','02':'维护库','03':'成品库','04':'生产配件库','L0':'待报废库','LS':'临时库','MH':'翻新仓','99':'其他' }
+function whtypLabel(v: string) { return whtypMap[v] || v || '-' }
+
 const warehouses = ref<Record<string,unknown>[]>([])
 const allData = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const total = ref(0); const filterUseflg = ref('')
 const dialogVisible = ref(false); const editing = ref<Record<string,unknown>|null>(null); const saving = ref(false)
-const form = reactive({ whcd: '', whnm: '', address: '', phoneno: '', leader: '', useflg: '1' })
+const form = reactive({ whcd: '', whnm: '', address: '', phoneno: '', leader: '', whtyp: '', defaultflg: '0', useflg: '1' })
 
 onMounted(() => loadData())
 
@@ -92,8 +106,8 @@ function filterData() {
 }
 
 function openDialog(row?: Record<string,unknown>) {
-    if (row) { editing.value = row; form.whcd = row.whcd as string; form.whnm = row.whnm as string; form.address = (row.address as string)||''; form.phoneno = (row.phoneno as string)||''; form.leader = (row.leader as string)||''; form.useflg = (row.useflg as string)||'1' }
-    else { editing.value = null; Object.assign(form, { whcd:'',whnm:'',address:'',phoneno:'',leader:'',useflg:'1' }) }
+    if (row) { editing.value = row; form.whcd = row.whcd as string; form.whnm = row.whnm as string; form.address = (row.address as string)||''; form.phoneno = (row.phoneno as string)||''; form.leader = (row.leader as string)||''; form.whtyp = (row.whtyp as string)||''; form.defaultflg = (row.defaultflg as string)||'0'; form.useflg = (row.useflg as string)||'1' }
+    else { editing.value = null; Object.assign(form, { whcd:'',whnm:'',address:'',phoneno:'',leader:'',whtyp:'',defaultflg:'0',useflg:'1' }) }
     dialogVisible.value = true
 }
 

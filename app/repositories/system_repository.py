@@ -774,6 +774,90 @@ class SystemRepository:
         return q.offset((page - 1) * per_page).limit(per_page).all(), total
 
     @staticmethod
+    def get_pos_models() -> list[dict[str, Any]]:
+        """获取在产机型列表(整机成品 JOIN Bom useflg=1,带押金/售价/库存/品级)。
+
+        包含属性: item_cd, item_nm, rent_money, sale_money,
+          stock_qty(成品库03总量), stock_by_wh[{whcd,whnm,qty,itemtyp}],
+          grade_ga/gb/gc(绿A/绿B/绿C台数)。
+        排序: 成品库(03)库存从多到少。
+        """
+        from sqlalchemy import func, case
+        from app.models.inventory import Price
+        from app.models.master import Bom
+        from app.models.warehouse import StockDetail as _WHD, Warehouse as _WH
+
+        PriceRent = db.aliased(Price)
+        PriceSale = db.aliased(Price)
+
+        # 在产机型基础信息
+        rows = (
+            db.session.query(
+                Item.item_cd,
+                Item.item_nm,
+                PriceRent.itemprice,
+                PriceSale.itemprice,
+            )
+            .join(Bom, Bom.bomcd == Item.item_cd)
+            .outerjoin(PriceRent, (PriceRent.itemcd == Item.item_cd) & (PriceRent.busityp == "40"))
+            .outerjoin(PriceSale, (PriceSale.itemcd == Item.item_cd) & (PriceSale.busityp == "10"))
+            .filter(Item.typflg == "1", Item.useflg == "1", Bom.useflg == "1")
+            .all()
+        )
+
+        item_cds = [r[0] for r in rows]
+
+        # 库存: 按 itemcd + whcd 汇总(仅 itemqty>0)
+        stock_rows = (
+            db.session.query(
+                _WHD.itemcd, _WHD.whcd, _WH.whnm, _WHD.itemtyp,
+                func.sum(_WHD.itemqty),
+            )
+            .outerjoin(_WH, _WHD.whcd == _WH.whcd)
+            .filter(_WHD.itemcd.in_(item_cds), _WHD.itemqty > 0, _WHD.useflg == "1")
+            .group_by(_WHD.itemcd, _WHD.whcd, _WH.whnm, _WHD.itemtyp)
+            .all()
+        )
+
+        # 组织库存数据
+        stock_map: dict[str, list[dict]] = {}
+        grade_map: dict[str, dict[str, int]] = {}
+        for sr in stock_rows:
+            cd = sr[0]
+            wh = {"whcd": sr[1], "whnm": sr[2] or "", "itemtyp": sr[3] or "", "qty": int(sr[4] or 0)}
+            stock_map.setdefault(cd, []).append(wh)
+            if cd not in grade_map:
+                grade_map[cd] = {"GA": 0, "GB": 0, "GC": 0, "DJ": 0}
+            it = sr[3] or ""
+            if it in grade_map[cd]:
+                grade_map[cd][it] += int(sr[4] or 0)
+
+        result = []
+        for r in rows:
+            cd = r[0]
+            wh_list = stock_map.get(cd, [])
+            total_03 = sum(x["qty"] for x in wh_list if x["whcd"] == "03")
+            g = grade_map.get(cd, {"GA": 0, "GB": 0, "GC": 0, "DJ": 0})
+            result.append({
+                "item_cd": cd,
+                "item_nm": r[1] or "",
+                "rent_money": float(r[2]) if r[2] is not None else 0,
+                "sale_money": float(r[3]) if r[3] is not None else 0,
+                "stock_qty": total_03,
+                "stock_by_wh": wh_list,
+                "grade_ga": g["GA"], "grade_gb": g["GB"],
+                "grade_gc": g["GC"], "grade_dj": g["DJ"],
+                "grade_label": (
+                    f"绿A:{g['GA']} 绿B:{g['GB']} 绿C:{g['GC']} 待检:{g['DJ']}"
+                    if any(g.values()) else "无库存"
+                ),
+            })
+
+        # 排序: 成品库(03)库存从多到少
+        result.sort(key=lambda x: x["stock_qty"], reverse=True)
+        return result
+
+    @staticmethod
     def get_item(item_cd: str) -> Item | None:
         return db.session.get(Item, item_cd)
 

@@ -872,7 +872,7 @@ class WorkOrderService:
         # 更新新 EID → 正常、入库到工单仓库（仅EID类型物料）
         if new_eid:
             db.session.query(EidModel).filter(EidModel.eid == new_eid).update(
-                {"sflg": "1", "qcflg": "GA", "whcd": wo.pick_whcd or wo.warehouse_cd or "01"},
+                {"sflg": "1", "qcflg": "GA", "whcd": wo.pick_whcd or wo.warehouse_cd or "03"},
                 synchronize_session=False,
             )
 

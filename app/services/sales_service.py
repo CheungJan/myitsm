@@ -369,8 +369,11 @@ class PlanCustService:
         2. 客户生命周期：创建 TEMP 客户（如果提供了客户信息）
         下游 ITSM 单据在 implement() 阶段才生成。
         """
+        # 过滤 Schema 中的非模型字段（call_serve/serve_task 仅在保存时通过 PlanServe 服务处理）
+        model_data = {k: v for k, v in data.items() if k not in ("call_serve", "serve_task")}
+
         # 磁卡号唯一性检查
-        custcard = data.get("custcard")
+        custcard = model_data.get("custcard")
         if custcard:
             existing_customer = CustomerService.check_card_exists(custcard)
             if existing_customer:
@@ -389,7 +392,7 @@ class PlanCustService:
                 }
 
         # 创建预计划（plan_status=00 计划中）
-        record = PlanCustRepository.create(data, creator)
+        record = PlanCustRepository.create(model_data, creator)
 
         # 自动创建呼出单（PLAN_SERVE）— 话务台呼出确认是后续流程的前置
         plantyp = data.get("plantyp")
@@ -402,6 +405,20 @@ class PlanCustService:
             },
             creator,
         )
+
+        # PB cbx_serve 勾选:额外生成 servetyp=1 预计划呼出单,并更新 serve_status=01
+        if data.get("call_serve"):
+            PlanServeRepository.create(
+                {
+                    "planno": record.planno,
+                    "plantyp": plantyp,
+                    "servetyp": "1",
+                    "serve_task": data.get("serve_task") or f"预计划呼出-{record.planno}",
+                    "commmode": data.get("commmode"),
+                },
+                creator,
+            )
+            record.serve_status = "01"
 
         # 客户生命周期：创建 TEMP 客户
         custcd = data.get("custcd")
@@ -425,9 +442,42 @@ class PlanCustService:
                 return {"success": False, "error": f"创建临时客户失败: {exc}"}
 
         db.session.commit()
+
+        # 库存不足自动触发采购需求(pos_from=00 商用仓库,不限 plantyp)
+        PlanCustService._try_trigger_procurement(record, data, creator)
+
         result = record.to_dict()
         result["success"] = True
         return result
+
+    @staticmethod
+    def _try_trigger_procurement(record: Any, data: dict[str, Any], operator: str) -> None:
+        """库存不足自动触发采购需求(仅 pos_from=00 商用仓库)。
+
+        供 create() 和 update() 共用。条件放宽为不限 plantyp,
+        翻新(20)/关门(40)等选商用仓库时同样需要采购备货。
+        """
+        pos_from = (data.get("pos_from") or getattr(record, "pos_from", "") or "").strip()
+        pos_item = (data.get("pos_item") or getattr(record, "pos_item", "") or "").strip()
+        if pos_from != "00" or not pos_item:
+            return
+        try:
+            from app.services.plan_stock_service import PlanStockService
+            stock = PlanStockService.check_stock(pos_item)
+            if stock.get("total_qty", 0) <= 0:
+                proc_result = PlanStockService.trigger_procurement(
+                    planno=record.planno,
+                    model_cd=pos_item,
+                    qty=1,
+                    operator=operator,
+                )
+                if proc_result.get("pcplanid"):
+                    logger.info(
+                        "预计划 %s 库存不足,已触发采购需求 %s",
+                        record.planno, proc_result["pcplanid"],
+                    )
+        except Exception:
+            logger.exception("预计划 %s 触发采购需求失败", record.planno)
 
     @staticmethod
     def implement(
@@ -562,11 +612,46 @@ class PlanCustService:
         if record.custcd:
             CustomerService.promote_to_active(record.custcd, operator)
 
+        # 客户无效化联动（对齐 usp_plan_confrim cust_useflg 分支）
+        PlanCustService._apply_cust_useflg_invalidation(record, operator)
+
         db.session.commit()
         return {"success": True, "planno": planno, "to_status": "01"}
 
     @staticmethod
-    def update(planno: str, data: dict[str, Any]) -> dict[str, Any] | None:
+    def _apply_cust_useflg_invalidation(record: Any, operator: str) -> None:
+        """计划完成时按 cust_useflg 处理客户无效化（对齐 PB usp_plan_confrim）。
+
+        - plantyp='10' 磁卡号变更/移机：源门店（new_custcd）无条件失效（无移机时 new_custcd 为空，自动跳过）。
+        - plantyp in ('00','20') 开通/翻新移机：勾选 cust_useflg='1' 时，移出源门店（new_custcd）失效。
+        - plantyp='30' 取机：勾选 cust_useflg='1' 时，取机门店本身（custcd）失效。
+        - plantyp='40' 门店关闭：从下游 StoreClose 单据取 close_type，联动 s_status 与名称前缀。
+        """
+        plantyp = (record.plantyp or "").strip()
+        cust_useflg = (record.cust_useflg or "").strip()
+        new_custcd = (record.new_custcd or "").strip()
+
+        if plantyp == "10":
+            if new_custcd:
+                CustomerService.invalidate_store_customer(new_custcd, operator)
+        elif plantyp in ("00", "20"):
+            if cust_useflg == "1" and new_custcd:
+                CustomerService.invalidate_store_customer(new_custcd, operator)
+        elif plantyp == "30":
+            if cust_useflg == "1" and record.custcd:
+                CustomerService.invalidate_store_customer(record.custcd, operator)
+        elif plantyp == "40":
+            # 门店关闭：从下游 StoreClose 取 close_type 联动 s_status（对齐 usp_plan_confrim GB 分支）
+            downstream_id = (record.imple_billid or "").strip()
+            if downstream_id and record.custcd:
+                from app.repositories.itsm_repository import StoreCloseRepository
+
+                store_close = StoreCloseRepository.get_by_id(downstream_id)
+                close_type = store_close.close_type if store_close else None
+                CustomerService.set_store_close_status(record.custcd, close_type, operator)
+
+    @staticmethod
+    def update(planno: str, data: dict[str, Any], operator: str = "") -> dict[str, Any] | None:
         """更新预计划 —— 含磁卡号变更自动记录与 Customer 同步。"""
         record = PlanCustRepository.get_by_id(planno)
         if record is None:
@@ -595,6 +680,10 @@ class PlanCustService:
         # 批量 setattr 剩余字段
         PlanCustRepository.update(record, data)
         db.session.commit()
+
+        # 库存不足自动触发采购需求(先保存草稿、后续才选机型场景)
+        PlanCustService._try_trigger_procurement(record, data, operator=operator)
+
         result = record.to_dict()
         result["success"] = True
         return result
@@ -632,6 +721,8 @@ class PlanCustService:
         # 01（计划完成/设备出库）：客户 PENDING → ACTIVE
         if to_status == "01" and record.custcd:
             CustomerService.promote_to_active(record.custcd, operator)
+            # 客户无效化联动（对齐 usp_plan_confrim cust_useflg 分支）
+            PlanCustService._apply_cust_useflg_invalidation(record, operator)
 
         record.plan_status = to_status
         db.session.commit()
