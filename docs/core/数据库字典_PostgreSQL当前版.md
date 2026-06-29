@@ -590,7 +590,7 @@
 | 3 | opercd | VARCHAR(6) |  | 操作员 |
 | 4 | gendate | TIMESTAMP |  | 创建日期 |
 | 5 | upddate | TIMESTAMP |  | 更新日期 |
-| 6 | useflg | VARCHAR(1) |  | 有效标志 |
+| 6 | useflg | VARCHAR(1) |  | 有效/在产标志（1=在产可选/0=停产，对齐PB Bom.useflg语义，预计划机型下拉用此过滤） |
 | 7 | redundancy_ratio | NUMERIC(5,4) |  | 补料冗余比例 |
 | 8 | created_at | TIMESTAMP | NOT NULL |  |
 | 9 | updated_at | TIMESTAMP | NOT NULL |  |
@@ -2968,15 +2968,18 @@
 | 34 | created_at | TIMESTAMP | NOT NULL |  |
 | 35 | updated_at | TIMESTAMP | NOT NULL |  |
 
-#### 5. tmm61_deposit_posmodel
+#### 5. tmm61_deposit_posmodel（⚠️ 已废弃）
+
+> **已废弃**。机型押金/售价改由 `tip01_price` (busityp=40 押金/10 销售价) 管理；
+> 在产/停产改由 `tmm41_bom.useflg` 控制。此表保留仅供历史数据查看。
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | model_cd | VARCHAR(8) | PK NOT NULL | 型号编码 |
 | 2 | model_nm | VARCHAR(20) |  | 型号名称 |
-| 3 | rent_money | NUMERIC(10,2) |  | 租金 |
-| 4 | sale_money | NUMERIC(10,2) |  | 售价 |
-| 5 | useflg | VARCHAR(1) |  | 有效标志 |
+| 3 | rent_money | NUMERIC(10,2) |  | 租金(已废弃→tip01_price busityp=40) |
+| 4 | sale_money | NUMERIC(10,2) |  | 售价(已废弃→tip01_price busityp=10) |
+| 5 | useflg | VARCHAR(1) |  | 有效标志(已废弃→tmm41_bom.useflg) |
 | 6 | created_at | TIMESTAMP | NOT NULL |  |
 | 7 | updated_at | TIMESTAMP | NOT NULL |  |
 
@@ -3093,7 +3096,7 @@
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | itemcd | VARCHAR(6) | PK NOT NULL | 物料编码 |
-| 2 | busityp | VARCHAR(6) | PK NOT NULL | 业务类型 |
+| 2 | busityp | VARCHAR(6) | PK NOT NULL | 业务类型（10=销售价/20=采购价/40=押金） |
 | 3 | unitcd | VARCHAR(6) |  | 单位 |
 | 4 | itemprice | NUMERIC(16,8) |  | 物料单价 |
 | 5 | opercd | VARCHAR(6) |  | 操作员 |
@@ -3166,7 +3169,7 @@
 | 15 | jl_contactor | VARCHAR(10) |  | 客户经理 |
 | 16 | jl_phoneno | VARCHAR(60) |  | 经理联系方式 |
 | 17 | pos_from | VARCHAR(6) |  | 设备来源（PF字典：00商用仓库/01门店移机/02烟草直调/03IT公司/04海晟公司） |
-| 18 | pos_item | VARCHAR(6) |  | 目标机型（新开店要安装的整机型号） |
+| 18 | pos_item | VARCHAR(6) |  | 机型编码(关联 tmm12_items.item_cd / tmm41_bom.bomcd，选机型时从在产BOM中获取) |
 | 19 | posid | VARCHAR(13) |  | 目标设备EID |
 | 20 | new_custcard | VARCHAR(20) |  | 源磁卡号（移机/变更场景的源门店磁卡号） |
 | 21 | new_custcd | VARCHAR(8) |  | 目标客户编码（移机场景目标门店编码） |
