@@ -827,17 +827,25 @@ class SystemRepository:
             wh = {"whcd": sr[1], "whnm": sr[2] or "", "itemtyp": sr[3] or "", "qty": int(sr[4] or 0)}
             stock_map.setdefault(cd, []).append(wh)
             if cd not in grade_map:
-                grade_map[cd] = {"GA": 0, "GB": 0, "GC": 0, "DJ": 0}
-            it = sr[3] or ""
-            if it in grade_map[cd]:
-                grade_map[cd][it] += int(sr[4] or 0)
+                grade_map[cd] = {"GA": 0, "GB": 0, "GC": 0, "DJ": 0, "__": 0}
+            it = sr[3] or "__"
+            if it not in grade_map[cd]:
+                it = "__"
+            grade_map[cd][it] += int(sr[4] or 0)
 
         result = []
         for r in rows:
             cd = r[0]
             wh_list = stock_map.get(cd, [])
             total_03 = sum(x["qty"] for x in wh_list if x["whcd"] == "03")
-            g = grade_map.get(cd, {"GA": 0, "GB": 0, "GC": 0, "DJ": 0})
+            g = grade_map.get(cd, {"GA": 0, "GB": 0, "GC": 0, "DJ": 0, "__": 0})
+            parts = []
+            if g["GA"]: parts.append(f"绿A:{g['GA']}")
+            if g["GB"]: parts.append(f"绿B:{g['GB']}")
+            if g["GC"]: parts.append(f"绿C:{g['GC']}")
+            if g["DJ"]: parts.append(f"待检:{g['DJ']}")
+            if g["__"]: parts.append(f"未分级:{g['__']}")
+            label = " ".join(parts) if parts else "无库存"
             result.append({
                 "item_cd": cd,
                 "item_nm": r[1] or "",
@@ -847,10 +855,7 @@ class SystemRepository:
                 "stock_by_wh": wh_list,
                 "grade_ga": g["GA"], "grade_gb": g["GB"],
                 "grade_gc": g["GC"], "grade_dj": g["DJ"],
-                "grade_label": (
-                    f"绿A:{g['GA']} 绿B:{g['GB']} 绿C:{g['GC']} 待检:{g['DJ']}"
-                    if any(g.values()) else "无库存"
-                ),
+                "grade_label": label,
             })
 
         # 排序: 成品库(03)库存从多到少
