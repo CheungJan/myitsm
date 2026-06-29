@@ -51,10 +51,7 @@
                 <el-form-item label="负责人"><el-input v-model="form.leader" /></el-form-item>
                 <el-form-item label="仓库分类">
                     <el-select v-model="form.whtyp" style="width:100%" clearable>
-                        <el-option label="成品库" value="03" /><el-option label="新品库" value="01" />
-                        <el-option label="维护库" value="02" /><el-option label="待报废库" value="L0" />
-                        <el-option label="临时库" value="LS" /><el-option label="翻新仓" value="MH" />
-                        <el-option label="生产配件库" value="04" /><el-option label="其他" value="99" />
+                        <el-option v-for="o in whtypOptions" :key="o.value" :label="o.label" :value="o.value" />
                     </el-select>
                 </el-form-item>
                 <el-form-item label="默认仓库"><el-switch v-model="form.defaultflg" active-value="1" inactive-value="0" /></el-form-item>
@@ -74,12 +71,13 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from '@/api/warehouse'
+import { useDict } from '@/composables/useDict'
 
-const whtypMap: Record<string,string> = { '01':'新品库','02':'维护库','03':'成品库','04':'生产配件库','L0':'待报废库','LS':'临时库','MH':'翻新仓','99':'其他' }
-function whtypLabel(v: string) { return whtypMap[v] || v || '-' }
+const { dictMap: whtypMap, dictLabel: whtypLabel } = useDict('WT')
+const whtypOptions = computed(() => Object.entries(whtypMap.value).map(([k, v]) => ({ value: k, label: v })))
 
 const warehouses = ref<Record<string,unknown>[]>([])
 const allData = ref<Record<string,unknown>[]>([])
