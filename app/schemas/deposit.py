@@ -46,6 +46,7 @@ class DepositPosModelCreate(BaseModel):
     model_nm: str | None = Field(None, max_length=20, description="型号名称")
     rent_money: Decimal | None = Field(None, description="租金")
     sale_money: Decimal | None = Field(None, description="售价")
+    item_cd: str | None = Field(None, max_length=20, description="关联成品物料编码")
 
 
 class DepositPosModelUpdate(BaseModel):
@@ -54,6 +55,7 @@ class DepositPosModelUpdate(BaseModel):
     model_nm: str | None = Field(None, max_length=20, description="型号名称")
     rent_money: Decimal | None = Field(None, description="租金")
     sale_money: Decimal | None = Field(None, description="售价")
+    item_cd: str | None = Field(None, max_length=20, description="关联成品物料编码")
 
 
 class DepositIOQuery(BaseModel):

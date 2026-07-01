@@ -655,14 +655,14 @@
 | 8 | useflg | VARCHAR(1) |  | 有效标志 |
 | 9 | etyp | VARCHAR(1) |  | 设备类型 |
 | 10 | sflg | VARCHAR(1) |  | 状态标志 |
-| 11 | refid | VARCHAR(8) |  | 关联单号 |
+| 11 | refid | VARCHAR(20) |  | 关联单号（预计划号/出库单号/维护单号） |
 | 12 | qcflg | VARCHAR(2) |  | 质检标志 |
 | 13 | whcd | VARCHAR(2) |  | 仓库编码 |
 | 14 | prddate | TIMESTAMP |  | 生产日期 |
 | 15 | itemtyp | VARCHAR(2) |  | 物料类型 |
 | 16 | new_old | VARCHAR(1) |  | 新旧标志 |
 | 17 | n_sflg | VARCHAR(1) |  | 新状态标志 |
-| 18 | n_refid | VARCHAR(8) |  | 新关联单号 |
+| 18 | n_refid | VARCHAR(20) |  | 新关联单号（变更后关联单号） |
 | 19 | n_qcflg | VARCHAR(2) |  | 新质检标志 |
 | 20 | n_whcd | VARCHAR(2) |  | 新仓库编码 |
 | 21 | n_prddate | TIMESTAMP |  | 新生产日期 |
@@ -1523,7 +1523,7 @@
 | 15 | created_at | TIMESTAMP | NOT NULL |  |
 | 16 | updated_at | TIMESTAMP | NOT NULL |  |
 
-#### 2. twh11_detail
+#### 2. twh11_detail--全仓库库存余量表
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|

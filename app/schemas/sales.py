@@ -42,6 +42,9 @@ class PlanCustCreate(BaseModel):
     posid: str | None = Field(None, max_length=13, description="设备EID")
     jl_contactor: str | None = Field(None, max_length=10, description="经理联系人")
     jl_phoneno: str | None = Field(None, max_length=60, description="经理电话")
+    # PB cbx_serve 勾选:保存时同步生成预计划呼出单(servetyp=1)
+    call_serve: bool = Field(False, description="保存时触发请求呼出(对齐 PB cbx_serve)")
+    serve_task: str | None = Field(None, max_length=200, description="呼出任务描述(对齐 PB sle_task)")
 
 
 class PlanCustUpdate(BaseModel):

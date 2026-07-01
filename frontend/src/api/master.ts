@@ -326,7 +326,7 @@ export interface EidRecord {
     etyp: string
     whcd: string
     sflg: string
-    new_old: string
+    asset_type: string
     qcflg: string
     gendate: string
     prddate: string
@@ -376,11 +376,11 @@ export function fetchBom(bomcd: string) {
     return request.get<never, { data: BomRecord }>(`/bom/${bomcd}`)
 }
 
-export function createBom(data: { bomcd: string; bomnm: string }) {
+export function createBom(data: { bomcd: string; bomnm: string; redundancy_ratio?: number }) {
     return request.post<never, { data: BomRecord }>('/bom', data)
 }
 
-export function updateBom(bomcd: string, data: { bomnm?: string; useflg?: string }) {
+export function updateBom(bomcd: string, data: { bomnm?: string; useflg?: string; redundancy_ratio?: number }) {
     return request.put<never, { data: BomRecord }>(`/bom/${bomcd}`, data)
 }
 

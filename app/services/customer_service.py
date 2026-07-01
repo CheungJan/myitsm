@@ -159,3 +159,58 @@ class CustomerService:
             return None
         customer.cust_card = new_card
         return customer
+
+    # ------------------------------------------------------------------
+    # 门店经营状态 / 数据有效性（对齐 PB usp_plan_confrim）
+    # ------------------------------------------------------------------
+
+    # 门店关闭名称前缀（与 s_status 对应，用于幂等判断）
+    _CLOSE_PREFIX: dict[str, str] = {
+        "3": "(永久关闭)",
+        "2": "(临时关闭)",
+    }
+
+    @staticmethod
+    def set_store_close_status(
+        custcd: str, close_type: str | None, operator: str | None = None
+    ) -> Customer | None:
+        """门店关闭时设置经营状态（对齐 usp_plan_confrim 门店关闭分支）。
+
+        close_type='YJ'（永久）→ s_status='3' + 名称前缀 '(永久关闭)'；
+        其他（临时）→ s_status='2' + 名称前缀 '(临时关闭)'。
+        名称前缀幂等：已加过则不重复添加。
+        """
+        customer = db.session.get(Customer, custcd)
+        if customer is None:
+            return None
+
+        new_status = "3" if (close_type or "").strip().upper() == "YJ" else "2"
+        prefix = CustomerService._CLOSE_PREFIX[new_status]
+
+        customer.s_status = new_status
+        cust_nm = customer.cust_nm or ""
+        # 幂等：避免重复叠加关闭前缀（永久/临时前缀均不重复添加）
+        already_prefixed = cust_nm.startswith("(永久关闭)") or cust_nm.startswith("(临时关闭)")
+        if not already_prefixed:
+            customer.cust_nm = f"{prefix}{cust_nm}"
+        return customer
+
+    @staticmethod
+    def invalidate_store_customer(
+        custcd: str, operator: str | None = None
+    ) -> Customer | None:
+        """客户无效化：移机/取机后空门店逻辑删除（对齐 usp_plan_confrim cust_useflg='1' 分支）。
+
+        置 useflg='0'、pos_n=0、posstatus='03'、posstatus1='31'。
+        仅对当前有效（useflg='1'）的客户生效，避免重复处理。
+        """
+        customer = db.session.get(Customer, custcd)
+        if customer is None:
+            return None
+        if (customer.useflg or "") == "0":
+            return customer
+        customer.useflg = "0"
+        customer.pos_n = 0
+        customer.posstatus = "03"
+        customer.posstatus1 = "31"
+        return customer

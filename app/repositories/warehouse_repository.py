@@ -1415,20 +1415,23 @@ class StockDetailRepository:
     """库存明细数据访问。"""
 
     @staticmethod
-    def get_balance(whcd: str, itemcd: str) -> int:
-        record = (
-            db.session.query(StockDetail)
-            .filter(
-                StockDetail.whcd == whcd,
-                StockDetail.itemcd == itemcd,
-                StockDetail.useflg == "1",
-            )
-            .first()
+    def get_balance(whcd: str | None, itemcd: str) -> int:
+        """查询物料库存数量。
+
+        Args:
+            whcd: 仓库编码，传入 None 表示汇总所有仓库
+            itemcd: 物料编码
+
+        Returns:
+            库存数量（按 itemcd 汇总所有批次）
+        """
+        query = db.session.query(db.func.coalesce(db.func.sum(StockDetail.itemqty), 0)).filter(
+            StockDetail.itemcd == itemcd,
+            StockDetail.useflg == "1",
         )
-        if record is None:
-            return 0
-        qty: int = record.itemqty or 0
-        return qty
+        if whcd:
+            query = query.filter(StockDetail.whcd == whcd)
+        return int(query.scalar() or 0)
 
     @staticmethod
     def list_by_warehouse(

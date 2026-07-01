@@ -569,8 +569,9 @@ class PlanCustService:
             except Exception as exc:
                 logger.warning("押金写入失败 planno=%s: %s", planno, exc)
 
-        # 状态流转：02（分派中）→ 03（实施完成）
-        record.plan_status = "03"
+        # 状态流转：02（分派中）→ 04（实施中）
+        # 对齐 PB status='04'（分派中/实施中），complete() 和 create_outbound() 前置要求 04
+        record.plan_status = "04"
 
         # 客户：TEMP → PENDING
         if record.custcd:
@@ -580,7 +581,7 @@ class PlanCustService:
         return {
             "success": True,
             "planno": planno,
-            "to_status": "03",
+            "to_status": "04",
             "downstream_id": downstream_id,
         }
 
@@ -615,8 +616,53 @@ class PlanCustService:
         # 客户无效化联动（对齐 usp_plan_confrim cust_useflg 分支）
         PlanCustService._apply_cust_useflg_invalidation(record, operator)
 
+        # 写 tmm43_eid_track type='u'（状态变更：设备已销售 → 计划完成配置生效）
+        # 对齐 PB 配置确认步骤，refid=出库单号
+        PlanCustService._write_eid_track_on_complete(record, operator)
+
         db.session.commit()
         return {"success": True, "planno": planno, "to_status": "01"}
+
+    @staticmethod
+    def _write_eid_track_on_complete(record: Any, operator: str) -> None:
+        """计划完成时写 tmm43_eid_track type='u' 记录。
+
+        从关联的 OV=1 销售出库单明细取 EID 列表，对每个 EID 写一条
+        type='u' 记录，refid=出库单号，记录"配置已确认生效"。
+        """
+        from app.models.warehouse import StockOut, StockOutDetailEid
+        from app.repositories.system_repository import SystemRepository
+
+        outbillid = (
+            db.session.query(StockOut.outbillid)
+            .filter(
+                StockOut.refbillid == record.planno,
+                StockOut.invtyp == "1",
+                StockOut.auditflg == "2",
+            )
+            .scalar()
+        )
+        if not outbillid:
+            return
+
+        eid_rows = (
+            db.session.query(StockOutDetailEid.eid, StockOutDetailEid.itemcd)
+            .filter(StockOutDetailEid.outbillid == outbillid)
+            .all()
+        )
+        for row in eid_rows:
+            if not row.eid or not row.itemcd:
+                continue
+            SystemRepository.create_eid_track(
+                eid=row.eid,
+                itemcd=row.itemcd,
+                track_type="u",
+                operator=operator,
+                refid=outbillid,
+                sflg="S",       # 变更前：已销售
+                n_sflg="S",     # 变更后：仍为已销售（配置生效不改 sflg）
+                remark=f"预计划 {record.planno} 配置确认生效",
+            )
 
     @staticmethod
     def _apply_cust_useflg_invalidation(record: Any, operator: str) -> None:
@@ -786,11 +832,17 @@ class PlanCustService:
         planno: str,
         whcd: str,
         operator: str,
+        eids: list[str] | None = None,
     ) -> dict[str, object]:
         """生成 OV=1 销售出库草稿 —— 仓库实施部领机时调用。
 
         前置条件：plan_status='04'（实施中）。
         创建 OV=1 草稿（refbillid=planno），仓库人工审核后出库。
+
+        参数 eids：可选 EID 列表。
+          - 方案 A（预绑定）：预计划已选 posid，此处传 [posid] 自动带出库明细
+          - 方案 B（发货时绑定）：仓库人选 N 台 EID 传入，写出库明细
+          - 不传 eids：创建空草稿，仓库人审核前在出库单页面补充明细
         """
         record = PlanCustRepository.get_by_id(planno)
         if record is None:
@@ -821,6 +873,31 @@ class PlanCustService:
                 "error": f"已存在出库单 {existing.outbillid}",
             }
 
+        # 方案 A：预计划已选 posid 且未传 eids，自动带出
+        if not eids and record.posid:
+            eids = [record.posid]
+
+        # 构造出库 EID 明细
+        details_eid: list[dict[str, Any]] = []
+        if eids:
+            from app.models.master import Eid as EidModel
+
+            for eid in eids:
+                eid_rec = (
+                    db.session.query(EidModel)
+                    .filter(EidModel.eid == eid)
+                    .first()
+                )
+                if eid_rec is None:
+                    return {"success": False, "error": f"EID {eid} 不存在"}
+                if not eid_rec.itemcd:
+                    return {"success": False, "error": f"EID {eid} 无机型信息"}
+                details_eid.append({
+                    "eid": eid,
+                    "itemcd": eid_rec.itemcd,
+                    "outqty": 1,
+                })
+
         # 创建 OV=1 销售出库草稿
         from app.services.warehouse_service import StockOutService
 
@@ -830,7 +907,11 @@ class PlanCustService:
             "refbillid": planno,
             "memo": f"预计划 {planno} 销售出库",
         }
-        result = StockOutService.create(data=out_data, creator=operator)
+        result = StockOutService.create(
+            data=out_data,
+            details_eid=details_eid if details_eid else None,
+            creator=operator,
+        )
         if not result.get("success") and result.get("error"):
             return {"success": False, "error": str(result["error"])}
 
@@ -843,6 +924,7 @@ class PlanCustService:
             "success": True,
             "planno": planno,
             "outbillid": outbillid,
+            "eid_count": len(details_eid),
         }
 
 

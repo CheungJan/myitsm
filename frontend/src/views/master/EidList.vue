@@ -63,8 +63,8 @@
                     <el-table-column label="关联单号" width="120">
                         <template #default="{ row }">{{ (row as Record<string,unknown>).plan_refid || row.refid }}</template>
                     </el-table-column>
-                    <el-table-column label="新旧" width="70">
-                        <template #default="{ row }">{{ codeMaps.NO?.[row.new_old] || row.new_old }}</template>
+                    <el-table-column label="资产类型" width="90">
+                        <template #default="{ row }">{{ codeMaps.AT?.[row.asset_type] || row.asset_type || '-' }}</template>
                     </el-table-column>
                     <el-table-column prop="prddate" label="生产日期" width="110" />
                     <el-table-column label="操作" width="180" fixed="right">
@@ -88,7 +88,7 @@
                     <el-col :span="12"><el-form-item label="状态"><el-select v-model="form.sflg" clearable style="width:100%"><el-option v-for="t in sflgOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="质检"><el-select v-model="form.qcflg" clearable style="width:100%"><el-option v-for="t in qcflgOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="仓库"><el-select v-model="form.whcd" clearable style="width:100%"><el-option v-for="w in whOptions" :key="w.whcd" :label="w.whnm" :value="w.whcd" /></el-select></el-form-item></el-col>
-                    <el-col :span="12"><el-form-item label="新旧"><el-select v-model="form.new_old" clearable style="width:100%"><el-option v-for="t in noOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
+                    <el-col :span="12"><el-form-item label="资产类型"><el-select v-model="form.asset_type" clearable style="width:100%"><el-option v-for="t in atOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="质保范围"><el-select v-model="form.old_degree" clearable style="width:100%"><el-option v-for="t in odOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="是否整机"><el-select v-model="form.isunit" clearable style="width:100%"><el-option v-for="t in iuOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="关联单号"><el-input v-model="form.refid" /></el-form-item></el-col>
@@ -183,9 +183,9 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const editing = ref<Record<string,string>|null>(null)
 const saving = ref(false)
-const form = reactive({ itemcd: '', eid: '', etyp: '0', whcd: '', sflg: '8', qcflg: '', new_old: '1', old_degree: '', isunit: '', refid: '', prddate: '', manuf_seq: '', remark: '' })
+const form = reactive({ itemcd: '', eid: '', etyp: '0', whcd: '', sflg: '8', qcflg: '', asset_type: '01', old_degree: '', isunit: '', refid: '', prddate: '', manuf_seq: '', remark: '' })
 const whOptions = ref<{ whcd: string; whnm: string }[]>([])
-const noOptions = ref<{ code_cd: string; code_nm: string }[]>([])
+const atOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const iuOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const odOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const historyVisible = ref(false)
@@ -202,21 +202,21 @@ watch(perPage, () => { page.value = 1; loadData() })
 watch(treeFilterText, (v) => treeRef.value?.filter(v))
 onMounted(async () => {
     await loadTree()
-    const [et, es, qc, no, iu, od] = await Promise.all([
+    const [et, es, qc, at, iu, od] = await Promise.all([
         fetchSyscodes('ET'), fetchSyscodes('ES'), fetchSyscodes('QC'),
-        fetchSyscodes('NO'), fetchSyscodes('IU'), fetchSyscodes('OD'),
+        fetchSyscodes('AT'), fetchSyscodes('IU'), fetchSyscodes('OD'),
     ])
     etypOptions.value = et.data || []
     sflgOptions.value = es.data || []
     qcflgOptions.value = qc.data || []
-    noOptions.value = no.data || []
+    atOptions.value = at.data || []
     iuOptions.value = iu.data || []
     odOptions.value = od.data || []
     codeMaps.value = {
         ET: Object.fromEntries((et.data||[]).map(t => [t.code_cd, t.code_nm])),
         ES: Object.fromEntries((es.data||[]).map(t => [t.code_cd, t.code_nm])),
         QC: Object.fromEntries((qc.data||[]).map(t => [t.code_cd, t.code_nm])),
-        NO: Object.fromEntries((no.data||[]).map(t => [t.code_cd, t.code_nm])),
+        AT: Object.fromEntries((at.data||[]).map(t => [t.code_cd, t.code_nm])),
         IU: Object.fromEntries((iu.data||[]).map(t => [t.code_cd, t.code_nm])),
         OD: Object.fromEntries((od.data||[]).map(t => [t.code_cd, t.code_nm])),
     }
@@ -275,13 +275,13 @@ function openDialog(row?: Record<string,string>) {
         form.itemcd = row.itemcd || ''; form.eid = row.eid || ''
         form.etyp = row.etyp || '0'; form.whcd = row.whcd || ''
         form.sflg = row.sflg || '8'; form.qcflg = row.qcflg || ''
-        form.new_old = row.new_old || '1'; form.old_degree = row.old_degree || ''
+        form.asset_type = row.asset_type || '01'; form.old_degree = row.old_degree || ''
         form.isunit = row.isunit || ''; form.refid = row.refid || ''
         form.prddate = row.prddate || ''; form.manuf_seq = row.manuf_seq || ''
         form.remark = row.remark || ''
     } else {
         editing.value = null
-        Object.assign(form, { itemcd: '', eid: '', etyp: '0', whcd: '', sflg: '8', qcflg: '', new_old: '1', old_degree: '', isunit: '', refid: '', prddate: '', manuf_seq: '', remark: '' })
+        Object.assign(form, { itemcd: '', eid: '', etyp: '0', whcd: '', sflg: '8', qcflg: '', asset_type: '01', old_degree: '', isunit: '', refid: '', prddate: '', manuf_seq: '', remark: '' })
     }
     dialogVisible.value = true
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import Any
 
@@ -34,6 +35,31 @@ from app.repositories.itsm_repository import (
     TimepointAreaRepository,
 )
 from app.services.state_machine import StateMachine
+
+# ---------------------------------------------------------------------------
+# 业务码值常量（避免硬编码散落各方法）
+# ---------------------------------------------------------------------------
+
+# CustPosRl.useflg：设备绑定有效标志
+RL_USEFLG_ACTIVE = "1"
+RL_USEFLG_INACTIVE = "0"
+
+# CustPosRl.asset_status：资产状态
+ASSET_STATUS_ACTIVE = "ACTIVE"
+ASSET_STATUS_RETURNED = "RETURNED"
+
+# PlanCust.plan_status：预计划状态
+PLAN_STATUS_COMPLETED = "01"  # 计划完成
+PLAN_STATUS_IN_PROGRESS = "04"  # 实施中
+
+# EidTrack.type：业务语义层追踪类型
+TRACK_TYPE_ALLOCATE = "C"  # 客户分配
+TRACK_TYPE_RECYCLE = "R"  # 回收
+TRACK_TYPE_TRANSFER = "T"  # 客户转移
+TRACK_TYPE_ATTRIBUTE = "A"  # 属性变更
+
+# ITSM 单据关单状态
+CLOSE_STATUS = "5"
 
 
 def _enrich_store_card(items: list[dict[str, Any]], key: str = "store_id") -> list[dict[str, Any]]:
@@ -167,7 +193,24 @@ class MaintenanceOpenService(_BaseMaintenanceService):
         record = MaintenanceOpenRepository.get_by_id(opening_id)
         if record is None:
             return None
-        return record.to_dict()
+        data = record.to_dict()
+        # 附带 equipments 子表（TIT14_EQUIPMENT_OPEN）
+        data["equipments"] = [
+            {
+                "device_id": eq.device_id,
+                "item_cd": None,  # EquipmentOpen 无 item_cd 字段，前端按 device_id 显示
+                "price": float(eq.price) if eq.price is not None else None,
+                "delivery_id": eq.delivery_id,
+                "is_finish": eq.is_finish,
+                "is_change": eq.is_change,
+                "change_eid": eq.change_eid,
+                "from_custcard": eq.from_custcard,
+                "from_posid": eq.from_posid,
+                "from_custcd": eq.from_custcd,
+            }
+            for eq in record.equipments
+        ]
+        return data
 
     @staticmethod
     def list_records(
@@ -204,8 +247,160 @@ class MaintenanceOpenService(_BaseMaintenanceService):
             return {"success": False, "error": "开通单不存在"}
         result = self._do_transition(record, to_status, operator, remark, pk_field="new_opening_id")
         if result.get("success"):
+            # 关单完成（to_status=5）：
+            # 1. 写 tmm43_eid_track type='C'（设备分配到门店）
+            # 2. 写 tmm35_cust_pos_rl（设备绑定到门店）
+            # 3. 回写预计划 plan_status='01'（计划完成）
+            if to_status == CLOSE_STATUS:
+                self._write_eid_track_on_close(record, operator)
+                self._link_equipment_to_store(record, operator)
+                self._write_back_plan_status(record, operator)
             db.session.commit()
         return result
+
+    @staticmethod
+    def _write_eid_track_on_close(record: Any, operator: str) -> None:
+        """开通单关单时写 tmm43_eid_track type='C' 记录。
+
+        从主设备 device_id 和附表 equipments 取 EID 列表，
+        对每个 EID 写一条 type='C' 记录，refid=预计划号（通过 imple_billid 反查）。
+        """
+        from datetime import UTC, datetime as _dt
+        from app.models.master import Eid as EidModel
+        from app.models.sales import PlanCust
+        from app.repositories.system_repository import SystemRepository
+
+        # 收集 EID 列表（主设备 + 附表）
+        eids: list[str] = []
+        if record.device_id:
+            eids.append(record.device_id)
+        for eq in record.equipments:
+            if eq.device_id and eq.device_id not in eids:
+                eids.append(eq.device_id)
+
+        if not eids:
+            return
+
+        # 反查预计划号（imple_billid = new_opening_id）
+        planno = (
+            db.session.query(PlanCust.planno)
+            .filter(PlanCust.imple_billid == record.new_opening_id)
+            .scalar()
+        ) or ""
+
+        change_date = _dt.now(UTC)
+        for eid in eids:
+            eid_rec = (
+                db.session.query(EidModel)
+                .filter(EidModel.eid == eid)
+                .first()
+            )
+            if eid_rec is None:
+                continue
+            SystemRepository.create_eid_track(
+                eid=eid,
+                itemcd=eid_rec.itemcd or "",
+                track_type=TRACK_TYPE_ALLOCATE,
+                operator=operator,
+                refid=planno,
+                change_date=change_date,
+                cust_cd=None,
+                n_cust_cd=record.store_id,
+                sflg=eid_rec.sflg,
+                n_sflg=eid_rec.sflg,
+                whcd=eid_rec.whcd,
+                n_whcd=eid_rec.whcd,
+                install_date=None,
+                n_install_date=change_date,
+                remark=f"开通单 {record.new_opening_id} 关单，设备绑定到门店 {record.store_id}",
+            )
+
+    @staticmethod
+    def _link_equipment_to_store(record: Any, operator: str) -> None:
+        """开通单关单时写 tmm35_cust_pos_rl（设备绑定到门店）。
+
+        对每个 EID 写一条 CustPosRl 记录，标记设备已分配到客户门店。
+        若已存在同 eid + useflg='1' 的记录，更新 posupddate 而非重复插入。
+        """
+        from datetime import UTC, datetime as _dt
+        from app.models.master import CustPosRl, Eid as EidModel
+
+        eids: list[str] = []
+        if record.device_id:
+            eids.append(record.device_id)
+        for eq in record.equipments:
+            if eq.device_id and eq.device_id not in eids:
+                eids.append(eq.device_id)
+
+        if not eids or not record.store_id:
+            return
+
+        now = _dt.now(UTC)
+        for eid in eids:
+            eid_rec = (
+                db.session.query(EidModel)
+                .filter(EidModel.eid == eid)
+                .first()
+            )
+            item_cd = eid_rec.itemcd if eid_rec else ""
+
+            # 查是否已有活跃绑定
+            existing = (
+                db.session.query(CustPosRl)
+                .filter(CustPosRl.eid == eid, CustPosRl.useflg == RL_USEFLG_ACTIVE)
+                .first()
+            )
+            if existing:
+                # 已绑定到其他门店：失效旧记录，写新记录
+                if existing.cust_cd != record.store_id:
+                    existing.useflg = RL_USEFLG_INACTIVE
+                    existing.asset_status = ASSET_STATUS_RETURNED
+                    db.session.add(CustPosRl(
+                        cust_cd=record.store_id,
+                        eid=eid,
+                        item_cd=item_cd,
+                        useflg=RL_USEFLG_ACTIVE,
+                        posupddate=now,
+                        asset_status=ASSET_STATUS_ACTIVE,
+                        created_from="MAINTENANCE_OPEN",
+                        source_id=record.new_opening_id,
+                    ))
+                else:
+                    existing.posupddate = now
+                    existing.asset_status = ASSET_STATUS_ACTIVE
+            else:
+                db.session.add(CustPosRl(
+                    cust_cd=record.store_id,
+                    eid=eid,
+                    item_cd=item_cd,
+                    useflg=RL_USEFLG_ACTIVE,
+                    posupddate=now,
+                    asset_status=ASSET_STATUS_ACTIVE,
+                    created_from="MAINTENANCE_OPEN",
+                    source_id=record.new_opening_id,
+                ))
+
+    @staticmethod
+    def _write_back_plan_status(record: Any, operator: str) -> None:
+        """开通单关单时回写预计划 plan_status='01'（计划完成）。
+
+        对齐 PB"实施完成即计划完成"优化，消除人工配置确认环节。
+        仅当预计划当前 plan_status='04'（实施中）时回写。
+        """
+        from app.models.sales import PlanCust
+
+        plan = (
+            db.session.query(PlanCust)
+            .filter(PlanCust.imple_billid == record.new_opening_id)
+            .first()
+        )
+        if plan is None:
+            return
+        if (plan.plan_status or "00") != PLAN_STATUS_IN_PROGRESS:
+            return
+        plan.plan_status = PLAN_STATUS_COMPLETED
+        plan.update_time = datetime.now(UTC)
+        plan.updator = operator
 
 
 class MaintenanceRenovateService(_BaseMaintenanceService):
@@ -253,8 +448,162 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
             return {"success": False, "error": "翻新单不存在"}
         result = self._do_transition(record, to_status, operator, remark, pk_field="renew_id")
         if result.get("success"):
+            # 11c: 关单（to_status=5）时写 EidTrack + rl 转移 + 回写计划
+            if to_status == CLOSE_STATUS:
+                self._write_eid_track_on_close_renovate(record, operator)
+                self._transfer_rl_on_close_renovate(record, operator)
+                self._write_back_plan_status_renovate(record, operator)
             db.session.commit()
         return result
+
+    @staticmethod
+    def _write_eid_track_on_close_renovate(record: MaintenanceRenovate, operator: str) -> None:
+        """翻新单关单时写 tmm43_eid_track：旧机 type='R'（回收）+ 新机 type='C'（分配）。
+
+        对齐 PB usp_plan_confrim L301-356, L403-405。
+        refid=预计划号（通过 imple_billid 反查）。
+        """
+        from app.models.master import Eid as EidModel
+        from app.models.sales import PlanCust
+        from app.repositories.system_repository import SystemRepository
+
+        planno = (
+            db.session.query(PlanCust.planno)
+            .filter(PlanCust.imple_billid == record.renew_id)
+            .scalar()
+        ) or ""
+
+        change_date = datetime.now(UTC)
+
+        # 旧机写 type='R'（回收）
+        if record.old_device_id:
+            eid_rec = (
+                db.session.query(EidModel)
+                .filter(EidModel.eid == record.old_device_id)
+                .first()
+            )
+            if eid_rec:
+                SystemRepository.create_eid_track(
+                    eid=record.old_device_id,
+                    itemcd=eid_rec.itemcd or "",
+                    track_type=TRACK_TYPE_RECYCLE,
+                    operator=operator,
+                    refid=planno,
+                    change_date=change_date,
+                    cust_cd=record.store_id,
+                    n_cust_cd=None,
+                    sflg=eid_rec.sflg,
+                    n_sflg=eid_rec.sflg,
+                    whcd=eid_rec.whcd,
+                    n_whcd=eid_rec.whcd,
+                    install_date=eid_rec.install_date,
+                    n_install_date=eid_rec.install_date,
+                    remark=f"翻新单 {record.renew_id} 关单，旧机 {record.old_device_id} 从门店 {record.store_id} 回收",
+                )
+
+        # 新机写 type='C'（分配）
+        if record.new_device_id:
+            eid_rec = (
+                db.session.query(EidModel)
+                .filter(EidModel.eid == record.new_device_id)
+                .first()
+            )
+            if eid_rec:
+                SystemRepository.create_eid_track(
+                    eid=record.new_device_id,
+                    itemcd=eid_rec.itemcd or "",
+                    track_type=TRACK_TYPE_ALLOCATE,
+                    operator=operator,
+                    refid=planno,
+                    change_date=change_date,
+                    cust_cd=None,
+                    n_cust_cd=record.store_id,
+                    sflg=eid_rec.sflg,
+                    n_sflg=eid_rec.sflg,
+                    whcd=eid_rec.whcd,
+                    n_whcd=eid_rec.whcd,
+                    install_date=None,
+                    n_install_date=change_date,
+                    remark=f"翻新单 {record.renew_id} 关单，新机 {record.new_device_id} 分配到门店 {record.store_id}",
+                )
+
+    @staticmethod
+    def _transfer_rl_on_close_renovate(record: MaintenanceRenovate, operator: str) -> None:
+        """翻新单关单时转移 tmm35_cust_pos_rl：旧机失效 + 新机新建。
+
+        对齐 PB usp_plan_confrim L301-356, L403-405。
+        """
+        from app.models.master import CustPosRl, Eid as EidModel
+
+        now = datetime.now(UTC)
+
+        # 旧机 rl 失效
+        if record.old_device_id:
+            old_rl = (
+                db.session.query(CustPosRl)
+                .filter(
+                    CustPosRl.eid == record.old_device_id,
+                    CustPosRl.useflg == RL_USEFLG_ACTIVE,
+                )
+                .first()
+            )
+            if old_rl:
+                old_rl.useflg = RL_USEFLG_INACTIVE
+                old_rl.asset_status = ASSET_STATUS_RETURNED
+                old_rl.posupddate = now
+
+        # 新机 rl 新建或更新
+        if record.new_device_id and record.store_id:
+            new_rl = (
+                db.session.query(CustPosRl)
+                .filter(
+                    CustPosRl.eid == record.new_device_id,
+                    CustPosRl.cust_cd == record.store_id,
+                    CustPosRl.useflg == RL_USEFLG_ACTIVE,
+                )
+                .first()
+            )
+            if new_rl:
+                new_rl.posupddate = now
+                new_rl.asset_status = ASSET_STATUS_ACTIVE
+            else:
+                eid_rec = (
+                    db.session.query(EidModel)
+                    .filter(EidModel.eid == record.new_device_id)
+                    .first()
+                )
+                item_cd = eid_rec.itemcd if eid_rec else ""
+                db.session.add(CustPosRl(
+                    cust_cd=record.store_id,
+                    eid=record.new_device_id,
+                    item_cd=item_cd,
+                    useflg="1",
+                    posupddate=now,
+                    asset_status="ACTIVE",
+                    created_from="MAINTENANCE_RENOVATE",
+                    source_id=record.renew_id,
+                ))
+
+    @staticmethod
+    def _write_back_plan_status_renovate(record: MaintenanceRenovate, operator: str) -> None:
+        """回写预计划 plan_status='01'（计划完成）。
+
+        仅当预计划当前 plan_status='04'（实施中）时回写。
+        """
+        from app.models.sales import PlanCust
+
+        plan = (
+            db.session.query(PlanCust)
+            .filter(PlanCust.imple_billid == record.renew_id)
+            .first()
+        )
+        if plan is None:
+            return
+        if (plan.plan_status or "00") != PLAN_STATUS_IN_PROGRESS:
+            return
+        plan.plan_status = PLAN_STATUS_COMPLETED
+        plan.update_time = datetime.now(UTC)
+        plan.updator = operator
 
 
 class DeviceChangeService(_BaseMaintenanceService):
@@ -311,19 +660,217 @@ class DeviceChangeService(_BaseMaintenanceService):
         )
 
         if result.get("success"):
-            if to_status == "5" and record.change_type == "CK":
-                DeviceChangeRepository.save_customer_history(
-                    {
-                        "cust_cd": record.store_id or "",
-                        "change_type": "CK",
-                        "old_value": record.new_store_card,
-                        "new_value": record.new_store_card,
-                        "oper_cd": operator,
-                    }
-                )
+            # CK/BG/BG 三种变更类型都在审核完成（to_status=5）时同步客户表并写历史
+            if to_status == CLOSE_STATUS and record.change_type in ("CK", "BG", "BQ"):
+                self._sync_customer_and_history(record, operator, remark)
+
+            # 11b: BG 子类型写 type='T' + rl 转移；CK/BQ 只回写计划
+            if to_status == CLOSE_STATUS:
+                if record.change_type == "BG":
+                    self._write_eid_track_on_close_bg(record, operator)
+                    self._transfer_rl_on_close_bg(record, operator)
+                # CK/BQ 不涉及设备，不写 EidTrack，只回写计划
+                self._write_back_plan_status(record, operator)
+
             db.session.commit()
 
         return result
+
+    @staticmethod
+    def _write_eid_track_on_close_bg(record: DeviceChange, operator: str) -> None:
+        """BG 子类型关单时写 tmm43_eid_track type='T'（客户转移）记录。
+
+        设备从 A 客户（store_id）转移到 B 客户（new_store_id）。
+        refid=预计划号（通过 imple_billid 反查）。
+        """
+        from app.models.master import Eid as EidModel
+        from app.models.sales import PlanCust
+        from app.repositories.system_repository import SystemRepository
+
+        if not record.device_id:
+            return
+
+        planno = (
+            db.session.query(PlanCust.planno)
+            .filter(PlanCust.imple_billid == record.device_change_id)
+            .scalar()
+        ) or ""
+
+        eid_rec = (
+            db.session.query(EidModel)
+            .filter(EidModel.eid == record.device_id)
+            .first()
+        )
+        if eid_rec is None:
+            return
+
+        change_date = datetime.now(UTC)
+        SystemRepository.create_eid_track(
+            eid=record.device_id,
+            itemcd=eid_rec.itemcd or "",
+            track_type=TRACK_TYPE_TRANSFER,
+            operator=operator,
+            refid=planno,
+            change_date=change_date,
+            cust_cd=record.store_id,
+            n_cust_cd=record.new_store_id,
+            sflg=eid_rec.sflg,
+            n_sflg=eid_rec.sflg,
+            whcd=eid_rec.whcd,
+            n_whcd=eid_rec.whcd,
+            install_date=eid_rec.install_date,
+            n_install_date=eid_rec.install_date,
+            remark=f"设备变更单 {record.device_change_id} 关单，设备从 {record.store_id} 转移到 {record.new_store_id}",
+        )
+
+    @staticmethod
+    def _transfer_rl_on_close_bg(record: DeviceChange, operator: str) -> None:
+        """BG 子类型关单时转移 tmm35_cust_pos_rl。
+
+        旧门店（store_id）rl 失效（useflg=0, asset_status=RETURNED）；
+        新门店（new_store_id）rl 新建或更新（useflg=1, asset_status=ACTIVE）。
+        对齐 PB usp_plan_confrim L221-243。
+        """
+        from app.models.master import CustPosRl, Eid as EidModel
+
+        if not record.device_id or not record.new_store_id:
+            return
+
+        now = datetime.now(UTC)
+
+        # 旧门店 rl 失效
+        old_rl = (
+            db.session.query(CustPosRl)
+            .filter(
+                CustPosRl.eid == record.device_id,
+                CustPosRl.cust_cd == record.store_id,
+                CustPosRl.useflg == RL_USEFLG_ACTIVE,
+            )
+            .first()
+        )
+        if old_rl:
+            old_rl.useflg = RL_USEFLG_INACTIVE
+            old_rl.asset_status = ASSET_STATUS_RETURNED
+            old_rl.posupddate = now
+
+        # 新门店 rl 新建或更新
+        new_rl = (
+            db.session.query(CustPosRl)
+            .filter(
+                CustPosRl.eid == record.device_id,
+                CustPosRl.cust_cd == record.new_store_id,
+                CustPosRl.useflg == RL_USEFLG_ACTIVE,
+            )
+            .first()
+        )
+        if new_rl:
+            new_rl.posupddate = now
+            new_rl.asset_status = ASSET_STATUS_ACTIVE
+        else:
+            eid_rec = (
+                db.session.query(EidModel)
+                .filter(EidModel.eid == record.device_id)
+                .first()
+            )
+            item_cd = eid_rec.itemcd if eid_rec else ""
+            db.session.add(CustPosRl(
+                cust_cd=record.new_store_id,
+                eid=record.device_id,
+                item_cd=item_cd,
+                useflg=RL_USEFLG_ACTIVE,
+                posupddate=now,
+                asset_status=ASSET_STATUS_ACTIVE,
+                created_from="DEVICE_CHANGE",
+                source_id=record.device_change_id,
+            ))
+
+    @staticmethod
+    def _write_back_plan_status(record: DeviceChange, operator: str) -> None:
+        """回写预计划 plan_status='01'（计划完成）。
+
+        对齐 PB"实施完成即计划完成"优化。仅当预计划当前 plan_status='04'（实施中）时回写。
+        CK/BQ/BG 三种子类型都回写。
+        """
+        from app.models.sales import PlanCust
+
+        plan = (
+            db.session.query(PlanCust)
+            .filter(PlanCust.imple_billid == record.device_change_id)
+            .first()
+        )
+        if plan is None:
+            return
+        if (plan.plan_status or "00") != PLAN_STATUS_IN_PROGRESS:
+            return
+        plan.plan_status = PLAN_STATUS_COMPLETED
+        plan.update_time = datetime.now(UTC)
+        plan.updator = operator
+
+    @staticmethod
+    def _sync_customer_and_history(
+        record: DeviceChange, operator: str, remark: str | None
+    ) -> None:
+        """审核完成时同步客户主表并写历史表（CK/BG/BG 三种类型）。"""
+        cust_cd = record.store_id or ""
+        if not cust_cd:
+            return
+
+        customer = db.session.get(Customer, cust_cd)
+        if customer is None:
+            return
+
+        change_type = record.change_type
+        device_change_id = record.device_change_id
+
+        if change_type in ("CK", "BG"):
+            # 磁卡号变更：同步 cust_card，历史表记录旧/新磁卡号
+            old_card = customer.cust_card or ""
+            new_card = record.new_store_card or ""
+            if new_card and new_card != old_card:
+                customer.cust_card = new_card
+                customer.replacedate = datetime.now(UTC)
+            DeviceChangeRepository.save_customer_history(
+                {
+                    "cust_cd": cust_cd,
+                    "change_type": change_type,
+                    "old_value": old_card,
+                    "new_value": new_card,
+                    "oper_cd": operator,
+                    "oper_date": datetime.now(UTC),
+                    "change_reason": remark or f"{change_type} 磁卡号变更",
+                    "device_change_id": device_change_id,
+                }
+            )
+        elif change_type == "BQ":
+            # 信息变更：同步联系人/电话/地址，历史表记录旧/新信息（JSON 快照）
+            old_info = {
+                "contactor": customer.contactor or "",
+                "phone_no": customer.phone_no or "",
+                "address": customer.address or "",
+            }
+            new_contactor = record.new_contactor or customer.contactor or ""
+            new_tel = record.new_tel or customer.phone_no or ""
+            new_address = record.new_address or customer.address or ""
+            customer.contactor = new_contactor
+            customer.phone_no = new_tel
+            customer.address = new_address
+            new_info = {
+                "contactor": new_contactor,
+                "phone_no": new_tel,
+                "address": new_address,
+            }
+            DeviceChangeRepository.save_customer_history(
+                {
+                    "cust_cd": cust_cd,
+                    "change_type": change_type,
+                    "old_value": json.dumps(old_info, ensure_ascii=False),
+                    "new_value": json.dumps(new_info, ensure_ascii=False),
+                    "oper_cd": operator,
+                    "oper_date": datetime.now(UTC),
+                    "change_reason": remark or "BQ 信息变更",
+                    "device_change_id": device_change_id,
+                }
+            )
 
 
 class StoreCloseService(_BaseMaintenanceService):
@@ -371,8 +918,119 @@ class StoreCloseService(_BaseMaintenanceService):
             return {"success": False, "error": "关闭单不存在"}
         result = self._do_transition(record, to_status, operator, remark, pk_field="store_close_id")
         if result.get("success"):
+            # 关单完成（to_status=5）联动客户经营状态（对齐 usp_plan_confrim 门店关闭分支）
+            if to_status == CLOSE_STATUS and record.store_id:
+                from app.services.customer_service import CustomerService
+
+                CustomerService.set_store_close_status(
+                    record.store_id, record.close_type, operator
+                )
+                # 11e: 门店所有活跃 EID 写 type='R' + rl 全失效 + 回写计划
+                self._write_eid_track_on_close_store(record, operator)
+                self._invalidate_rl_on_close_store(record, operator)
+                self._write_back_plan_status_store(record, operator)
             db.session.commit()
         return result
+
+    @staticmethod
+    def _write_eid_track_on_close_store(record: StoreClose, operator: str) -> None:
+        """门店关闭关单时写 tmm43_eid_track type='R'（回收）。
+
+        对齐 PB usp_plan_confrim type='4' 分支 L591-593。
+        对门店所有活跃 EID 写 R 记录，cust_cd=门店，n_cust_cd=None。
+        refid=预计划号（通过 imple_billid 反查）。
+        """
+        from app.models.master import CustPosRl, Eid as EidModel
+        from app.models.sales import PlanCust
+        from app.repositories.system_repository import SystemRepository
+
+        planno = (
+            db.session.query(PlanCust.planno)
+            .filter(PlanCust.imple_billid == record.store_close_id)
+            .scalar()
+        ) or ""
+
+        change_date = datetime.now(UTC)
+
+        # 查门店所有活跃 EID（通过 rl 反查，rl.useflg='1'）
+        active_eids = (
+            db.session.query(CustPosRl.eid, CustPosRl.item_cd)
+            .filter(
+                CustPosRl.cust_cd == record.store_id,
+                CustPosRl.useflg == RL_USEFLG_ACTIVE,
+            )
+            .all()
+        )
+
+        for eid_val, item_cd in active_eids:
+            eid_rec = (
+                db.session.query(EidModel)
+                .filter(EidModel.eid == eid_val)
+                .first()
+            )
+            if eid_rec is None:
+                continue
+            SystemRepository.create_eid_track(
+                eid=eid_val,
+                itemcd=eid_rec.itemcd or item_cd or "",
+                track_type=TRACK_TYPE_RECYCLE,
+                operator=operator,
+                refid=planno,
+                change_date=change_date,
+                cust_cd=record.store_id,
+                n_cust_cd=None,
+                sflg=eid_rec.sflg,
+                n_sflg=eid_rec.sflg,
+                whcd=eid_rec.whcd,
+                n_whcd=eid_rec.whcd,
+                install_date=eid_rec.install_date,
+                n_install_date=eid_rec.install_date,
+                remark=f"门店关闭 {record.store_close_id} 关单，设备 {eid_val} 从门店 {record.store_id} 回收",
+            )
+
+    @staticmethod
+    def _invalidate_rl_on_close_store(record: StoreClose, operator: str) -> None:
+        """门店关闭关单时失效 tmm35_cust_pos_rl。
+
+        门店所有活跃 rl 失效（useflg=0, asset_status=RETURNED）。
+        """
+        from app.models.master import CustPosRl
+
+        now = datetime.now(UTC)
+
+        rls = (
+            db.session.query(CustPosRl)
+            .filter(
+                CustPosRl.cust_cd == record.store_id,
+                CustPosRl.useflg == RL_USEFLG_ACTIVE,
+            )
+            .all()
+        )
+        for rl in rls:
+            rl.useflg = RL_USEFLG_INACTIVE
+            rl.asset_status = ASSET_STATUS_RETURNED
+            rl.posupddate = now
+
+    @staticmethod
+    def _write_back_plan_status_store(record: StoreClose, operator: str) -> None:
+        """回写预计划 plan_status='01'（计划完成）。
+
+        仅当预计划当前 plan_status='04'（实施中）时回写。
+        """
+        from app.models.sales import PlanCust
+
+        plan = (
+            db.session.query(PlanCust)
+            .filter(PlanCust.imple_billid == record.store_close_id)
+            .first()
+        )
+        if plan is None:
+            return
+        if (plan.plan_status or "00") != PLAN_STATUS_IN_PROGRESS:
+            return
+        plan.plan_status = PLAN_STATUS_COMPLETED
+        plan.update_time = datetime.now(UTC)
+        plan.updator = operator
 
 
 # ---------------------------------------------------------------------------
@@ -507,8 +1165,110 @@ class RecycleTaskService(_BaseMaintenanceService):
         if not result["valid"]:
             return {"success": False, "error": result.get("error", "状态流转验证失败")}
         RecycleTaskRepository.update_status(record, to_status, operator)
+        # 11d: 关单（to_status=5）时写 EidTrack + rl 失效 + 回写计划
+        if to_status == CLOSE_STATUS:
+            self._write_eid_track_on_close_recycle(record, operator)
+            self._invalidate_rl_on_close_recycle(record, operator)
+            self._write_back_plan_status_recycle(record, operator)
         db.session.commit()
         return {"success": True, "from_status": from_status, "to_status": to_status}
+
+    @staticmethod
+    def _write_eid_track_on_close_recycle(record: RecycleTask, operator: str) -> None:
+        """回收任务关单时写 tmm43_eid_track type='R'（回收）。
+
+        对齐 PB usp_plan_confrim type='3' 分支 L591-593。
+        对每个明细 asset_id 写一条 R 记录，cust_cd=门店，n_cust_cd=None。
+        refid=预计划号（通过 imple_billid 反查）。
+        """
+        from app.models.master import Eid as EidModel
+        from app.models.sales import PlanCust
+        from app.repositories.system_repository import SystemRepository
+
+        planno = (
+            db.session.query(PlanCust.planno)
+            .filter(PlanCust.imple_billid == record.recycle_id)
+            .scalar()
+        ) or record.plan_no or ""
+
+        change_date = datetime.now(UTC)
+
+        for dtl in record.details:
+            eid_val = dtl.asset_id or ""
+            if not eid_val:
+                continue
+            eid_rec = (
+                db.session.query(EidModel)
+                .filter(EidModel.eid == eid_val)
+                .first()
+            )
+            if eid_rec is None:
+                continue
+            SystemRepository.create_eid_track(
+                eid=eid_val,
+                itemcd=eid_rec.itemcd or "",
+                track_type=TRACK_TYPE_RECYCLE,
+                operator=operator,
+                refid=planno,
+                change_date=change_date,
+                cust_cd=record.cust_cd,
+                n_cust_cd=None,
+                sflg=eid_rec.sflg,
+                n_sflg=eid_rec.sflg,
+                whcd=eid_rec.whcd,
+                n_whcd=dtl.warehouse_cd or eid_rec.whcd,
+                install_date=eid_rec.install_date,
+                n_install_date=eid_rec.install_date,
+                remark=f"回收任务 {record.recycle_id} 关单，设备 {eid_val} 从门店 {record.cust_cd} 回收",
+            )
+
+    @staticmethod
+    def _invalidate_rl_on_close_recycle(record: RecycleTask, operator: str) -> None:
+        """回收任务关单时失效 tmm35_cust_pos_rl。
+
+        对每个明细 asset_id 失效对应的活跃 rl（useflg=0, asset_status=RETURNED）。
+        """
+        from app.models.master import CustPosRl
+
+        now = datetime.now(UTC)
+
+        for dtl in record.details:
+            eid_val = dtl.asset_id or ""
+            if not eid_val:
+                continue
+            rl = (
+                db.session.query(CustPosRl)
+                .filter(
+                    CustPosRl.eid == eid_val,
+                    CustPosRl.useflg == RL_USEFLG_ACTIVE,
+                )
+                .first()
+            )
+            if rl:
+                rl.useflg = RL_USEFLG_INACTIVE
+                rl.asset_status = ASSET_STATUS_RETURNED
+                rl.posupddate = now
+
+    @staticmethod
+    def _write_back_plan_status_recycle(record: RecycleTask, operator: str) -> None:
+        """回写预计划 plan_status='01'（计划完成）。
+
+        仅当预计划当前 plan_status='04'（实施中）时回写。
+        """
+        from app.models.sales import PlanCust
+
+        plan = (
+            db.session.query(PlanCust)
+            .filter(PlanCust.imple_billid == record.recycle_id)
+            .first()
+        )
+        if plan is None:
+            return
+        if (plan.plan_status or "00") != PLAN_STATUS_IN_PROGRESS:
+            return
+        plan.plan_status = PLAN_STATUS_COMPLETED
+        plan.update_time = datetime.now(UTC)
+        plan.updator = operator
 
     @staticmethod
     def add_detail(recycle_id: str, data: dict[str, Any]) -> dict[str, Any]:

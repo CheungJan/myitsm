@@ -221,10 +221,26 @@
             </el-select>
           </el-form-item></el-col>
         </el-row>
+        <!-- 方案 A：商用仓库对应设备可选下拉（预绑定 EID） -->
+        <el-row v-if="showModelPicker && showEidPicker" :gutter="20">
+          <el-col :span="18"><el-form-item label="对应设备">
+            <el-select v-model="form.posid" filterable clearable placeholder="可选，指定具体 EID（方案 A 预绑定）" style="width:100%">
+              <el-option v-for="e in availableEids" :key="e.eid" :value="e.eid" :label="e.eid">
+                <div class="eid-option">
+                  <span class="eid-code"><b>{{ e.eid }}</b></span>
+                  <span class="eid-wh">{{ e.whnm || e.whcd }}</span>
+                  <span class="eid-asset">{{ e.asset_type_nm || atLabel(e.asset_type) }}</span>
+                  <span class="eid-qc">{{ e.itemtyp_nm || e.itemtyp }}</span>
+                </div>
+              </el-option>
+            </el-select>
+            <span class="eid-hint" style="margin-left:8px;color:#909399;font-size:12px">不选则发货时由仓库绑定（方案 B）</span>
+          </el-form-item></el-col>
+        </el-row>
         <!-- 旧设备块(20/30/40): 旧设备ID+旧机型+旧机处理 -->
         <template v-if="showOldPos">
           <el-row :gutter="20">
-            <el-col :span="8"><el-form-item label="旧设备ID"><el-select v-model="form.posid" filterable clearable placeholder="选择客户后联动" style="width:100%" @change="onMainAssetSelect"><el-option v-for="a in mainAssets" :key="a.eid" :label="a.eid" :value="a.eid"/></el-select></el-form-item></el-col>
+            <el-col :span="8"><el-form-item label="旧设备ID"><el-select v-model="form.posid" filterable clearable placeholder="选择客户后联动" style="width:100%" @change="onMainAssetSelect"><el-option v-for="a in mainAssets" :key="a.eid" :label="mainAssetLabel(a.eid)" :value="a.eid"/></el-select></el-form-item></el-col>
             <el-col :span="8"><el-form-item label="旧机型"><el-input :model-value="mainAssets.find(a=>a.eid===form.posid)?.item_nm || form.pos_item || ''" disabled placeholder="选择旧设备后自动带出"/></el-form-item></el-col>
             <el-col :span="8"><el-form-item label="旧机处理"><el-select v-model="form.solve_type" filterable clearable placeholder="处理方式" style="width:100%"><el-option v-for="o in solveOptions" :key="o.value" :label="o.label" :value="o.value"/></el-select></el-form-item></el-col>
           </el-row>
@@ -281,6 +297,25 @@
       </el-table>
       <AppPagination :page="custPickerPage" :per-page="custPickerPerPage" :total="custPickerTotal" @update:page="custPickerPage=$event;loadCustPicker()" @update:per-page="custPickerPerPage=$event;custPickerPage=1;loadCustPicker()"/>
     </el-dialog>
+
+    <!-- 方案 B：出库前 EID 选择对话框 -->
+    <el-dialog :title="`选择出库设备 - 预计划 ${outboundEidPlanno}`" v-model="outboundEidDialog" width="800px">
+      <div style="margin-bottom:10px;color:#606266;font-size:13px">
+        机型：<b>{{ outboundEidModel }}</b>，请勾选要出库的设备 EID（方案 B：发货时绑定）
+      </div>
+      <el-table :data="outboundEidList" stripe size="small" max-height="400" @selection-change="(rows: any[]) => outboundEidPicked = rows.map(r => r.eid)">
+        <el-table-column type="selection" width="45" />
+        <el-table-column prop="eid" label="设备 EID" width="160" />
+        <el-table-column prop="whnm" label="所在仓库" width="120" />
+        <el-table-column prop="asset_type_nm" label="资产类型" width="90" />
+        <el-table-column prop="itemtyp_nm" label="品级" width="80" />
+        <el-table-column prop="sflg" label="状态" width="60" />
+      </el-table>
+      <template #footer>
+        <el-button @click="cancelOutboundEids">取消</el-button>
+        <el-button type="primary" @click="confirmOutboundEids">确认出库</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -292,9 +327,9 @@ import { useDict } from '@/composables/useDict'
 import {
   fetchPlans, createPlan, updatePlan,
   transitionPlan, implementPlan, completePlan, voidPlan, createOutbound,
-  fetchPlanServes, createPlanServe,
+  fetchPlanServes, createPlanServe, fetchAvailableEids,
 } from '@/api/sales'
-import type { PlanRecord, ServeRecord } from '@/api/sales'
+import type { PlanRecord, ServeRecord, AvailableEid } from '@/api/sales'
 import request from '@/api/request'
 import { fetchCustomers } from '@/api/master'
 import type { CustRecord } from '@/api/master'
@@ -427,6 +462,25 @@ async function loadModels() {
   try { const r = await request.get<never,{data:any[]}>('/items/pos-models'); modelOptions.value = (r?.data||[]) as any } catch { modelOptions.value = [] }
 }
 
+// 资产类型字典(AT: 01新机/02旧机/03翻新机/04报废) —— 用于旧设备下拉显示
+const { dictLabel: atLabel } = useDict('AT')
+
+// 方案 A：商用仓库对应设备可选下拉（预绑定 EID）
+// 当 pos_from='00' 且 plantyp in ('00','20') 时，选机型后可可选指定具体 EID
+const availableEids = ref<AvailableEid[]>([])
+const showEidPicker = computed(() => {
+  // 商用仓库 + 开通/翻新 才显示对应设备下拉
+  return isPosFrom('00') && ['00', '20'].includes(form.plantyp)
+})
+async function loadAvailableEids(modelCd: string) {
+  availableEids.value = []
+  if (!modelCd) return
+  try {
+    const r = await fetchAvailableEids({ model_cd: modelCd, per_page: 100 })
+    availableEids.value = (r?.data?.items || []) as any
+  } catch { availableEids.value = [] }
+}
+
 // pos_from 下拉选项（PB 按 plantyp 过滤可用来源）
 const plantypPfFilter: Record<string, string[]> = { '00': ['00','01','02'], '10': ['01'], '20': ['00','01','02','03','04'], '30': [], '40': [] }
 const filteredPfOptions = computed(() => pfOptions.value.filter(o => (plantypPfFilter[form.plantyp]||[]).includes(o.value)))
@@ -474,7 +528,7 @@ const changeSubType = computed(() => {
 })
 
 // 主客户(目标客户)名下有效资产列表,用于旧设备ID下拉(20/30/40)
-const mainAssets = ref<{ eid: string; itemcd: string; item_nm: string }[]>([])
+const mainAssets = ref<{ eid: string; itemcd: string; item_nm: string; asset_type?: string }[]>([])
 async function loadMainAssets(custCd: string) {
   mainAssets.value = []; form.posid = ''; form.pos_item = ''
   if (!custCd) return
@@ -483,7 +537,8 @@ async function loadMainAssets(custCd: string) {
       params: { cust_cd: custCd, useflg: '1', location: 'customer', per_page: 200 }
     })
     mainAssets.value = (r?.data?.items || []).map((a: any) => ({
-      eid: a.eid || '', itemcd: a.itemcd || '', item_nm: a.item_nm || ''
+      eid: a.eid || '', itemcd: a.itemcd || '', item_nm: a.item_nm || '',
+      asset_type: a.asset_type || ''
     }))
   } catch { mainAssets.value = [] }
 }
@@ -496,6 +551,13 @@ function onMainAssetSelect(eid: string) {
     form.deposit = m?.rent_money || 0
   }
 }
+// 旧设备下拉显示标签：eid + 资产类型名称
+function mainAssetLabel(eid: string) {
+  const a = mainAssets.value.find(x => x.eid === eid)
+  if (!a) return eid
+  const at = a.asset_type ? atLabel(a.asset_type) : ''
+  return at ? `${eid}（${at}）` : eid
+}
 
 function onPlantypChange() { form.pos_from = ''; form.cust_useflg = '0'; form.pos_item = ''; form.posid = '' }
 function onPosFromChange() { if (form.pos_from === '00') { form.cust_useflg = '0'; form.new_custcard = ''; form.new_custcd = ''; form.new_phoneno = ''; form.new_address = '' } }
@@ -504,6 +566,9 @@ function onModelSelect(val: string) {
   if (m) { form.deposit = m.rent_money || 0
     if (m.stock_qty <= 0) ElMessage.warning('该机型库存不足,保存后将自动触发采购需求')
   }
+  // 方案 A：选机型后加载可用 EID 列表，清空已选 posid
+  form.posid = ''
+  if (showEidPicker.value && val) loadAvailableEids(val)
 }
 
 // 状态标签映射 (对齐 PB plan_cust.status: 00/01/02/04/09)
@@ -734,11 +799,57 @@ async function doImplement(row: PlanRecord) {
 async function doOutbound(row: PlanRecord) {
   try {
     await ElMessageBox.confirm(`为预计划 ${row.planno} 生成 OV=1 销售出库草稿？`, '生成出库单', { type: 'info' })
-    const res = await createOutbound(row.planno, '04')
+    // 方案 A（posid 已选）：直接创建出库单，后端从 posid 自动带 EID
+    // 方案 B（posid 未选）：弹出 EID 选择对话框，由仓库人扫码选择
+    let eids: string[] | undefined
+    if (!row.posid && row.pos_item) {
+      const picked = await pickEidsForOutbound(row.pos_item, row.planno)
+      if (!picked) return  // 用户取消
+      eids = picked
+    }
+    const res = await createOutbound(row.planno, '04', eids)
     const obid = (res.data as any)?.outbillid || ''
     ElMessage.success(`出库单已创建: ${obid}`)
     loadData()
   } catch { /* 取消 */ }
+}
+
+// 方案 B：出库前 EID 选择对话框
+const outboundEidDialog = ref(false)
+const outboundEidList = ref<AvailableEid[]>([])
+const outboundEidPicked = ref<string[]>([])
+const outboundEidPlanno = ref('')
+const outboundEidModel = ref('')
+async function pickEidsForOutbound(modelCd: string, planno: string): Promise<string[] | null> {
+  outboundEidPlanno.value = planno
+  outboundEidModel.value = modelCd
+  outboundEidPicked.value = []
+  outboundEidDialog.value = true
+  // 加载该机型可用 EID
+  try {
+    const r = await fetchAvailableEids({ model_cd: modelCd, per_page: 200 })
+    outboundEidList.value = (r?.data?.items || []) as any
+  } catch { outboundEidList.value = [] }
+  // 等待用户确认/取消（通过 Promise + 闭包变量模拟同步）
+  return new Promise((resolve) => {
+    const check = setInterval(() => {
+      if (!outboundEidDialog.value) {
+        clearInterval(check)
+        resolve(outboundEidPicked.value.length > 0 ? [...outboundEidPicked.value] : null)
+      }
+    }, 200)
+  })
+}
+function confirmOutboundEids() {
+  if (outboundEidPicked.value.length === 0) {
+    ElMessage.warning('请至少选择一台设备')
+    return
+  }
+  outboundEidDialog.value = false
+}
+function cancelOutboundEids() {
+  outboundEidPicked.value = []
+  outboundEidDialog.value = false
 }
 async function doComplete(row: PlanRecord) {
   try {
@@ -773,4 +884,10 @@ async function doVoid(row: PlanRecord) {
 .model-option .model-stock.in { color:#67c23a; font-size:12px; min-width:60px }
 .model-option .model-stock.out { color:#f56c6c; font-size:12px; min-width:60px }
 .model-option .model-grade { color:#909399; font-size:11px; min-width:130px; white-space:nowrap }
+/* EID 下拉选项 */
+.eid-option { display:flex; align-items:center; width:100%; gap:10px }
+.eid-option .eid-code { min-width:120px; font-weight:600 }
+.eid-option .eid-wh { color:#67c23a; font-size:12px; min-width:80px }
+.eid-option .eid-asset { color:#e6a23c; font-size:12px; min-width:60px }
+.eid-option .eid-qc { color:#909399; font-size:12px; min-width:50px }
 </style>

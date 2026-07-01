@@ -463,6 +463,14 @@ class SystemService:
         )
         return {"items": [i.to_dict() for i in items], "total": total}
 
+    def list_pos_models(self) -> list[dict[str, Any]]:
+        """获取在产机型列表(整机成品 JOIN Bom useflg=1)。
+
+        对齐 PB 语义:Bom.useflg='1' 表示配方有效即机型在产可选。
+        返回字段:item_cd, item_nm, rent_money(busityp=40), sale_money(busityp=10)。
+        """
+        return self._repo.get_pos_models()
+
     # ——— 客户分类 ———
 
     def list_cust_classes(self) -> list[dict[str, Any]]:

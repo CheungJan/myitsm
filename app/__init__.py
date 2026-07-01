@@ -44,6 +44,11 @@ def _init_extensions(app: Flask) -> None:
     migrate.init_app(app, db, compare_type=True, include_comments=False)
     cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
 
+    # 注册 Eid 模型事件监听（自动写 tmm43_eid_track i/u/d，对齐 PB 触发器）
+    from app.extensions.eid_listeners import register_eid_listeners
+
+    register_eid_listeners()
+
 
 def _register_blueprints(app: Flask) -> None:
     """注册蓝图。"""

@@ -317,7 +317,8 @@ def activate_label():  # type: ignore[no-untyped-def]
             whcd=whcd or None,
             prddate=prd_dt,
             etyp="1",
-            new_old="1",
+            asset_type="01",
+            itemtyp=qcflg,
         )
         _db.session.add(new_eid)
     _db.session.commit()
@@ -375,7 +376,8 @@ def batch_activate_labels():  # type: ignore[no-untyped-def]
             _db.session.add(Eid(
                 itemcd=icd, eid=lid, opercd=operator, gendate=now,
                 useflg="1", sflg=sflg, qcflg=qcflg,
-                whcd=whcd or None, prddate=prd_dt, etyp="1", new_old="1",
+                whcd=whcd or None, prddate=prd_dt, etyp="1", asset_type="01",
+                itemtyp=qcflg,
             ))
         success_list.append(lid)
     _db.session.commit()

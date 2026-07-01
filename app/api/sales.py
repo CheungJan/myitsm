@@ -81,12 +81,86 @@ def create_plan():  # type: ignore[no-untyped-def]
     return success_response(data=result, message="创建成功", code=201)
 
 
+@sales_bp.get("/plans/stock-check")
+@login_required
+def check_plan_stock():  # type: ignore[no-untyped-def]
+    """预计划机型库存校验。
+
+    Query: model_cd=xxx
+    Returns: {total_qty, wh_details, item_cd}
+    """
+    from app.services.plan_stock_service import PlanStockService
+    model_cd = (request.args.get("model_cd") or "").strip()
+    if not model_cd:
+        return error_response("model_cd 不能为空", 400)
+    data = PlanStockService.check_stock(model_cd)
+    return success_response(data=data)
+
+
+@sales_bp.get("/plans/available-eids")
+@login_required
+def list_available_eids():  # type: ignore[no-untyped-def]
+    """预计划机型可用设备列表（TMM43_EID 设备维度）。
+
+    Query: model_cd=xxx&whtyp=03&asset_types=01,03&itemtyp=GA&page=1&per_page=50
+    Returns: {total, items: [{eid, itemcd, whcd, whnm, asset_type, asset_type_nm,
+              itemtyp, itemtyp_nm, sflg, qcflg}]}
+    """
+    from app.services.plan_stock_service import PlanStockService
+    model_cd = (request.args.get("model_cd") or "").strip()
+    if not model_cd:
+        return error_response("model_cd 不能为空", 400)
+    whtyp = request.args.get("whtyp", "03")
+    whtyp = None if whtyp == "" else whtyp
+    asset_types_str = request.args.get("asset_types")
+    if asset_types_str is not None:
+        asset_types = [s.strip() for s in asset_types_str.split(",") if s.strip()] or None
+    else:
+        asset_types = None  # 默认 ['01','02','03']
+    itemtyp_str = request.args.get("itemtyp")
+    if itemtyp_str is not None:
+        itemtyp = [s.strip() for s in itemtyp_str.split(",") if s.strip()] or None
+    else:
+        itemtyp = None  # 默认 ['GA','GB','GC']
+    page = int(request.args.get("page", "1") or "1")
+    per_page = int(request.args.get("per_page", "50") or "50")
+    data = PlanStockService.list_available_eids(
+        model_cd=model_cd,
+        whtyp=whtyp,
+        asset_types=asset_types,
+        itemtyp=itemtyp,
+        page=page,
+        per_page=per_page,
+    )
+    return success_response(data=data)
+
+
+@sales_bp.get("/plans/bom-check")
+@login_required
+def check_plan_bom():  # type: ignore[no-untyped-def]
+    """预计划机型 BOM 齐套校验。
+
+    Query: model_cd=xxx&qty=1
+    Returns: {lines: [{itemcd, item_nm, need_qty, stock_qty, enough}], all_enough}
+    """
+    from app.services.plan_stock_service import PlanStockService
+    model_cd = (request.args.get("model_cd") or "").strip()
+    if not model_cd:
+        return error_response("model_cd 不能为空", 400)
+    qty = int(request.args.get("qty", "1") or "1")
+    if qty < 1:
+        qty = 1
+    data = PlanStockService.expand_bom_and_check(model_cd, qty)
+    return success_response(data=data)
+
+
 @sales_bp.put("/plans/<planno>")
 @login_required
 def update_plan(planno: str):  # type: ignore[no-untyped-def]
     """更新预计划。"""
     body = PlanCustUpdate.model_validate(request.get_json(silent=True) or {})
-    result = PlanCustService.update(planno, body.model_dump(exclude_unset=True))
+    user_cd: str = g.current_user
+    result = PlanCustService.update(planno, body.model_dump(exclude_unset=True), user_cd)
     if result is None:
         return error_response(message="预计划不存在", code=404)
     if not result.get("success"):
@@ -151,11 +225,20 @@ def complete_plan(planno: str):  # type: ignore[no-untyped-def]
 @sales_bp.post("/plans/<planno>/outbound")
 @login_required
 def create_outbound(planno: str):  # type: ignore[no-untyped-def]
-    """生成 OV=1 销售出库草稿（仓库实施部领机）。"""
+    """生成 OV=1 销售出库草稿（仓库实施部领机）。
+
+    请求体可选 eids: list[str] —— 方案 B 仓库人选定的 EID 列表。
+    方案 A（预计划已选 posid）无需传 eids，自动带出。
+    """
     json_data = request.get_json(silent=True) or {}
     whcd = json_data.get("whcd", "04")
+    eids = json_data.get("eids")
+    if eids is not None and not isinstance(eids, list):
+        return error_response(message="eids 必须是数组", code=400)
     user_cd: str = g.current_user
-    result = PlanCustService.create_outbound(planno, whcd=whcd, operator=user_cd)
+    result = PlanCustService.create_outbound(
+        planno, whcd=whcd, operator=user_cd, eids=eids,
+    )
     if not result.get("success"):
         return error_response(message=str(result.get("error", "出库单创建失败")), code=400)
     return success_response(data=result, message="出库单已创建", code=201)

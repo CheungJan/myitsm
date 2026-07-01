@@ -244,7 +244,7 @@ class QcService:
                         db.session.add(EidModel(
                             itemcd=row.itemcd, eid=row.eid,
                             sflg="8" if is_fqc else "1", qcflg=rq, whcd=wh,
-                            new_old="1", etyp="1",
+                            asset_type="01", etyp="1", itemtyp=rq,
                         ))
                     else:
                         eid_model.qcflg = rq

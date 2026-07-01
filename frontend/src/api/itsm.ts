@@ -5,6 +5,7 @@ export interface MntPage { items: MntRecord[]; total: number }
 
 export function fetchMaintenanceDaily(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/maintenance-daily',{params:p})}
 export function fetchMaintenanceOpen(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/maintenance-open',{params:p})}
+export function fetchMaintenanceOpenDetail(opening_id:string){return request.get<never,{data:MntRecord}>(`/itsm/maintenance-open/${opening_id}`)}
 export function fetchMaintenanceRenovate(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/maintenance-renovate',{params:p})}
 export function fetchDeviceChange(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/device-change',{params:p})}
 export function fetchStoreClose(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/store-close',{params:p})}

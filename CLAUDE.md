@@ -6,10 +6,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 项目规则与约定在 `AGENTS.md`，所有任务开始前必须阅读。CLAUDE.md 仅补充 Claude Code 特定配置与常用命令。
 
+## uv 虚拟环境
+
+项目使用 [uv](https://docs.astral.sh/uv/) 管理 Python 虚拟环境和依赖。
+
+```bash
+# 虚拟环境位置
+.venv/                          # uv 自动创建，已加入 .gitignore
+
+# Python 版本（由 .python-version 文件指定）
+cat .python-version              # 当前：3.12
+
+# 安装依赖（首次运行自动创建 .venv）
+uv sync                         # 生产依赖
+uv sync --extra dev             # 含开发依赖（black/isort/ruff/mypy/pytest）
+
+# 激活虚拟环境
+source .venv/bin/activate       # 手动激活（macOS/Linux）
+# 退出：deactivate
+
+# 不激活直接运行（推荐）
+uv run python -c "print('hello')"
+uv run flask run --debug
+uv run pytest
+
+# 依赖管理
+uv add <package>                # 安装新包（写入 pyproject.toml）
+uv add --dev <package>          # 安装开发依赖
+uv remove <package>             # 移除包
+uv lock --upgrade-package <pkg> # 升级单个包
+uv sync --reinstall             # 强制重建 venv（遇到问题时）
+```
+
+> **注意**：所有命令优先使用 `uv run` 而非手动 `source .venv/bin/activate`，确保始终在正确的 venv 中执行。
+
 ## 常用命令
 
 ```bash
-# 安装依赖（自动创建 .venv）
+# 安装依赖
 uv sync --extra dev
 
 # 数据库迁移

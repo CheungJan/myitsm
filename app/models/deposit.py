@@ -140,7 +140,13 @@ class DepositList(BaseModel):
 
 
 class DepositPosModel(BaseModel):
-    """设备型号押金标准（TMM61_DEPOSIT_POSMODEL）。"""
+    """设备型号押金标准（TMM61_DEPOSIT_POSMODEL）。
+
+    .. deprecated::
+        已弃用。押金/售价改从 tip01_price 读取(busityp=40 押金/10 销售价),
+        在产机型筛选改用 Bom.useflg='1'(对齐 PB 语义)。
+        历史数据已迁移至 tip01_price,保留表结构仅供历史追溯,不再维护。
+    """
 
     __tablename__ = "tmm61_deposit_posmodel"
 
@@ -148,4 +154,5 @@ class DepositPosModel(BaseModel):
     model_nm = db.Column(db.String(20), comment="型号名称")
     rent_money = db.Column(db.Numeric(10, 2), comment="租金")
     sale_money = db.Column(db.Numeric(10, 2), comment="售价")
+    item_cd = db.Column(db.String(20), comment="关联成品物料编码(tmm12_items.item_cd),用于 BOM 展开与库存查询")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")

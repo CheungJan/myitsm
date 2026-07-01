@@ -779,8 +779,9 @@ class SystemRepository:
 
         包含属性: item_cd, item_nm, rent_money, sale_money,
           stock_qty(成品库03总量), stock_by_wh[{whcd,whnm,qty,itemtyp}],
-          grade_ga/gb/gc(绿A/绿B/绿C台数)。
-        排序: 成品库(03)库存从多到少。
+          grade_* 各品级台数。
+        排序: 在产优先 -> 有库存优先 -> 成品库数量降序。
+        品级标签从 tmm31_syscodes(code_typ='QC') 动态读取，避免硬编码。
         """
         from sqlalchemy import func, case
         from app.models.inventory import Price
@@ -807,6 +808,14 @@ class SystemRepository:
 
         item_cds = [r[0] for r in rows]
 
+        # QC 字典(code_typ='QC'),用于 itemtyp -> 品级名称
+        qc_codes = {
+            sc.code_cd: sc.code_nm
+            for sc in db.session.query(SysCode.code_cd, SysCode.code_nm)
+            .filter(SysCode.code_typ == "QC", SysCode.useflg == "1")
+            .all()
+        }
+
         # 库存: 按 itemcd + whcd 汇总(仅 itemqty>0)
         stock_rows = (
             db.session.query(
@@ -824,27 +833,25 @@ class SystemRepository:
         grade_map: dict[str, dict[str, int]] = {}
         for sr in stock_rows:
             cd = sr[0]
-            wh = {"whcd": sr[1], "whnm": sr[2] or "", "itemtyp": sr[3] or "", "qty": int(sr[4] or 0)}
-            stock_map.setdefault(cd, []).append(wh)
-            if cd not in grade_map:
-                grade_map[cd] = {"GA": 0, "GB": 0, "GC": 0, "DJ": 0, "__": 0}
             it = sr[3] or "__"
-            if it not in grade_map[cd]:
-                it = "__"
-            grade_map[cd][it] += int(sr[4] or 0)
+            wh = {"whcd": sr[1], "whnm": sr[2] or "", "itemtyp": it, "qty": int(sr[4] or 0)}
+            stock_map.setdefault(cd, []).append(wh)
+            grade_map.setdefault(cd, {})
+            grade_map[cd][it] = grade_map[cd].get(it, 0) + int(sr[4] or 0)
 
         result = []
         for r in rows:
             cd = r[0]
             wh_list = stock_map.get(cd, [])
             total_03 = sum(x["qty"] for x in wh_list if x["whcd"] == "03")
-            g = grade_map.get(cd, {"GA": 0, "GB": 0, "GC": 0, "DJ": 0, "__": 0})
+            g = grade_map.get(cd, {})
             parts = []
-            if g["GA"]: parts.append(f"绿A:{g['GA']}")
-            if g["GB"]: parts.append(f"绿B:{g['GB']}")
-            if g["GC"]: parts.append(f"绿C:{g['GC']}")
-            if g["DJ"]: parts.append(f"待检:{g['DJ']}")
-            if g["__"]: parts.append(f"未分级:{g['__']}")
+            # 按 QC 字典顺序输出各品级库存
+            for qc_cd, qc_nm in qc_codes.items():
+                if g.get(qc_cd):
+                    parts.append(f"{qc_nm}:{g[qc_cd]}")
+            if g.get("__"):
+                parts.append(f"未分级:{g['__']}")
             label = " ".join(parts) if parts else "无库存"
             result.append({
                 "item_cd": cd,
@@ -853,13 +860,18 @@ class SystemRepository:
                 "sale_money": float(r[3]) if r[3] is not None else 0,
                 "stock_qty": total_03,
                 "stock_by_wh": wh_list,
-                "grade_ga": g["GA"], "grade_gb": g["GB"],
-                "grade_gc": g["GC"], "grade_dj": g["DJ"],
                 "grade_label": label,
+                "grade_detail": g,
             })
 
-        # 排序: 成品库(03)库存从多到少
-        result.sort(key=lambda x: x["stock_qty"], reverse=True)
+        # 排序: 在产优先 -> 有库存优先 -> 成品库数量降序
+        result.sort(
+            key=lambda x: (
+                1 if x["stock_qty"] > 0 else 0,
+                x["stock_qty"],
+            ),
+            reverse=True,
+        )
         return result
 
     @staticmethod
@@ -1117,6 +1129,65 @@ class SystemRepository:
         return list(db.session.query(EidTrack).filter(
             EidTrack.itemcd == itemcd, EidTrack.eid == eid
         ).order_by(EidTrack.change_date.asc(), EidTrack.seqno.asc()).all())
+
+    @staticmethod
+    def create_eid_track(
+        eid: str,
+        itemcd: str,
+        track_type: str,
+        operator: str,
+        refid: str = "",
+        change_date: Any | None = None,
+        cust_cd: str | None = None,
+        n_cust_cd: str | None = None,
+        sflg: str | None = None,
+        n_sflg: str | None = None,
+        whcd: str | None = None,
+        n_whcd: str | None = None,
+        install_date: Any | None = None,
+        n_install_date: Any | None = None,
+        remark: str = "",
+    ) -> EidTrack:
+        """写入设备变更轨迹记录。
+
+        参数：
+            track_type: 变更类型。
+                'C'=客户分配（设备绑定到门店）
+                'u'=状态变更（配置确认/计划完成）
+                'R'=设备回收
+            refid: 关联单号（预计划号/出库单号/维护单号）
+            cust_cd/n_cust_cd: 变更前后客户
+            sflg/n_sflg: 变更前后状态标志
+            whcd/n_whcd: 变更前后仓库
+            install_date/n_install_date: 变更前后安装日期
+        """
+        from datetime import UTC, datetime as _dt
+
+        if change_date is None:
+            change_date = _dt.now(UTC)
+
+        track = EidTrack(
+            type=track_type,
+            change_date=change_date,
+            itemcd=itemcd,
+            eid=eid,
+            opercd=operator,
+            gendate=_dt.now(UTC),
+            useflg="1",
+            refid=refid,
+            cust_cd=cust_cd,
+            n_cust_cd=n_cust_cd,
+            sflg=sflg,
+            n_sflg=n_sflg,
+            whcd=whcd,
+            n_whcd=n_whcd,
+            install_date=install_date,
+            n_install_date=n_install_date,
+            remark=remark,
+        )
+        db.session.add(track)
+        db.session.flush()
+        return track
 
     @staticmethod
     def get_cust_pos_rl(page: int = 1, per_page: int = 20, search: str | None = None,

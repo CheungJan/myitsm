@@ -42,8 +42,19 @@ export function completePlan(planno: string) {
 export function voidPlan(planno: string, remark?: string) {
     return request.post<never, { data: PlanResult }>(`/sales/plans/${planno}/void`, { remark })
 }
-export function createOutbound(planno: string, whcd?: string) {
-    return request.post<never, { data: PlanResult }>(`/sales/plans/${planno}/outbound`, { whcd })
+export function createOutbound(planno: string, whcd?: string, eids?: string[]) {
+    return request.post<never, { data: PlanResult }>(`/sales/plans/${planno}/outbound`, { whcd, eids })
+}
+
+// 预计划机型可用设备列表（方案 A 预绑定 EID 选择）
+export interface AvailableEid {
+    eid: string; itemcd: string; whcd: string; whnm: string
+    asset_type: string; asset_type_nm: string
+    itemtyp: string; itemtyp_nm: string
+    sflg: string; qcflg: string
+}
+export function fetchAvailableEids(params: { model_cd: string; whtyp?: string; asset_types?: string; itemtyp?: string; page?: number; per_page?: number }) {
+    return request.get<never, { data: { total: number; items: AvailableEid[] } }>('/sales/plans/available-eids', { params })
 }
 
 // ---- 呼出单 ----

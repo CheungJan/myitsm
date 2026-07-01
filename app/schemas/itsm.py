@@ -134,7 +134,7 @@ class DeviceChangeCreate(BaseModel):
     """创建设备变更单。"""
 
     store_id: str = Field(..., max_length=8, description="门店ID")
-    change_type: str = Field(..., max_length=8, description="变更类型（CK/BQ/BG）")
+    change_type: str = Field(..., max_length=8, description="变更类型（CK=仅磁卡号/BQ=信息变更/BG=磁卡号+设备）")
     device_id: str | None = Field(None, max_length=13, description="整机ID")
     new_contactor: str | None = Field(None, max_length=10, description="变更后联系人")
     new_tel: str | None = Field(None, max_length=60, description="变更后电话")

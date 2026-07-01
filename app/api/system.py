@@ -406,6 +406,16 @@ def list_items():  # type: ignore[no-untyped-def]
     return success_response(data={"items": result["items"], "total": result["total"]})
 
 
+@system_bp.get("/items/pos-models")
+@login_required
+def list_pos_models():  # type: ignore[no-untyped-def]
+    """在产机型列表(整机成品 JOIN Bom useflg=1,带押金/售价)。
+
+    供预计划机型下拉使用。对齐 PB 语义:Bom.useflg='1' 即在产可选。
+    """
+    return success_response(data=_service.list_pos_models())
+
+
 @system_bp.post("/items")
 @login_required
 def create_item():  # type: ignore[no-untyped-def]

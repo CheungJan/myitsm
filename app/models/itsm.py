@@ -457,7 +457,7 @@ class DeviceChange(BaseModel):
     """
     设备变更单（TIT16_DEVICE_CHANGE）。
 
-    CHANGE_TYPE: CK=改磁卡号, BQ=信息变更, BG=设备变更
+    CHANGE_TYPE: CK=仅磁卡号变更, BQ=信息变更, BG=磁卡号+设备变更
     """
 
     __tablename__ = "tit16_device_change"
@@ -465,7 +465,7 @@ class DeviceChange(BaseModel):
     device_change_id = db.Column(db.String(8), primary_key=True, comment="变更单ID")
     store_id = db.Column(db.String(8), comment="门店ID")
     requset_paper_id = db.Column(db.String(8), comment="变更请求单ID")
-    change_type = db.Column(db.String(8), comment="变更类型（CK/BQ/BG）")
+    change_type = db.Column(db.String(8), comment="变更类型（CK=仅磁卡号/BQ=信息变更/BG=磁卡号+设备）")
     device_id = db.Column(db.String(13), comment="整机ID")
     new_contactor = db.Column(db.String(10), comment="变更后联系人")
     new_tel = db.Column(db.String(60), comment="变更后电话")

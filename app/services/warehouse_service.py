@@ -542,6 +542,8 @@ class StockInService:
                     # 翻新/生产入库：新机/成品 EID 回库，标记在库
                     vals["sflg"] = "8"
                     vals["qcflg"] = "GA"  # 合格
+                    if record.invtyp == "6":
+                        vals["asset_type"] = "03"  # 翻新机
                 db.session.query(Eid).filter(
                     Eid.itemcd == itemcd_val, Eid.eid == eid_val,
                 ).update(vals, synchronize_session=False)
@@ -599,6 +601,7 @@ class StockInService:
                     ).update({
                         "sflg": "8",    # 翻新完成（旧机已废弃）
                         "qcflg": "BF",
+                        "asset_type": "04",  # 报废
                     }, synchronize_session=False)
             # 新EID溯源：ref_eid指向旧机EID（取第一个旧EID）
             first_old = old_eids[0].eid if old_eids else None
@@ -1199,6 +1202,10 @@ class StockOutService:
                         # 翻新出库：旧机 EID 离库，标记翻新中（与生产中共用 sflg='7'）
                         eid_updates["whcd"] = None
                         eid_updates["sflg"] = "7"
+                    elif record.invtyp == "1":
+                        # 销售出库：EID 离库，标记已销售（sflg='S'）
+                        eid_updates["whcd"] = None
+                        eid_updates["sflg"] = "S"
                     else:
                         # 其他出库：EID 清空 whcd（离库）
                         eid_updates["whcd"] = None
@@ -1673,7 +1680,7 @@ class StockBalanceService:
     """库存查询服务。"""
 
     @staticmethod
-    def get_balance(whcd: str, itemcd: str) -> dict[str, Any]:
+    def get_balance(whcd: str | None, itemcd: str) -> dict[str, Any]:
         qty = StockDetailRepository.get_balance(whcd, itemcd)
         return {"whcd": whcd, "itemcd": itemcd, "quantity": qty}
 
