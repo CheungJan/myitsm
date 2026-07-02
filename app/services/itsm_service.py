@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.extensions import db
 from app.models.master import Customer
@@ -35,6 +35,9 @@ from app.repositories.itsm_repository import (
     TimepointAreaRepository,
 )
 from app.services.state_machine import StateMachine
+
+if TYPE_CHECKING:
+    from app.models.itsm import DeviceChange, MaintenanceRenovate, RecycleTask, StoreClose
 
 # ---------------------------------------------------------------------------
 # 业务码值常量（避免硬编码散落各方法）
@@ -265,7 +268,9 @@ class MaintenanceOpenService(_BaseMaintenanceService):
         从主设备 device_id 和附表 equipments 取 EID 列表，
         对每个 EID 写一条 type='C' 记录，refid=预计划号（通过 imple_billid 反查）。
         """
-        from datetime import UTC, datetime as _dt
+        from datetime import UTC
+        from datetime import datetime as _dt
+
         from app.models.master import Eid as EidModel
         from app.models.sales import PlanCust
         from app.repositories.system_repository import SystemRepository
@@ -290,11 +295,7 @@ class MaintenanceOpenService(_BaseMaintenanceService):
 
         change_date = _dt.now(UTC)
         for eid in eids:
-            eid_rec = (
-                db.session.query(EidModel)
-                .filter(EidModel.eid == eid)
-                .first()
-            )
+            eid_rec = db.session.query(EidModel).filter(EidModel.eid == eid).first()
             if eid_rec is None:
                 continue
             SystemRepository.create_eid_track(
@@ -322,8 +323,11 @@ class MaintenanceOpenService(_BaseMaintenanceService):
         对每个 EID 写一条 CustPosRl 记录，标记设备已分配到客户门店。
         若已存在同 eid + useflg='1' 的记录，更新 posupddate 而非重复插入。
         """
-        from datetime import UTC, datetime as _dt
-        from app.models.master import CustPosRl, Eid as EidModel
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        from app.models.master import CustPosRl
+        from app.models.master import Eid as EidModel
 
         eids: list[str] = []
         if record.device_id:
@@ -337,11 +341,7 @@ class MaintenanceOpenService(_BaseMaintenanceService):
 
         now = _dt.now(UTC)
         for eid in eids:
-            eid_rec = (
-                db.session.query(EidModel)
-                .filter(EidModel.eid == eid)
-                .first()
-            )
+            eid_rec = db.session.query(EidModel).filter(EidModel.eid == eid).first()
             item_cd = eid_rec.itemcd if eid_rec else ""
 
             # 查是否已有活跃绑定
@@ -355,7 +355,24 @@ class MaintenanceOpenService(_BaseMaintenanceService):
                 if existing.cust_cd != record.store_id:
                     existing.useflg = RL_USEFLG_INACTIVE
                     existing.asset_status = ASSET_STATUS_RETURNED
-                    db.session.add(CustPosRl(
+                    db.session.add(
+                        CustPosRl(
+                            cust_cd=record.store_id,
+                            eid=eid,
+                            item_cd=item_cd,
+                            useflg=RL_USEFLG_ACTIVE,
+                            posupddate=now,
+                            asset_status=ASSET_STATUS_ACTIVE,
+                            created_from="MAINTENANCE_OPEN",
+                            source_id=record.new_opening_id,
+                        )
+                    )
+                else:
+                    existing.posupddate = now
+                    existing.asset_status = ASSET_STATUS_ACTIVE
+            else:
+                db.session.add(
+                    CustPosRl(
                         cust_cd=record.store_id,
                         eid=eid,
                         item_cd=item_cd,
@@ -364,21 +381,8 @@ class MaintenanceOpenService(_BaseMaintenanceService):
                         asset_status=ASSET_STATUS_ACTIVE,
                         created_from="MAINTENANCE_OPEN",
                         source_id=record.new_opening_id,
-                    ))
-                else:
-                    existing.posupddate = now
-                    existing.asset_status = ASSET_STATUS_ACTIVE
-            else:
-                db.session.add(CustPosRl(
-                    cust_cd=record.store_id,
-                    eid=eid,
-                    item_cd=item_cd,
-                    useflg=RL_USEFLG_ACTIVE,
-                    posupddate=now,
-                    asset_status=ASSET_STATUS_ACTIVE,
-                    created_from="MAINTENANCE_OPEN",
-                    source_id=record.new_opening_id,
-                ))
+                    )
+                )
 
     @staticmethod
     def _write_back_plan_status(record: Any, operator: str) -> None:
@@ -478,9 +482,7 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
         # 旧机写 type='R'（回收）
         if record.old_device_id:
             eid_rec = (
-                db.session.query(EidModel)
-                .filter(EidModel.eid == record.old_device_id)
-                .first()
+                db.session.query(EidModel).filter(EidModel.eid == record.old_device_id).first()
             )
             if eid_rec:
                 SystemRepository.create_eid_track(
@@ -498,15 +500,16 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
                     n_whcd=eid_rec.whcd,
                     install_date=eid_rec.install_date,
                     n_install_date=eid_rec.install_date,
-                    remark=f"翻新单 {record.renew_id} 关单，旧机 {record.old_device_id} 从门店 {record.store_id} 回收",
+                    remark=(
+                        f"翻新单 {record.renew_id} 关单，旧机 "
+                        f"{record.old_device_id} 从门店 {record.store_id} 回收"
+                    ),
                 )
 
         # 新机写 type='C'（分配）
         if record.new_device_id:
             eid_rec = (
-                db.session.query(EidModel)
-                .filter(EidModel.eid == record.new_device_id)
-                .first()
+                db.session.query(EidModel).filter(EidModel.eid == record.new_device_id).first()
             )
             if eid_rec:
                 SystemRepository.create_eid_track(
@@ -524,7 +527,10 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
                     n_whcd=eid_rec.whcd,
                     install_date=None,
                     n_install_date=change_date,
-                    remark=f"翻新单 {record.renew_id} 关单，新机 {record.new_device_id} 分配到门店 {record.store_id}",
+                    remark=(
+                        f"翻新单 {record.renew_id} 关单，新机 "
+                        f"{record.new_device_id} 分配到门店 {record.store_id}"
+                    ),
                 )
 
     @staticmethod
@@ -533,7 +539,8 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
 
         对齐 PB usp_plan_confrim L301-356, L403-405。
         """
-        from app.models.master import CustPosRl, Eid as EidModel
+        from app.models.master import CustPosRl
+        from app.models.master import Eid as EidModel
 
         now = datetime.now(UTC)
 
@@ -568,21 +575,21 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
                 new_rl.asset_status = ASSET_STATUS_ACTIVE
             else:
                 eid_rec = (
-                    db.session.query(EidModel)
-                    .filter(EidModel.eid == record.new_device_id)
-                    .first()
+                    db.session.query(EidModel).filter(EidModel.eid == record.new_device_id).first()
                 )
                 item_cd = eid_rec.itemcd if eid_rec else ""
-                db.session.add(CustPosRl(
-                    cust_cd=record.store_id,
-                    eid=record.new_device_id,
-                    item_cd=item_cd,
-                    useflg="1",
-                    posupddate=now,
-                    asset_status="ACTIVE",
-                    created_from="MAINTENANCE_RENOVATE",
-                    source_id=record.renew_id,
-                ))
+                db.session.add(
+                    CustPosRl(
+                        cust_cd=record.store_id,
+                        eid=record.new_device_id,
+                        item_cd=item_cd,
+                        useflg="1",
+                        posupddate=now,
+                        asset_status="ACTIVE",
+                        created_from="MAINTENANCE_RENOVATE",
+                        source_id=record.renew_id,
+                    )
+                )
 
     @staticmethod
     def _write_back_plan_status_renovate(record: MaintenanceRenovate, operator: str) -> None:
@@ -592,11 +599,7 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
         """
         from app.models.sales import PlanCust
 
-        plan = (
-            db.session.query(PlanCust)
-            .filter(PlanCust.imple_billid == record.renew_id)
-            .first()
-        )
+        plan = db.session.query(PlanCust).filter(PlanCust.imple_billid == record.renew_id).first()
         if plan is None:
             return
         if (plan.plan_status or "00") != PLAN_STATUS_IN_PROGRESS:
@@ -696,11 +699,7 @@ class DeviceChangeService(_BaseMaintenanceService):
             .scalar()
         ) or ""
 
-        eid_rec = (
-            db.session.query(EidModel)
-            .filter(EidModel.eid == record.device_id)
-            .first()
-        )
+        eid_rec = db.session.query(EidModel).filter(EidModel.eid == record.device_id).first()
         if eid_rec is None:
             return
 
@@ -720,7 +719,10 @@ class DeviceChangeService(_BaseMaintenanceService):
             n_whcd=eid_rec.whcd,
             install_date=eid_rec.install_date,
             n_install_date=eid_rec.install_date,
-            remark=f"设备变更单 {record.device_change_id} 关单，设备从 {record.store_id} 转移到 {record.new_store_id}",
+            remark=(
+                f"设备变更单 {record.device_change_id} 关单，设备从 "
+                f"{record.store_id} 转移到 {record.new_store_id}"
+            ),
         )
 
     @staticmethod
@@ -731,7 +733,8 @@ class DeviceChangeService(_BaseMaintenanceService):
         新门店（new_store_id）rl 新建或更新（useflg=1, asset_status=ACTIVE）。
         对齐 PB usp_plan_confrim L221-243。
         """
-        from app.models.master import CustPosRl, Eid as EidModel
+        from app.models.master import CustPosRl
+        from app.models.master import Eid as EidModel
 
         if not record.device_id or not record.new_store_id:
             return
@@ -767,22 +770,20 @@ class DeviceChangeService(_BaseMaintenanceService):
             new_rl.posupddate = now
             new_rl.asset_status = ASSET_STATUS_ACTIVE
         else:
-            eid_rec = (
-                db.session.query(EidModel)
-                .filter(EidModel.eid == record.device_id)
-                .first()
-            )
+            eid_rec = db.session.query(EidModel).filter(EidModel.eid == record.device_id).first()
             item_cd = eid_rec.itemcd if eid_rec else ""
-            db.session.add(CustPosRl(
-                cust_cd=record.new_store_id,
-                eid=record.device_id,
-                item_cd=item_cd,
-                useflg=RL_USEFLG_ACTIVE,
-                posupddate=now,
-                asset_status=ASSET_STATUS_ACTIVE,
-                created_from="DEVICE_CHANGE",
-                source_id=record.device_change_id,
-            ))
+            db.session.add(
+                CustPosRl(
+                    cust_cd=record.new_store_id,
+                    eid=record.device_id,
+                    item_cd=item_cd,
+                    useflg=RL_USEFLG_ACTIVE,
+                    posupddate=now,
+                    asset_status=ASSET_STATUS_ACTIVE,
+                    created_from="DEVICE_CHANGE",
+                    source_id=record.device_change_id,
+                )
+            )
 
     @staticmethod
     def _write_back_plan_status(record: DeviceChange, operator: str) -> None:
@@ -807,9 +808,7 @@ class DeviceChangeService(_BaseMaintenanceService):
         plan.updator = operator
 
     @staticmethod
-    def _sync_customer_and_history(
-        record: DeviceChange, operator: str, remark: str | None
-    ) -> None:
+    def _sync_customer_and_history(record: DeviceChange, operator: str, remark: str | None) -> None:
         """审核完成时同步客户主表并写历史表（CK/BG/BG 三种类型）。"""
         cust_cd = record.store_id or ""
         if not cust_cd:
@@ -922,9 +921,7 @@ class StoreCloseService(_BaseMaintenanceService):
             if to_status == CLOSE_STATUS and record.store_id:
                 from app.services.customer_service import CustomerService
 
-                CustomerService.set_store_close_status(
-                    record.store_id, record.close_type, operator
-                )
+                CustomerService.set_store_close_status(record.store_id, record.close_type, operator)
                 # 11e: 门店所有活跃 EID 写 type='R' + rl 全失效 + 回写计划
                 self._write_eid_track_on_close_store(record, operator)
                 self._invalidate_rl_on_close_store(record, operator)
@@ -940,7 +937,8 @@ class StoreCloseService(_BaseMaintenanceService):
         对门店所有活跃 EID 写 R 记录，cust_cd=门店，n_cust_cd=None。
         refid=预计划号（通过 imple_billid 反查）。
         """
-        from app.models.master import CustPosRl, Eid as EidModel
+        from app.models.master import CustPosRl
+        from app.models.master import Eid as EidModel
         from app.models.sales import PlanCust
         from app.repositories.system_repository import SystemRepository
 
@@ -963,11 +961,7 @@ class StoreCloseService(_BaseMaintenanceService):
         )
 
         for eid_val, item_cd in active_eids:
-            eid_rec = (
-                db.session.query(EidModel)
-                .filter(EidModel.eid == eid_val)
-                .first()
-            )
+            eid_rec = db.session.query(EidModel).filter(EidModel.eid == eid_val).first()
             if eid_rec is None:
                 continue
             SystemRepository.create_eid_track(
@@ -985,7 +979,10 @@ class StoreCloseService(_BaseMaintenanceService):
                 n_whcd=eid_rec.whcd,
                 install_date=eid_rec.install_date,
                 n_install_date=eid_rec.install_date,
-                remark=f"门店关闭 {record.store_close_id} 关单，设备 {eid_val} 从门店 {record.store_id} 回收",
+                remark=(
+                    f"门店关闭 {record.store_close_id} 关单，设备 "
+                    f"{eid_val} 从门店 {record.store_id} 回收"
+                ),
             )
 
     @staticmethod
@@ -1186,10 +1183,14 @@ class RecycleTaskService(_BaseMaintenanceService):
         from app.repositories.system_repository import SystemRepository
 
         planno = (
-            db.session.query(PlanCust.planno)
-            .filter(PlanCust.imple_billid == record.recycle_id)
-            .scalar()
-        ) or record.plan_no or ""
+            (
+                db.session.query(PlanCust.planno)
+                .filter(PlanCust.imple_billid == record.recycle_id)
+                .scalar()
+            )
+            or record.plan_no
+            or ""
+        )
 
         change_date = datetime.now(UTC)
 
@@ -1197,11 +1198,7 @@ class RecycleTaskService(_BaseMaintenanceService):
             eid_val = dtl.asset_id or ""
             if not eid_val:
                 continue
-            eid_rec = (
-                db.session.query(EidModel)
-                .filter(EidModel.eid == eid_val)
-                .first()
-            )
+            eid_rec = db.session.query(EidModel).filter(EidModel.eid == eid_val).first()
             if eid_rec is None:
                 continue
             SystemRepository.create_eid_track(
@@ -1219,7 +1216,10 @@ class RecycleTaskService(_BaseMaintenanceService):
                 n_whcd=dtl.warehouse_cd or eid_rec.whcd,
                 install_date=eid_rec.install_date,
                 n_install_date=eid_rec.install_date,
-                remark=f"回收任务 {record.recycle_id} 关单，设备 {eid_val} 从门店 {record.cust_cd} 回收",
+                remark=(
+                    f"回收任务 {record.recycle_id} 关单，设备 "
+                    f"{eid_val} 从门店 {record.cust_cd} 回收"
+                ),
             )
 
     @staticmethod
@@ -1257,11 +1257,7 @@ class RecycleTaskService(_BaseMaintenanceService):
         """
         from app.models.sales import PlanCust
 
-        plan = (
-            db.session.query(PlanCust)
-            .filter(PlanCust.imple_billid == record.recycle_id)
-            .first()
-        )
+        plan = db.session.query(PlanCust).filter(PlanCust.imple_billid == record.recycle_id).first()
         if plan is None:
             return
         if (plan.plan_status or "00") != PLAN_STATUS_IN_PROGRESS:
@@ -1356,9 +1352,7 @@ class MaintenanceT17Service(_BaseMaintenanceService):
         record = MaintenanceT17Repository.get_by_id(maintenance_id)
         if record is None:
             return {"success": False, "error": "保养工单不存在"}
-        result = self._do_transition(
-            record, to_status, operator, remark, pk_field="maintenance_id"
-        )
+        result = self._do_transition(record, to_status, operator, remark, pk_field="maintenance_id")
         if result.get("success"):
             db.session.commit()
         return result
@@ -1402,9 +1396,7 @@ class FreeReplaceService(_BaseMaintenanceService):
     ) -> dict[str, Any]:
         record = FreeReplaceRepository.create(data, creator)
         for detail_data in details:
-            FreeReplaceRepository.add_detail(
-                renew_id=record.renew_id, data=detail_data
-            )
+            FreeReplaceRepository.add_detail(renew_id=record.renew_id, data=detail_data)
         db.session.commit()
         return record.to_dict()
 
@@ -1419,9 +1411,7 @@ class FreeReplaceService(_BaseMaintenanceService):
         if record is None:
             return {"success": False, "error": "免费更换单不存在"}
 
-        result = self._do_transition(
-            record, to_status, operator, remark, pk_field="renew_id"
-        )
+        result = self._do_transition(record, to_status, operator, remark, pk_field="renew_id")
 
         if result.get("success"):
             FreeReplaceRepository.update_status(record, to_status, operator)
@@ -1466,6 +1456,7 @@ class MaintenanceLiabilityService:
     @staticmethod
     def update(record_id: int, data: dict[str, Any]) -> dict[str, Any] | None:
         from app.models.itsm import MaintenanceLiability
+
         record = db.session.get(MaintenanceLiability, record_id)
         if record is None:
             return None
@@ -1586,6 +1577,7 @@ class RepairInfoService:
     @staticmethod
     def delete(record_id: int) -> bool:
         from app.models.itsm import RepairInfo
+
         record = db.session.get(RepairInfo, record_id)
         if record is None:
             return False

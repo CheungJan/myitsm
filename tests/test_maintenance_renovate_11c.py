@@ -16,7 +16,7 @@ from flask import Flask
 
 from app.extensions import db
 from app.models.itsm import MaintenanceRenovate
-from app.models.master import CustPosRl, Customer, Eid, EidTrack
+from app.models.master import Customer, CustPosRl, Eid, EidTrack
 from app.models.sales import PlanCust
 from app.repositories.itsm_repository import MaintenanceRenovateRepository
 from app.services.itsm_service import MaintenanceRenovateService
@@ -40,9 +40,7 @@ def _seed_customer(cust_cd: str, cust_card: str) -> Customer:
 
 def _seed_eid(eid: str, itemcd: str = "IT0001") -> Eid:
     """创建测试 EID（已存在则复用）。"""
-    existing = (
-        db.session.query(Eid).filter(Eid.eid == eid).first()
-    )
+    existing = db.session.query(Eid).filter(Eid.eid == eid).first()
     if existing:
         return existing
     record = Eid(
@@ -117,7 +115,9 @@ class TestMaintenanceRenovate11c:
     """11c 翻新单关单写 EidTrack + rl + 回写计划。"""
 
     def test_renovate_close_writes_r_and_c_track_and_transfers_rl(self, app: Flask) -> None:
-        """翻新单关单：旧机写 type='R'，新机写 type='C'，旧机 rl 失效，新机 rl 新建，回写 plan_status='01'。"""
+        """翻新单关单：旧机写 type='R'，新机写 type='C'，旧机 rl 失效，
+        新机 rl 新建，回写 plan_status='01'。
+        """
         with app.app_context():
             # 准备数据
             _seed_customer("CUST001", "CARD001")
@@ -246,3 +246,86 @@ class TestMaintenanceRenovate11c:
 
             plan = db.session.get(PlanCust, "PL000003")
             assert plan.plan_status == "01"  # 未被回写
+
+    def test_renovate_not_found_returns_error(self, app: Flask) -> None:
+        """翻新单不存在时返回错误，不抛异常。"""
+        with app.app_context():
+            svc = MaintenanceRenovateService()
+            result = svc.transition("NON_EXIST_ID", "2", "T00001")
+            assert result["success"] is False
+            assert "不存在" in result["error"]
+
+    def test_renovate_invalid_transition_no_side_effects(self, app: Flask) -> None:
+        """非法状态流转（1→5 跳过 2）被状态机拒绝，不写 EidTrack/rl/回写。"""
+        with app.app_context():
+            _seed_customer("CUST001", "CARD001")
+            _seed_eid("EIDOLD0000010")
+            _seed_eid("EIDNEW0000010")
+            _seed_rl("CUST001", "EIDOLD0000010")
+            renovate = _seed_renovate(
+                old_device_id="EIDOLD0000010",
+                new_device_id="EIDNEW0000010",
+            )
+            _seed_plan("PL000010", renovate.renew_id)
+            db.session.commit()
+
+            svc = MaintenanceRenovateService()
+            # 1→5 非法（应先 1→2 再 2→5）
+            result = svc.transition(renovate.renew_id, "5", "T00001")
+            assert result["success"] is False
+
+            # 校验无 EidTrack 业务语义层记录
+            tracks = (
+                db.session.query(EidTrack)
+                .filter(
+                    EidTrack.eid.in_(["EIDOLD0000010", "EIDNEW0000010"]),
+                    EidTrack.type.in_(["R", "C"]),
+                )
+                .all()
+            )
+            assert len(tracks) == 0, "非法流转不应写 EidTrack"
+
+            # 校验 rl 未失效
+            old_rl = (
+                db.session.query(CustPosRl)
+                .filter(
+                    CustPosRl.eid == "EIDOLD0000010",
+                    CustPosRl.useflg == "1",
+                )
+                .first()
+            )
+            assert old_rl is not None, "非法流转不应失效 rl"
+            assert old_rl.asset_status == "ACTIVE"
+
+            # 校验 plan_status 未回写
+            plan = db.session.get(PlanCust, "PL000010")
+            assert plan.plan_status == "04"
+
+    def test_renovate_no_device_id_no_track_no_rl(self, app: Flask) -> None:
+        """翻新单无 old_device_id/new_device_id 时，不写 EidTrack，不转移 rl。"""
+        with app.app_context():
+            _seed_customer("CUST001", "CARD001")
+            renovate = _seed_renovate(
+                old_device_id="",
+                new_device_id="",
+            )
+            _seed_plan("PL000020", renovate.renew_id)
+            db.session.commit()
+
+            svc = MaintenanceRenovateService()
+            _transition_to_5(svc, renovate.renew_id)
+
+            # 无设备 ID，不写 R/C 记录（按 planno 过滤避免跨测试污染）
+            tracks = (
+                db.session.query(EidTrack)
+                .filter(
+                    EidTrack.refid == "PL000020",
+                    EidTrack.type.in_(["R", "C"]),
+                )
+                .all()
+            )
+            assert len(tracks) == 0, "无设备 ID 不应写 R/C 记录"
+
+            # plan_status 仍回写（回写逻辑不依赖设备 ID）
+            plan = db.session.get(PlanCust, "PL000020")
+            assert plan.plan_status == "01"

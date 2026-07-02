@@ -14,7 +14,7 @@ from flask import Flask
 
 from app.extensions import db
 from app.models.itsm import StoreClose
-from app.models.master import CustPosRl, Customer, Eid, EidTrack
+from app.models.master import Customer, CustPosRl, Eid, EidTrack
 from app.models.sales import PlanCust
 from app.repositories.itsm_repository import StoreCloseRepository
 from app.services.itsm_service import StoreCloseService
@@ -38,9 +38,7 @@ def _seed_customer(cust_cd: str, cust_card: str) -> Customer:
 
 def _seed_eid(eid: str, itemcd: str = "IT0001") -> Eid:
     """创建测试 EID（已存在则复用）。"""
-    existing = (
-        db.session.query(Eid).filter(Eid.eid == eid).first()
-    )
+    existing = db.session.query(Eid).filter(Eid.eid == eid).first()
     if existing:
         return existing
     record = Eid(
@@ -129,9 +127,7 @@ class TestStoreClose11e:
             tracks = (
                 db.session.query(EidTrack)
                 .filter(
-                    EidTrack.eid.in_([
-                        "EIDCL0000001", "EIDCL0000002", "EIDCL0000003"
-                    ]),
+                    EidTrack.eid.in_(["EIDCL0000001", "EIDCL0000002", "EIDCL0000003"]),
                     EidTrack.type == "R",
                 )
                 .all()
@@ -215,3 +211,80 @@ class TestStoreClose11e:
 
             plan = db.session.get(PlanCust, "PL000013")
             assert plan.plan_status == "01"  # 未被回写
+
+    def test_store_close_not_found_returns_error(self, app: Flask) -> None:
+        """门店关闭单不存在时返回错误，不抛异常。"""
+        with app.app_context():
+            svc = StoreCloseService()
+            result = svc.transition("NON_EXIST_ID", "2", "T00001")
+            assert result["success"] is False
+            assert "不存在" in result["error"]
+
+    def test_store_close_invalid_transition_no_side_effects(self, app: Flask) -> None:
+        """非法状态流转被状态机拒绝，不写 EidTrack/rl/回写。"""
+        with app.app_context():
+            _seed_customer("CUST004", "CARD004")
+            _seed_eid("EIDCL0000010")
+            _seed_rl("CUST004", "EIDCL0000010")
+            close = _seed_store_close(store_id="CUST004")
+            _seed_plan("PL000040", close.store_close_id)
+            db.session.commit()
+
+            svc = StoreCloseService()
+            # 1→5 非法（应先 1→2 再 2→5）
+            result = svc.transition(close.store_close_id, "5", "T00001")
+            assert result["success"] is False
+
+            # 无 R 记录
+            tracks = (
+                db.session.query(EidTrack)
+                .filter(
+                    EidTrack.eid == "EIDCL0000010",
+                    EidTrack.type == "R",
+                )
+                .all()
+            )
+            assert len(tracks) == 0, "非法流转不应写 EidTrack"
+
+            # rl 未失效
+            rl = (
+                db.session.query(CustPosRl)
+                .filter(
+                    CustPosRl.eid == "EIDCL0000010",
+                    CustPosRl.useflg == "1",
+                )
+                .first()
+            )
+            assert rl is not None, "非法流转不应失效 rl"
+            assert rl.asset_status == "ACTIVE"
+
+            # plan_status 未回写
+            plan = db.session.get(PlanCust, "PL000040")
+            assert plan.plan_status == "04"
+
+    def test_store_close_no_active_eid_no_track(self, app: Flask) -> None:
+        """门店无活跃 EID 时，不写 EidTrack，但仍回写计划。"""
+        with app.app_context():
+            _seed_customer("CUST005", "CARD005")
+            # 不创建 EID/rl
+            close = _seed_store_close(store_id="CUST005")
+            _seed_plan("PL000041", close.store_close_id)
+            db.session.commit()
+
+            svc = StoreCloseService()
+            _transition_to_5(svc, close.store_close_id)
+
+            # 无活跃 EID，不写 R 记录（按 planno 过滤）
+            tracks = (
+                db.session.query(EidTrack)
+                .filter(
+                    EidTrack.refid == "PL000041",
+                    EidTrack.type == "R",
+                )
+                .all()
+            )
+            assert len(tracks) == 0, "无活跃 EID 不应写 R 记录"
+
+            # plan_status 仍回写
+            plan = db.session.get(PlanCust, "PL000041")
+            assert plan.plan_status == "01"

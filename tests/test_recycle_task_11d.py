@@ -14,7 +14,7 @@ from flask import Flask
 
 from app.extensions import db
 from app.models.itsm import RecycleTask, RecycleTaskDtl
-from app.models.master import CustPosRl, Customer, Eid, EidTrack
+from app.models.master import Customer, CustPosRl, Eid, EidTrack
 from app.models.sales import PlanCust
 from app.repositories.itsm_repository import RecycleTaskRepository
 from app.services.itsm_service import RecycleTaskService
@@ -38,9 +38,7 @@ def _seed_customer(cust_cd: str, cust_card: str) -> Customer:
 
 def _seed_eid(eid: str, itemcd: str = "IT0001") -> Eid:
     """创建测试 EID（已存在则复用）。"""
-    existing = (
-        db.session.query(Eid).filter(Eid.eid == eid).first()
-    )
+    existing = db.session.query(Eid).filter(Eid.eid == eid).first()
     if existing:
         return existing
     record = Eid(
@@ -102,11 +100,13 @@ def _seed_recycle_task(
         "T00001",
     )
     for aid in asset_ids or []:
-        db.session.add(RecycleTaskDtl(
-            recycle_id=record.recycle_id,
-            asset_id=aid,
-            asset_type="POS",
-        ))
+        db.session.add(
+            RecycleTaskDtl(
+                recycle_id=record.recycle_id,
+                asset_id=aid,
+                asset_type="POS",
+            )
+        )
     return record
 
 
@@ -228,3 +228,79 @@ class TestRecycleTask11d:
 
             plan = db.session.get(PlanCust, "PL000024")
             assert plan.plan_status == "01"  # 未被回写
+
+    def test_recycle_not_found_returns_error(self, app: Flask) -> None:
+        """回收任务不存在时返回错误，不抛异常。"""
+        with app.app_context():
+            svc = RecycleTaskService()
+            result = svc.transition("NON_EXIST_ID", "2", "T00001")
+            assert result["success"] is False
+            assert "不存在" in result["error"]
+
+    def test_recycle_invalid_transition_no_side_effects(self, app: Flask) -> None:
+        """非法状态流转被状态机拒绝，不写 EidTrack/rl/回写。"""
+        with app.app_context():
+            _seed_customer("CUST001", "CARD001")
+            _seed_eid("EIDRCY0000010")
+            _seed_rl("CUST001", "EIDRCY0000010")
+            task = _seed_recycle_task(asset_ids=["EIDRCY0000010"])
+            _seed_plan("PL000030", task.recycle_id)
+            db.session.commit()
+
+            svc = RecycleTaskService()
+            # 1→5 非法（应先 1→2 再 2→5）
+            result = svc.transition(task.recycle_id, "5", "T00001")
+            assert result["success"] is False
+
+            # 无 R 记录
+            tracks = (
+                db.session.query(EidTrack)
+                .filter(
+                    EidTrack.eid == "EIDRCY0000010",
+                    EidTrack.type == "R",
+                )
+                .all()
+            )
+            assert len(tracks) == 0, "非法流转不应写 EidTrack"
+
+            # rl 未失效
+            rl = (
+                db.session.query(CustPosRl)
+                .filter(
+                    CustPosRl.eid == "EIDRCY0000010",
+                    CustPosRl.useflg == "1",
+                )
+                .first()
+            )
+            assert rl is not None, "非法流转不应失效 rl"
+            assert rl.asset_status == "ACTIVE"
+
+            # plan_status 未回写
+            plan = db.session.get(PlanCust, "PL000030")
+            assert plan.plan_status == "04"
+
+    def test_recycle_empty_details_no_track_no_rl(self, app: Flask) -> None:
+        """回收任务无明细时，不写 EidTrack，不失效 rl，但仍回写计划。"""
+        with app.app_context():
+            _seed_customer("CUST001", "CARD001")
+            task = _seed_recycle_task(asset_ids=[])
+            _seed_plan("PL000031", task.recycle_id)
+            db.session.commit()
+
+            svc = RecycleTaskService()
+            _transition_to_5(svc, task.recycle_id)
+
+            # 无明细，不写 R 记录（按 planno 过滤避免跨测试污染）
+            tracks = (
+                db.session.query(EidTrack)
+                .filter(
+                    EidTrack.refid == "PL000031",
+                    EidTrack.type == "R",
+                )
+                .all()
+            )
+            assert len(tracks) == 0, "空明细不应写 R 记录"
+
+            # plan_status 仍回写
+            plan = db.session.get(PlanCust, "PL000031")
+            assert plan.plan_status == "01"

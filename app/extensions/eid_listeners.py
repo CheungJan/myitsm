@@ -12,17 +12,34 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import event, insert, inspect as sa_inspect
+from sqlalchemy import event, insert
+from sqlalchemy import inspect as sa_inspect
+
+logger = logging.getLogger(__name__)
 
 # 追踪的字段列表（对齐 PB TRIG_U_TMM43_TRACK + 资产扩展字段）
 _TRACKED_FIELDS: tuple[str, ...] = (
-    "sflg", "refid", "qcflg", "whcd", "prddate", "itemtyp",
-    "new_old", "remark", "manuf_seq", "old_degree",
-    "etyp", "useflg", "asset_type", "recyclable", "recycle_status",
-    "asset_owner", "install_date",
+    "sflg",
+    "refid",
+    "qcflg",
+    "whcd",
+    "prddate",
+    "itemtyp",
+    "new_old",
+    "remark",
+    "manuf_seq",
+    "old_degree",
+    "etyp",
+    "useflg",
+    "asset_type",
+    "recyclable",
+    "recycle_status",
+    "asset_owner",
+    "install_date",
 )
 
 _LISTENERS_REGISTERED: bool = False
@@ -32,49 +49,53 @@ def register_eid_listeners() -> None:
     """注册 Eid 模型事件监听。
 
     幂等：重复调用不会重复注册。
+    注册失败时记录错误日志并抛出，避免静默失效导致 i/u/d 记录丢失。
     """
     global _LISTENERS_REGISTERED
     if _LISTENERS_REGISTERED:
         return
 
-    from app.models.master import Eid, EidTrack
+    try:
+        from app.models.master import Eid, EidTrack
+    except ImportError as e:
+        logger.error("注册 Eid 事件监听失败：无法导入模型 %s", e, exc_info=True)
+        raise
 
     @event.listens_for(Eid, "after_insert")
-    def _write_track_on_insert(
-        mapper: Any, connection: Any, target: Eid
-    ) -> None:
+    def _write_track_on_insert(mapper: Any, connection: Any, target: Eid) -> None:
         """INSERT 时写 type='i'（对齐 TRIG_I_TMM43_TRACK）。"""
         now = datetime.now(UTC)
-        connection.execute(insert(EidTrack), {
-            "type": "i",
-            "change_date": now,
-            "itemcd": target.itemcd,
-            "eid": target.eid,
-            "opercd": target.opercd or "",
-            "gendate": now,
-            "useflg": target.useflg or "1",
-            "etyp": target.etyp,
-            "sflg": target.sflg,
-            "refid": target.refid,
-            "qcflg": target.qcflg,
-            "whcd": target.whcd,
-            "prddate": target.prddate,
-            "itemtyp": target.itemtyp,
-            "new_old": target.new_old,
-            "remark": target.remark,
-            "manuf_seq": target.manuf_seq,
-            "old_degree": target.old_degree,
-            "asset_type": target.asset_type,
-            "recyclable": _bool_to_str(target.recyclable),
-            "recycle_status": target.recycle_status,
-            "asset_owner": target.asset_owner,
-            "install_date": target.install_date,
-        })
+        connection.execute(
+            insert(EidTrack),
+            {
+                "type": "i",
+                "change_date": now,
+                "itemcd": target.itemcd,
+                "eid": target.eid,
+                "opercd": target.opercd or "",
+                "gendate": now,
+                "useflg": target.useflg or "1",
+                "etyp": target.etyp,
+                "sflg": target.sflg,
+                "refid": target.refid,
+                "qcflg": target.qcflg,
+                "whcd": target.whcd,
+                "prddate": target.prddate,
+                "itemtyp": target.itemtyp,
+                "new_old": target.new_old,
+                "remark": target.remark,
+                "manuf_seq": target.manuf_seq,
+                "old_degree": target.old_degree,
+                "asset_type": target.asset_type,
+                "recyclable": _bool_to_str(target.recyclable),
+                "recycle_status": target.recycle_status,
+                "asset_owner": target.asset_owner,
+                "install_date": target.install_date,
+            },
+        )
 
     @event.listens_for(Eid, "after_update")
-    def _write_track_on_update(
-        mapper: Any, connection: Any, target: Eid
-    ) -> None:
+    def _write_track_on_update(mapper: Any, connection: Any, target: Eid) -> None:
         """UPDATE 时写 type='u'（对齐 TRIG_U_TMM43_TRACK）。
 
         仅在追踪字段实际变更时写入，避免无变更的 UPDATE 产生噪声记录。
@@ -97,80 +118,84 @@ def register_eid_listeners() -> None:
         # 新值（变更后）
         new = {attr: changes[attr][1] for attr in changes}
 
-        connection.execute(insert(EidTrack), {
-            "type": "u",
-            "change_date": now,
-            "itemcd": target.itemcd,
-            "eid": target.eid,
-            "opercd": target.opercd or "",
-            "gendate": now,
-            "useflg": target.useflg or "1",
-            "etyp": old.get("etyp"),
-            "sflg": old.get("sflg"),
-            "refid": old.get("refid"),
-            "qcflg": old.get("qcflg"),
-            "whcd": old.get("whcd"),
-            "prddate": old.get("prddate"),
-            "itemtyp": old.get("itemtyp"),
-            "new_old": old.get("new_old"),
-            "remark": old.get("remark"),
-            "manuf_seq": old.get("manuf_seq"),
-            "old_degree": old.get("old_degree"),
-            "asset_type": old.get("asset_type"),
-            "recyclable": _bool_to_str(old.get("recyclable")),
-            "recycle_status": old.get("recycle_status"),
-            "asset_owner": old.get("asset_owner"),
-            "install_date": old.get("install_date"),
-            # 新值
-            "n_etyp": new.get("etyp"),
-            "n_sflg": new.get("sflg"),
-            "n_refid": new.get("refid"),
-            "n_qcflg": new.get("qcflg"),
-            "n_whcd": new.get("whcd"),
-            "n_prddate": new.get("prddate"),
-            "n_itemtyp": new.get("itemtyp"),
-            "n_new_old": new.get("new_old"),
-            "n_remark": new.get("remark"),
-            "n_manf_seq": new.get("manuf_seq"),
-            "n_old_degree": new.get("old_degree"),
-            "n_asset_type": new.get("asset_type"),
-            "n_recyclable": _bool_to_str(new.get("recyclable")),
-            "n_recycle_status": new.get("recycle_status"),
-            "n_asset_owner": new.get("asset_owner"),
-            "n_install_date": new.get("install_date"),
-        })
+        connection.execute(
+            insert(EidTrack),
+            {
+                "type": "u",
+                "change_date": now,
+                "itemcd": target.itemcd,
+                "eid": target.eid,
+                "opercd": target.opercd or "",
+                "gendate": now,
+                "useflg": target.useflg or "1",
+                "etyp": old.get("etyp"),
+                "sflg": old.get("sflg"),
+                "refid": old.get("refid"),
+                "qcflg": old.get("qcflg"),
+                "whcd": old.get("whcd"),
+                "prddate": old.get("prddate"),
+                "itemtyp": old.get("itemtyp"),
+                "new_old": old.get("new_old"),
+                "remark": old.get("remark"),
+                "manuf_seq": old.get("manuf_seq"),
+                "old_degree": old.get("old_degree"),
+                "asset_type": old.get("asset_type"),
+                "recyclable": _bool_to_str(old.get("recyclable")),
+                "recycle_status": old.get("recycle_status"),
+                "asset_owner": old.get("asset_owner"),
+                "install_date": old.get("install_date"),
+                # 新值
+                "n_etyp": new.get("etyp"),
+                "n_sflg": new.get("sflg"),
+                "n_refid": new.get("refid"),
+                "n_qcflg": new.get("qcflg"),
+                "n_whcd": new.get("whcd"),
+                "n_prddate": new.get("prddate"),
+                "n_itemtyp": new.get("itemtyp"),
+                "n_new_old": new.get("new_old"),
+                "n_remark": new.get("remark"),
+                "n_manf_seq": new.get("manuf_seq"),
+                "n_old_degree": new.get("old_degree"),
+                "n_asset_type": new.get("asset_type"),
+                "n_recyclable": _bool_to_str(new.get("recyclable")),
+                "n_recycle_status": new.get("recycle_status"),
+                "n_asset_owner": new.get("asset_owner"),
+                "n_install_date": new.get("install_date"),
+            },
+        )
 
     @event.listens_for(Eid, "after_delete")
-    def _write_track_on_delete(
-        mapper: Any, connection: Any, target: Eid
-    ) -> None:
+    def _write_track_on_delete(mapper: Any, connection: Any, target: Eid) -> None:
         """DELETE 时写 type='d'（对齐 TRIG_D_TMM43_TRACK）。"""
         now = datetime.now(UTC)
-        connection.execute(insert(EidTrack), {
-            "type": "d",
-            "change_date": now,
-            "itemcd": target.itemcd,
-            "eid": target.eid,
-            "opercd": target.opercd or "",
-            "gendate": now,
-            "useflg": target.useflg or "1",
-            "etyp": target.etyp,
-            "sflg": target.sflg,
-            "refid": target.refid,
-            "qcflg": target.qcflg,
-            "whcd": target.whcd,
-            "prddate": target.prddate,
-            "itemtyp": target.itemtyp,
-            "new_old": target.new_old,
-            "remark": target.remark,
-            "manuf_seq": target.manuf_seq,
-            "old_degree": target.old_degree,
-            "asset_type": target.asset_type,
-            "recyclable": _bool_to_str(target.recyclable),
-            "recycle_status": target.recycle_status,
-            "asset_owner": target.asset_owner,
-            "install_date": target.install_date,
-        })
+        connection.execute(
+            insert(EidTrack),
+            {
+                "type": "d",
+                "change_date": now,
+                "itemcd": target.itemcd,
+                "eid": target.eid,
+                "opercd": target.opercd or "",
+                "gendate": now,
+                "useflg": target.useflg or "1",
+                "etyp": target.etyp,
+                "sflg": target.sflg,
+                "refid": target.refid,
+                "qcflg": target.qcflg,
+                "whcd": target.whcd,
+                "prddate": target.prddate,
+                "itemtyp": target.itemtyp,
+                "new_old": target.new_old,
+                "remark": target.remark,
+                "manuf_seq": target.manuf_seq,
+                "old_degree": target.old_degree,
+                "asset_type": target.asset_type,
+                "recyclable": _bool_to_str(target.recyclable),
+                "recycle_status": target.recycle_status,
+                "asset_owner": target.asset_owner,
+                "install_date": target.install_date,
+            },
+        )
 
     _LISTENERS_REGISTERED = True
 
