@@ -413,19 +413,12 @@ class PlanCustService:
         # 创建预计划（plan_status=00 计划中）
         record = PlanCustRepository.create(model_data, creator)
 
-        # 自动创建呼出单（PLAN_SERVE）— 话务台呼出确认是后续流程的前置
+        # 呼出（PlanServe）为可选辅助流程，对齐 PB 设计：
+        # - PB 中需用户手动点击「请求呼出」按钮 + 勾选复选框才生成呼出单
+        # - 不自动创建 PlanServe，仅当用户显式勾选 call_serve 时才创建
         plantyp = data.get("plantyp")
-        PlanServeRepository.create(
-            {
-                "planno": record.planno,
-                "plantyp": plantyp,
-                "servetyp": "0",
-                "serve_task": f"预计划呼出-{record.planno}",
-            },
-            creator,
-        )
 
-        # PB cbx_serve 勾选:额外生成 servetyp=1 预计划呼出单,并更新 serve_status=01
+        # PB cbx_serve 勾选:生成 servetyp=1 预计划呼出单,并更新 serve_status=01
         if data.get("call_serve"):
             PlanServeRepository.create(
                 {
@@ -794,6 +787,19 @@ class PlanCustService:
         # 业务推进
         # 02（分派中/呼出完成）：客户 TEMP → PENDING
         if to_status == "02" and record.custcd:
+            # 防并发：有进行中的呼出单（status='00'）时阻止确认（对齐 PB u_plan_befor line 487-491）
+            from app.models.sales import PlanServe as _PS
+
+            pending_serve = (
+                db.session.query(_PS)
+                .filter(_PS.planno == planno, _PS.status == "00")
+                .count()
+            )
+            if pending_serve > 0:
+                return {
+                    "success": False,
+                    "error": "该预计划有未完成的呼出单，请先完成或作废呼出单",
+                }
             CustomerService.promote_to_pending(record.custcd)
 
         # 01（计划完成/设备出库）：客户 PENDING → ACTIVE

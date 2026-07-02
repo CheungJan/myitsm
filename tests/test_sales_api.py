@@ -150,11 +150,11 @@ class TestPlanOrchestration:
         """正向链路：创建→呼出→实施→下游工单生成且imple_billid回写。"""
         headers = _auth_header(app)
 
-        # 1. 创建预计划 plantyp=00 (新机开通)
+        # 1. 创建预计划 plantyp=00 (新机开通)，显式勾选 call_serve 触发呼出单创建
         resp = _post(
             client,
             "/api/v1/sales/plans",
-            {"plantyp": "00", "custnm": "正向测试", "custcd": "T010", "custcard": "HP001"},
+            {"plantyp": "00", "custnm": "正向测试", "custcd": "T010", "custcard": "HP001", "call_serve": True},
             headers,
         )
         assert resp.status_code == 201
@@ -329,16 +329,7 @@ class TestPlanEndToEnd:
         assert resp.status_code == 201, resp.get_json()
         planno = resp.get_json()["data"]["planno"]
 
-        # 2. 呼出单 transition → 01
-        serve_resp = client.get(f"/api/v1/sales/plans/{planno}/serve", headers=headers)
-        serves = serve_resp.get_json()["data"]
-        assert len(serves) >= 1
-        _post(
-            client,
-            f"/api/v1/sales/plan-serve/{serves[0]['dtlid']}/transition",
-            {"to_status": "01"},
-            headers,
-        )
+        # 2. 呼出为可选辅助流程（对齐 PB 设计），E2E 不走呼出，直接 transition
 
         # 3. 预计划 transition 00→02
         _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
@@ -565,16 +556,7 @@ class TestPlanEndToEnd:
             )
             _db.session.commit()
 
-        # 2. 呼出单 transition → 01
-        serve_resp = client.get(f"/api/v1/sales/plans/{planno}/serve", headers=headers)
-        serves = serve_resp.get_json()["data"]
-        assert len(serves) >= 1
-        _post(
-            client,
-            f"/api/v1/sales/plan-serve/{serves[0]['dtlid']}/transition",
-            {"to_status": "01"},
-            headers,
-        )
+        # 2. 呼出为可选辅助流程（对齐 PB 设计），E2E 不走呼出，直接 transition
 
         # 3. 预计划 transition 00→02
         _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
@@ -764,16 +746,7 @@ class TestPlanEndToEnd:
             )
             _db.session.commit()
 
-        # 2. 呼出单 transition → 01
-        serve_resp = client.get(f"/api/v1/sales/plans/{planno}/serve", headers=headers)
-        serves = serve_resp.get_json()["data"]
-        assert len(serves) >= 1
-        _post(
-            client,
-            f"/api/v1/sales/plan-serve/{serves[0]['dtlid']}/transition",
-            {"to_status": "01"},
-            headers,
-        )
+        # 2. 呼出为可选辅助流程（对齐 PB 设计），E2E 不走呼出，直接 transition
 
         # 3. 预计划 transition 00→02
         _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
@@ -943,16 +916,7 @@ class TestPlanEndToEnd:
             )
             _db.session.commit()
 
-        # 2. 呼出单 transition → 01
-        serve_resp = client.get(f"/api/v1/sales/plans/{planno}/serve", headers=headers)
-        serves = serve_resp.get_json()["data"]
-        assert len(serves) >= 1
-        _post(
-            client,
-            f"/api/v1/sales/plan-serve/{serves[0]['dtlid']}/transition",
-            {"to_status": "01"},
-            headers,
-        )
+        # 2. 呼出为可选辅助流程（对齐 PB 设计），E2E 不走呼出，直接 transition
 
         # 3. 预计划 transition 00→02
         _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
