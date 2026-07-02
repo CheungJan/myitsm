@@ -31,7 +31,9 @@ class SystemService:
         group_cds = [ug["group_cd"] for ug in ug_list]
         if group_cds:
             all_groups = {g.group_cd: g.group_nm for g in self._repo.get_groups()}
-            user_dict["groups"] = [{"group_cd": gc, "group_nm": all_groups.get(gc, gc)} for gc in group_cds]
+            user_dict["groups"] = [
+                {"group_cd": gc, "group_nm": all_groups.get(gc, gc)} for gc in group_cds
+            ]
         else:
             user_dict["groups"] = []
         return user_dict
@@ -44,7 +46,9 @@ class SystemService:
         dept_cd: str | None = None,
     ) -> list[dict[str, Any]]:
         """获取用户列表，支持多条件筛选。"""
-        users = self._repo.get_users(status=status, user_cd=user_cd, user_nm=user_nm, dept_cd=dept_cd)
+        users = self._repo.get_users(
+            status=status, user_cd=user_cd, user_nm=user_nm, dept_cd=dept_cd
+        )
         result = [self._fill_dept_nm(u.to_dict()) for u in users]
         return [self._fill_user_groups(d) for d in result]
 
@@ -56,9 +60,12 @@ class SystemService:
     def create_user(self, data: dict[str, Any]) -> dict[str, Any]:
         """新增用户，自动哈希密码。"""
         from werkzeug.security import generate_password_hash
+
         payload = dict(data)
         if payload.get("password"):
-            payload["password"] = generate_password_hash(payload["password"], method="pbkdf2:sha256")
+            payload["password"] = generate_password_hash(
+                payload["password"], method="pbkdf2:sha256"
+            )
         return self._repo.create_user(payload).to_dict()
 
     def update_user(self, user_cd: str, data: dict[str, Any]) -> dict[str, Any] | None:
@@ -69,7 +76,10 @@ class SystemService:
         payload = dict(data)
         if payload.get("password"):
             from werkzeug.security import generate_password_hash
-            payload["password"] = generate_password_hash(payload["password"], method="pbkdf2:sha256")
+
+            payload["password"] = generate_password_hash(
+                payload["password"], method="pbkdf2:sha256"
+            )
         else:
             payload.pop("password", None)
         return self._repo.update_user(r, payload).to_dict()
@@ -198,7 +208,9 @@ class SystemService:
     def add_item_price(self, data: dict[str, Any]) -> dict[str, Any]:
         return self._repo.add_item_price(data).to_dict()
 
-    def update_item_price(self, item_cd: str, busityp: str, data: dict[str, Any]) -> dict[str, Any] | None:
+    def update_item_price(
+        self, item_cd: str, busityp: str, data: dict[str, Any]
+    ) -> dict[str, Any] | None:
         r = self._repo.get_item_price(item_cd, busityp)
         if not r:
             return None
@@ -225,7 +237,9 @@ class SystemService:
     def add_item_supplier(self, data: dict[str, Any]) -> dict[str, Any]:
         return self._repo.add_item_supplier(data).to_dict()
 
-    def update_item_supplier(self, item_cd: str, cust_cd: str, data: dict[str, Any]) -> dict[str, Any] | None:
+    def update_item_supplier(
+        self, item_cd: str, cust_cd: str, data: dict[str, Any]
+    ) -> dict[str, Any] | None:
         r = self._repo.get_item_supplier(item_cd, cust_cd)
         return self._repo.update_item_supplier(r, data).to_dict() if r else None
 
@@ -242,7 +256,9 @@ class SystemService:
         obj = self._repo.get_supplier(supp_cd)
         return obj.to_dict() if obj else None
 
-    def list_suppliers(self, keyword: str = "", class_cd: str = "", page: int = 1, per_page: int = 20) -> dict[str, Any]:
+    def list_suppliers(
+        self, keyword: str = "", class_cd: str = "", page: int = 1, per_page: int = 20
+    ) -> dict[str, Any]:
         return self._repo.list_suppliers_paginated(keyword, class_cd, page, per_page)
 
     def list_suppliers_all(self) -> list:
@@ -312,14 +328,23 @@ class SystemService:
             self._repo.set_item_default_supplier(item_cd, supp_cd)
         return self._repo.add_supplier_item(supp_cd, data).to_dict()
 
-    def update_supplier_item(self, supp_cd: str, item_cd: str, data: dict[str, Any]) -> dict[str, Any]:
+    def update_supplier_item(
+        self, supp_cd: str, item_cd: str, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """更新供应商-商品关联。"""
         obj = self._repo.get_supplier_item(supp_cd, item_cd)
         if not obj:
             raise ValueError("关联不存在")
         if data.get("dfltflg") == "Y":
             self._repo.set_item_default_supplier(item_cd, supp_cd)
-        updatable = {"dfltflg", "delivercycle", "servicecycle", "guaranteeperiod", "backup", "useflg"}
+        updatable = {
+            "dfltflg",
+            "delivercycle",
+            "servicecycle",
+            "guaranteeperiod",
+            "backup",
+            "useflg",
+        }
         for k, v in data.items():
             if k in updatable and hasattr(obj, k):
                 setattr(obj, k, v)
@@ -337,7 +362,9 @@ class SystemService:
 
     # ========== Supplier Prices ==========
 
-    def get_supplier_prices(self, supp_cd: str, item_cd: str = "", current_only: bool = False) -> list[dict[str, Any]]:
+    def get_supplier_prices(
+        self, supp_cd: str, item_cd: str = "", current_only: bool = False
+    ) -> list[dict[str, Any]]:
         return self._repo.get_supplier_prices(supp_cd, item_cd, current_only)
 
     def _validate_supplier_price(self, item_cd: str, price: float | Decimal) -> str | None:
@@ -350,7 +377,9 @@ class SystemService:
             return f"报价 {price} 低于物料标准采购价 {float(std.itemprice)} 的 80%，是否确认保存？"
         return None
 
-    def create_supplier_price(self, supp_cd: str, data: dict[str, Any], force: bool = False) -> dict[str, Any]:
+    def create_supplier_price(
+        self, supp_cd: str, data: dict[str, Any], force: bool = False
+    ) -> dict[str, Any]:
         item_cd = data.get("itemcd", "")
         if not item_cd:
             raise ValueError("物料编码不能为空")
@@ -442,24 +471,38 @@ class SystemService:
         r = self._repo.get_item_class_by_cd(class_cd)
         if not r:
             return False
-        children = [c for c in self._repo.get_item_classes() if c.parent_cd and c.parent_cd.strip() == class_cd]
+        children = [
+            c
+            for c in self._repo.get_item_classes()
+            if c.parent_cd and c.parent_cd.strip() == class_cd
+        ]
         if children:
             child_cds = [c.class_cd for c in children]
-            raise ValueError(f"该分类下有 {len(children)} 个子分类，请先删除子分类: {', '.join(child_cds[:5])}{'...' if len(child_cds) > 5 else ''}")
+            raise ValueError(
+                f"该分类下有 {len(children)} 个子分类，请先删除子分类: {', '.join(child_cds[:5])}{'...' if len(child_cds) > 5 else ''}"
+            )
         self._repo.delete_item_class(r)
         return True
 
     # ——— 基础数据 ———
 
     def list_items(
-        self, page: int = 1, per_page: int = 20,
-        class_cd: str | None = None, recursive: bool = True,
-        search: str | None = None, typflg: str | None = None,
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        class_cd: str | None = None,
+        recursive: bool = True,
+        search: str | None = None,
+        typflg: str | None = None,
     ) -> dict[str, Any]:
         """获取物料列表，支持分类筛选、递归子分类、搜索、成品/配件过滤。"""
         items, total = self._repo.get_items(
-            page=page, per_page=per_page,
-            class_cd=class_cd, recursive=recursive, search=search, typflg=typflg,
+            page=page,
+            per_page=per_page,
+            class_cd=class_cd,
+            recursive=recursive,
+            search=search,
+            typflg=typflg,
         )
         return {"items": [i.to_dict() for i in items], "total": total}
 
@@ -495,10 +538,16 @@ class SystemService:
         if not r:
             return False
         # 检查子分类
-        children = [c for c in self._repo.get_cust_classes() if c.parent_cd and c.parent_cd.strip() == class_cd]
+        children = [
+            c
+            for c in self._repo.get_cust_classes()
+            if c.parent_cd and c.parent_cd.strip() == class_cd
+        ]
         if children:
             child_cds = [c.class_cd for c in children]
-            raise ValueError(f"该分类下有 {len(children)} 个子分类，请先删除子分类: {', '.join(child_cds[:5])}{'...' if len(child_cds) > 5 else ''}")
+            raise ValueError(
+                f"该分类下有 {len(children)} 个子分类，请先删除子分类: {', '.join(child_cds[:5])}{'...' if len(child_cds) > 5 else ''}"
+            )
         # 检查该分类下是否有客户
         _, cust_total = self._repo.get_customers(page=1, per_page=1, class_cd=class_cd)
         if cust_total > 0:
@@ -593,11 +642,15 @@ class SystemService:
         return cache
 
     def list_customers(
-        self, page: int = 1, per_page: int = 20,
-        class_cd: str | None = None, search: str | None = None,
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        class_cd: str | None = None,
+        search: str | None = None,
     ) -> dict[str, Any]:
         items, total = self._repo.get_customers(
-            page=page, per_page=per_page, class_cd=class_cd, search=search)
+            page=page, per_page=per_page, class_cd=class_cd, search=search
+        )
         resolved = [self._resolve_customer_refs(c.to_dict()) for c in items]
         return {"items": resolved, "total": total}
 
@@ -607,14 +660,22 @@ class SystemService:
         """获取物料分类树（含 EID 数量）。"""
         return self._repo.get_eid_itemcd_tree()
 
-    def list_eid(self, page: int = 1, per_page: int = 20,
-                 search: str | None = None, class_cd: str | None = None,
-                 whcd: str | None = None) -> dict[str, Any]:
-        items, total = self._repo.get_eid_list(page=page, per_page=per_page, search=search, class_cd=class_cd, whcd=whcd)
+    def list_eid(
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        search: str | None = None,
+        class_cd: str | None = None,
+        whcd: str | None = None,
+    ) -> dict[str, Any]:
+        items, total = self._repo.get_eid_list(
+            page=page, per_page=per_page, search=search, class_cd=class_cd, whcd=whcd
+        )
         # 解析物料名称 + 仓库名称
         item_map: dict[str, str] = {}
         wh_map: dict[str, str] = {}
         from app.models.warehouse import Warehouse
+
         for e in items:
             if e.itemcd and e.itemcd not in item_map:
                 item = self._repo.get_item(e.itemcd)
@@ -632,7 +693,8 @@ class SystemService:
                 db.text("""
                     SELECT new_device_id, renew_id FROM tit15_maintenance_renovate
                     WHERE new_device_id = ANY(:eids)
-                """), {"eids": eids}
+                """),
+                {"eids": eids},
             ).fetchall()
             for new_device_id, renew_id in renovate_rows:
                 plan_map[new_device_id] = renew_id
@@ -640,13 +702,17 @@ class SystemService:
             # 2. 其次：C 记录（refid 非空 且 change_date >= 设备生产日期）
             gendate_map = {e.eid: e.gendate for e in items if e.gendate}
             from app.models.master import EidTrack
-            tracks = db.session.query(
-                EidTrack.eid, EidTrack.refid, EidTrack.change_date
-            ).filter(
-                EidTrack.eid.in_(eids),
-                EidTrack.type == 'C',
-                EidTrack.refid != '',
-            ).order_by(EidTrack.change_date.desc()).all()
+
+            tracks = (
+                db.session.query(EidTrack.eid, EidTrack.refid, EidTrack.change_date)
+                .filter(
+                    EidTrack.eid.in_(eids),
+                    EidTrack.type == "C",
+                    EidTrack.refid != "",
+                )
+                .order_by(EidTrack.change_date.desc())
+                .all()
+            )
             for t in tracks:
                 if t.eid not in plan_map:  # 翻新单已匹配则跳过
                     gd = gendate_map.get(t.eid)
@@ -662,15 +728,35 @@ class SystemService:
             result.append(d)
         return {"items": result, "total": total}
 
-    def list_assets(self, page: int = 1, per_page: int = 20,
-                    search: str | None = None, class_cd: str | None = None,
-                    asset_type: str | None = None, asset_owner: str | None = None,
-                    useflg: str | None = None, location: str | None = None,
-                    whcd: str | None = None, sflg: str | None = None,
-                    cust_cd: str | None = None, item_class: str | None = None) -> dict[str, Any]:
+    def list_assets(
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        search: str | None = None,
+        class_cd: str | None = None,
+        asset_type: str | None = None,
+        asset_owner: str | None = None,
+        useflg: str | None = None,
+        location: str | None = None,
+        whcd: str | None = None,
+        sflg: str | None = None,
+        cust_cd: str | None = None,
+        item_class: str | None = None,
+    ) -> dict[str, Any]:
         items, total = self._repo.get_cust_pos_rl(
-            page=page, per_page=per_page, search=search,
-            class_cd=class_cd, asset_type=asset_type, asset_owner=asset_owner, useflg=useflg, location=location, whcd=whcd, sflg=sflg, cust_cd=cust_cd, item_class=item_class)
+            page=page,
+            per_page=per_page,
+            search=search,
+            class_cd=class_cd,
+            asset_type=asset_type,
+            asset_owner=asset_owner,
+            useflg=useflg,
+            location=location,
+            whcd=whcd,
+            sflg=sflg,
+            cust_cd=cust_cd,
+            item_class=item_class,
+        )
         return {"items": items, "total": total}
 
     def get_asset(self, asset_id: int) -> dict[str, Any] | None:
@@ -706,6 +792,7 @@ class SystemService:
     def _validate_item_cd(item_cd: str) -> None:
         """检查物料编码是否与物料分类编码冲突。"""
         from app.models.master import ItemClass
+
         if db.session.get(ItemClass, item_cd):
             raise ValueError(f"编码 {item_cd} 已被物料分类占用，请使用其他编码")
 
@@ -715,6 +802,7 @@ class SystemService:
         from app.models.inventory import SupplierPrice
         from app.models.master import CustItems
         from app.models.procurement import PurchasePlanDt, PurchaseRegisterDt
+
         result: dict[str, int] = {}
         for model, key in [
             (PurchasePlanDt, "采购需求明细"),
@@ -733,6 +821,7 @@ class SystemService:
             return False
         # 级联删除关联数据
         from app.repositories.bom_repository import BomRepository
+
         bom = BomRepository.get_bom(item_cd.upper())
         if bom:
             for dt in BomRepository.list_details(item_cd.upper()):
@@ -756,15 +845,90 @@ class SystemService:
 
     def delete_customer(self, cust_cd: str) -> bool:
         r = self._repo.get_customer(cust_cd)
-        if r: self._repo.delete_customer(r); return True
+        if r:
+            self._repo.delete_customer(r)
+            return True
         return False
 
     def create_eid(self, data: dict[str, Any]) -> dict[str, Any]:
         return self._repo.create_eid(data).to_dict()
 
     def update_eid(self, itemcd: str, eid_val: str, data: dict[str, Any]) -> dict[str, Any] | None:
-        r = self._repo.update_eid(itemcd, eid_val, data)
-        return r.to_dict() if r else None
+        """更新 EID 资产属性，并写 type='A' 属性变更轨迹（11f）。
+
+        业务语义层写 type='A'（属性变更），DB 操作层由 11a 事件监听自动写 type='u'。
+        仅当资产属性字段（asset_type/recyclable/recycle_status/asset_owner/install_date 等）
+        实际变更时才写 A 记录，记录变更前后值。
+        """
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        from app.models.master import Eid
+        from app.repositories.system_repository import SystemRepository as _Repo
+        from app.services.itsm_service import TRACK_TYPE_ATTRIBUTE
+
+        # 资产属性字段白名单（对齐 eid_listeners._TRACKED_FIELDS 资产扩展部分）
+        asset_fields: tuple[str, ...] = (
+            "asset_type",
+            "recyclable",
+            "recycle_status",
+            "asset_owner",
+            "install_date",
+            "etyp",
+            "sflg",
+            "refid",
+            "qcflg",
+            "whcd",
+            "prddate",
+            "itemtyp",
+            "remark",
+            "manuf_seq",
+            "old_degree",
+        )
+
+        # 取变更前快照
+        before = db.session.get(Eid, (itemcd, eid_val))
+        if before is None:
+            return None
+
+        old_vals: dict[str, Any] = {f: getattr(before, f, None) for f in asset_fields}
+
+        # 执行更新
+        updated = self._repo.update_eid(itemcd, eid_val, data)
+        if updated is None:
+            return None
+
+        # 比对变更，构造新旧值字典
+        changes: dict[str, tuple[Any, Any]] = {}
+        for f in asset_fields:
+            old_v = old_vals.get(f)
+            new_v = getattr(updated, f, None)
+            if old_v != new_v:
+                changes[f] = (old_v, new_v)
+
+        if not changes:
+            return updated.to_dict()
+
+        # 写 type='A' 属性变更轨迹
+        operator = data.get("opercd", "") or ""
+        remark_parts: list[str] = [f"{f}: {changes[f][0]}→{changes[f][1]}" for f in changes]
+        _Repo.create_eid_track(
+            eid=eid_val,
+            itemcd=itemcd,
+            track_type=TRACK_TYPE_ATTRIBUTE,
+            operator=operator,
+            refid="",
+            change_date=_dt.now(UTC),
+            sflg=old_vals.get("sflg"),
+            n_sflg=getattr(updated, "sflg", None),
+            whcd=old_vals.get("whcd"),
+            n_whcd=getattr(updated, "whcd", None),
+            install_date=old_vals.get("install_date"),
+            n_install_date=getattr(updated, "install_date", None),
+            remark="属性变更：" + "; ".join(remark_parts),
+        )
+        db.session.commit()
+        return updated.to_dict()
 
     def delete_eid(self, itemcd: str, eid_val: str) -> bool:
         return self._repo.delete_eid(itemcd, eid_val)
@@ -781,7 +945,9 @@ class SystemService:
 
     def delete_warehouse(self, whcd: str) -> bool:
         r = self._repo.get_warehouse(whcd)
-        if r: self._repo.delete_warehouse(r); return True
+        if r:
+            self._repo.delete_warehouse(r)
+            return True
         return False
 
     def get_eid_tracks(self, itemcd: str, eid: str) -> list[dict[str, Any]]:
@@ -793,7 +959,9 @@ class SystemService:
         reno_refid: str | None = None
         if eid_record:
             row = db.session.execute(
-                db.text("SELECT renew_id FROM tit15_maintenance_renovate WHERE new_device_id = :eid"),
+                db.text(
+                    "SELECT renew_id FROM tit15_maintenance_renovate WHERE new_device_id = :eid"
+                ),
                 {"eid": eid},
             ).fetchone()
             if row:
@@ -801,27 +969,28 @@ class SystemService:
 
         from app.models.master import Customer
         from app.models.warehouse import Warehouse
+
         wh_map: dict[str, str] = {}
         cust_map: dict[str, str] = {}
         result = []
         for t in tracks:
             d = t.to_dict()
-            for wh_field in ['whcd', 'n_whcd']:
+            for wh_field in ["whcd", "n_whcd"]:
                 whcd = d.get(wh_field)
                 if whcd and whcd not in wh_map:
                     wh = db.session.get(Warehouse, whcd)
                     wh_map[whcd] = wh.whnm if wh else ""
-                key = 'wh_nm' if wh_field == 'whcd' else 'n_wh_nm'
+                key = "wh_nm" if wh_field == "whcd" else "n_wh_nm"
                 d[key] = wh_map.get(whcd, "")
-            for cust_field in ['cust_cd', 'n_cust_cd']:
+            for cust_field in ["cust_cd", "n_cust_cd"]:
                 cd = d.get(cust_field)
                 if cd and cd not in cust_map:
                     c = db.session.get(Customer, cd)
                     cust_map[cd] = c.cust_card if c else ""
-                d[cust_field + '_card'] = cust_map.get(cd, "")
+                d[cust_field + "_card"] = cust_map.get(cd, "")
 
             # C 记录校验：change_date 不得早于设备生产日期，refid 优先用翻新单
-            if t.type == 'C' and gendate and t.change_date:
+            if t.type == "C" and gendate and t.change_date:
                 if t.change_date < gendate:
                     # 从 CustPosRl 取正确的安装日期
                     pos_row = db.session.execute(
@@ -829,10 +998,10 @@ class SystemService:
                         {"eid": eid},
                     ).fetchone()
                     if pos_row and pos_row[0]:
-                        d['change_date'] = pos_row[0].isoformat()
+                        d["change_date"] = pos_row[0].isoformat()
                 if reno_refid and t.refid != reno_refid:
-                    d['refid'] = reno_refid
-                    d['_refid_corrected'] = True
+                    d["refid"] = reno_refid
+                    d["_refid_corrected"] = True
             result.append(d)
         # 纠正后重新按时间排序（change_date 可能在上面被修正过）
         result.sort(key=lambda d: (d.get("change_date") or "", d.get("seqno") or 0))
@@ -855,7 +1024,9 @@ class SystemService:
 
     def delete_syscode(self, code_id: int) -> bool:
         r = self._repo.get_syscode_by_id(code_id)
-        if r: self._repo.delete_syscode(r); return True
+        if r:
+            self._repo.delete_syscode(r)
+            return True
         return False
 
     def get_areas(self) -> list[dict[str, Any]]:
