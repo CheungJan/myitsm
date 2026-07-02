@@ -54,6 +54,11 @@
                     <el-table-column prop="cust_card" label="磁卡号" width="120" />
                     <el-table-column prop="cust_nm" label="名称" min-width="180" />
                     <el-table-column prop="class_cd" label="分类" width="80" />
+                    <el-table-column label="状态" width="100">
+                        <template #default="{ row }">
+                            <el-tag :type="custStatusLabel(row).type" size="small">{{ custStatusLabel(row).text }}</el-tag>
+                        </template>
+                    </el-table-column>
                     <el-table-column prop="phone_no" label="电话" width="130" />
                     <el-table-column prop="contactor" label="联系人" width="100" />
                     <el-table-column label="操作" width="180" fixed="right">
@@ -184,7 +189,7 @@
                     <el-descriptions-item label="全称">{{ detailRow.custrnm || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="品牌代码">{{ detailRow.cust_brcd || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="状态">
-                        <el-tag :type="detailRow.useflg === '0' ? 'danger' : 'success'" size="small">{{ detailRow.useflg === '0' ? '无效' : '有效' }}</el-tag>
+                        <el-tag :type="custStatusLabel(detailRow).type" size="small">{{ custStatusLabel(detailRow).text }}</el-tag>
                     </el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">分类与层级</el-divider>
@@ -587,6 +592,23 @@ async function loadCustomers() {
 function onSearch() {
     page.value = 1
     loadCustomers()
+}
+
+// ---- 客户状态文案（三维度组合，对齐设计文档 11.8）----
+// 优先级：useflg='0' 已失效 > customer_status=INVALID 已作废 > TEMP 未转正 > PENDING 待确认
+// > s_status='3' 永久关闭 > s_status='2' 临时停业 > ACTIVE/正常
+function custStatusLabel(row: Record<string, unknown>): { text: string; type: 'success' | 'warning' | 'danger' | 'info' } {
+    const useflg = String(row.useflg ?? '')
+    const cs = String(row.customer_status ?? '')
+    const ss = String(row.s_status ?? '')
+    if (useflg === '0') return { text: '已失效', type: 'danger' }
+    if (cs === 'INVALID') return { text: '已作废', type: 'info' }
+    if (cs === 'TEMP') return { text: '未转正', type: 'warning' }
+    if (cs === 'PENDING') return { text: '待确认', type: 'warning' }
+    if (ss === '3') return { text: '永久关闭', type: 'danger' }
+    if (ss === '2') return { text: '临时停业', type: 'warning' }
+    if (cs === 'ACTIVE' || ss === '1') return { text: '正常', type: 'success' }
+    return { text: '未知', type: 'info' }
 }
 
 // ---- 客户详情 ----

@@ -30,7 +30,9 @@ class Province(BaseModel):
 
     prvn_cd = db.Column(db.String(2), primary_key=True, comment="省份代码")
     prvn_nm = db.Column(db.String(50), nullable=False, comment="省份名称")
-    country_cd = db.Column(db.String(3), db.ForeignKey("tmm02_country.country_cd"), comment="国家代码")
+    country_cd = db.Column(
+        db.String(3), db.ForeignKey("tmm02_country.country_cd"), comment="国家代码"
+    )
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
 
@@ -256,9 +258,7 @@ class CustPosRl(BaseModel):
     source_id = db.Column(db.String(20), comment="来源单号")
     warranty_expire = db.Column(db.DateTime, comment="保修到期日")
 
-    __table_args__ = (
-        db.Index("idx_cust_pos_rl_eid_useflg", "eid", "useflg"),
-    )
+    __table_args__ = (db.Index("idx_cust_pos_rl_eid_useflg", "eid", "useflg"),)
 
     customer = db.relationship("Customer", back_populates="positions")
 
@@ -421,11 +421,15 @@ class Eid(BaseModel):
     old_degree = db.Column(db.Numeric, comment="旧化程度")
     isunit = db.Column(db.String(1), comment="是否整机")
     # 资产属性（从 CustPosRl 迁入，2026-05-11）
-    asset_type = db.Column(db.String(10), comment="资产类型（AT码表：01新机/02旧机/03翻新机/04报废）")
+    asset_type = db.Column(
+        db.String(10), comment="资产类型（AT码表：01新机/02旧机/03翻新机/04报废）"
+    )
     recyclable = db.Column(db.Boolean, default=False, comment="可回收标志")
     recycle_status = db.Column(db.String(10), comment="回收状态（RS码表）")
     asset_owner = db.Column(db.String(20), default="CUSTOMER", comment="资产所属方（AO码表）")
     install_date = db.Column(db.DateTime, comment="安装日期")
+    # 方案 A 预占：预计划选 posid 时锁定 EID，其他计划不可选
+    reserve_planno = db.Column(db.String(20), comment="预占预计划号（方案A专属）")
 
 
 class EidTrack(BaseModel):

@@ -1,0 +1,172 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<link rel="stylesheet" type="text/css" href="visio.css"/>
+<title>
+ITSM20180302_2010visio版本
+</title>
+<script type="text/javascript" language="javascript">
+function UpdateTooltip(){};
+function OnShapeClick(){};
+</script>
+
+<script src="png_1.js" type="text/javascript" language="javascript"></script>
+<script type="text/javascript" language="javascript">
+	if( (parent.isSVG) || 
+		(parent.isVML && parent.vmlSupported) || 
+		(parent.isXAML && parent.isUpLevel)) 
+	{
+		location.replace(parent.g_FileList[parent.g_CurPageIndex].PriImage);
+	}
+</script>
+
+
+<script type="text/javascript" language="javascript">
+var pageID = 7;
+var isUpLevel = parent.isUpLevel;
+var OnShapeClick = null;
+if (!parent.isMac)
+{
+	OnShapeClick = parent.OnShapeClick;
+}
+
+var OnShapeKey = parent.OnShapeKey;
+var UpdateTooltip = parent.UpdateTooltip;
+var clickMenu = parent.clickMenu;
+var toggleMenuDiv = parent.toggleMenuDiv;
+var toggleMenuLink = parent.toggleMenuLink;
+var GoToPage = parent.GoToPage;
+
+
+if (parent.isUpLevel)
+{
+
+	if (parent.g_FirstPageToLoad != null && parent.g_FirstPageToLoad.length > 0)
+	{
+		if (parent.g_FileList[parent.g_CurPageIndex].PageID != pageID)
+		{
+			var fileEntry = parent.g_FileList[parent.g_CurPageIndex];
+			var fileToLoad = fileToLoad = fileEntry.PriImage;
+			if (fileEntry.SecImage.length > 0)
+			{
+				fileToLoad = fileEntry.SecImage;
+			}
+
+			location.replace(fileToLoad);
+		}
+
+		parent.g_FirstPageToLoad = null;
+	}
+
+
+	var viewMgr = new parent.CViewMgr();
+	parent.viewMgr = viewMgr;
+
+	viewMgr.SupportsDetails = true;
+	viewMgr.SupportsSearch = true;
+
+	viewMgr.put_Location = ViewMgrSetRasterLocation;
+	viewMgr.visBBoxLeft = 0.352035;
+	viewMgr.visBBoxRight = 11.304498;
+	viewMgr.visBBoxBottom = 1.961535;
+	viewMgr.visBBoxTop = 8.075866;
+	viewMgr.highlightDiv = null;
+}
+
+function load ()
+{
+	if(isUpLevel)
+	{
+		arrowdiv.innerHTML = '<img id="arrowgif" alt="显示所选形状的位置" src="arrow.png"/>';
+
+		var pageIndex = parent.PageIndexFromID (pageID);
+		parent.CurPageUpdate (pageIndex);
+	}
+}
+
+function unload()
+{
+	if(isUpLevel)
+	{
+		viewMgr = null;
+		parent.viewMgr = null;
+	}
+}
+
+window.onload = load;
+window.onunload = unload;
+document.onclick = clickMenu;
+
+</script>
+<style type="text/css"> 
+body {
+	background:url(foo) fixed;
+	padding: 10px;
+}
+div.banner {
+	position: fixed;
+	_position: absolute;
+	top: 0;
+	left: 0;
+	_top: expression(eval(document.body.scrollTop));
+	_left: expression(eval(document.body.scrollLeft));
+	width: 100%;
+	_width: expression(eval(document.body.clientWidth));
+	margin: 0;
+	padding: 3px;
+	padding-left: 6px;
+	background:lime;
+	background-color: #FFFFC6;
+	font: 11px tahoma,arial,serif;
+	border-bottom: 2px ridge #FFFFC6;
+}
+</style>
+</head>
+
+<body class="pageView" bgcolor="#FFFFFF" style="margin: 0px">
+
+<script type="text/javascript" language="javascript">
+// Displays the banner prompt to install Silverlight
+if (parent.slSupported && !parent.slInstalled)
+{
+	var slBanner = document.createElement("div");
+	slBanner.className = "banner";
+	slBanner.innerHTML = '若要启用全部功能(例如扫视和缩放)，<a href="http://www.microsoft.com/silverlight/resources/install.aspx" target="parent">单击此处</a> 需要安装 Silverlight 插件。';
+
+	document.body.appendChild(slBanner);
+	document.body.style.paddingTop = "2.5em";
+}
+</script>
+
+
+<div id="arrowdiv" style="position:absolute;top:0;left:0;visibility:hidden;z-index:5">
+</div>
+
+<div id="menu1" onclick="clickMenu()" class="hlMenu">
+</div>
+<DIV id="RasterDiv" style="margin:10px">
+
+<center>
+  <IMG id="ConvertedImage" SRC="png_2.png" ALT="门店关闭" name=RasterImage BORDER="0" USEMAP="#visImageMap">
+</center>
+
+<MAP NAME="visImageMap">
+  <AREA shape="POLYGON" tabindex="1" ALT="预计划单" origTitle="预计划单" TITLE="预计划单"  target="_top" COORDS="68,148,160,148,160,74,68,74,68,148" onmouseover="UpdateTooltip(this,7,50,event)" onfocus="UpdateTooltip(this,7,50,event)" onclick="return OnShapeClick(7,50,event);" onkeyup="OnShapeKey(7,50,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="预计划 呼出单" origTitle="预计划 呼出单" TITLE="预计划 呼出单"  target="_top" COORDS="68,424,160,424,160,350,68,350,68,424" onmouseover="UpdateTooltip(this,7,51,event)" onfocus="UpdateTooltip(this,7,51,event)" onclick="return OnShapeClick(7,51,event);" onkeyup="OnShapeKey(7,51,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="反馈呼出结果" origTitle="反馈呼出结果" TITLE="反馈呼出结果"  target="_top" COORDS="263,103,234,91,205,103,203,103,203,104,188,111,203,117,203,117,203,117,234,131,265,117,265,117,265,117,280,111,265,104,265,103,263,103" onmouseover="UpdateTooltip(this,7,54,event)" onfocus="UpdateTooltip(this,7,54,event)" onclick="return OnShapeClick(7,54,event);" onkeyup="OnShapeKey(7,54,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="计划确认" origTitle="计划确认" TITLE="计划确认"  target="_top" COORDS="317,111,363,131,409,111,363,91,317,111" onmouseover="UpdateTooltip(this,7,55,event)" onfocus="UpdateTooltip(this,7,55,event)" onclick="return OnShapeClick(7,55,event);" onkeyup="OnShapeKey(7,55,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="确认" origTitle="确认" TITLE="确认"  target="_top" COORDS="880,516,935,551,990,516,935,480,880,516" onmouseover="UpdateTooltip(this,7,34,event)" onfocus="UpdateTooltip(this,7,34,event)" onclick="return OnShapeClick(7,34,event);" onkeyup="OnShapeKey(7,34,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="上门 离店 关单" origTitle="上门 离店 关单" TITLE="上门 离店 关单"  target="_top" COORDS="880,386,935,422,990,386,935,350,880,386" onmouseover="UpdateTooltip(this,7,33,event)" onfocus="UpdateTooltip(this,7,33,event)" onclick="return OnShapeClick(7,33,event);" onkeyup="OnShapeKey(7,33,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="同步生成 实施单" origTitle="同步生成 实施单" TITLE="同步生成 实施单"  target="_top" COORDS="239,386,285,423,331,386,285,350,239,386" onmouseover="UpdateTooltip(this,7,24,event)" onfocus="UpdateTooltip(this,7,24,event)" onclick="return OnShapeClick(7,24,event);" onkeyup="OnShapeKey(7,24,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="数据确认 （业务回馈）" origTitle="数据确认 （业务回馈）" TITLE="数据确认 （业务回馈）"  target="_top" COORDS="718,552,828,552,828,479,718,479,718,552" onmouseover="UpdateTooltip(this,7,31,event)" onfocus="UpdateTooltip(this,7,31,event)" onclick="return OnShapeClick(7,31,event);" onkeyup="OnShapeKey(7,31,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="计划任务单" origTitle="计划任务单" TITLE="计划任务单"  target="_top" COORDS="239,294,331,294,331,182,239,182,239,294" onmouseover="UpdateTooltip(this,7,20,event)" onfocus="UpdateTooltip(this,7,20,event)" onclick="return OnShapeClick(7,20,event);" onkeyup="OnShapeKey(7,20,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="门店关闭单" origTitle="门店关闭单" TITLE="门店关闭单"  target="_top" COORDS="387,441,479,441,479,331,387,331,387,441" onmouseover="UpdateTooltip(this,7,19,event)" onfocus="UpdateTooltip(this,7,19,event)" onclick="return OnShapeClick(7,19,event);" onkeyup="OnShapeKey(7,19,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="关单" origTitle="关单" TITLE="关单"  target="_top" COORDS="719,386,773,423,827,386,773,349,719,386" onmouseover="UpdateTooltip(this,7,29,event)" onfocus="UpdateTooltip(this,7,29,event)" onclick="return OnShapeClick(7,29,event);" onkeyup="OnShapeKey(7,29,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="门店关闭单" origTitle="门店关闭单" TITLE="门店关闭单"  target="_top" COORDS="387,294,479,294,479,182,387,182,387,294" onmouseover="UpdateTooltip(this,7,21,event)" onfocus="UpdateTooltip(this,7,21,event)" onclick="return OnShapeClick(7,21,event);" onkeyup="OnShapeKey(7,21,event);">
+  <AREA shape="POLYGON" tabindex="1" ALT="1.工程师上门 2.工程师离店 3.  设备信息 4.  客户回访" origTitle="1.工程师上门 2.工程师离店 3.  设备信息 4.  客户回访" TITLE="1.工程师上门 2.工程师离店 3.  设备信息 4.  客户回访"  target="_top" COORDS="665,397,681,386,657,370,657,360,641,360,626,349,610,360,605,360,600,360,595,360,595,370,571,386,595,402,595,411,600,411,608,411,626,423,644,411,657,411,668,411,668,397,665,397" onmouseover="UpdateTooltip(this,7,26,event)" onfocus="UpdateTooltip(this,7,26,event)" onclick="return OnShapeClick(7,26,event);" onkeyup="OnShapeKey(7,26,event);">
+</MAP>
+
+
+</DIV>
+</body>
+</html>

@@ -90,6 +90,7 @@ def check_plan_stock():  # type: ignore[no-untyped-def]
     Returns: {total_qty, wh_details, item_cd}
     """
     from app.services.plan_stock_service import PlanStockService
+
     model_cd = (request.args.get("model_cd") or "").strip()
     if not model_cd:
         return error_response("model_cd 不能为空", 400)
@@ -107,6 +108,7 @@ def list_available_eids():  # type: ignore[no-untyped-def]
               itemtyp, itemtyp_nm, sflg, qcflg}]}
     """
     from app.services.plan_stock_service import PlanStockService
+
     model_cd = (request.args.get("model_cd") or "").strip()
     if not model_cd:
         return error_response("model_cd 不能为空", 400)
@@ -124,6 +126,7 @@ def list_available_eids():  # type: ignore[no-untyped-def]
         itemtyp = None  # 默认 ['GA','GB','GC']
     page = int(request.args.get("page", "1") or "1")
     per_page = int(request.args.get("per_page", "50") or "50")
+    exclude_reserved = request.args.get("exclude_reserved", "1") != "0"
     data = PlanStockService.list_available_eids(
         model_cd=model_cd,
         whtyp=whtyp,
@@ -131,6 +134,7 @@ def list_available_eids():  # type: ignore[no-untyped-def]
         itemtyp=itemtyp,
         page=page,
         per_page=per_page,
+        exclude_reserved=exclude_reserved,
     )
     return success_response(data=data)
 
@@ -144,6 +148,7 @@ def check_plan_bom():  # type: ignore[no-untyped-def]
     Returns: {lines: [{itemcd, item_nm, need_qty, stock_qty, enough}], all_enough}
     """
     from app.services.plan_stock_service import PlanStockService
+
     model_cd = (request.args.get("model_cd") or "").strip()
     if not model_cd:
         return error_response("model_cd 不能为空", 400)
@@ -237,7 +242,10 @@ def create_outbound(planno: str):  # type: ignore[no-untyped-def]
         return error_response(message="eids 必须是数组", code=400)
     user_cd: str = g.current_user
     result = PlanCustService.create_outbound(
-        planno, whcd=whcd, operator=user_cd, eids=eids,
+        planno,
+        whcd=whcd,
+        operator=user_cd,
+        eids=eids,
     )
     if not result.get("success"):
         return error_response(message=str(result.get("error", "出库单创建失败")), code=400)
@@ -402,6 +410,7 @@ def update_plan_serve(dtlid: int):  # type: ignore[no-untyped-def]
         {**body.model_dump(exclude_unset=True), "opercd": user_cd},
     )
     from app.extensions import db
+
     db.session.commit()
     return success_response(data=record.to_dict())
 

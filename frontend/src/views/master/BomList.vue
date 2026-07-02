@@ -53,7 +53,7 @@
                             <template #default="{ row }">
                                 <template v-if="bomStatusMap[row.item_cd.toUpperCase()] === undefined"><span style="font-size:12px;color:#ccc">-</span></template>
                                 <template v-else-if="bomStatusMap[row.item_cd.toUpperCase()] === null"><el-tag type="info" size="small">无BOM</el-tag></template>
-                                <template v-else><el-tag :type="bomStatusMap[row.item_cd.toUpperCase()]==='0'?'danger':'success'" size="small">{{ bomStatusMap[row.item_cd.toUpperCase()]==='0'?'无效':'有效' }}</el-tag></template>
+                                <template v-else><el-tag :type="bomStatusMap[row.item_cd.toUpperCase()]==='0'?'danger':'success'" size="small">{{ bomStatusMap[row.item_cd.toUpperCase()]==='0'?'停产':'在产' }}</el-tag></template>
                             </template>
                         </el-table-column>
                         <el-table-column label="操作员" width="80">
@@ -78,9 +78,9 @@
                 <el-form-item label="BOM 名称">
                     <el-input v-model="bomForm.bomnm" placeholder="如 TFP4000 4LR4" />
                 </el-form-item>
-                <el-form-item label="状态">
+                <el-form-item label="在产状态">
                     <el-select v-model="bomForm.useflg" style="width: 100%">
-                        <el-option label="有效" value="1" /><el-option label="无效" value="0" />
+                        <el-option label="在产" value="1" /><el-option label="停产" value="0" />
                     </el-select>
                 </el-form-item>
                 <el-form-item label="补料冗余比例">
@@ -101,7 +101,7 @@
                     <span style="font-weight:bold">{{ selectedItem?.item_cd }}</span>
                     <span style="color:#999;font-size:13px">{{ selectedBom.bomnm || selectedItem?.item_nm }}</span>
                     <el-tag :type="bomType.type" size="small">{{ bomType.label }}</el-tag>
-                    <el-tag :type="selectedBom.useflg==='0'?'danger':'success'" size="small">{{ selectedBom.useflg==='0'?'无效':'有效' }}</el-tag>
+                    <el-tag :type="selectedBom.useflg==='0'?'danger':'success'" size="small">{{ selectedBom.useflg==='0'?'停产':'在产' }}</el-tag>
                     <el-tag v-if="selectedBom.redundancy_ratio && selectedBom.redundancy_ratio > 0" type="info" size="small">冗余{{ (selectedBom.redundancy_ratio * 100).toFixed(0) }}%</el-tag>
                     <el-button type="primary" size="small" @click="openAddDetail">添加物料</el-button>
                     <el-button size="small" @click="openEditBom">重命名</el-button>
@@ -161,7 +161,7 @@ import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/api/request'
 import {
-    fetchBom, createBom, updateBom, deleteBom,
+    fetchBom, createBom, updateBom,
     addBomDetail, updateBomDetail, deleteBomDetail,
     fetchItems, fetchBomClassTree,
 } from '@/api/master'

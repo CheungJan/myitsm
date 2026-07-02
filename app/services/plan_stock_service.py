@@ -20,16 +20,17 @@ TWH11_DETAIL 与 TMM43_EID 联动关系:
 押金/售价改从 tip01_price 读取(busityp=40 押金/10 销售价),
 DepositPosModel 已弃用,仅保留表结构供历史数据迁移参考。
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from app.extensions import db
-from app.models.master import Item, Bom, BomDt, Eid, SysCode
-from app.models.warehouse import StockDetail, Warehouse
+from app.models.master import Bom, BomDt, Eid, Item, SysCode
 from app.models.procurement import PurchasePlan
+from app.models.warehouse import StockDetail, Warehouse
 from app.services.bom_service import BomService
 from app.services.procurement_service import PurchasePlanService
 
@@ -74,10 +75,7 @@ class PlanStockService:
             .group_by(StockDetail.whcd, Warehouse.whnm)
             .all()
         )
-        wh_details = [
-            {"whcd": r[0], "whnm": r[1] or "", "qty": int(r[2] or 0)}
-            for r in rows
-        ]
+        wh_details = [{"whcd": r[0], "whnm": r[1] or "", "qty": int(r[2] or 0)} for r in rows]
         total = sum(d["qty"] for d in wh_details)
         return {
             "model_cd": model_cd,
@@ -94,6 +92,7 @@ class PlanStockService:
         itemtyp: list[str] | None = None,
         page: int = 1,
         per_page: int = 50,
+        exclude_reserved: bool = True,
     ) -> dict[str, Any]:
         """查询机型可用设备列表（TMM43_EID 设备维度，供预计划设备选择）。
 
@@ -109,6 +108,7 @@ class PlanStockService:
                      None=不限；传单个值时按单值过滤)
             page: 页码
             per_page: 每页条数
+            exclude_reserved: 是否排除已被预占的 EID（方案 A 预占，默认 True）
         Returns:
             {model_cd, item_cd, total, items: [{eid, itemcd, whcd, whnm,
               asset_type, asset_type_nm, itemtyp, itemtyp_nm, sflg, qcflg}]}
@@ -116,8 +116,10 @@ class PlanStockService:
         item_cd = model_cd.strip() if model_cd else ""
         if not item_cd:
             return {
-                "model_cd": model_cd, "item_cd": None,
-                "total": 0, "items": [],
+                "model_cd": model_cd,
+                "item_cd": None,
+                "total": 0,
+                "items": [],
                 "message": "机型编码为空,无法查询可用设备",
             }
 
@@ -132,13 +134,17 @@ class PlanStockService:
 
         # AT 字典（资产类型名称）
         at_map = {
-            r[0]: r[1] for r in db.session.query(SysCode.code_cd, SysCode.code_nm)
-            .filter(SysCode.code_typ == "AT", SysCode.useflg == "1").all()
+            r[0]: r[1]
+            for r in db.session.query(SysCode.code_cd, SysCode.code_nm)
+            .filter(SysCode.code_typ == "AT", SysCode.useflg == "1")
+            .all()
         }
         # QC 字典（物料类型名称）
         qc_map = {
-            r[0]: r[1] for r in db.session.query(SysCode.code_cd, SysCode.code_nm)
-            .filter(SysCode.code_typ == "QC", SysCode.useflg == "1").all()
+            r[0]: r[1]
+            for r in db.session.query(SysCode.code_cd, SysCode.code_nm)
+            .filter(SysCode.code_typ == "QC", SysCode.useflg == "1")
+            .all()
         }
 
         q = (
@@ -159,31 +165,33 @@ class PlanStockService:
         # 物料类型过滤
         if itemtyp:
             q = q.filter(Eid.itemtyp.in_(itemtyp))
+        # 方案 A 预占过滤：排除已被其他预计划预占的 EID
+        if exclude_reserved:
+            q = q.filter((Eid.reserve_planno.is_(None)) | (Eid.reserve_planno == ""))
 
         total = q.count()
         rows = (
-            q.order_by(Eid.asset_type, Eid.eid)
-            .offset((page - 1) * per_page)
-            .limit(per_page)
-            .all()
+            q.order_by(Eid.asset_type, Eid.eid).offset((page - 1) * per_page).limit(per_page).all()
         )
 
         items = []
         for eid_rec, whnm in rows:
             at = eid_rec.asset_type or ""
             it = eid_rec.itemtyp or ""
-            items.append({
-                "eid": eid_rec.eid,
-                "itemcd": eid_rec.itemcd,
-                "whcd": eid_rec.whcd or "",
-                "whnm": whnm or "",
-                "asset_type": at,
-                "asset_type_nm": at_map.get(at, ""),
-                "itemtyp": it,
-                "itemtyp_nm": qc_map.get(it, ""),
-                "sflg": eid_rec.sflg or "",
-                "qcflg": eid_rec.qcflg or "",
-            })
+            items.append(
+                {
+                    "eid": eid_rec.eid,
+                    "itemcd": eid_rec.itemcd,
+                    "whcd": eid_rec.whcd or "",
+                    "whnm": whnm or "",
+                    "asset_type": at,
+                    "asset_type_nm": at_map.get(at, ""),
+                    "itemtyp": it,
+                    "itemtyp_nm": qc_map.get(it, ""),
+                    "sflg": eid_rec.sflg or "",
+                    "qcflg": eid_rec.qcflg or "",
+                }
+            )
 
         return {
             "model_cd": model_cd,
@@ -253,13 +261,15 @@ class PlanStockService:
             enough = stock >= need
             if not enough:
                 all_enough = False
-            lines.append({
-                "itemcd": itemcd,
-                "item_nm": ln.get("item_nm", ""),
-                "need_qty": need,
-                "stock_qty": stock,
-                "enough": enough,
-            })
+            lines.append(
+                {
+                    "itemcd": itemcd,
+                    "item_nm": ln.get("item_nm", ""),
+                    "need_qty": need,
+                    "stock_qty": stock,
+                    "enough": enough,
+                }
+            )
         return {
             "model_cd": model_cd,
             "item_cd": item_cd,
@@ -286,10 +296,14 @@ class PlanStockService:
             {pcplanid, created_lines, skipped} 或 {error}
         """
         # 重复触发防护: 同一预计划已生成采购需求则跳过
-        existing = db.session.query(PurchasePlan).filter(
-            PurchasePlan.slbillid == planno,
-            PurchasePlan.useflg == "1",
-        ).count()
+        existing = (
+            db.session.query(PurchasePlan)
+            .filter(
+                PurchasePlan.slbillid == planno,
+                PurchasePlan.useflg == "1",
+            )
+            .count()
+        )
         if existing > 0:
             return {
                 "skipped": True,
@@ -318,12 +332,14 @@ class PlanStockService:
             need_qty = ln["need_qty"] - ln["stock_qty"]
             if need_qty <= 0:
                 continue
-            details.append({
-                "itemcd": ln["itemcd"],
-                "rgstqty": need_qty,
-                "storeqty": ln["stock_qty"],
-                "item_usage": "sale",
-            })
+            details.append(
+                {
+                    "itemcd": ln["itemcd"],
+                    "rgstqty": need_qty,
+                    "storeqty": ln["stock_qty"],
+                    "item_usage": "sale",
+                }
+            )
 
         if not details:
             return {"skipped": True, "message": "计算后无需采购"}
@@ -343,7 +359,9 @@ class PlanStockService:
             )
             logger.info(
                 "预计划 %s 触发采购需求 %s,共 %d 条配件",
-                planno, result.get("pcplanid"), len(details),
+                planno,
+                result.get("pcplanid"),
+                len(details),
             )
             return {
                 "pcplanid": result.get("pcplanid"),

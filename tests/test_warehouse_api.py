@@ -59,6 +59,17 @@ class TestStockIn:
             {"whcd": "02", "whnm": "入库测试仓"},
             headers,
         )
+        # 确保物料 IT0001 存在（可能被前序测试已创建）
+        from app.extensions import db as _db
+        from app.models.master import Item as _Item
+        with app.app_context():
+            if not _db.session.get(_Item, "IT0001"):
+                _post(
+                    client,
+                    "/api/v1/items",
+                    {"item_cd": "IT0001", "item_nm": "测试物料", "unit": "个"},
+                    headers,
+                )
         resp = _post(
             client,
             "/api/v1/warehouse/stock-in",
@@ -99,13 +110,45 @@ class TestStockOut:
             {"whcd": "03", "whnm": "出库测试仓"},
             headers,
         )
+        # 确保物料 IT0001 存在（可能被前序测试已创建）
+        from app.extensions import db as _db
+        from app.models.master import Item as _Item
+        with app.app_context():
+            if not _db.session.get(_Item, "IT0001"):
+                _post(
+                    client,
+                    "/api/v1/items",
+                    {"item_cd": "IT0001", "item_nm": "测试物料", "unit": "个"},
+                    headers,
+                )
+        # 先入库 IT0001 到仓库 03 并审核，确保有库存可出
+        in_resp = _post(
+            client,
+            "/api/v1/warehouse/stock-in",
+            {
+                "whcd": "03",
+                "invtyp": "1",
+                "details": [{"itemcd": "IT0001", "inqty": 10}],
+            },
+            headers,
+        )
+        assert in_resp.status_code == 201
+        inbillid = in_resp.get_json()["data"]["inbillid"]
+        audit_in = _post(
+            client,
+            f"/api/v1/warehouse/stock-in/{inbillid}/audit",
+            {},
+            headers,
+        )
+        assert audit_in.status_code == 200
+
         resp = _post(
             client,
             "/api/v1/warehouse/stock-out",
             {
                 "whcd": "03",
                 "invtyp": "1",
-                "details_eid": [{"itemcd": "IT0002", "outqty": 5}],
+                "details_eid": [{"itemcd": "IT0001", "outqty": 5}],
             },
             headers,
         )

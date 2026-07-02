@@ -1,0 +1,60 @@
+<h2>供应商商品关联维护 — 现状与方案</h2>
+<p class="subtitle">核心问题：从物料侧可以关联供应商，但从供应商侧看不到/管理不了它的商品</p>
+
+<div class="section">
+  <h3>当前状态</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <tr style="background:#f5f5f5;"><th style="padding:8px;text-align:left;">维度</th><th style="padding:8px;text-align:left;">已有</th><th style="padding:8px;text-align:left;">缺失</th></tr>
+    <tr>
+      <td style="padding:8px;"><strong>物料 → 供应商</strong></td>
+      <td style="padding:8px;color:#2e7d32;">ItemList.vue 编辑物料 → "供应商" tab<br>CRUD API: /items/<cd>/suppliers</td>
+      <td style="padding:8px;">—</td>
+    </tr>
+    <tr>
+      <td style="padding:8px;"><strong>供应商 → 商品</strong></td>
+      <td style="padding:8px;">—</td>
+      <td style="padding:8px;color:#c62828;">SupplierList.vue 详情里有空表格<br>缺少 GET /suppliers/<cd>/items<br>缺少在此处新增/删除关联</td>
+    </tr>
+    <tr>
+      <td style="padding:8px;"><strong>供应商价格</strong></td>
+      <td style="padding:8px;">tip02 模型存在</td>
+      <td style="padding:8px;color:#c62828;">完全无 API/Service/前端<br>PB 版在供应商编辑窗口中有"报价"tab</td>
+    </tr>
+  </table>
+</div>
+
+<div class="section">
+  <h3>数据模型关系</h3>
+  <div style="background:#f5f5f5;padding:16px;border-radius:8px;font-size:13px;line-height:2;">
+    <code>tmm19_suppliers</code> (供应商) ← <code>tmm24_custitems</code> (关联) → <code>tmm01_items</code> (物料)<br>
+    关联表字段：itemcd + custcd (联合PK) + dfltflg + delivercycle + servicecycle + guaranteeperiod<br><br>
+    <code>tip02_supplier_price</code> (供应商报价)：itemcd + supp_cd + min_qty + itemprice + effective_date + expire_date
+  </div>
+</div>
+
+<div class="section">
+  <h3>两种设计思路</h3>
+
+  <div class="options">
+    <div class="option" data-choice="a" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>在供应商详情中管理商品（推荐）</h3>
+        <p>SupplierList.vue 的详情弹窗里，"供应商品"表格支持完整的增删改 + 价格维护</p>
+        <div class="pros-cons">
+          <div class="pros"><h4>优点</h4><ul><li>符合 PB 版操作习惯（供应商窗口 → 商品tab）</li><li>采购专员在供应商页面一站式管理</li><li>新增 GET/POST/DELETE /suppliers/<cd>/items 即可</li></ul></div>
+        </div>
+      </div>
+    </div>
+    <div class="option" data-choice="b" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>保持现状 + 独立价格管理页</h3>
+        <p>供应商-商品关联仅从物料侧管理，另建供应商价格管理页面</p>
+        <div class="pros-cons">
+          <div class="cons"><h4>缺点</h4><ul><li>采购专员需在两个页面切换</li><li>与 PB 操作习惯不一致</li></ul></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

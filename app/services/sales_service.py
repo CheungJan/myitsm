@@ -65,13 +65,13 @@ class PlanStatus(str, Enum):
     04=实施中 08=计划退回 09=计划作废。
     """
 
-    PLANNING = "00"         # 计划中
-    COMPLETED = "01"        # 计划完成（呼出确认+实施完成）
-    DISPATCHING = "02"      # 分派中
-    IMPL_DONE = "03"        # 实施完成（下游单据已生成）
-    IMPLEMENTING = "04"     # 实施中
-    RETURNED = "08"         # 计划退回
-    VOIDED = "09"           # 计划作废
+    PLANNING = "00"  # 计划中
+    COMPLETED = "01"  # 计划完成（呼出确认+实施完成）
+    DISPATCHING = "02"  # 分派中
+    IMPL_DONE = "03"  # 实施完成（下游单据已生成）
+    IMPLEMENTING = "04"  # 实施中
+    RETURNED = "08"  # 计划退回
+    VOIDED = "09"  # 计划作废
 
     @classmethod
     def from_code(cls, code: str) -> "PlanStatus | None":
@@ -98,15 +98,22 @@ class PlanStatusMachine:
     """预计划状态机 —— 对齐 PB TS 码表流转。"""
 
     TRANSITIONS: dict[PlanStatus, list[PlanStatus]] = {
-        PlanStatus.PLANNING:     [PlanStatus.COMPLETED, PlanStatus.DISPATCHING, PlanStatus.VOIDED],
-        PlanStatus.COMPLETED:    [PlanStatus.DISPATCHING, PlanStatus.VOIDED],
-        PlanStatus.DISPATCHING:  [
-            PlanStatus.IMPL_DONE, PlanStatus.IMPLEMENTING,
-            PlanStatus.RETURNED, PlanStatus.VOIDED,
+        PlanStatus.PLANNING: [PlanStatus.COMPLETED, PlanStatus.DISPATCHING, PlanStatus.VOIDED],
+        PlanStatus.COMPLETED: [PlanStatus.DISPATCHING, PlanStatus.VOIDED],
+        PlanStatus.DISPATCHING: [
+            PlanStatus.IMPL_DONE,
+            PlanStatus.IMPLEMENTING,
+            PlanStatus.RETURNED,
+            PlanStatus.VOIDED,
         ],
-        PlanStatus.IMPL_DONE:    [PlanStatus.IMPLEMENTING, PlanStatus.COMPLETED],
-        PlanStatus.IMPLEMENTING: [PlanStatus.IMPL_DONE, PlanStatus.COMPLETED, PlanStatus.RETURNED, PlanStatus.VOIDED],
-        PlanStatus.RETURNED:     [PlanStatus.PLANNING, PlanStatus.VOIDED],
+        PlanStatus.IMPL_DONE: [PlanStatus.IMPLEMENTING, PlanStatus.COMPLETED],
+        PlanStatus.IMPLEMENTING: [
+            PlanStatus.IMPL_DONE,
+            PlanStatus.COMPLETED,
+            PlanStatus.RETURNED,
+            PlanStatus.VOIDED,
+        ],
+        PlanStatus.RETURNED: [PlanStatus.PLANNING, PlanStatus.VOIDED],
     }
     TERMINAL_STATES: set[PlanStatus] = {
         PlanStatus.COMPLETED,
@@ -391,6 +398,18 @@ class PlanCustService:
                     "error": f"磁卡号 {custcard} 已存在于预计划 {existing_plan.planno}",
                 }
 
+        # 方案 A 预占检查：posid 已选时校验 EID 是否已被其他计划预占
+        posid = model_data.get("posid")
+        if posid:
+            from app.models.master import Eid as _Eid
+
+            eid_rec = db.session.query(_Eid).filter(_Eid.eid == posid).first()
+            if eid_rec and eid_rec.reserve_planno:
+                return {
+                    "success": False,
+                    "error": f"EID {posid} 已被预计划 {eid_rec.reserve_planno} 预占",
+                }
+
         # 创建预计划（plan_status=00 计划中）
         record = PlanCustRepository.create(model_data, creator)
 
@@ -441,6 +460,14 @@ class PlanCustService:
                 db.session.rollback()
                 return {"success": False, "error": f"创建临时客户失败: {exc}"}
 
+        # 方案 A 预占：posid 已选时锁定 EID（reserve_planno=planno）
+        if posid:
+            from app.models.master import Eid as _Eid
+
+            eid_rec = db.session.query(_Eid).filter(_Eid.eid == posid).first()
+            if eid_rec:
+                eid_rec.reserve_planno = record.planno
+
         db.session.commit()
 
         # 库存不足自动触发采购需求(pos_from=00 商用仓库,不限 plantyp)
@@ -463,6 +490,7 @@ class PlanCustService:
             return
         try:
             from app.services.plan_stock_service import PlanStockService
+
             stock = PlanStockService.check_stock(pos_item)
             if stock.get("total_qty", 0) <= 0:
                 proc_result = PlanStockService.trigger_procurement(
@@ -474,7 +502,8 @@ class PlanCustService:
                 if proc_result.get("pcplanid"):
                     logger.info(
                         "预计划 %s 库存不足,已触发采购需求 %s",
-                        record.planno, proc_result["pcplanid"],
+                        record.planno,
+                        proc_result["pcplanid"],
                     )
         except Exception:
             logger.exception("预计划 %s 触发采购需求失败", record.planno)
@@ -511,9 +540,7 @@ class PlanCustService:
         from app.models.sales import PlanServe as _PS
 
         served_count = (
-            db.session.query(_PS)
-            .filter(_PS.planno == planno, _PS.status == "01")
-            .count()
+            db.session.query(_PS).filter(_PS.planno == planno, _PS.status == "01").count()
         )
         if served_count == 0:
             return {
@@ -572,6 +599,22 @@ class PlanCustService:
         # 状态流转：02（分派中）→ 04（实施中）
         # 对齐 PB status='04'（分派中/实施中），complete() 和 create_outbound() 前置要求 04
         record.plan_status = "04"
+
+        # 方案 A 自动出库：posid 已选时自动创建 OV=1 出库单（带 posid EID）
+        if record.posid:
+            try:
+                from app.models.master import Eid as _EidAuto
+
+                eid_rec = db.session.query(_EidAuto).filter(_EidAuto.eid == record.posid).first()
+                eid_whcd = eid_rec.whcd if eid_rec else ""
+                PlanCustService.create_outbound(
+                    planno=planno,
+                    whcd=eid_whcd or "",
+                    operator=operator,
+                    eids=[record.posid],
+                )
+            except Exception as exc:
+                logger.warning("方案 A 自动出库失败 planno=%s: %s", planno, exc)
 
         # 客户：TEMP → PENDING
         if record.custcd:
@@ -659,8 +702,8 @@ class PlanCustService:
                 track_type="u",
                 operator=operator,
                 refid=outbillid,
-                sflg="S",       # 变更前：已销售
-                n_sflg="S",     # 变更后：仍为已销售（配置生效不改 sflg）
+                sflg="S",  # 变更前：已销售
+                n_sflg="S",  # 变更后：仍为已销售（配置生效不改 sflg）
                 remark=f"预计划 {record.planno} 配置确认生效",
             )
 
@@ -823,6 +866,16 @@ class PlanCustService:
         record.plan_status = "09"
         if remark:
             record.plan_require = ((record.plan_require or "") + f" [作废: {remark}]")[:200]
+
+        # 方案 A：作废时释放 EID 预占
+        if record.posid:
+            from app.models.master import Eid as _EidVoid
+
+            db.session.query(_EidVoid).filter(
+                _EidVoid.eid == record.posid,
+                _EidVoid.reserve_planno == planno,
+            ).update({"reserve_planno": None}, synchronize_session=False)
+
         db.session.commit()
 
         return {"success": True, "planno": planno, "to_status": "09"}
@@ -883,20 +936,18 @@ class PlanCustService:
             from app.models.master import Eid as EidModel
 
             for eid in eids:
-                eid_rec = (
-                    db.session.query(EidModel)
-                    .filter(EidModel.eid == eid)
-                    .first()
-                )
+                eid_rec = db.session.query(EidModel).filter(EidModel.eid == eid).first()
                 if eid_rec is None:
                     return {"success": False, "error": f"EID {eid} 不存在"}
                 if not eid_rec.itemcd:
                     return {"success": False, "error": f"EID {eid} 无机型信息"}
-                details_eid.append({
-                    "eid": eid,
-                    "itemcd": eid_rec.itemcd,
-                    "outqty": 1,
-                })
+                details_eid.append(
+                    {
+                        "eid": eid,
+                        "itemcd": eid_rec.itemcd,
+                        "outqty": 1,
+                    }
+                )
 
         # 创建 OV=1 销售出库草稿
         from app.services.warehouse_service import StockOutService

@@ -358,16 +358,16 @@ class TestPlanEndToEnd:
         headers: dict[str, str],
         planno: str,
     ) -> str:
-        """生成出库草稿（P2）+ 仓库审核，返回 outbillid。"""
-        out_resp = _post(
-            client,
-            f"/api/v1/sales/plans/{planno}/outbound",
-            {"whcd": "W1", "eids": ["EID0000000001"]},
-            headers,
+        """审核出库单（P2）—— 方案 A：implement 已自动创建出库单，直接查询并审核。"""
+        from app.extensions import db as _db
+        from app.models.warehouse import StockOut
+
+        outbillid = (
+            _db.session.query(StockOut.outbillid)
+            .filter(StockOut.refbillid == planno, StockOut.invtyp == "1")
+            .scalar()
         )
-        assert out_resp.status_code == 201, out_resp.get_json()
-        outbillid = out_resp.get_json()["data"]["outbillid"]
-        assert outbillid  # P2: StockOutDetailEid 已写入
+        assert outbillid, f"方案 A 自动出库未生成，planno={planno}"
 
         audit_resp = _post(
             client,

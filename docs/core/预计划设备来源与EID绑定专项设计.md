@@ -605,8 +605,8 @@ ITSM 单据关单（安装完成）
 | 缺口 | 方案 A | 方案 B | 当前代码 |
 |------|--------|--------|----------|
 | 预计划选 EID（posid） | ✅ 需要 | ❌ 不需要 | `posid` 字段已有，`list_available_eids` API 已有 |
-| EID 预占状态 | ✅ 需要 | ❌ 不需要 | ❌ 缺失（无 sflg 预占值或 refid 关联） |
-| `implement()` 自动创建出库单 | ✅ 需要 | ❌ 不需要 | ❌ 缺失（当前 `implement()` 不创建出库单） |
+| EID 预占状态 | ✅ 需要 | ❌ 不需要 | ✅ 已完成（2026-07-02：`Eid.reserve_planno` 字段 + `create` 预占 + `list_available_eids` 排除 + `void`/出库审核释放） |
+| `implement()` 自动创建出库单 | ✅ 需要 | ❌ 不需要 | ✅ 已完成（2026-07-02：`implement` posid 已选时自动调 `create_outbound`） |
 | 人工 `create_outbound()` | ❌ 不需要 | ✅ 需要 | ✅ 已有（`sales_service.py:784`） |
 | 出库单明细带 EID | ✅ 自动带 | ✅ 仓库人选 | ✅ 已完成（P2：`create_outbound` 传 `eids` 写 `StockOutDetailEid`） |
 | 出库审核更新 EID 状态 | ✅ 需要 | ✅ 需要 | ✅ 已有（`warehouse_service.py` audit 逻辑） |
@@ -616,7 +616,7 @@ ITSM 单据关单（安装完成）
 **结论**：
 - 方案 A 和方案 B 的分歧点只在"出库单创建方式"和"EID 绑定时机"
 - 两种方案最终都需要在 ITSM 单据关单时写 `tmm35_cust_pos_rl`（设备绑定到门店）和 `tmm43_eid_track` type='C'——✅ 已完成（仅 plantyp=00，其他 plantyp 见行动项 11）
-- **当前剩余缺口**：EID 预占状态、`implement()` 自动创建出库单（均为方案 A 专属，方案 B 不需要）
+- **当前剩余缺口**：无（方案 A 专属功能已于 2026-07-02 完成，方案 A/B 全链路均已打通）
 
 ## 七、销售实施全链路现状分析
 
@@ -1229,8 +1229,8 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
 7. **11e** plantyp=40 门店关门（type='R' 批量 + rl 全失效 + 回写）
 
 **第三批：扩展**（按需）
-8. **11f** 资产编辑接口写 type='A'（属性变更，纯优化）
-9. 方案 A 专属：EID 预占状态、`implement()` 自动创建出库单（如需要）
+8. **11f** 资产编辑接口写 type='A'（属性变更，纯优化）✅ 已完成（2026-07-02）
+9. 方案 A 专属：EID 预占状态、`implement()` 自动创建出库单 ✅ 已完成（2026-07-02）
 
 **优先级理由**：
 - 11a 是基础设施，11b-e 都依赖它自动写 i/u/d
@@ -1268,3 +1268,4 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
 | 2026-07-02 | 质量提升项完成：(1) 抽取 11 个业务码值常量（RL_USEFLG/ASSET_STATUS/PLAN_STATUS/TRACK_TYPE/CLOSE_STATUS）替换 11a-e 所有硬编码；(2) 11c/d/e 各补 3 个失败路径测试（单据不存在/非法状态流转/边界场景），共 9 个新测试；(3) `eid_listeners.register_eid_listeners` 加 try/except + logging 告警 | Cascade |
 | 2026-07-02 | 行动项 10 完成：扩展 `tests/test_sales_api.py::TestPlanEndToEnd` 新增 3 个 plantyp E2E 测试（20 翻新/30 回收/40 门店关闭），验证预计划→实施→关单全链路（EidTrack + CustPosRl + 回写）；§8 行动项 10 标 ✅ 已完成 | Cascade |
 | 2026-07-02 | 任务 11f 完成：`SystemService.update_eid` 资产编辑接口写 type='A'（属性变更）轨迹——更新前取资产属性快照（asset_type/recyclable/recycle_status/asset_owner/install_date 等 15 字段），更新后比对变更，仅当实际变更时调 `create_eid_track(track_type='A')` 记录新旧值（remark 含字段级变更明细）；业务语义层 A 与 DB 操作层 u（11a 事件监听）双层覆盖；新增 `tests/test_update_eid_11f.py` 5 个测试（属性变更/无变更/不存在/双层写入）；§8 行动项 11f 标 ✅ 已完成 | Cascade |
+| 2026-07-02 | 方案 A 专属功能完成：(1) `Eid` 模型加 `reserve_planno` 字段（migration `c1a2b3d4e5f6`）；(2) `PlanCustService.create` posid 已选时校验+预占 EID（`reserve_planno=planno`），已被其他计划预占则拒绝；(3) `PlanStockService.list_available_eids` 加 `exclude_reserved` 参数（默认 True，排除已预占 EID），API 层同步加 `exclude_reserved` 查询参数；(4) `PlanCustService.implement` posid 已选时自动调 `create_outbound` 创建 OV=1 出库单（从 EID 取 whcd）；(5) `StockOutService.audit` OV=1 审核通过时释放 EID 预占（`reserve_planno=None`）；(6) `PlanCustService.void` 作废时释放 EID 预占；新增 `tests/test_plan_a_reserve.py` 5 个测试（预占/重复预占拒绝/排除已预占/含已预占/作废释放）；E2E 测试 `_create_and_audit_outbound` 适配方案 A（查自动出库单+审核）；§6.6 缺口表格方案 A 两行标 ✅，第三批第 9 项标 ✅；212 passed, 15 skipped | Cascade |
