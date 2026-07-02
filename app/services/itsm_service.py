@@ -727,13 +727,16 @@ class DeviceChangeService(_BaseMaintenanceService):
 
     @staticmethod
     def _transfer_rl_on_close_bg(record: DeviceChange, operator: str) -> None:
-        """BG 子类型关单时转移 tmm35_cust_pos_rl。
+        """BG 子类型关单时转移 tmm35_cust_pos_rl + 设备回库 + 目标客户合并。
 
         旧门店（store_id）rl 失效（useflg=0, asset_status=RETURNED）；
-        新门店（new_store_id）rl 新建或更新（useflg=1, asset_status=ACTIVE）。
+        新门店（new_store_id）rl 新建或更新（useflg=1, asset_status=ACTIVE）；
+        设备回库（tmm43_eid.sflg='8'，对齐 PB USP_ASSET_C_A sltyp='BG' v_back='Y'）；
+        目标客户合并（tmm22_customers.useflg='0'，对齐 PB USP_PLAN_CONFRIM）。
         对齐 PB usp_plan_confrim L221-243。
         """
         from app.models.master import CustPosRl
+        from app.models.master import Customer as CustomerModel
         from app.models.master import Eid as EidModel
 
         if not record.device_id or not record.new_store_id:
@@ -784,6 +787,16 @@ class DeviceChangeService(_BaseMaintenanceService):
                     source_id=record.device_change_id,
                 )
             )
+
+        # 设备回库：tmm43_eid.sflg='8'（在库），对齐 PB USP_ASSET_C_A sltyp='BG' v_back='Y'
+        eid_rec = db.session.query(EidModel).filter(EidModel.eid == record.device_id).first()
+        if eid_rec:
+            eid_rec.sflg = "8"
+
+        # 目标客户合并：tmm22_customers.useflg='0'（合并/废弃），对齐 PB USP_PLAN_CONFRIM
+        target_customer = db.session.get(CustomerModel, record.new_store_id)
+        if target_customer:
+            target_customer.useflg = "0"
 
     @staticmethod
     def _write_back_plan_status(record: DeviceChange, operator: str) -> None:

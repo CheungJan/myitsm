@@ -316,7 +316,7 @@ tags: [验收, 前端, 预计划, EID绑定, 方案A]
 - ✅ `tmm43_eid_track` 新增 `type='T'`（客户转移：源客户 → 目标客户）
 - ✅ `tmm35_cust_pos_rl`：源客户 rl `useflg='0'`（失效），目标客户 rl `useflg='1'`（新建/激活）
 - ✅ `tmm22_customers`：源客户更新磁卡号，目标客户 `useflg='0'`（合并/废弃）
-- ✅ `tmm43_eid.sflg='8'`（回库入库，`USP_ASSET_C_A sltyp='BG' v_back='Y'`）
+- ✅ `tmm43_eid.sflg='8'`（回库入库，`USP_ASSET_C_A sltyp='BG' v_back='Y'`）—— 已实现于 `_transfer_rl_on_close_bg`
 - ✅ 预计划回写 `01`
 
 ### 7.3 CK 子类型（仅磁卡号变更，同客户）

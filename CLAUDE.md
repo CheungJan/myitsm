@@ -83,7 +83,7 @@ PB 源码中涉及存储过程（Stored Procedure）、触发器（Trigger）、
 
 ```bash
 # 连接命令（TNS_ADMIN 需指向 tnsnames.ora 所在目录）
-export TNS_ADMIN=/Users/cheungjan/Downloads/instantclient_23_26/network/admin
+#export TNS_ADMIN=/Users/cheungjan/Downloads/instantclient_23_26/network/admin
 sqlplus ccgl/ccgl@CCGL_TEST
 ```
 
