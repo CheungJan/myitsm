@@ -73,9 +73,42 @@ uv run bandit -r app/ -c pyproject.toml  # 安全检查
 DATABASE_URL=postgresql://cheungjan@localhost:5432/myitsm
 TEST_DATABASE_URL=postgresql://cheungjan@localhost:5432/myitsm_test
 
-# 直接连接
+# 直接连接（重构目标库 PostgreSQL）
 psql -U cheungjan -d myitsm
 ```
+
+### PB 原库 Oracle（CCGLPDB）
+
+PB 源码中涉及存储过程（Stored Procedure）、触发器（Trigger）、函数（Function）等数据库对象，在 `.pbl` 源码文件中查不到实现时，使用以下命令连接原库查看：
+
+```bash
+# 连接命令（TNS_ADMIN 需指向 tnsnames.ora 所在目录）
+export TNS_ADMIN=/Users/cheungjan/Downloads/instantclient_23_26/network/admin
+sqlplus ccgl/ccgl@CCGL_TEST
+```
+
+连接后常用查询：
+
+```sql
+-- 查看存储过程/函数源码（按名称搜索）
+SELECT text FROM all_source WHERE name = 'USP_WH_OUT' ORDER BY line;
+
+-- 查看触发器源码
+SELECT trigger_body FROM all_triggers WHERE trigger_name = 'TRG_XXX';
+
+-- 列出所有存储过程
+SELECT object_name, object_type, status FROM all_objects
+WHERE object_type IN ('PROCEDURE','FUNCTION','TRIGGER','PACKAGE')
+  AND owner = 'CCGL'
+ORDER BY object_type, object_name;
+
+-- 模糊搜索含特定关键字的存储过程
+SELECT DISTINCT name, type FROM all_source
+WHERE owner = 'CCGL' AND UPPER(text) LIKE '%USP_WH%'
+ORDER BY type, name;
+```
+
+> **用途**：分析 PB 调用的 `usp_*`、`ufn_*` 等数据库存储过程与触发器的业务逻辑，作为 Python 重构的参考依据。
 
 ## 架构概览
 
