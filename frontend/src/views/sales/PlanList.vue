@@ -516,15 +516,17 @@ const showCustUseflg = computed(() => {
   return ['30', '40'].includes(form.plantyp)
 })
 
-// 磁卡号变更子类型(plantyp=10): 根据源磁卡号/源设备ID填写情况实时判定 CK/BG/BQ
-// 对齐后端 sales_service.py:232-250 的 _build_downstream_payload 映射逻辑
+// 磁卡号变更子类型(plantyp=10): 根据源设备ID + 源/目标磁卡号差异实时判定 CK/BG/BQ
+// 对齐后端 sales_service.py _build_downstream_payload 映射逻辑
+// BG: 选了源设备ID（设备转移） CK: 源磁卡号≠目标磁卡号（磁卡号变更） BQ: 源=目标磁卡号或未选源（信息变更）
 const changeSubType = computed(() => {
   if (form.plantyp !== '10') return { code: '', label: '', hint: '', tagType: 'info' as const }
-  const hasCard = !!(form.new_custcard || '').trim()
+  const srcCard = (form.new_custcard || '').trim()
+  const tgtCard = (form.custcard || '').trim()
   const hasDevice = !!(form.new_posid || '').trim()
-  if (hasDevice && hasCard) return { code: 'BG', label: '磁卡号+设备变更', hint: '源磁卡号和源设备ID均已选择,将生成设备变更单(BG)', tagType: 'warning' as const }
-  if (hasCard) return { code: 'CK', label: '仅磁卡号变更', hint: '只选了源磁卡号,将生成设备变更单(CK)', tagType: 'success' as const }
-  return { code: 'BQ', label: '信息变更', hint: '源磁卡号和源设备ID均未选,修改客户信息后将生成设备变更单(BQ)', tagType: 'info' as const }
+  if (hasDevice) return { code: 'BG', label: '磁卡号+设备变更', hint: '已选源设备ID,将生成设备变更单(BG,跨客户设备转移)', tagType: 'warning' as const }
+  if (srcCard && tgtCard && srcCard !== tgtCard) return { code: 'CK', label: '仅磁卡号变更', hint: '源磁卡号≠目标磁卡号,将生成设备变更单(CK)', tagType: 'success' as const }
+  return { code: 'BQ', label: '信息变更', hint: '源磁卡号=目标磁卡号(或未选源),修改地址/电话/联系人后将生成设备变更单(BQ)', tagType: 'info' as const }
 })
 
 // 主客户(目标客户)名下有效资产列表,用于旧设备ID下拉(20/30/40)

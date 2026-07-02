@@ -156,7 +156,7 @@ tags: [验收, 前端, 预计划, EID绑定, 方案A]
 | plantyp | 关单回调做的事 |
 |---------|---------------|
 | 00 开通 | `type='C'`（分配）+ 写 `CustPosRl` + 回写 01 |
-| 10 BG | `type='T'`（转移）+ rl 转移 + 回写 01 |
+| 10 变更 | `type='T'`（转移）+ rl 转移 + 回写 01（仅 BG 子类型） |
 | 20 翻新 | `type='R'`（旧机回收）+ `type='C'`（新机分配）+ rl 转移 + 回写 01 |
 | 30 回收 | `type='R'`（回收）+ rl 失效 + 回写 01 |
 | 40 门店关闭 | `type='R'`（批量回收）+ rl 全失效 + 回写 01 |
@@ -289,25 +289,63 @@ tags: [验收, 前端, 预计划, EID绑定, 方案A]
 
 ## 七、plantyp=10 磁卡号变更验收
 
-### 7.1 BG 子类型（磁卡号+设备变更）
+### 7.1 子类型判定规则（前端实时显示）
+
+**判定逻辑**（前端 `changeSubType` + 后端 `_build_downstream_payload` 一致）：
+
+| 条件 | 子类型 | 说明 |
+|------|--------|------|
+| 选了源设备 ID（`new_posid` 有值） | **BG** | 磁卡号+设备变更（跨客户设备转移） |
+| 源磁卡号 ≠ 目标磁卡号（`new_custcard` ≠ `custcard`） | **CK** | 仅磁卡号变更 |
+| 源磁卡号 = 目标磁卡号，或未选源客户 | **BQ** | 信息变更（地址/电话/联系人） |
+
+> **⚠️ 关键**：CK 的判定不是"是否选了源客户"，而是"源磁卡号与目标磁卡号是否不同"。选了源客户但目标磁卡号相同（只改地址）→ BQ。
+
+### 7.2 BG 子类型（磁卡号+设备变更，跨客户转移）
 
 **步骤**：
 
 1. 新建 `plantyp=10`，选择源客户（源磁卡号 + 源设备 ID）
-2. 保存 → 实施
-3. ITSM → 设备变更单列表，新增 BG 类型变更单
-4. 变更单关单（状态 → 5）
+2. 目标客户区填写新磁卡号（与源不同）+ 新客户信息
+3. 保存 → 实施
+4. ITSM → 设备变更单列表，新增 `change_type='BG'` 变更单
+5. 变更单关单（状态 → 5）
 
-**预期结果**：
+**预期结果**（对齐 PB `USP_PLAN_CONFRIM v_tftype=10`）：
 
 - ✅ `tmm43_eid_track` 新增 `type='T'`（客户转移：源客户 → 目标客户）
-- ✅ `tmm35_cust_pos_rl`：源门店 rl 失效，目标门店 rl 新建
+- ✅ `tmm35_cust_pos_rl`：源客户 rl `useflg='0'`（失效），目标客户 rl `useflg='1'`（新建/激活）
+- ✅ `tmm22_customers`：源客户更新磁卡号，目标客户 `useflg='0'`（合并/废弃）
+- ✅ `tmm43_eid.sflg='8'`（回库入库，`USP_ASSET_C_A sltyp='BG' v_back='Y'`）
 - ✅ 预计划回写 `01`
 
-### 7.2 CK/BQ 子类型
+### 7.3 CK 子类型（仅磁卡号变更，同客户）
 
-- **CK（仅磁卡号变更）**：不写 EidTrack，不转移 rl，只回写计划
-- **BQ（信息变更）**：同 CK
+**步骤**：
+
+1. 新建 `plantyp=10`，选择源客户（源磁卡号）
+2. 目标客户区填写**不同的磁卡号**（不选源设备 ID）
+3. 保存 → 实施 → 变更单关单
+
+**预期结果**（对齐 PB `USP_PLAN_IMPLE plantyp=10 CHANGE_TYPE='CK'`）：
+
+- ✅ `tmm16_device_change`：`change_type='CK'`，`new_store_card`=新磁卡号，`device_id`=原 POS，`new_store_id` 为空
+- ✅ `tmm22_customers`：更新 `custcard`（磁卡号）、`cust_nm`、`address`（`USP_PLAN_CONFRIM`）
+- ❌ 不写 `tmm43_eid_track`，不转移 `tmm35_cust_pos_rl`，不回库
+
+### 7.4 BQ 子类型（信息变更，同客户同磁卡号）
+
+**步骤**：
+
+1. 新建 `plantyp=10`，选择源客户（源磁卡号）
+2. 目标客户区填写**相同的磁卡号**，修改地址/电话/联系人
+3. 保存 → 实施 → 变更单关单
+
+**预期结果**（对齐 PB `USP_ITSM_EXTEND_NEW i_type='BQ'`）：
+
+- ✅ `tmm16_device_change`：`change_type='BQ'`，`new_address`/`new_tel`/`new_contactor` 有值
+- ✅ `tmm22_customers`：更新地址/电话/联系人字段
+- ❌ 不变更磁卡号，不写 `tmm43_eid_track`，不转移 `tmm35_cust_pos_rl`
 
 ---
 

@@ -237,12 +237,13 @@ def _build_downstream_payload(record: Any, plantyp: str, creator: str) -> dict[s
             }
         )
     elif plantyp == "10":  # 磁卡号变更（含三种子类型）
-        # CK=仅磁卡号变更, BG=磁卡号+设备变更, BQ=信息变更
-        has_card_change = bool((record.new_custcard or "").strip())
+        # BG=设备转移(选了源设备), CK=磁卡号变更(源≠目标), BQ=信息变更(源=目标或未选源)
+        src_card = (record.new_custcard or "").strip()
+        tgt_card = (record.custcard or "").strip()
         has_device_change = bool((record.new_posid or "").strip())
         if has_device_change:
-            change_type = "BG"  # 磁卡号+设备同时变更
-        elif has_card_change:
+            change_type = "BG"  # 磁卡号+设备同时变更（跨客户设备转移）
+        elif src_card and tgt_card and src_card != tgt_card:
             change_type = "CK"  # 仅磁卡号变更
         else:
             change_type = "BQ"  # 信息变更（地址/电话/联系人等）

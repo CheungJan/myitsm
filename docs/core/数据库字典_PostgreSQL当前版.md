@@ -638,6 +638,7 @@
 | 23 | asset_owner | VARCHAR(20) |  |  |
 | 24 | install_date | TIMESTAMP |  |  |
 | 25 | ref_eid | VARCHAR(13) |  | 来源EID（翻新溯源链，OV=10翻新出库→IV=6翻新入库后写入，可递归追溯） |
+| 26 | reserve_planno | VARCHAR(20) |  | 预占预计划号（方案A：创建预计划选posid时锁定；出库审核/作废后释放为NULL） |
 
 #### 21. tmm43_eid_track
 

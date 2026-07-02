@@ -273,6 +273,7 @@
 | refid | character varying | 50 | YES | | 关联单号 |
 | qcflg | character varying | 1 | YES | | 质检标志 |
 | remark | text | | YES | | 备注 |
+| reserve_planno | character varying | 20 | YES | | 预占预计划号（方案A专属） |
 
 #### tmm43_eid_track - 设备变动轨迹
 | 字段名 | 数据类型 | 长度 | 可空 | 默认值 | 说明 |
