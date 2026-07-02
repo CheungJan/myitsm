@@ -1617,12 +1617,39 @@ class StockOutService:
 
     @staticmethod
     def unaudit(outbillid: str, auditor: str) -> dict[str, object]:
-        """反审核出库单：回退库存、清理TMS04、重置EID状态。"""
+        """反审核出库单：回退库存、清理TMS04、重置EID状态。
+
+        校验：
+        - 仅已审核（auditflg='2'）单据可反审核。
+        - 若关联入库单已审核（auditflg='2'），拒绝反审核（防止库存数据不一致）。
+        - OV=1 销售出库审核时自动生成的 IV=2 退货入库草稿（auditflg='0'）随反审核一并清理。
+        """
         record = StockOutRepository.get_by_id(outbillid)
         if record is None:
             return {"success": False, "error": "出库单不存在"}
         if record.auditflg != "2":
             return {"success": False, "error": "仅已审核单据可反审核"}
+
+        # 关联入库单校验：若有关联入库单已审核，拒绝反审核
+        from app.models.warehouse import StockIn
+
+        linked_ins = (
+            db.session.query(StockIn)
+            .filter(StockIn.refbillid == outbillid)
+            .all()
+        )
+        for si in linked_ins:
+            if si.auditflg == "2":
+                return {
+                    "success": False,
+                    "error": f"关联入库单 {si.inbillid} 已审核，不可反审核",
+                }
+
+        # 清理 OV=1 审核时自动生成的 IV=2 退货入库草稿（仅草稿，已审核的上面已拦截）
+        if record.invtyp == "1":
+            for si in linked_ins:
+                if si.invtyp == "2" and si.auditflg == "0":
+                    db.session.delete(si)
 
         # 回退库存 eid
         for detail in record.details_eid:
