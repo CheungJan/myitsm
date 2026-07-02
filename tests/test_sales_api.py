@@ -104,8 +104,8 @@ class TestPlanOrchestration:
         data = resp2.get_json()["data"]
         assert data["to_status"] == "02"
 
-    def test_implement_without_serve_blocks(self, app: Flask, client: FlaskClient) -> None:
-        """无已呼出记录时实施被拒绝。"""
+    def test_implement_without_serve_allowed(self, app: Flask, client: FlaskClient) -> None:
+        """无已呼出记录时仍可实施（呼出为可选辅助流程，对齐 PB 设计）。"""
         headers = _auth_header(app)
         resp = _post(
             client,
@@ -117,8 +117,8 @@ class TestPlanOrchestration:
         _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
 
         resp3 = _post(client, f"/api/v1/sales/plans/{planno}/implement", {}, headers)
-        assert resp3.status_code == 400
-        assert "呼出" in resp3.get_json()["message"]
+        assert resp3.status_code == 200, resp3.get_json()
+        assert resp3.get_json()["data"]["to_status"] == "04"
 
     def test_void_cascade(self, app: Flask, client: FlaskClient) -> None:
         """作废 00 状态预计划。"""

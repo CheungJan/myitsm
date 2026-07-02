@@ -536,18 +536,7 @@ class PlanCustService:
         if not plantyp or plantyp not in _PLANTYP_SERVICE_MAP:
             return {"success": False, "error": f"未知的计划类型 plantyp={plantyp}"}
 
-        # 呼出前置校验：至少一条呼出单已回访(status=01)
-        from app.models.sales import PlanServe as _PS
-
-        served_count = (
-            db.session.query(_PS).filter(_PS.planno == planno, _PS.status == "01").count()
-        )
-        if served_count == 0:
-            return {
-                "success": False,
-                "error": "该预计划尚无已完成呼出的记录，请先在话务台完成呼出确认",
-            }
-
+        # 注：呼出（PlanServe）为可选辅助流程，非 implement() 前置条件（对齐 PB 设计）
         # 幂等检查
         if record.imple_billid:
             return {
