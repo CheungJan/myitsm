@@ -1141,7 +1141,7 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
 | 7 | 销售出库审核后自动同步 EID 到安装单 | 高 | ✅ 已完成（P2：出库单带 eids，安装单从明细取 EID） | - |
 | 8 | 安装单设备勾选绑定 UI | 中 | ✅ 已完成（P5：equipments 子表显示） | - |
 | 9 | 安装完成回写预计划状态 + EID 绑定关系 | 高 | ✅ 已完成（P3/P4：EidTrack+CustPosRl+回写） | - |
-| 10 | 端到端测试验证 | 高 | 📋 待规划 | - |
+| 10 | 端到端测试验证 | 高 | ✅ 已完成（plantyp=00/20/30/40 全链路 E2E） | `tests/test_sales_api.py::TestPlanEndToEnd` |
 | 11 | 其他 plantyp EidTrack/CustPosRl/回写补齐 | 中 | 📋 待规划 | - |
 
 ### 行动项 11 说明：其他 plantyp EidTrack/CustPosRl/回写补齐
@@ -1265,3 +1265,5 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
 | 2026-07-01 | 任务 11a 完成：新增 `app/extensions/eid_listeners.py`，用 SQLAlchemy `after_insert/after_update/after_delete` 事件监听 `Eid` 模型，自动写 `tmm43_eid_track` type='i/u/d' 记录（对齐 PB `TRIG_I/U/D_TMM43_TRACK`）；`after_update` 仅在追踪字段（sflg/refid/qcflg/whcd 等 17 字段）实际变更时写入，避免噪声；用 `connection.execute(insert(...))` 避免 flush 阶段 `session.add` 警告；在 `app/__init__.py:_init_extensions` 注册监听；新增 `tests/test_eid_listeners.py` 4 个测试验证 i/u/d 写入和无变更不写；§4.4 新增 11a 行，§8 行动项 11a 标 ✅ 已完成 | Cascade |
 | 2026-07-01 | 任务 11b 完成：`DeviceChangeService.transition(to_status=5)` 按 change_type 分支——BG 子类型调 `_write_eid_track_on_close_bg()` 写 type='T'（cust_cd→n_cust_cd 客户转移）+ `_transfer_rl_on_close_bg()` 旧门店 rl 失效（useflg=0, asset_status=RETURNED）/新门店 rl 新建（useflg=1, asset_status=ACTIVE, created_from=DEVICE_CHANGE）；CK/BQ 子类型不写 EidTrack、不转移 rl；三种子类型都调 `_write_back_plan_status()` 回写 plan_status='01'（仅当当前='04'）；新增 `tests/test_device_change_11b.py` 3 个测试（BG/CK/BQ）；§4.4 新增 11b 行，§8 行动项 11b 标 ✅ 已完成 | Cascade |
 | 2026-07-01 | 任务 11c-e 完成：`MaintenanceRenovateService.transition(to_status=5)` 写旧机 type='R' + 新机 type='C' + rl 旧机失效/新机新建 + 回写（11c）；`RecycleTaskService.transition(to_status=5)` 对每个明细 asset_id 写 type='R' + rl 失效 + 回写（11d）；`StoreCloseService.transition(to_status=5)` 通过 rl 反查门店所有活跃 EID 批量写 type='R' + rl 全失效 + 回写（11e，在原有客户状态联动基础上追加）；新增 `tests/test_maintenance_renovate_11c.py`/`test_recycle_task_11d.py`/`test_store_close_11e.py` 各 3 个测试；§7.1.2 检查表格全部标 ✅，§8 行动项 11c-e 标 ✅ 已完成，未覆盖 plantyp 表格全部标 ✅ | Cascade |
+| 2026-07-02 | 质量提升项完成：(1) 抽取 11 个业务码值常量（RL_USEFLG/ASSET_STATUS/PLAN_STATUS/TRACK_TYPE/CLOSE_STATUS）替换 11a-e 所有硬编码；(2) 11c/d/e 各补 3 个失败路径测试（单据不存在/非法状态流转/边界场景），共 9 个新测试；(3) `eid_listeners.register_eid_listeners` 加 try/except + logging 告警 | Cascade |
+| 2026-07-02 | 行动项 10 完成：扩展 `tests/test_sales_api.py::TestPlanEndToEnd` 新增 3 个 plantyp E2E 测试（20 翻新/30 回收/40 门店关闭），验证预计划→实施→关单全链路（EidTrack + CustPosRl + 回写）；§8 行动项 10 标 ✅ 已完成 | Cascade |
