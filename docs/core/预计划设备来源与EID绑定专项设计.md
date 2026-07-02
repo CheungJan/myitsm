@@ -1142,7 +1142,7 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
 | 8 | 安装单设备勾选绑定 UI | 中 | ✅ 已完成（P5：equipments 子表显示） | - |
 | 9 | 安装完成回写预计划状态 + EID 绑定关系 | 高 | ✅ 已完成（P3/P4：EidTrack+CustPosRl+回写） | - |
 | 10 | 端到端测试验证 | 高 | ✅ 已完成（plantyp=00/20/30/40 全链路 E2E） | `tests/test_sales_api.py::TestPlanEndToEnd` |
-| 11 | 其他 plantyp EidTrack/CustPosRl/回写补齐 | 中 | 📋 待规划 | - |
+| 11 | 其他 plantyp EidTrack/CustPosRl/回写补齐 | 中 | ✅ 已完成（11a-g 全部完成 + 方案 A 专属功能） | - |
 
 ### 行动项 11 说明：其他 plantyp EidTrack/CustPosRl/回写补齐
 
