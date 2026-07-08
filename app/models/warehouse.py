@@ -215,6 +215,7 @@ class StockOutDetailEid(BaseModel):
     closed_by = db.Column(db.String(6), comment="结案操作人")
     closed_at = db.Column(db.DateTime, comment="结案时间")
     ref_inbillid = db.Column(db.String(8), comment="来源入库单号（质检出库追溯）")
+    ref_planno = db.Column(db.String(12), comment="来源预计划号（批量出库方案B：明细行记来源预计划）")
 
     stock_out = db.relationship("StockOut", back_populates="details_eid")
 
@@ -245,6 +246,7 @@ class StockOutDetailPrd(BaseModel):
     closed_by = db.Column(db.String(6), comment="结案操作人")
     closed_at = db.Column(db.DateTime, comment="结案时间")
     ref_inbillid = db.Column(db.String(8), comment="来源入库单号（质检出库追溯）")
+    ref_planno = db.Column(db.String(12), comment="来源预计划号（批量出库方案B：明细行记来源预计划）")
 
     stock_out = db.relationship("StockOut", back_populates="details_prd")
 

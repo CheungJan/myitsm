@@ -1580,6 +1580,25 @@ class StockOutService:
                         _EidReserve.eid == d.eid,
                         _EidReserve.reserve_planno == record.refbillid,
                     ).update({"reserve_planno": None}, synchronize_session=False)
+            # is_outflag 回写：OV=1 出库单审核通过 → 关联预计划标记为已出库('1')
+            # 仅回写商用仓库来源（is_outflag != 'N/A'），避免误改不适用记录
+            # 支持批量出库方案B：一个出库单可对应多个预计划（refbillid + 各明细行 ref_planno）
+            from app.models.sales import PlanCust as _PlanCust
+
+            _plannos_to_mark: set[str] = set()
+            if record.refbillid:
+                _plannos_to_mark.add(record.refbillid)
+            for d in record.details_eid:  # type: ignore[attr-defined]
+                if getattr(d, "ref_planno", None):
+                    _plannos_to_mark.add(d.ref_planno)
+            for d in record.details_prd:  # type: ignore[attr-defined]
+                if getattr(d, "ref_planno", None):
+                    _plannos_to_mark.add(d.ref_planno)
+            if _plannos_to_mark:
+                db.session.query(_PlanCust).filter(
+                    _PlanCust.planno.in_(_plannos_to_mark),
+                    _PlanCust.is_outflag != "N/A",
+                ).update({"is_outflag": "1"}, synchronize_session=False)
             in_details = []
             for d in record.details_eid:  # type: ignore[attr-defined]
                 dd = d.to_dict()
@@ -1650,6 +1669,25 @@ class StockOutService:
             for si in linked_ins:
                 if si.invtyp == "2" and si.auditflg == "0":
                     db.session.delete(si)
+            # is_outflag 回退：OV=1 反审核 → 关联预计划从 '1'（已出库）回 '0'（待出库）
+            # 仅回写商用仓库来源（is_outflag != 'N/A'），与审核回写对称
+            # 支持批量出库方案B：一个出库单可对应多个预计划（refbillid + 各明细行 ref_planno）
+            from app.models.sales import PlanCust as _PlanCust
+
+            _plannos_to_reset: set[str] = set()
+            if record.refbillid:
+                _plannos_to_reset.add(record.refbillid)
+            for d in record.details_eid:  # type: ignore[attr-defined]
+                if getattr(d, "ref_planno", None):
+                    _plannos_to_reset.add(d.ref_planno)
+            for d in record.details_prd:  # type: ignore[attr-defined]
+                if getattr(d, "ref_planno", None):
+                    _plannos_to_reset.add(d.ref_planno)
+            if _plannos_to_reset:
+                db.session.query(_PlanCust).filter(
+                    _PlanCust.planno.in_(_plannos_to_reset),
+                    _PlanCust.is_outflag == "1",
+                ).update({"is_outflag": "0"}, synchronize_session=False)
 
         # 回退库存 eid
         for detail in record.details_eid:

@@ -52,6 +52,8 @@ tags: [验收, 前端, 预计划, EID绑定, 方案A]
    - ✅ 验证：已预占的 EID 不出现在下拉框中（默认 `exclude_reserved=1`）
 4. 选择 `posid` = `EID0000000001`
 5. 填写客户信息（custcard、custnm 等）
+   - **磁卡号支持手动输入**：plantyp=00（全新开通）针对新用户，磁卡号在系统客户表中不存在，可直接在「磁卡号」输入框手动输入
+   - 也可点击「选择」按钮从已有客户中选取（如老客户补录预计划）
 6. 点击「保存」
 
 **预期结果**：
@@ -293,59 +295,58 @@ tags: [验收, 前端, 预计划, EID绑定, 方案A]
 
 **判定逻辑**（前端 `changeSubType` + 后端 `_build_downstream_payload` 一致）：
 
-| 条件 | 子类型 | 说明 |
-|------|--------|------|
-| 选了源设备 ID（`new_posid` 有值） | **BG** | 磁卡号+设备变更（跨客户设备转移） |
-| 源磁卡号 ≠ 目标磁卡号（`new_custcard` ≠ `custcard`） | **CK** | 仅磁卡号变更 |
-| 源磁卡号 = 目标磁卡号，或未选源客户 | **BQ** | 信息变更（地址/电话/联系人） |
+> **重要修正**：重构版本对齐 PB 当前版本 `USP_PLAN_IMPLE` 硬编码，`CHANGE_TYPE` **始终为 `CK`**，不再区分 BG/CK/BQ 三种子类型。关单时按数据条件隐式区分两条处理路径。
 
-> **⚠️ 关键**：CK 的判定不是"是否选了源客户"，而是"源磁卡号与目标磁卡号是否不同"。选了源客户但目标磁卡号相同（只改地址）→ BQ。
+| 条件 | 显示子类型 | 关单处理路径 | 说明 |
+|------|-----------|------------|------|
+| `new_posid` 或 `posid` 非空 **且** `new_custcd` 非空 | **CK（含设备转移）** | rl 转移 + 目标客户合并 | 源磁卡号设备转移到新磁卡号下 |
+| 无设备 **或** 无新客户 | **CK（纯信息变更）** | 仅同步客户主表 | 磁卡号/姓名/地址/电话变更 |
 
-### 7.2 BG 子类型（磁卡号+设备变更，跨客户转移）
+> **⚠️ 关键修正**：
+> - 旧文档描述的 BG/CK/BQ 三种子类型是 PB **老版本**语义，当前版本已废弃
+> - `CHANGE_TYPE` 字段值始终为 `CK`，前端显示的"含设备转移/纯信息变更"仅用于提示用户关单处理路径，不写入数据库
+> - `device_id` 取值：`new_posid or posid or None`（兼容不换设备场景）
+
+### 7.2 CK（含设备转移）子类型
 
 **步骤**：
 
 1. 新建 `plantyp=10`，选择源客户（源磁卡号 + 源设备 ID）
-2. 目标客户区填写新磁卡号（与源不同）+ 新客户信息
+2. 目标客户区填写新客户（`new_custcd` 非空）+ 新磁卡号
+   - **目标磁卡号支持手动输入**：磁卡号变更是老用户新磁卡号，新磁卡号在系统客户表中不存在，可直接在「磁卡号」输入框手动输入
+   - 也可点击「选择」按钮从已有客户中选取（如目标客户已存在于系统）
 3. 保存 → 实施
-4. ITSM → 设备变更单列表，新增 `change_type='BG'` 变更单
+4. ITSM → 设备变更单列表，新增 `change_type='CK'` 变更单
 5. 变更单关单（状态 → 5）
 
-**预期结果**（对齐 PB `USP_PLAN_CONFRIM v_tftype=10`）：
+**预期结果**（对齐 PB `USP_PLAN_CONFRIM v_tftype=10` V_NEW_POSID 非空分支）：
 
+- ✅ `tmm16_device_change`：`change_type='CK'`，`device_id`=源设备 EID，`new_store_id`=新客户
 - ✅ `tmm43_eid_track` 新增 `type='T'`（客户转移：源客户 → 目标客户）
-- ✅ `tmm35_cust_pos_rl`：源客户 rl `useflg='0'`（失效），目标客户 rl `useflg='1'`（新建/激活）
+- ✅ `tmm35_cust_pos_rl`：源客户 rl `useflg='0'`（失效，`maintenancetyp='BG'`），目标客户 rl `useflg='1'`（新建/激活，`maintenancetyp='BG'`）
 - ✅ `tmm22_customers`：源客户更新磁卡号，目标客户 `useflg='0'`（合并/废弃）
-- ✅ `tmm43_eid.sflg='8'`（回库入库，`USP_ASSET_C_A sltyp='BG' v_back='Y'`）—— 已实现于 `_transfer_rl_on_close_bg`
+- ✅ `tmm43_eid.sflg` **保持原值不变**（设备在门店不经过仓库，对齐 PB `USP_PLAN_CONFRIM` 不更新 sflg）
 - ✅ 预计划回写 `01`
 
-### 7.3 CK 子类型（仅磁卡号变更，同客户）
+### 7.3 CK（纯信息变更）子类型
 
 **步骤**：
 
 1. 新建 `plantyp=10`，选择源客户（源磁卡号）
-2. 目标客户区填写**不同的磁卡号**（不选源设备 ID）
+2. 目标客户区填写新磁卡号（不选源设备 ID，或不填新客户）
 3. 保存 → 实施 → 变更单关单
 
-**预期结果**（对齐 PB `USP_PLAN_IMPLE plantyp=10 CHANGE_TYPE='CK'`）：
+**预期结果**（对齐 PB `USP_PLAN_CONFRIM v_tftype=10` V_NEW_POSID 为空分支）：
 
-- ✅ `tmm16_device_change`：`change_type='CK'`，`new_store_card`=新磁卡号，`device_id`=原 POS，`new_store_id` 为空
+- ✅ `tmm16_device_change`：`change_type='CK'`，`new_store_card`=新磁卡号，`device_id` 可能为空或非空（但 `new_store_id` 为空）
 - ✅ `tmm22_customers`：更新 `custcard`（磁卡号）、`cust_nm`、`address`（`USP_PLAN_CONFRIM`）
-- ❌ 不写 `tmm43_eid_track`，不转移 `tmm35_cust_pos_rl`，不回库
+- ✅ `tmm22_customers_history`：写入历史记录
+- ❌ 不写 `tmm43_eid_track`，不转移 `tmm35_cust_pos_rl`，不更新 `tmm43_eid.sflg`
+- ✅ 预计划回写 `01`
 
-### 7.4 BQ 子类型（信息变更，同客户同磁卡号）
+### 7.4 老数据兼容（OP 前缀遗留数据）
 
-**步骤**：
-
-1. 新建 `plantyp=10`，选择源客户（源磁卡号）
-2. 目标客户区填写**相同的磁卡号**，修改地址/电话/联系人
-3. 保存 → 实施 → 变更单关单
-
-**预期结果**（对齐 PB `USP_ITSM_EXTEND_NEW i_type='BQ'`）：
-
-- ✅ `tmm16_device_change`：`change_type='BQ'`，`new_address`/`new_tel`/`new_contactor` 有值
-- ✅ `tmm22_customers`：更新地址/电话/联系人字段
-- ❌ 不变更磁卡号，不写 `tmm43_eid_track`，不转移 `tmm35_cust_pos_rl`
+**说明**：OP 前缀的老版本遗留数据 `CHANGE_TYPE='BG'/'BQ'` 仍能在关单时走 `_sync_customer_and_history`（因为条件是 `change_type in ("CK","BG","BQ")`），但当前版本不再产生新的 BG/BQ 记录。
 
 ---
 

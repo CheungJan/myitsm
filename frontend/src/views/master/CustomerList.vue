@@ -45,7 +45,15 @@
                     <div class="page-header">
                         <span>客户管理（共 {{ total }} 条）<template v-if="selectedClassCd"> — 分类: {{ selectedClassCd }}</template></span>
                         <div class="header-actions">
-                            <el-input v-model="searchText" placeholder="搜索磁卡号或名称" clearable size="small" style="width:200px" @keyup.enter="onSearch" @clear="onSearch" />
+                            <el-select v-model="statusFilter" clearable placeholder="客户状态" size="small" style="width:110px" @change="onStatusFilter">
+                                <el-option label="全部" value="" />
+                                <el-option label="正常" value="cs+uf1:ACTIVE" />
+                                <el-option label="未转正" value="cs:TEMP" />
+                                <el-option label="待确认" value="cs:PENDING" />
+                                <el-option label="已失效" value="uf:0" />
+                                <el-option label="已作废" value="cs:INVALID" />
+                            </el-select>
+                            <el-input v-model="searchText" placeholder="搜索磁卡号或名称" clearable size="small" style="width:200px;margin-left:8px" @keyup.enter="onSearch" @clear="onSearch" />
                             <el-button type="primary" size="small" style="margin-left:8px" @click="openCustDialog()">新增客户</el-button>
                         </div>
                     </div>
@@ -87,18 +95,15 @@
                         </el-row>
                     </el-collapse-item>
                     <el-collapse-item title="分类与层级" name="classify">
-                        <el-row :gutter="12">
-                            <el-col :span="8"><el-form-item label="客户分类"><el-select v-model="custForm.class_cd" clearable filterable style="width:100%"><el-option v-for="c in classOptions" :key="c.class_cd" :label="`${c.class_cd} - ${c.class_nm}`" :value="c.class_cd" /></el-select></el-form-item></el-col>
-                            <el-col :span="8"><el-form-item label="区域编码"><el-input v-model="custForm.area_cd" /></el-form-item></el-col>
-                            <el-col :span="8"><el-form-item label="管理单位"><el-input v-model="custForm.parentcd" /></el-form-item></el-col>
-                            <el-col :span="6"><el-form-item label="负责区域"><el-select v-model="custForm.area" clearable style="width:100%"><el-option v-for="a in areas" :key="a.area_cd" :label="a.name || a.area_nm" :value="String(a.area_id)" /></el-select></el-form-item></el-col>
-                            <el-col :span="6"><el-form-item label="环线位置"><el-select v-model="custForm.location" clearable style="width:100%"><el-option label="内环" value="1" /><el-option label="中环" value="2" /><el-option label="外环" value="3" /></el-select></el-form-item></el-col>
-                        </el-row>
-                        <el-row :gutter="12">
-                            <el-col :span="8"><el-form-item label="国家"><el-select v-model="custForm.country_cd" clearable style="width:100%" @change="onCountryChange"><el-option v-for="c in countries" :key="c.country_cd" :label="c.country_nm" :value="c.country_cd" /></el-select></el-form-item></el-col>
-                            <el-col :span="8"><el-form-item label="省/直辖市"><el-select v-model="custForm.prvn_cd" clearable style="width:100%" @change="onProvinceChange"><el-option v-for="p in provinces" :key="p.prvn_cd" :label="p.prvn_nm" :value="p.prvn_cd" /></el-select></el-form-item></el-col>
-                            <el-col :span="8"><el-form-item label="城市/区"><el-select v-model="custForm.city_cd" clearable style="width:100%" @change="onCityChange"><el-option v-for="c in cities" :key="c.city_cd" :label="c.city_nm" :value="c.city_cd" /></el-select></el-form-item></el-col>
-                            <el-col :span="8"><el-form-item label="区县/街道"><el-select v-model="custForm.town_cd" clearable style="width:100%"><el-option v-for="t in towns" :key="t.town_cd" :label="t.town_nm" :value="t.town_cd" /></el-select></el-form-item></el-col>
+                        <el-row :gutter="16">
+                            <el-col :span="10"><el-form-item label="客户分类"><el-select v-model="custForm.class_cd" clearable filterable style="width:100%"><el-option v-for="c in classOptions" :key="c.class_cd" :label="`${c.class_cd} - ${c.class_nm}`" :value="c.class_cd" /></el-select></el-form-item></el-col>
+                            <el-col :span="10"><el-form-item label="管理单位"><el-select v-model="custForm.parentcd" clearable filterable style="width:100%"><el-option v-for="c in classOptions" :key="c.class_cd" :label="`${c.class_cd} - ${c.class_nm}`" :value="c.class_cd" /></el-select></el-form-item></el-col>
+                            <el-col :span="6"><el-form-item label="负责区域"><el-select v-model="custForm.area_cd" clearable filterable style="width:100%"><el-option v-for="a in areas" :key="(a.area_cd || '').trim()" :label="a.name || a.area_nm" :value="(a.area_cd || '').trim()" /></el-select></el-form-item></el-col>
+                            <el-col :span="6"><el-form-item label="环线位置"><el-select v-model="custForm.location" clearable style="width:100%"><el-option v-for="w in wzOptions" :key="w.code_cd" :label="w.code_nm" :value="w.code_cd" /></el-select></el-form-item></el-col>
+                            <el-col :span="7"><el-form-item label="省/直辖市"><el-select v-model="custForm.geo_prvn_cd" clearable filterable style="width:100%" @change="onGeoPrvnChange"><el-option v-for="p in geoProvinces" :key="p.code" :label="p.name" :value="p.code" /></el-select></el-form-item></el-col>
+                            <el-col :span="7"><el-form-item label="地级市"><el-select v-model="custForm.geo_city_cd" clearable filterable style="width:100%" @change="onGeoCityChange" :loading="geoCitiesLoading"><el-option v-for="c in geoCities" :key="c.code" :label="c.name" :value="c.code" /></el-select></el-form-item></el-col>
+                            <el-col :span="7"><el-form-item label="区县"><el-select v-model="custForm.geo_area_cd" clearable filterable style="width:100%" @change="onGeoAreaChange" :loading="geoAreasLoading"><el-option v-for="a in geoAreas" :key="a.code" :label="a.name" :value="a.code" /></el-select></el-form-item></el-col>
+                            <el-col :span="10"><el-form-item label="街道乡镇"><el-select v-model="custForm.geo_street_cd" clearable filterable style="width:100%" :loading="geoStreetsLoading"><el-option v-for="s in geoStreets" :key="s.code" :label="s.name" :value="s.code" /></el-select></el-form-item></el-col>
                         </el-row>
                     </el-collapse-item>
                     <el-collapse-item title="联系信息" name="contact">
@@ -132,7 +137,7 @@
                     </el-collapse-item>
                     <el-collapse-item title="通信" name="comm">
                         <el-row :gutter="12">
-                            <el-col :span="8"><el-form-item label="通讯方式"><el-select v-model="custForm.comm_mode" clearable style="width:100%"><el-option v-for="t in commodes" :key="t.cmm_cd" :label="t.cmm_nm" :value="t.cmm_cd" /></el-select></el-form-item></el-col>
+                            <el-col :span="8"><el-form-item label="通讯方式"><el-select v-model="custForm.comm_mode" clearable style="width:100%"><el-option v-for="t in commodes" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="3G卡号"><el-input v-model="custForm.card3g" /></el-form-item></el-col>
                             <el-col :span="8"><el-form-item label="3G地址"><el-input v-model="custForm.adr3g" /></el-form-item></el-col>
                         </el-row>
@@ -195,14 +200,13 @@
                 <el-divider content-position="left">分类与层级</el-divider>
                 <el-descriptions :column="3" border size="small">
                     <el-descriptions-item label="客户分类">{{ (detailRow as Record<string,unknown>).class_cd_nm || detailRow.class_cd || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="区域编码">{{ detailRow.area_cd || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="管理单位">{{ (detailRow as Record<string,unknown>).parentcd_nm || detailRow.parentcd || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="负责区域">{{ (detailRow as Record<string,unknown>).area_nm || detailRow.area || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="负责区域">{{ (detailRow as Record<string,unknown>).area_nm || detailRow.area_cd || '-' }}</el-descriptions-item>
                     <el-descriptions-item label="环线位置">{{ (detailRow as Record<string,unknown>).location_nm || detailRow.location || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="国家">{{ (detailRow as Record<string,unknown>).country_nm || detailRow.country_cd || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="省/直辖市">{{ (detailRow as Record<string,unknown>).prvn_nm || detailRow.prvn_cd || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="城市/区">{{ (detailRow as Record<string,unknown>).city_nm || detailRow.city_cd || '-' }}</el-descriptions-item>
-                    <el-descriptions-item label="区县/街道">{{ (detailRow as Record<string,unknown>).town_nm || detailRow.town_cd || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="省/直辖市">{{ (detailRow as Record<string,unknown>).geo_prvn_nm || detailRow.geo_prvn_cd || (detailRow as Record<string,unknown>).prvn_nm || detailRow.prvn_cd || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="地级市">{{ (detailRow as Record<string,unknown>).geo_city_nm || detailRow.geo_city_cd || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="区县">{{ (detailRow as Record<string,unknown>).geo_area_nm || detailRow.geo_area_cd || (detailRow as Record<string,unknown>).city_nm || detailRow.city_cd || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="街道/乡镇">{{ (detailRow as Record<string,unknown>).geo_street_nm || detailRow.geo_street_cd || '-' }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="left">联系信息</el-divider>
                 <el-descriptions :column="2" border size="small">
@@ -320,6 +324,7 @@ import {
     createCustClass, updateCustClass, deleteCustClass,
     fetchSyscodes, fetchAreas, fetchCommodes,
     fetchCountries, fetchProvinces, fetchCities, fetchTowns,
+    fetchGeoProvinces, fetchGeoCities, fetchGeoAreas, fetchGeoStreets,
 } from '@/api/master'
 import type { CustClassNode, CustRecord, CustPage } from '@/api/master'
 
@@ -334,6 +339,7 @@ const classOptions = ref<{ class_cd: string; class_nm: string; parent_cd: string
 const customers = ref<CustRecord[]>([])
 const loading = ref(false)
 const searchText = ref('')
+const statusFilter = ref('')
 const page = ref(1)
 const perPage = ref(20)
 const total = ref(0)
@@ -349,16 +355,17 @@ const custEditing = ref<CustRecord | null>(null)
 const custSaving = ref(false)
 const editActiveGroups = ref<string[]>(['core'])
 const custForm = reactive<Record<string, string>>({
-    cust_card: '', cust_nm: '', cust_anm: '', custrnm: '', store_cd: '', cust_brcd: '',
+    cust_card: '', cust_nm: '', cust_anm: '', custrnm: '', cust_brcd: '',
     class_cd: '', area_cd: '', parentcd: '',
     address: '', phone_no: '', contactor: '', zipcd: '', faxno: '',
     country_cd: '', prvn_cd: '', city_cd: '', town_cd: '',
+    geo_prvn_cd: '', geo_city_cd: '', geo_area_cd: '', geo_street_cd: '',
     taxno: '', banknm: '', bankaccno: '', yj_money: '',
     pos_n: '', posstatus: '', posstatus1: '', ad_video: '', opersystem: '', data_base: '', soft_edition: '', systemcode: '',
     card3g: '', adr3g: '',
     busi_typ: '', ppt_code: '', levels: '', ordertype: '', is_contract: '', zf_type: '', comm_mode: '',
     customer_status: '', opendate: '', replacedate: '', source_type: '', preplan_id: '', useflg: '1',
-    jl_contactor: '', jl_phoneno: '', area: '', location: '', s_status: '', backup: '',
+    jl_contactor: '', jl_phoneno: '', location: '', s_status: '', backup: '',
 })
 
 // ---- 码表数据 ----
@@ -366,15 +373,23 @@ const businessTypes = ref<{ code_cd: string; code_nm: string }[]>([])
 const storeAttrs = ref<{ code_cd: string; code_nm: string }[]>([])
 const payTypes = ref<{ code_cd: string; code_nm: string }[]>([])
 const areas = ref<{ area_cd: string; area_nm: string; area_id: number; name: string }[]>([])
-const commodes = ref<{ cmm_cd: string; cmm_nm: string }[]>([])
+const commodes = ref<{ code_cd: string; code_nm: string }[]>([])
 const posStatuses = ref<{ code_cd: string; code_nm: string }[]>([])
 const deviceStatuses = ref<{ code_cd: string; code_nm: string }[]>([])
 const csOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const srcOptions = ref<{ code_cd: string; code_nm: string }[]>([])
+const wzOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const countries = ref<{ country_cd: string; country_nm: string }[]>([])
 const provinces = ref<{ prvn_cd: string; prvn_nm: string }[]>([])
 const cities = ref<{ city_cd: string; city_nm: string }[]>([])
 const towns = ref<{ town_cd: string; town_nm: string }[]>([])
+const geoProvinces = ref<{ code: string; name: string }[]>([])
+const geoCities = ref<{ code: string; name: string; province_code: string }[]>([])
+const geoAreas = ref<{ code: string; name: string; city_code: string; province_code: string }[]>([])
+const geoStreets = ref<{ code: string; name: string; area_code: string }[]>([])
+const geoCitiesLoading = ref(false)
+const geoAreasLoading = ref(false)
+const geoStreetsLoading = ref(false)
 
 // ---- 分类弹窗 ----
 const classDialogVisible = ref(false)
@@ -387,28 +402,70 @@ watch(perPage, () => { page.value = 1; loadCustomers() })
 watch(treeFilterText, (v) => treeRef.value?.filter(v))
 
 onMounted(async () => {
-    await Promise.all([loadTree(), loadClassOptions(), loadLookups(), initCities()])
+    await Promise.all([loadTree(), loadClassOptions(), loadLookups(), initCities(), initGeo()])
     loadCustomers()
 })
 
-async function onCountryChange() {
-    custForm.prvn_cd = ''; custForm.city_cd = ''; custForm.town_cd = ''
-    cities.value = []; towns.value = []
-}
 
-async function onProvinceChange() {
-    custForm.city_cd = ''; custForm.town_cd = ''
-    towns.value = []
-    if (custForm.prvn_cd) {
-        const res = await fetchCities(custForm.prvn_cd)
-        cities.value = res.data || []
-    } else { cities.value = [] }
-}
-
-// 初始化加载上海区县（默认省份09=上海）
+// 初始化加载上海区县（默认省份09=上海，老系统兼容）
 async function initCities() {
     const res = await fetchCities('09')
     cities.value = res.data || []
+}
+
+// 初始化国标地理数据
+async function initGeo() {
+    const [pvRes, ctRes] = await Promise.all([fetchGeoProvinces(), fetchGeoCities('31')])
+    geoProvinces.value = pvRes.data || []
+    geoCities.value = ctRes.data || []
+}
+
+async function onGeoPrvnChange() {
+    custForm.geo_city_cd = ''; custForm.geo_area_cd = ''; custForm.geo_street_cd = ''
+    geoCities.value = []; geoAreas.value = []; geoStreets.value = []
+    if (custForm.geo_prvn_cd) {
+        geoCitiesLoading.value = true
+        const res = await fetchGeoCities(custForm.geo_prvn_cd)
+        geoCities.value = res.data || []
+        geoCitiesLoading.value = false
+    }
+}
+
+async function onGeoCityChange() {
+    custForm.geo_area_cd = ''; custForm.geo_street_cd = ''
+    geoAreas.value = []; geoStreets.value = []
+    if (custForm.geo_city_cd) {
+        geoAreasLoading.value = true
+        const res = await fetchGeoAreas(custForm.geo_city_cd)
+        geoAreas.value = res.data || []
+        geoAreasLoading.value = false
+    }
+}
+
+async function onGeoAreaChange() {
+    custForm.geo_street_cd = ''
+    geoStreets.value = []
+    if (custForm.geo_area_cd) {
+        geoStreetsLoading.value = true
+        const res = await fetchGeoStreets(custForm.geo_area_cd)
+        geoStreets.value = res.data || []
+        geoStreetsLoading.value = false
+    }
+}
+
+// 编辑模式下根据已有代码反向加载级联下拉数据
+async function loadGeoForEdit(prvnCd: string, cityCd: string, areaCd: string) {
+    const tasks: Promise<void>[] = []
+    if (prvnCd) {
+        tasks.push(fetchGeoCities(prvnCd).then(r => { geoCities.value = r.data || [] }))
+    }
+    if (cityCd) {
+        tasks.push(fetchGeoAreas(cityCd).then(r => { geoAreas.value = r.data || [] }))
+    }
+    if (areaCd) {
+        tasks.push(fetchGeoStreets(areaCd).then(r => { geoStreets.value = r.data || [] }))
+    }
+    await Promise.all(tasks)
 }
 
 async function autoMatchCity() {
@@ -438,13 +495,6 @@ async function autoMatchCity() {
     towns.value = []
 }
 
-async function onCityChange() {
-    custForm.town_cd = ''
-    if (custForm.city_cd) {
-        const res = await fetchTowns(custForm.city_cd)
-        towns.value = res.data || []
-    } else { towns.value = [] }
-}
 
 async function loadLookups() {
     try {
@@ -468,6 +518,8 @@ async function loadLookups() {
         commodes.value = cm.data || []
         countries.value = ct.data || []
         provinces.value = pv.data || []
+        const wz = await fetchSyscodes('WZ')
+        wzOptions.value = wz.data || []
     } catch { /* 编辑下拉用，非关键 */ }
 }
 
@@ -571,7 +623,7 @@ async function handleDeleteClass(data: CustClassNode) {
 async function loadCustomers() {
     loading.value = true
     try {
-        const params: { page: string; per_page: string; class_cd?: string; search?: string } = {
+        const params: { page: string; per_page: string; class_cd?: string; search?: string; customer_status?: string; useflg?: string } = {
             page: String(page.value),
             per_page: String(perPage.value),
         }
@@ -580,6 +632,20 @@ async function loadCustomers() {
         } else if (selectedClassCd.value) {
             params.class_cd = selectedClassCd.value
         }
+        // 解析组合状态过滤选项
+        // cs:XXX      → 仅限定 customer_status
+        // uf:X        → 仅限定 useflg
+        // cs+uf1:XXX  → 同时限定 customer_status=XXX 且 useflg='1'（正常客户专用）
+        if (statusFilter.value) {
+            if (statusFilter.value.startsWith('cs+uf1:')) {
+                params.customer_status = statusFilter.value.slice(7)
+                params.useflg = '1'
+            } else if (statusFilter.value.startsWith('cs:')) {
+                params.customer_status = statusFilter.value.slice(3)
+            } else if (statusFilter.value.startsWith('uf:')) {
+                params.useflg = statusFilter.value.slice(3)
+            }
+        }
         const res = await fetchCustomers(params)
         const data = res.data as CustPage
         customers.value = data.items || []
@@ -587,6 +653,11 @@ async function loadCustomers() {
     } catch {
         ElMessage.error('加载客户列表失败')
     } finally { loading.value = false }
+}
+
+function onStatusFilter() {
+    page.value = 1
+    loadCustomers()
 }
 
 function onSearch() {
@@ -628,7 +699,46 @@ function openCustDialog(row?: CustRecord) {
     if (row) {
         custEditing.value = row
         for (const key of Object.keys(custForm)) {
-            (custForm as Record<string,string>)[key] = (row as Record<string,unknown>)[key] as string || ''
+            const raw = (row as Record<string,unknown>)[key]
+            if (raw == null) {
+                (custForm as Record<string,string>)[key] = ''
+            } else {
+                (custForm as Record<string,string>)[key] = ('' + raw).trim()
+            }
+        }
+        // 管理单位：修复旧数据 parentcd 前后空格导致下拉匹配失败
+        if (custForm.parentcd && classOptions.value.length) {
+            const hasMatch = classOptions.value.some(c => c.class_cd === custForm.parentcd)
+            if (!hasMatch) {
+                // 尝试用 parentcd_nm 反查 class_cd（后端已解析中文名）
+                const pnm = (row as Record<string,unknown>).parentcd_nm as string || ''
+                if (pnm) {
+                    const byName = classOptions.value.find(c => c.class_nm === pnm)
+                    if (byName) custForm.parentcd = byName.class_cd
+                }
+            }
+        }
+        // geo 地理字段：反向加载级联下拉
+        if (custForm.geo_prvn_cd || custForm.geo_city_cd || custForm.geo_area_cd) {
+            loadGeoForEdit(custForm.geo_prvn_cd, custForm.geo_city_cd, custForm.geo_area_cd)
+        }
+        // 负责区域：area_cd 可能为空（旧数据），从旧 area 字段取值（可能是 area_id 或 area_cd）
+        if (areas.value.length) {
+            const acd = custForm.area_cd
+            // trim() 双侧：避免后端/旧数据 area_cd 带空格导致匹配失败
+            const valid = acd && areas.value.some(a => (a.area_cd || '').trim() === acd)
+            if (!valid) {
+                const rawAreaRaw = (row as Record<string,unknown>).area
+                const rawArea = rawAreaRaw != null ? String(rawAreaRaw).trim() : ''
+                if (rawArea) {
+                    const rawAreaTrimmed = rawArea
+                    const areaId = parseInt(rawAreaTrimmed, 10)
+                    const matched = areas.value.find(
+                        a => (!isNaN(areaId) && a.area_id === areaId) || (a.area_cd || '').trim() === rawAreaTrimmed
+                    )
+                    custForm.area_cd = matched ? matched.area_cd.trim() : ''
+                }
+            }
         }
     } else {
         custEditing.value = null
@@ -642,9 +752,13 @@ function openCustDialog(row?: CustRecord) {
         custForm.source_type = 'MANUAL'
         custForm.country_cd = '191'   // 默认中国
         custForm.prvn_cd = '09'       // 默认上海
+        custForm.geo_prvn_cd = '31'   // 默认上海（国标）
+        custForm.geo_city_cd = '3101' // 默认上海市辖区（国标）
+        // 反向加载上海的区县列表
+        fetchGeoAreas('3101').then(r => { geoAreas.value = r.data || [] })
         autoMatchCity()
     }
-    editActiveGroups.value = ['core']
+    editActiveGroups.value = ['core', 'classify']
     custDialogVisible.value = true
 }
 

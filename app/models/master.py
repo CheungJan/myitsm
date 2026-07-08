@@ -86,13 +86,13 @@ class Area(BaseModel):
 
     __tablename__ = "tmm46_area"
 
-    area_cd = db.Column(db.String(20), primary_key=True, comment="区域编码")
+    area_cd = db.Column(db.String(20), primary_key=True, comment="区域编码（原Oracle TMM46_AREA.ID，迁移后字符串化为主键）")
     area_nm = db.Column(db.String(50), nullable=False, comment="区域名称")
-    parent_cd = db.Column(db.String(20), comment="上级区域")
+    parent_cd = db.Column(db.String(20), comment="上级区域【扩展字段，Oracle原表无此字段，当前全为空，待后续启用】")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
-    # --- Oracle 原表恢复字段 ---
-    area_id = db.Column(db.Integer, comment="区域ID")
-    name = db.Column(db.String(50), comment="区域全称")
+    # --- Oracle 原表迁移备份字段（待删除）---
+    area_id = db.Column(db.Integer, comment="【废弃】Oracle原表ID的整数备份，已回填为area_cd::int，业务代码不再使用")
+    name = db.Column(db.String(50), comment="【废弃】Oracle原表NAME的备份，已迁移至area_nm，业务代码不再使用")
     usercd = db.Column(db.String(6), comment="负责人编码")
 
 
@@ -153,12 +153,17 @@ class Customer(BaseModel):
     ppt_code = db.Column(db.String(20), comment="品牌编码")
     zf_type = db.Column(db.String(10), comment="支付方式")
     comm_mode = db.Column(db.String(20), comment="通讯方式")
-    store_cd = db.Column(db.String(30), comment="门店编码")
-    # 行政区域（关联 tmm02-05 地理表）
-    country_cd = db.Column(db.String(3), comment="国家代码")
-    prvn_cd = db.Column(db.String(2), comment="省份代码")
-    city_cd = db.Column(db.String(4), comment="城市代码")
-    town_cd = db.Column(db.String(4), comment="区县代码")
+    store_cd = db.Column(db.String(30), comment="【废弃】门店编码，Oracle原表无此字段，数据全为空，与cust_cd功能重复，待删除")
+    # 行政区域（老系统 tmm02-05 自定义短码，待废弃）
+    country_cd = db.Column(db.String(3), comment="【废弃】国家代码（老系统自定义短码，如191=中国），由geo_prvn_cd等替代，待删除")
+    prvn_cd = db.Column(db.String(2), comment="【废弃】省份代码（老系统自定义短码，如09=上海），由geo_prvn_cd替代，待删除")
+    city_cd = db.Column(db.String(4), comment="【废弃】城市/区代码（老系统自定义短码，如0121=浦东新区），由geo_city_cd/geo_area_cd替代，待删除")
+    town_cd = db.Column(db.String(4), comment="【废弃】区县代码（老系统自定义短码，迁移后全为空），由geo_area_cd替代，待删除")
+    # 行政区域（国标 geo_* 四级，关联 geo_province/city/area/street 表）
+    geo_prvn_cd = db.Column(db.String(6), comment="国标省级代码（关联geo_province.code，如31=上海市）")
+    geo_city_cd = db.Column(db.String(6), comment="国标地级市代码（关联geo_city.code，如3101=上海市辖区）")
+    geo_area_cd = db.Column(db.String(6), comment="国标区县代码（关联geo_area.code，如310101=黄浦区）")
+    geo_street_cd = db.Column(db.String(12), comment="国标街道代码（关联geo_street.code，如310101002=南京东路街道）")
     # --- Oracle 原表恢复字段（31个） ---
     cust_anm = db.Column(db.String(40), comment="客户别名")
     cust_brcd = db.Column(db.String(20), comment="客户条码")
@@ -170,7 +175,7 @@ class Customer(BaseModel):
     parentcd = db.Column(db.String(8), comment="上级客户编码")
     backup = db.Column(db.String(200), comment="备注")
     location = db.Column(db.String(1), comment="位置标志")
-    area = db.Column(db.Integer, comment="区域编号")
+    area = db.Column(db.Integer, comment="【废弃】Oracle原表AREA整数（关联TMM46_AREA.ID），迁移后由area_cd（VARCHAR）替代，数据已回填至area_cd，不再写入")
     pos_n = db.Column(db.Integer, comment="POS数量")
     opersystem = db.Column(db.String(128), comment="POS操作系统")
     data_base = db.Column(db.String(128), comment="POS数据库版本")
@@ -191,6 +196,7 @@ class Customer(BaseModel):
     posstatus1 = db.Column(db.String(2), comment="POS状态1")
     is_contract = db.Column(db.String(2), comment="合同标志")
     yj_money = db.Column(db.Numeric(12, 2), comment="押金金额")
+    yun_type = db.Column(db.String(2), comment="所属云类别（与plan_cust.yun_type一致）")
     # --- 优化方案1 未落地字段（4个） ---
     source_type = db.Column(db.String(20), comment="来源类型（PREPLAN/MANUAL/IMPORT/API）")
     verified_at = db.Column(db.DateTime, comment="转正时间")
@@ -607,4 +613,97 @@ class PosREid(BaseModel):
     __table_args__ = (
         db.Index("idx_pos_r_eid_eid", "eid"),
         db.Index("idx_pos_r_eid_useflg", "useflg", "eid"),
+    )
+
+
+# ─────────────────────────────────────────────
+# 国标行政区划表（来源：province-city-china / data.sqlite）
+# 与老系统 tmm02-05 表并存，新业务使用此组表
+# 编码体系：民政部国标行政区划码
+# ─────────────────────────────────────────────
+
+
+class GeoProvince(BaseModel):
+    """国标省级行政区（geo_province）。
+    
+    数据来源：province-city-china（民政部国标行政区划码）。
+    与老表 tmm03_province 并存，老表保持不变。
+    编码示例：11=北京市, 31=上海市, 44=广东省。
+    """
+
+    __tablename__ = "geo_province"
+
+    code = db.Column(db.String(6), primary_key=True, comment="国标省级代码（2位，如11=北京）")
+    name = db.Column(db.String(50), nullable=False, comment="省级名称")
+
+    cities = db.relationship("GeoCity", back_populates="province", lazy="dynamic")
+
+
+class GeoCity(BaseModel):
+    """国标地级市行政区（geo_city）。
+    
+    数据来源：province-city-china。
+    老表 tmm04_city 实为区县级，与本表层级不同。
+    编码示例：1101=北京市辖区, 3101=上海市辖区, 4401=广州市。
+    """
+
+    __tablename__ = "geo_city"
+
+    code = db.Column(db.String(6), primary_key=True, comment="国标地级市代码（4位，如3101=上海市辖区）")
+    name = db.Column(db.String(50), nullable=False, comment="地级市名称")
+    province_code = db.Column(
+        db.String(6), db.ForeignKey("geo_province.code"), comment="所属省级代码"
+    )
+
+    province = db.relationship("GeoProvince", back_populates="cities")
+    areas = db.relationship("GeoArea", back_populates="city", lazy="dynamic")
+
+
+class GeoArea(BaseModel):
+    """国标区县行政区（geo_area）。
+    
+    数据来源：province-city-china。
+    编码示例：110101=东城区, 310101=黄浦区。
+    """
+
+    __tablename__ = "geo_area"
+
+    code = db.Column(db.String(6), primary_key=True, comment="国标区县代码（6位，如310101=黄浦区）")
+    name = db.Column(db.String(50), nullable=False, comment="区县名称")
+    city_code = db.Column(
+        db.String(6), db.ForeignKey("geo_city.code"), comment="所属地级市代码"
+    )
+    province_code = db.Column(db.String(6), comment="所属省级代码（冗余，便于查询）")
+
+    city = db.relationship("GeoCity", back_populates="areas")
+    streets = db.relationship("GeoStreet", back_populates="area", lazy="dynamic")
+
+    __table_args__ = (
+        db.Index("idx_geo_area_city_code", "city_code"),
+        db.Index("idx_geo_area_province_code", "province_code"),
+    )
+
+
+class GeoStreet(BaseModel):
+    """国标街道/乡镇行政区（geo_street）。
+    
+    数据来源：province-city-china（41352条）。
+    编码示例：110101001=东华门街道（9位），末3位001-099=街道，100-199=镇，200-399=乡。
+    """
+
+    __tablename__ = "geo_street"
+
+    code = db.Column(db.String(12), primary_key=True, comment="国标街道代码（9位，如110101001=东华门街道）")
+    name = db.Column(db.String(100), nullable=False, comment="街道/乡镇名称")
+    area_code = db.Column(
+        db.String(6), db.ForeignKey("geo_area.code"), comment="所属区县代码"
+    )
+    province_code = db.Column(db.String(6), comment="所属省级代码（冗余，便于查询）")
+    city_code = db.Column(db.String(6), comment="所属地级市代码（冗余，便于查询）")
+
+    area = db.relationship("GeoArea", back_populates="streets")
+
+    __table_args__ = (
+        db.Index("idx_geo_street_area_code", "area_code"),
+        db.Index("idx_geo_street_city_code", "city_code"),
     )

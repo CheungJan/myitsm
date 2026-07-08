@@ -43,8 +43,12 @@ tags: [预计划, EID, 设备绑定, 销售出库, 安装单, 专项设计]
 ```
 
 **关键节点**：
-- **领货单**：实施部门根据计划数量和机型从仓库领取设备，对应系统 `OV=1` 销售出库单
+- **领货单(预计划只绑定机型不绑定EID)**：实施部门根据计划数量和机型从仓库领取设备，对应系统 `OV=1` 销售出库单;
+
+  预计划绑定设备ID模式:自动生成销售出库单草稿
+
 - **配送**：一批门店的设备装在一辆货运车上，按路线配送
+
 - **安装**：工程师上门时从领货设备的 EID 中勾选并绑定给门店
 
 ## 二、五个问题的结论
@@ -397,7 +401,7 @@ GET /api/v1/plans/available-eids
 | **ETK 码表** | `tmm31_syscodes` 插入 C/R/T/A 四条码（C=客户分配/R=回收/T=客户转移/A=属性变更） | 数据库 `tmm31_syscodes` `code_typ='ETK'` | ✅ 已存在 |
 | **E2E 测试** | P0-P5 全链路联调测试（路径 A: MO 关单 / 路径 B: complete） | `tests/test_sales_api.py::TestPlanEndToEnd` | ✅ 已完成 |
 | **11a 事件监听** | SQLAlchemy `after_insert/after_update/after_delete` 监听 `Eid` 模型，自动写 `tmm43_eid_track` type='i/u/d'（对齐 PB `TRIG_I/U/D_TMM43_TRACK`） | `app/extensions/eid_listeners.py` + `app/__init__.py:48` | ✅ 已完成 |
-| **11b BG 子类型** | plantyp=10 DeviceChangeService BG 子类型关单写 type='T'（客户转移）+ rl 转移（旧失效/新建）+ 回写 plan_status='01'；CK/BQ 只回写 | `app/services/itsm_service.py:488-628` | ✅ 已完成 |
+| **11b 磁卡号变更** | plantyp=10 DeviceChangeService 关单：`CHANGE_TYPE` 始终 `CK`（对齐 PB `USP_PLAN_IMPLE` 硬编码）；按 `device_id + new_store_id` 隐式区分两条路径——含设备转移时写 type='T'（客户转移）+ rl 转移（旧失效/新建，`maintenancetyp='BG'`）+ 目标客户合并 + 回写 plan_status='01'；纯信息变更仅同步客户主表 + 写历史 + 回写。`device_id = new_posid or posid or None`（兼容不换设备场景）；`sflg` 保持原值不变（设备在门店不经过仓库） | `app/services/itsm_service.py:846-989` + `app/services/sales_service.py:239-252` | ✅ 已完成 |
 
 **说明**：
 - P0-P5 命名沿用行动项表格的编号，对应关系见 §8 行动项表格
@@ -818,7 +822,7 @@ PB 代码中 `plan_status` 和 `status` 是两个独立字段，但不同按钮�
 > **`tmm35_cust_pos_rl` 与 `plan_cust.status` 的写入机制**：
 > - **`usp_plan_confrim`**（被 `usp_trans_in_confrim` 对所有 plantyp 调用）**显式处理**：
 >   - plantyp='00'（新机开通）：L116-126 insert 新 rl；L145-174 按 POS_FROM 分支处理新旧客户 rl
->   - plantyp='10'（磁卡号变更，含 CK/BG/BQ 三子类型）：L221-243 update 旧 rl useflg=0 + insert/update 新 rl（仅 BG 设备变更子类型涉及 rl 转移）
+>   - plantyp='10'（磁卡号变更，`CHANGE_TYPE` 始终 `CK`）：L221-243 update 旧 rl useflg=0 + insert/update 新 rl（含设备转移分支涉及 rl 转移，纯信息变更分支不处理 rl）
 >   - plantyp='20'（旧机翻新）：L301-356 insert/update rl；L403-405 旧机 rl useflg=0
 >   - plantyp='30'/'GB'（门店关闭）：L414-438 只更新 tmm22，不处理 rl
 >   - type='3'（维护单整机换）：L591-593 旧机 rl useflg=0
@@ -850,7 +854,7 @@ PB 代码中 `plan_status` 和 `status` 是两个独立字段，但不同按钮�
 实施确认 (PlanCustService.implement)  ← sales_service.py:482-585
   按 plantyp 生成下游 ITSM 单据：
     - plantyp='00' → MaintenanceOpenService（TIT13 新机开通单）
-    - plantyp='10' → DeviceChangeService（TIT16 磁卡号变更单，含 CK/BG/BQ 三子类型）
+    - plantyp='10' → DeviceChangeService（TIT16 磁卡号变更单，`CHANGE_TYPE` 始终 `CK`，按 `new_posid/posid + new_custcd` 隐式区分含设备转移/纯信息变更两条路径）
     - plantyp='20' → MaintenanceRenovateService（TIT15 翻新单）
     - plantyp='30' → RecycleTaskService（TIT20 回收单）
     - plantyp='40' → StoreCloseService（门店关闭单）
@@ -1170,7 +1174,7 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
 | Service | plantyp | EidTrack 'C' | CustPosRl | 回写计划 | 说明 |
 |---------|---------|--------------|-----------|----------|------|
 | MaintenanceOpenService | 00 | ✅ | ✅ | ✅ | 新机开通（已完成） |
-| DeviceChangeService | 10 | ✅（仅 BG 子类型写 'T' 客户转移；CK/BQ 不涉及设备不写） | ✅（BG 子类型） | ✅ | 磁卡号变更（CK/BG/BQ 三子类型，11b 已完成） |
+| DeviceChangeService | 10 | ✅（含设备转移路径写 'T' 客户转移；纯信息变更路径不写） | ✅（含设备转移路径） | ✅ | 磁卡号变更（`CHANGE_TYPE` 始终 `CK`，按数据条件隐式区分两条路径，11b 已完成） |
 | MaintenanceRenovateService | 20 | ✅（旧机写 'R' 回收 + 新机写 'C' 分配） | ✅（旧机失效/新机新建） | ✅ | 旧机翻新（11c 已完成） |
 | RecycleTaskService | 30 | ✅（写 'R' 回收） | ✅（失效） | ✅ | 设备取回（11d 已完成） |
 | StoreCloseService | 40 | ✅（写 'R' 回收，批量） | ✅（全失效） | ✅ | 门店关门（11e 已完成） |
@@ -1181,11 +1185,11 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
 
 **业务语义层 type 映射**（重构版优化，PB 无对应）：
 - **plantyp=00（新机开通）**：type='C'（客户分配）—— ✅ 已实现
-- **plantyp=10（磁卡号变更，含 CK/BG/BQ 三子类型）**：
-  - CK=仅磁卡号变更（不涉及设备，不写 EidTrack）
-  - BG=磁卡号+设备变更（写 type='T' 客户转移，A 客户→B 客户）—— 对照 `usp_plan_confrim` L221-243
-  - BQ=信息变更（不涉及设备，不写 EidTrack）
-  - 详见 `docs/myitsm/客户状态与磁卡号变更优化设计.md`
+- **plantyp=10（磁卡号变更，`CHANGE_TYPE` 始终 `CK`，按数据条件隐式区分两条路径）**：
+  - 含设备转移（`new_posid` 或 `posid` 非空 **且** `new_custcd` 非空）：写 type='T' 客户转移（A 客户→B 客户）+ rl 转移（旧失效/新建）+ 目标客户合并—— 对照 `usp_plan_confrim` L221-243
+  - 纯信息变更（无设备 **或** 无新客户）：不写 EidTrack，不转移 rl，仅同步客户主表 + 写历史
+  - ⚠️ 旧文档描述的 BG/CK/BQ 三子类型是 PB **老版本**语义，当前版本已废弃；`CHANGE_TYPE` 字段值始终为 `CK`
+  - 详见 `docs/myitsm/客户状态与磁卡号变更优化设计.md` 与 `docs/core/预计划设备来源与EID绑定_前端操作验收手册.md`
 - **plantyp=20（旧机翻新）**：旧机 type='R'（回收）+ 新机 type='C'（分配）—— 对照 L301-356, L403-405
 - **plantyp=30（设备取回）**：type='R'（回收）—— 对照 type='3' 分支 L591-593
 - **plantyp=40（门店关门）**：type='R'（回收，批量）—— 对照 L414-438（PB 只更新 tmm22，重构版补充 rl 失效）
@@ -1248,7 +1252,8 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
 - `docs/core/仓库模块操作手册.md`：仓库模块操作手册
 - `docs/core/MES_QC_Warehouse_业务流程与技术实现_v2.md`：MES/QC/仓库业务流程
 - `docs/core/实施单资产同步开发规范.md`：实施单资产同步开发规范
-- `docs/myitsm/客户状态与磁卡号变更优化设计.md`：客户状态与磁卡号变更优化设计（plantyp=10 三子类型 CK/BG/BQ 详细设计）
+- `docs/myitsm/客户状态与磁卡号变更优化设计.md`：客户状态与磁卡号变更优化设计（plantyp=10 `CHANGE_TYPE` 始终 `CK`，按数据条件隐式区分含设备转移/纯信息变更两条路径）
+- `docs/core/预计划设备来源与EID绑定_前端操作验收手册.md`：前端操作验收手册（plantyp=10 两条路径验收步骤与预期结果）
 - `docs/superpowers/specs/2026-05-30-warehouse-full-design.md`：仓库全设计文档（含销售实施流程）
 
 ## 十、变更记录
@@ -1259,6 +1264,7 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
 | 2026-07-01 | 从生产 Oracle 导出 `usp_trans_in_confrim`/`usp_plan_confrim`/`TRIG_I/U/D_TMM43_TRACK`/`TRIG_U_PLAN_STATUS`，澄清 PB 写入机制；修正 Action Item 11：两层追踪体系（DB 操作层 i/u/d + 业务语义层 C/R/T/A），更新各 plantyp type 映射（10→T、20→R+C、30→R、40→R） | Cascade |
 | 2026-07-01 | 文档评审修复：§4.4 新增 P0-P5 已完成工作汇总；§6.6 缺口表格更新（P2/P3/P4 已完成）；§7.1.2 检查表格与结论修正（plantyp=00 已落地）；§7.1 complete() 动作第 3 点标 ✅；§8 行动项 7 标 ✅ | Cascade |
 | 2026-07-01 | plantyp=10 术语修正：从"设备变更"改为"磁卡号变更（含 CK/BG/BQ 三子类型）"，对齐 PL 字典与 `sales_service.py:230` 代码；type='T' 仅适用于 BG 子类型；P0 状态码修正为 02→04；新增引用 `docs/myitsm/客户状态与磁卡号变更优化设计.md` | Cascade |
+| 2026-07-03 | plantyp=10 子类型描述修正：对齐当前版本 `USP_PLAN_IMPLE` 硬编码，`CHANGE_TYPE` **始终为 `CK`**，不再区分 BG/CK/BQ 三子类型；改为按数据条件隐式区分两条路径——含设备转移（`new_posid/posid + new_custcd` 非空）写 type='T' + rl 转移 + 目标客户合并；纯信息变更仅同步客户主表 + 写历史；更新 §7.1.2/§7.2/§8 未覆盖 plantyp 表格/业务语义层 type 映射/相关文档索引 | Cascade |
 | 2026-07-01 | §8 待办清单后新增"建议执行顺序"小节：三批次（验证+基础设施 / plantyp 补齐 / 扩展），标注关键依赖（11a 先于 11b-e）和业务频率排序 | Cascade |
 | 2026-07-01 | §7.2/§7.3 P0 修复标注：§7.2 流程图 implement() 状态 03→04；§7.3 问题 1 表格"实施确认后"标 ✅ P0 已修复；阻断性 Bug 说明改为"已修复"，保留历史描述 | Cascade |
 | 2026-07-01 | 任务 10 + 11g 完成：新增 `tests/test_sales_api.py::TestPlanEndToEnd` 两个 E2E 测试（路径 A: MO 关单 / 路径 B: complete），发现并修复 2 个真实 Bug——(1) `EidTrack.refid`/`n_refid` 从 `varchar(8)` 扩展为 `varchar(20)`（迁移 `b181717d589f`），容纳 10 位 `planno`；(2) `sales_service.py:898` `create_outbound` 的 `details_eid` 字段名 `qty`→`outqty` 对齐 `StockOutDetailEid` 模型；§4.4 新增 P6/P7/ETK 码表/E2E 测试四行；§8 行动项 11g 标 ✅ 已完成 | Cascade |

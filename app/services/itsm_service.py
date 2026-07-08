@@ -64,6 +64,68 @@ TRACK_TYPE_ATTRIBUTE = "A"  # 属性变更
 # ITSM 单据关单状态
 CLOSE_STATUS = "5"
 
+# 关单自动创建入库单的 sysparm 配置键（统一命名 stock_in_whcd_{invtyp}）
+SYSPARM_STOCK_IN_WHCD_PREFIX = "stock_in_whcd_"
+SYSPARM_SERVICE_RETURN_WHCD = "stock_in_whcd_3"  # 服务返还仓（IV=3）
+SYSPARM_RECYCLE_RETURN_WHCD = "stock_in_whcd_7"  # 回收仓（IV=7）
+SYSPARM_RENOVATE_RETURN_WHCD = "stock_in_whcd_7"  # 翻新返还仓（IV=7，与回收共用）
+
+
+def _get_sysparm_whcd(parm_cd: str, default: str = "") -> str:
+    """从 sysparm 读取仓库编码，未配置时返回 default。"""
+    from app.models.system import SysParm
+
+    sp = db.session.get(SysParm, parm_cd)
+    return (sp.parm_val or default) if sp else default
+
+
+def _create_stock_in_draft(
+    invtyp: str,
+    whcd: str,
+    refbillid: str,
+    memo: str,
+    eid_items: list[dict[str, Any]],
+    creator: str,
+) -> str | None:
+    """创建入库草稿（auditflg='0'）。
+
+    Args:
+        invtyp: 入库类型（3=服务返还, 7=回收入库）
+        whcd: 仓库编码
+        refbillid: 关联单据号（ITSM 单号）
+        memo: 备注
+        eid_items: [{"eid": ..., "itemcd": ...}, ...]
+        creator: 操作人
+
+    Returns:
+        inbillid 或 None（无明细时）
+    """
+    if not eid_items or not whcd:
+        return None
+
+    from app.repositories.warehouse_repository import StockInRepository
+
+    data = {
+        "invtyp": invtyp,
+        "whcd": whcd,
+        "refbillid": refbillid,
+        "memo": memo,
+    }
+    record = StockInRepository.create(data, creator)
+    for idx, item in enumerate(eid_items, start=1):
+        StockInRepository.add_detail(
+            inbillid=record.inbillid,
+            whcd=record.whcd,
+            lineno=idx,
+            data={
+                "itemcd": item.get("itemcd") or "",
+                "itemtyp": item.get("itemtyp") or "01",
+                "inqty": 1,
+                "eid": item.get("eid") or "",
+            },
+        )
+    return record.inbillid
+
 
 def _enrich_store_card(items: list[dict[str, Any]], key: str = "store_id") -> list[dict[str, Any]]:
     """为维护单记录补充 store_cust_card（从 tmm22_customers 关联查询）。"""
@@ -184,8 +246,82 @@ class MaintenanceDailyService(_BaseMaintenanceService):
             pk_field="maintenance_id",
         )
         if result.get("success"):
+            # 关单完成（to_status=5）：自动创建服务返还入库草稿（IV=3）
+            if to_status == CLOSE_STATUS:
+                self._create_service_return_inbound(record, operator)
             db.session.commit()
         return result
+
+    @staticmethod
+    def _create_service_return_inbound(record: Any, operator: str) -> None:
+        """日常维护单关单时，为自有资产旧配件创建服务返还入库草稿（IV=3）。
+
+        从 TIT25_ACCESSORIES_UPDATE 中取 old_accessories_id，过滤 asset_owner != '01'（自有资产），
+        排除耗材（Item.consume='1'）和已标记不入库（in_wh='2'）的记录，
+        按仓库配置 sysparm 'service_return_whcd' 创建入库草稿。
+        """
+        from app.models.itsm import AccessoriesUpdate
+        from app.models.master import Eid as EidModel, Item
+
+        # 查询本工单配件变更记录
+        rows = (
+            db.session.query(AccessoriesUpdate)
+            .filter(
+                AccessoriesUpdate.maintenance_id == record.maintenance_id,
+                AccessoriesUpdate.old_accessories_id.isnot(None),
+                AccessoriesUpdate.old_accessories_id != "",
+                AccessoriesUpdate.in_wh.is_distinct_from("2"),  # 排除已标记不入库
+            )
+            .all()
+        )
+        if not rows:
+            return
+
+        eids = [r.old_accessories_id for r in rows if r.old_accessories_id]
+        if not eids:
+            return
+
+        # 过滤自有资产（asset_owner != '01'）
+        eid_rows = (
+            db.session.query(EidModel)
+            .filter(
+                EidModel.eid.in_(eids),
+                EidModel.asset_owner != "01",
+            )
+            .all()
+        )
+        if not eid_rows:
+            return
+
+        # 排除耗材
+        itemcds = {e.itemcd for e in eid_rows}
+        consumable_items = {
+            r[0]
+            for r in db.session.query(Item.item_cd)
+            .filter(Item.item_cd.in_(itemcds), Item.consume == "1")
+            .all()
+        }
+
+        eid_items = [
+            {"eid": e.eid, "itemcd": e.itemcd, "itemtyp": e.itemtyp or "01"}
+            for e in eid_rows
+            if e.itemcd not in consumable_items
+        ]
+        if not eid_items:
+            return
+
+        whcd = _get_sysparm_whcd(SYSPARM_SERVICE_RETURN_WHCD)
+        if not whcd:
+            return  # 未配置仓库，跳过自动创建
+
+        _create_stock_in_draft(
+            invtyp="3",
+            whcd=whcd,
+            refbillid=record.maintenance_id,
+            memo=f"日常维护单 {record.maintenance_id} 关单自动创建服务返还入库",
+            eid_items=eid_items,
+            creator=operator,
+        )
 
 
 class MaintenanceOpenService(_BaseMaintenanceService):
@@ -452,11 +588,12 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
             return {"success": False, "error": "翻新单不存在"}
         result = self._do_transition(record, to_status, operator, remark, pk_field="renew_id")
         if result.get("success"):
-            # 11c: 关单（to_status=5）时写 EidTrack + rl 转移 + 回写计划
+            # 11c: 关单（to_status=5）时写 EidTrack + rl 转移 + 回写计划 + 自动创建回收入库草稿
             if to_status == CLOSE_STATUS:
                 self._write_eid_track_on_close_renovate(record, operator)
                 self._transfer_rl_on_close_renovate(record, operator)
                 self._write_back_plan_status_renovate(record, operator)
+                self._create_recycle_inbound_renovate(record, operator)
             db.session.commit()
         return result
 
@@ -558,6 +695,13 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
                 old_rl.useflg = RL_USEFLG_INACTIVE
                 old_rl.asset_status = ASSET_STATUS_RETURNED
                 old_rl.posupddate = now
+            # 旧机回库待核实：tmm43_eid.sflg='3'（待检），对齐 PB USP_PLAN_CONFRIM
+            # 注：sflg='2' 是"已报废"，'3' 才是"待检/待核实"
+            old_eid = (
+                db.session.query(EidModel).filter(EidModel.eid == record.old_device_id).first()
+            )
+            if old_eid:
+                old_eid.sflg = "3"
 
         # 新机 rl 新建或更新
         if record.new_device_id and record.store_id:
@@ -590,6 +734,43 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
                         source_id=record.renew_id,
                     )
                 )
+
+    @staticmethod
+    def _create_recycle_inbound_renovate(record: MaintenanceRenovate, operator: str) -> None:
+        """翻新单关单时，为旧机创建回收入库草稿（IV=7）。
+
+        按仓库配置 sysparm 'renovate_return_whcd' 创建入库草稿。
+        仅当旧机 asset_owner != '01'（自有资产）时创建。
+        """
+        if not record.old_device_id:
+            return
+
+        from app.models.master import Eid as EidModel
+
+        eid_rec = (
+            db.session.query(EidModel).filter(EidModel.eid == record.old_device_id).first()
+        )
+        if not eid_rec or eid_rec.asset_owner == "01":
+            return  # 客户资产不回收
+
+        whcd = _get_sysparm_whcd(SYSPARM_RENOVATE_RETURN_WHCD)
+        if not whcd:
+            return
+
+        _create_stock_in_draft(
+            invtyp="7",
+            whcd=whcd,
+            refbillid=record.renew_id,
+            memo=f"翻新单 {record.renew_id} 关单自动创建回收入库",
+            eid_items=[
+                {
+                    "eid": eid_rec.eid,
+                    "itemcd": eid_rec.itemcd,
+                    "itemtyp": eid_rec.itemtyp or "02",  # 旧机
+                }
+            ],
+            creator=operator,
+        )
 
     @staticmethod
     def _write_back_plan_status_renovate(record: MaintenanceRenovate, operator: str) -> None:
@@ -663,16 +844,16 @@ class DeviceChangeService(_BaseMaintenanceService):
         )
 
         if result.get("success"):
-            # CK/BG/BG 三种变更类型都在审核完成（to_status=5）时同步客户表并写历史
+            # CK/BG/BQ 三种变更类型都在审核完成（to_status=5）时同步客户表并写历史
             if to_status == CLOSE_STATUS and record.change_type in ("CK", "BG", "BQ"):
                 self._sync_customer_and_history(record, operator, remark)
 
-            # 11b: BG 子类型写 type='T' + rl 转移；CK/BQ 只回写计划
+            # 11b: 设备转移按 device_id + new_store_id 判断（对齐 PB USP_PLAN_CONFRIM V_NEW_POSID）
+            # 预计划入口 CHANGE_TYPE 始终为 CK，不能依赖 change_type=='BG' 触发设备转移
             if to_status == CLOSE_STATUS:
-                if record.change_type == "BG":
+                if record.device_id and record.new_store_id:
                     self._write_eid_track_on_close_bg(record, operator)
                     self._transfer_rl_on_close_bg(record, operator)
-                # CK/BQ 不涉及设备，不写 EidTrack，只回写计划
                 self._write_back_plan_status(record, operator)
 
             db.session.commit()
@@ -727,10 +908,10 @@ class DeviceChangeService(_BaseMaintenanceService):
 
     @staticmethod
     def _transfer_rl_on_close_bg(record: DeviceChange, operator: str) -> None:
-        """BG 子类型关单时转移 tmm35_cust_pos_rl + 设备回库 + 目标客户合并。
+        """设备转移关单时转移 tmm35_cust_pos_rl + 设备回库 + 目标客户合并。
 
-        旧门店（store_id）rl 失效（useflg=0, asset_status=RETURNED）；
-        新门店（new_store_id）rl 新建或更新（useflg=1, asset_status=ACTIVE）；
+        旧门店（store_id）rl 失效（useflg=0, asset_status=RETURNED, maintenancetyp='BG', maintenanceno=变更单号, maintenancedate=now）；
+        新门店（new_store_id）rl 新建或更新（useflg=1, asset_status=ACTIVE, maintenancetyp='BG', maintenanceno=变更单号, maintenancedate=now）；
         设备回库（tmm43_eid.sflg='8'，对齐 PB USP_ASSET_C_A sltyp='BG' v_back='Y'）；
         目标客户合并（tmm22_customers.useflg='0'，对齐 PB USP_PLAN_CONFRIM）。
         对齐 PB usp_plan_confrim L221-243。
@@ -743,8 +924,9 @@ class DeviceChangeService(_BaseMaintenanceService):
             return
 
         now = datetime.now(UTC)
+        maintenance_no = record.device_change_id or ""
 
-        # 旧门店 rl 失效
+        # 旧门店 rl 失效（对齐 PB: useflg='0', MAINTENANCETYP='BG', maintenanceno, maintenancedate）
         old_rl = (
             db.session.query(CustPosRl)
             .filter(
@@ -757,9 +939,12 @@ class DeviceChangeService(_BaseMaintenanceService):
         if old_rl:
             old_rl.useflg = RL_USEFLG_INACTIVE
             old_rl.asset_status = ASSET_STATUS_RETURNED
+            old_rl.maintenancetyp = "BG"
+            old_rl.maintenanceno = maintenance_no
+            old_rl.maintenancedate = now
             old_rl.posupddate = now
 
-        # 新门店 rl 新建或更新
+        # 新门店 rl 新建或更新（对齐 PB: useflg='1', MAINTENANCETYP='BG', maintenanceno, maintenancedate）
         new_rl = (
             db.session.query(CustPosRl)
             .filter(
@@ -772,6 +957,9 @@ class DeviceChangeService(_BaseMaintenanceService):
         if new_rl:
             new_rl.posupddate = now
             new_rl.asset_status = ASSET_STATUS_ACTIVE
+            new_rl.maintenancetyp = "BG"
+            new_rl.maintenanceno = maintenance_no
+            new_rl.maintenancedate = now
         else:
             eid_rec = db.session.query(EidModel).filter(EidModel.eid == record.device_id).first()
             item_cd = eid_rec.itemcd if eid_rec else ""
@@ -783,15 +971,17 @@ class DeviceChangeService(_BaseMaintenanceService):
                     useflg=RL_USEFLG_ACTIVE,
                     posupddate=now,
                     asset_status=ASSET_STATUS_ACTIVE,
+                    maintenancetyp="BG",
+                    maintenanceno=maintenance_no,
+                    maintenancedate=now,
                     created_from="DEVICE_CHANGE",
                     source_id=record.device_change_id,
                 )
             )
 
-        # 设备回库：tmm43_eid.sflg='8'（在库），对齐 PB USP_ASSET_C_A sltyp='BG' v_back='Y'
-        eid_rec = db.session.query(EidModel).filter(EidModel.eid == record.device_id).first()
-        if eid_rec:
-            eid_rec.sflg = "8"
+        # 设备状态保持原值不变（对齐 PB USP_PLAN_CONFRIM）
+        # 磁卡号变更：设备物理位置不动，只改客户归属，不经过仓库，sflg 不更新
+        # 注：旧实现设 sflg='8'（在库）不正确，磁卡号变更不涉及实物回仓库
 
         # 目标客户合并：tmm22_customers.useflg='0'（合并/废弃），对齐 PB USP_PLAN_CONFRIM
         target_customer = db.session.get(CustomerModel, record.new_store_id)
@@ -935,10 +1125,11 @@ class StoreCloseService(_BaseMaintenanceService):
                 from app.services.customer_service import CustomerService
 
                 CustomerService.set_store_close_status(record.store_id, record.close_type, operator)
-                # 11e: 门店所有活跃 EID 写 type='R' + rl 全失效 + 回写计划
+                # 11e: 门店所有活跃 EID 写 type='R' + rl 全失效 + 回写计划 + 自动创建回收入库草稿
                 self._write_eid_track_on_close_store(record, operator)
                 self._invalidate_rl_on_close_store(record, operator)
                 self._write_back_plan_status_store(record, operator)
+                self._create_recycle_inbound_store(record, operator)
             db.session.commit()
         return result
 
@@ -1000,11 +1191,13 @@ class StoreCloseService(_BaseMaintenanceService):
 
     @staticmethod
     def _invalidate_rl_on_close_store(record: StoreClose, operator: str) -> None:
-        """门店关闭关单时失效 tmm35_cust_pos_rl。
+        """门店关闭关单时失效 tmm35_cust_pos_rl + 设备回库待核实。
 
-        门店所有活跃 rl 失效（useflg=0, asset_status=RETURNED）。
+        门店所有活跃 rl 失效（useflg=0, asset_status=RETURNED），
+        并将对应 tmm43_eid.sflg 置为 '2'（待核实），对齐 PB USP_PLAN_CONFRIM。
         """
         from app.models.master import CustPosRl
+        from app.models.master import Eid as EidModel
 
         now = datetime.now(UTC)
 
@@ -1016,10 +1209,71 @@ class StoreCloseService(_BaseMaintenanceService):
             )
             .all()
         )
+        eid_vals = [rl.eid for rl in rls]
         for rl in rls:
             rl.useflg = RL_USEFLG_INACTIVE
             rl.asset_status = ASSET_STATUS_RETURNED
             rl.posupddate = now
+        # 批量将设备回库待核实：tmm43_eid.sflg='3'（待检），对齐 PB USP_PLAN_CONFRIM
+        # 注：sflg='2' 是"已报废"，'3' 才是"待检/待核实"
+        if eid_vals:
+            db.session.query(EidModel).filter(EidModel.eid.in_(eid_vals)).update(
+                {"sflg": "3"}, synchronize_session=False
+            )
+
+    @staticmethod
+    def _create_recycle_inbound_store(record: StoreClose, operator: str) -> None:
+        """门店关闭关单时，为所有回收的自有资产创建回收入库草稿（IV=7）。
+
+        按仓库配置 sysparm 'recycle_return_whcd' 创建入库草稿。
+        仅当 asset_owner != '01'（自有资产）时创建。
+
+        注：此方法在 _invalidate_rl_on_close_store 之后调用，
+        此时 rl 已失效（useflg=0, asset_status=RETURNED），
+        故按 cust_cd + asset_status=RETURNED 查询刚失效的 rl。
+        """
+        from app.models.master import CustPosRl, Eid as EidModel
+
+        # 取门店刚失效的 rl（asset_status=RETURNED）的 eid
+        rls = (
+            db.session.query(CustPosRl.eid)
+            .filter(
+                CustPosRl.cust_cd == record.store_id,
+                CustPosRl.asset_status == ASSET_STATUS_RETURNED,
+            )
+            .all()
+        )
+        eid_vals = [r.eid for r in rls if r.eid]
+        if not eid_vals:
+            return
+
+        eid_rows = (
+            db.session.query(EidModel)
+            .filter(
+                EidModel.eid.in_(eid_vals),
+                EidModel.asset_owner != "01",
+            )
+            .all()
+        )
+        if not eid_rows:
+            return
+
+        whcd = _get_sysparm_whcd(SYSPARM_RECYCLE_RETURN_WHCD)
+        if not whcd:
+            return
+
+        eid_items = [
+            {"eid": e.eid, "itemcd": e.itemcd, "itemtyp": e.itemtyp or "02"}
+            for e in eid_rows
+        ]
+        _create_stock_in_draft(
+            invtyp="7",
+            whcd=whcd,
+            refbillid=record.store_close_id,
+            memo=f"门店关闭 {record.store_close_id} 关单自动创建回收入库",
+            eid_items=eid_items,
+            creator=operator,
+        )
 
     @staticmethod
     def _write_back_plan_status_store(record: StoreClose, operator: str) -> None:
@@ -1175,11 +1429,12 @@ class RecycleTaskService(_BaseMaintenanceService):
         if not result["valid"]:
             return {"success": False, "error": result.get("error", "状态流转验证失败")}
         RecycleTaskRepository.update_status(record, to_status, operator)
-        # 11d: 关单（to_status=5）时写 EidTrack + rl 失效 + 回写计划
+        # 11d: 关单（to_status=5）时写 EidTrack + rl 失效 + 回写计划 + 自动创建回收入库草稿
         if to_status == CLOSE_STATUS:
             self._write_eid_track_on_close_recycle(record, operator)
             self._invalidate_rl_on_close_recycle(record, operator)
             self._write_back_plan_status_recycle(record, operator)
+            self._create_recycle_inbound_recycle(record, operator)
         db.session.commit()
         return {"success": True, "from_status": from_status, "to_status": to_status}
 
@@ -1237,11 +1492,13 @@ class RecycleTaskService(_BaseMaintenanceService):
 
     @staticmethod
     def _invalidate_rl_on_close_recycle(record: RecycleTask, operator: str) -> None:
-        """回收任务关单时失效 tmm35_cust_pos_rl。
+        """回收任务关单时失效 tmm35_cust_pos_rl + 设备回库待核实。
 
-        对每个明细 asset_id 失效对应的活跃 rl（useflg=0, asset_status=RETURNED）。
+        对每个明细 asset_id 失效对应的活跃 rl（useflg=0, asset_status=RETURNED），
+        并将 tmm43_eid.sflg 置为 '2'（待核实），对齐 PB USP_PLAN_CONFRIM。
         """
         from app.models.master import CustPosRl
+        from app.models.master import Eid as EidModel
 
         now = datetime.now(UTC)
 
@@ -1261,6 +1518,52 @@ class RecycleTaskService(_BaseMaintenanceService):
                 rl.useflg = RL_USEFLG_INACTIVE
                 rl.asset_status = ASSET_STATUS_RETURNED
                 rl.posupddate = now
+            # 设备回库待核实：tmm43_eid.sflg='3'（待检），对齐 PB USP_PLAN_CONFRIM
+            # 注：sflg='2' 是"已报废"，'3' 才是"待检/待核实"
+            eid_rec = db.session.query(EidModel).filter(EidModel.eid == eid_val).first()
+            if eid_rec:
+                eid_rec.sflg = "3"
+
+    @staticmethod
+    def _create_recycle_inbound_recycle(record: RecycleTask, operator: str) -> None:
+        """回收任务关单时，为明细中自有资产创建回收入库草稿（IV=7）。
+
+        按仓库配置 sysparm 'recycle_return_whcd' 创建入库草稿。
+        仅当 asset_owner != '01'（自有资产）时创建。
+        """
+        from app.models.master import Eid as EidModel
+
+        eid_vals = [d.asset_id for d in record.details if d.asset_id]
+        if not eid_vals:
+            return
+
+        eid_rows = (
+            db.session.query(EidModel)
+            .filter(
+                EidModel.eid.in_(eid_vals),
+                EidModel.asset_owner != "01",
+            )
+            .all()
+        )
+        if not eid_rows:
+            return
+
+        whcd = _get_sysparm_whcd(SYSPARM_RECYCLE_RETURN_WHCD)
+        if not whcd:
+            return
+
+        eid_items = [
+            {"eid": e.eid, "itemcd": e.itemcd, "itemtyp": e.itemtyp or "02"}
+            for e in eid_rows
+        ]
+        _create_stock_in_draft(
+            invtyp="7",
+            whcd=whcd,
+            refbillid=record.recycle_id,
+            memo=f"回收任务 {record.recycle_id} 关单自动创建回收入库",
+            eid_items=eid_items,
+            creator=operator,
+        )
 
     @staticmethod
     def _write_back_plan_status_recycle(record: RecycleTask, operator: str) -> None:

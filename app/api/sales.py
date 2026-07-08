@@ -13,6 +13,7 @@ from app.api.auth import login_required
 from app.schemas.sales import (
     PlanCustCreate,
     PlanCustUpdate,
+    PlanServeAssign,
     PlanServeCreate,
     PlanServeUpdate,
     PlanTransition,
@@ -46,6 +47,7 @@ def list_plans():  # type: ignore[no-untyped-def]
     data = PlanCustService.list_records(
         plantyp=params.plantyp,
         plan_status=params.plan_status,
+        exclude_plan_status=params.exclude_plan_status,
         custcd=params.custcd,
         planno=params.planno,
         custnm=params.custnm,
@@ -252,6 +254,31 @@ def create_outbound(planno: str):  # type: ignore[no-untyped-def]
     return success_response(data=result, message="出库单已创建", code=201)
 
 
+@sales_bp.post("/plans/batch-outbound")
+@login_required
+def batch_create_outbound():  # type: ignore[no-untyped-def]
+    """批量生成 OV=1 销售出库草稿（方案B：多个预计划合到一个出库单）。
+
+    请求体：
+        whcd: str —— 出库仓库编码
+        items: [{ planno: str, eids?: list[str] }, ...]
+    """
+    json_data = request.get_json(silent=True) or {}
+    whcd = json_data.get("whcd", "04")
+    items = json_data.get("items")
+    if not isinstance(items, list) or not items:
+        return error_response(message="items 必须为非空数组", code=400)
+    user_cd: str = g.current_user
+    result = PlanCustService.batch_create_outbound(
+        items=items,
+        whcd=whcd,
+        operator=user_cd,
+    )
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "批量出库失败")), code=400)
+    return success_response(data=result, message=f"出库单已创建，含 {result.get('planno_count', 0)} 个预计划", code=201)
+
+
 # ---- 呼出单 ----
 @sales_bp.get("/plan-serve")
 @login_required
@@ -390,26 +417,44 @@ def create_plan_serve(planno: str):  # type: ignore[no-untyped-def]
         {**body.model_dump(exclude_none=True), "planno": planno},
         creator=user_cd,
     )
+    if not data.get("success", True):
+        return error_response(message=str(data.get("error", "创建失败")), code=400)
     return success_response(data=data, message="呼出单已创建", code=201)
 
 
 @sales_bp.put("/plan-serve/<int:dtlid>")
 @login_required
 def update_plan_serve(dtlid: int):  # type: ignore[no-untyped-def]
-    """更新呼出单（反馈呼出结果）。"""
+    """更新呼出单（反馈呼出结果）。
+
+    业务校验：主记录 plan_cust.serve_ercd 必须已分配呼出人，否则禁止录入反馈。
+    """
     body = PlanServeUpdate.model_validate(request.get_json(silent=True) or {})
     user_cd: str = g.current_user
+    from app.extensions import db
+    from app.models.sales import PlanCust
     from app.repositories.sales_repository import PlanServeRepository
 
     record = PlanServeRepository.get_by_id(dtlid)
     if record is None:
         return error_response(message="呼出单不存在", code=404)
 
+    # 校验主记录已分配呼出人
+    plan_cust = (
+        db.session.query(PlanCust)
+        .filter(PlanCust.planno == record.planno)
+        .first()
+    )
+    if plan_cust is None or not (plan_cust.serve_ercd or "").strip():
+        return error_response(
+            message="该预计划尚未分配呼出人，请先在呼出管理列表分配呼出人后再录入反馈",
+            code=400,
+        )
+
     PlanServeRepository.update(
         record,
         {**body.model_dump(exclude_unset=True), "opercd": user_cd},
     )
-    from app.extensions import db
 
     db.session.commit()
     return success_response(data=record.to_dict())
@@ -425,6 +470,48 @@ def transition_plan_serve(dtlid: int):  # type: ignore[no-untyped-def]
     if not result.get("success"):
         return error_response(message=str(result.get("error", "流转失败")), code=400)
     return success_response(data=result)
+
+
+@sales_bp.get("/plan-serve/overview")
+@login_required
+def list_plan_serve_overview():  # type: ignore[no-untyped-def]
+    """呼出管理列表（对齐 PB d_serve_list，按预计划聚合）。
+
+    查询参数：
+    - planno/custnm/custcard/plantyp/plan_status：过滤条件
+    - servetyp：呼出类型过滤（1=预计划呼出，2=实施任务呼出）
+    - serve_status：呼出单状态过滤（00=待呼出，01=已呼出）
+    - serve_ercd：分配呼出人过滤（话务台员工查本人单据）
+    - only_pending：1=仅显示存在待呼出单的预计划
+    - page/per_page：分页
+    """
+    args = request.args.to_dict()
+    data = PlanServeService.list_overview(
+        planno=args.get("planno") or None,
+        custnm=args.get("custnm") or None,
+        custcard=args.get("custcard") or None,
+        plantyp=args.get("plantyp") or None,
+        plan_status=args.get("plan_status") or None,
+        serve_status=args.get("serve_status") or None,
+        serve_ercd=args.get("serve_ercd") or None,
+        servetyp=args.get("servetyp") or None,
+        only_pending=args.get("only_pending") == "1",
+        page=int(args.get("page", 1)),
+        per_page=int(args.get("per_page", 20)),
+    )
+    return success_response(data=data)
+
+
+@sales_bp.post("/plans/<planno>/assign-serve")
+@login_required
+def assign_plan_serve(planno: str):  # type: ignore[no-untyped-def]
+    """分配呼出人（对齐 PB d_serve_list.serve_ercd）。"""
+    body = PlanServeAssign.model_validate(request.get_json(silent=True) or {})
+    user_cd: str = g.current_user
+    result = PlanServeService.assign_serve(planno, body.serve_ercd, operator=user_cd)
+    if not result.get("success"):
+        return error_response(message=str(result.get("error", "分配失败")), code=400)
+    return success_response(data=result, message="分配成功")
 
 
 # ---- 销售单据 ----

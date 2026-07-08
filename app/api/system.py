@@ -143,8 +143,13 @@ def delete_group(group_cd: str):  # type: ignore[no-untyped-def]
 @system_bp.get("/groups/<group_cd>/members")
 @login_required
 def get_group_members(group_cd: str):  # type: ignore[no-untyped-def]
-    """获取用户组成员列表。"""
-    return success_response(data=_service.get_group_members(group_cd))
+    """获取用户组成员列表。
+
+    查询参数:
+        active_only: 1 时仅返回 status='1' 的有效成员
+    """
+    active_only = request.args.get("active_only", "0") == "1"
+    return success_response(data=_service.get_group_members(group_cd, active_only=active_only))
 
 
 @system_bp.post("/groups/<group_cd>/members")
@@ -329,6 +334,42 @@ def list_towns():  # type: ignore[no-untyped-def]
     """区县/街道列表，可选按城市筛选。"""
     city_cd = request.args.get("city_cd")
     return success_response(data=_service.get_towns(city_cd))
+
+
+# ---- 国标地理表（geo_*，来源：province-city-china）----
+
+
+@system_bp.get("/geo/provinces")
+@login_required
+def list_geo_provinces():  # type: ignore[no-untyped-def]
+    """国标省级列表（31条，不含港澳台）。"""
+    return success_response(data=_service.get_geo_provinces())
+
+
+@system_bp.get("/geo/cities")
+@login_required
+def list_geo_cities():  # type: ignore[no-untyped-def]
+    """国标地级市列表，可按省级代码筛选（?province_code=31）。"""
+    province_code = request.args.get("province_code")
+    return success_response(data=_service.get_geo_cities(province_code))
+
+
+@system_bp.get("/geo/areas")
+@login_required
+def list_geo_areas():  # type: ignore[no-untyped-def]
+    """国标区县列表，可按地级市代码筛选（?city_code=3101）。"""
+    city_code = request.args.get("city_code")
+    province_code = request.args.get("province_code")
+    return success_response(data=_service.get_geo_areas(city_code, province_code))
+
+
+@system_bp.get("/geo/streets")
+@login_required
+def list_geo_streets():  # type: ignore[no-untyped-def]
+    """国标街道列表，可按区县代码筛选（?area_code=310101）。街道数据较多，建议必传 area_code。"""
+    area_code = request.args.get("area_code")
+    city_code = request.args.get("city_code")
+    return success_response(data=_service.get_geo_streets(area_code, city_code))
 
 
 # ---- 物料分类 ----
@@ -917,7 +958,9 @@ def list_customers():  # type: ignore[no-untyped-def]
     per_page = request.args.get("per_page", 20, type=int)
     class_cd = request.args.get("class_cd")
     search = request.args.get("search")
-    result = _service.list_customers(page=page, per_page=per_page, class_cd=class_cd, search=search)
+    customer_status = request.args.get("customer_status")
+    useflg = request.args.get("useflg")
+    result = _service.list_customers(page=page, per_page=per_page, class_cd=class_cd, search=search, customer_status=customer_status, useflg=useflg)
     return success_response(data={"items": result["items"], "total": result["total"]})
 
 

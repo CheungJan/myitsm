@@ -87,14 +87,19 @@ def _seed_device_change(
     store_id: str = "CUST001",
     new_store_id: str = "CUST002",
     device_id: str = "EIDBG00000001",
+    force_device_transfer: bool = False,
 ) -> DeviceChange:
-    """创建测试设备变更单。"""
+    """创建测试设备变更单。
+
+    force_device_transfer=True 时即使 change_type != 'BG' 也写入 new_store_id，
+    用于模拟预计划 plantyp=10 入口产生的 CK + 设备转移场景。
+    """
     record = DeviceChangeRepository.create(
         {
             "store_id": store_id,
             "change_type": change_type,
             "device_id": device_id,
-            "new_store_id": new_store_id if change_type == "BG" else "",
+            "new_store_id": new_store_id if (change_type == "BG" or force_device_transfer) else "",
             "new_store_card": "CARD003" if change_type in ("CK", "BG") else "",
         },
         "T00001",
@@ -254,6 +259,77 @@ class TestDeviceChangeBG:
 
             # 验证回写 plan_status='01'
             plan = db.session.query(PlanCust).filter(PlanCust.planno == "PLBG000003").first()
+            assert plan is not None
+            assert plan.plan_status == "01"
+
+            _cleanup()
+
+    def test_ck_with_device_transfer_triggers_rl_transfer(self, app: Flask) -> None:
+        """CK + device_id + new_store_id 非空（预计划 plantyp=10 正常场景）应触发设备转移。
+
+        对齐 PB USP_PLAN_IMPLE 硬编码 CK + USP_PLAN_CONFRIM V_NEW_POSID 隐式判断：
+        预计划入口产生的变更单 CHANGE_TYPE 始终为 CK，但包含设备转移时（new_posid 非空）
+        关单必须执行 EidTrack + rl 转移 + 设备回库 + 目标客户合并。
+        """
+        with app.app_context():
+            _cleanup()
+            _seed_customer("CUST001", "CARD001")
+            _seed_customer("CUST002", "CARD002")
+            _seed_eid("EIDBG00000004")
+            _seed_rl("CUST001", "EIDBG00000004")
+
+            # CK + 强制写入 new_store_id（模拟预计划 plantyp=10 含设备转移）
+            record = _seed_device_change(
+                "CK",
+                device_id="EIDBG00000004",
+                force_device_transfer=True,
+            )
+            _seed_plan("PLBG000004", record.device_change_id)
+
+            db.session.commit()
+
+            svc = DeviceChangeService()
+            _transition_to_5(svc, record.device_change_id)
+
+            # 验证 type='T' EidTrack 已写入
+            t_tracks = (
+                db.session.query(EidTrack)
+                .filter(EidTrack.eid == "EIDBG00000004", EidTrack.type == "T")
+                .all()
+            )
+            assert len(t_tracks) == 1
+            assert t_tracks[0].cust_cd == "CUST001"
+            assert t_tracks[0].n_cust_cd == "CUST002"
+
+            # 验证旧 rl 失效
+            old_rl = (
+                db.session.query(CustPosRl)
+                .filter(CustPosRl.eid == "EIDBG00000004", CustPosRl.cust_cd == "CUST001")
+                .first()
+            )
+            assert old_rl is not None
+            assert old_rl.useflg == "0"
+            # 对齐 PB USP_PLAN_CONFRIM：MAINTENANCETYP='BG', maintenanceno=变更单号, maintenancedate
+            assert old_rl.maintenancetyp == "BG"
+            assert old_rl.maintenanceno == record.device_change_id
+            assert old_rl.maintenancedate is not None
+
+            # 验证新 rl 新建
+            new_rl = (
+                db.session.query(CustPosRl)
+                .filter(CustPosRl.eid == "EIDBG00000004", CustPosRl.cust_cd == "CUST002")
+                .first()
+            )
+            assert new_rl is not None
+            assert new_rl.useflg == "1"
+            assert new_rl.created_from == "DEVICE_CHANGE"
+            # 对齐 PB USP_PLAN_CONFRIM：新 rl 同样写入 MAINTENANCETYP='BG'
+            assert new_rl.maintenancetyp == "BG"
+            assert new_rl.maintenanceno == record.device_change_id
+            assert new_rl.maintenancedate is not None
+
+            # 验证回写 plan_status='01'
+            plan = db.session.query(PlanCust).filter(PlanCust.planno == "PLBG000004").first()
             assert plan is not None
             assert plan.plan_status == "01"
 

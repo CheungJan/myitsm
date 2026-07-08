@@ -239,9 +239,12 @@
 
 #### 2. tmm02_country
 
+> ⚠️ **老系统地理码表（保留不动，新业务使用 geo_* 系列表）**  
+> 编码体系为 Oracle 原系统自定义短码，非国标行政区划码。
+
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | country_cd | VARCHAR(3) | PK NOT NULL | 国家代码 |
+| 1 | country_cd | VARCHAR(3) | PK NOT NULL | 国家代码（老系统自定义，如191=中国） |
 | 2 | country_nm | VARCHAR(50) | NOT NULL | 国家名称 |
 | 3 | useflg | VARCHAR(1) |  | 有效标志 |
 | 4 | created_at | TIMESTAMP | NOT NULL |  |
@@ -249,33 +252,43 @@
 
 #### 3. tmm03_province
 
+> ⚠️ **老系统地理码表（保留不动，新业务使用 geo_province）**  
+> 编码为自定义2位短码（如09=上海），含港澳台（32/33/34），共34条。
+
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | prvn_cd | VARCHAR(2) | PK NOT NULL | 省份代码 |
+| 1 | prvn_cd | VARCHAR(2) | PK NOT NULL | 省份代码（老系统自定义，如09=上海、01=北京） |
 | 2 | prvn_nm | VARCHAR(50) | NOT NULL | 省份名称 |
-| 3 | country_cd | VARCHAR(3) |  | 国家代码 |
+| 3 | country_cd | VARCHAR(3) |  | 国家代码（关联tmm02_country） |
 | 4 | useflg | VARCHAR(1) |  | 有效标志 |
 | 5 | created_at | TIMESTAMP | NOT NULL |  |
 | 6 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 4. tmm04_city
 
+> ⚠️ **老系统地理码表（保留不动，新业务使用 geo_area）**  
+> 注意：本表实为**区级**数据（省直辖市的区直挂省下），并非国标地级市层级。  
+> 含已撤销区划（卢湾区/南汇区/闸北区/崇明县等），共436条。
+
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | city_cd | VARCHAR(4) | PK NOT NULL | 城市代码 |
-| 2 | city_nm | VARCHAR(50) | NOT NULL | 城市名称 |
-| 3 | prvn_cd | VARCHAR(2) |  | 省份代码 |
+| 1 | city_cd | VARCHAR(4) | PK NOT NULL | 区级代码（老系统自定义4位短码，如0121=浦东新区） |
+| 2 | city_nm | VARCHAR(50) | NOT NULL | 区名称（含已撤销区划） |
+| 3 | prvn_cd | VARCHAR(2) |  | 省份代码（关联tmm03_province） |
 | 4 | useflg | VARCHAR(1) |  | 有效标志 |
 | 5 | created_at | TIMESTAMP | NOT NULL |  |
 | 6 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 5. tmm05_town
 
+> ⚠️ **老系统地理码表（保留不动，新业务使用 geo_street）**  
+> 本表在迁移后 `town_cd` 数据全为空（tmm22_customers.town_cd 全NULL），实际未使用。共2778条。
+
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | town_cd | VARCHAR(4) | PK NOT NULL | 区县代码 |
+| 1 | town_cd | VARCHAR(4) | PK NOT NULL | 区县代码（老系统自定义，迁移后客户表town_cd全为空） |
 | 2 | town_nm | VARCHAR(50) | NOT NULL | 区县名称 |
-| 3 | city_cd | VARCHAR(4) |  | 城市代码 |
+| 3 | city_cd | VARCHAR(4) |  | 城市代码（关联tmm04_city） |
 | 4 | useflg | VARCHAR(1) |  | 有效标志 |
 | 5 | created_at | TIMESTAMP | NOT NULL |  |
 | 6 | updated_at | TIMESTAMP | NOT NULL |  |
@@ -391,7 +404,7 @@
 | 2 | cust_nm | VARCHAR(100) | NOT NULL | 客户名称 |
 | 3 | cust_card | VARCHAR(30) |  | 磁卡号 |
 | 4 | class_cd | VARCHAR(20) |  | 客户分类 |
-| 5 | area_cd | VARCHAR(20) |  | 区域编码 |
+| 5 | area_cd | VARCHAR(20) |  | 区域编码（关联tmm46_area.area_cd，原Oracle TMM22.AREA整数已回填至此） |
 | 6 | address | VARCHAR(200) |  | 地址 |
 | 7 | phone_no | VARCHAR(30) |  | 电话 |
 | 8 | contactor | VARCHAR(50) |  | 联系人 |
@@ -401,7 +414,7 @@
 | 12 | ppt_code | VARCHAR(20) |  | 品牌编码 |
 | 13 | zf_type | VARCHAR(10) |  | 支付方式 |
 | 14 | comm_mode | VARCHAR(20) |  | 通讯方式 |
-| 15 | store_cd | VARCHAR(30) |  | 门店编码 |
+| 15 | store_cd | VARCHAR(30) |  | ⚠️**废弃**：Oracle原表无此字段，数据全为空，与cust_cd功能重复，待删除 |
 | 16 | created_at | TIMESTAMP | NOT NULL |  |
 | 17 | updated_at | TIMESTAMP | NOT NULL |  |
 | 18 | cust_anm | VARCHAR(40) |  | 客户别名 |
@@ -414,7 +427,7 @@
 | 25 | parentcd | VARCHAR(8) |  | 上级客户编码 |
 | 26 | backup | VARCHAR(200) |  | 备注 |
 | 27 | location | VARCHAR(1) |  | 位置标志 |
-| 28 | area | INTEGER |  | 区域编号 |
+| 28 | area | INTEGER |  | ⚠️**废弃**：Oracle原表AREA整数（关联TMM46_AREA.ID），迁移后由area_cd替代，数据已回填至area_cd，不再写入，待删除 |
 | 29 | pos_n | INTEGER |  | POS数量 |
 | 30 | opersystem | VARCHAR(128) |  | POS操作系统 |
 | 31 | data_base | VARCHAR(128) |  | POS数据库版本 |
@@ -439,10 +452,14 @@
 | 50 | verified_at | TIMESTAMP |  | 转正时间 |
 | 51 | preplan_id | VARCHAR(50) |  | 关联预计划号 |
 | 52 | valid_until | TIMESTAMP |  | 临时客户有效期 |
-| 53 | country_cd | VARCHAR(3) |  | 国家代码 |
-| 54 | prvn_cd | VARCHAR(2) |  | 省份代码 |
-| 55 | city_cd | VARCHAR(4) |  | 城市代码 |
-| 56 | town_cd | VARCHAR(4) |  | 区县代码 |
+| 53 | country_cd | VARCHAR(3) |  | ⚠️**废弃**：老系统自定义国家码（191=中国），由geo_prvn_cd等替代，待删除 |
+| 54 | prvn_cd | VARCHAR(2) |  | ⚠️**废弃**：老系统自定义省份码（09=上海），由geo_prvn_cd替代，待删除 |
+| 55 | city_cd | VARCHAR(4) |  | ⚠️**废弃**：老系统自定义区级码（如0121=浦东新区），已回填至geo_area_cd，待删除 |
+| 56 | town_cd | VARCHAR(4) |  | ⚠️**废弃**：老系统区县码，迁移后全为空，由geo_area_cd替代，待删除 |
+| 57 | geo_prvn_cd | VARCHAR(6) |  | 国标省级代码（关联geo_province.code，如31=上海市，已回填11020条） |
+| 58 | geo_city_cd | VARCHAR(6) |  | 国标地级市代码（关联geo_city.code，如3101=上海市辖区，已回填11020条） |
+| 59 | geo_area_cd | VARCHAR(6) |  | 国标区县代码（关联geo_area.code，如310101=黄浦区，已回填11020条） |
+| 60 | geo_street_cd | VARCHAR(12) |  | 国标街道代码（关联geo_street.code，如310101002=南京东路街道，新录入时通过前端四级联动填入） |
 
 #### 12. tmm22_customers_history
 
@@ -713,14 +730,14 @@
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | area_cd | VARCHAR(20) | PK NOT NULL | 区域编码 |
+| 1 | area_cd | VARCHAR(20) | PK NOT NULL | 区域编码（原Oracle TMM46_AREA.ID，迁移后字符串化为主键，值为纯数字字符串） |
 | 2 | area_nm | VARCHAR(50) | NOT NULL | 区域名称 |
-| 3 | parent_cd | VARCHAR(20) |  | 上级区域 |
+| 3 | parent_cd | VARCHAR(20) |  | 上级区域【扩展字段，Oracle原表无此字段，当前全为空，待后续启用】 |
 | 4 | useflg | VARCHAR(1) |  | 有效标志 |
 | 5 | created_at | TIMESTAMP | NOT NULL |  |
 | 6 | updated_at | TIMESTAMP | NOT NULL |  |
-| 7 | area_id | INTEGER |  | 区域ID |
-| 8 | name | VARCHAR(50) |  | 区域全称 |
+| 7 | area_id | INTEGER |  | ⚠️**废弃**：Oracle原表ID的整数备份，已回填为area_cd::int，业务代码不再使用，待删除 |
+| 8 | name | VARCHAR(50) |  | ⚠️**废弃**：Oracle原表NAME的备份，已迁移至area_nm，业务代码不再使用，待删除 |
 | 9 | usercd | VARCHAR(6) |  | 负责人编码 |
 
 #### 24. tmm47_commode
@@ -1650,8 +1667,9 @@
 | 15 | closed_by | VARCHAR(6) |  | 结案操作人 |
 | 16 | closed_at | TIMESTAMP |  | 结案时间 |
 | 17 | ref_inbillid | VARCHAR(8) |  | 来源入库单号（质检出库追溯） |
-| 18 | created_at | TIMESTAMP | NOT NULL |  |
-| 19 | updated_at | TIMESTAMP | NOT NULL |  |
+| 18 | ref_planno | VARCHAR(12) |  | 来源预计划号（批量出库方案B：明细行记来源预计划） |
+| 19 | created_at | TIMESTAMP | NOT NULL |  |
+| 20 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 8. twh16_outdtprd
 
@@ -1673,8 +1691,9 @@
 | 14 | closed_by | VARCHAR(6) |  | 结案操作人 |
 | 15 | closed_at | TIMESTAMP |  | 结案时间 |
 | 16 | ref_inbillid | VARCHAR(8) |  | 来源入库单号（质检出库追溯） |
-| 17 | created_at | TIMESTAMP | NOT NULL |  |
-| 18 | updated_at | TIMESTAMP | NOT NULL |  |
+| 17 | ref_planno | VARCHAR(12) |  | 来源预计划号（批量出库方案B：明细行记来源预计划） |
+| 18 | created_at | TIMESTAMP | NOT NULL |  |
+| 19 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 9. twh17_overlost
 
@@ -3196,7 +3215,7 @@
 | 40 | imple_mark | VARCHAR(200) |  | 实施备注（配送/安装要求等） |
 | 41 | imple_result | VARCHAR(10) |  | 实施结果 |
 | 42 | fail_reason | VARCHAR(200) |  | 失败原因 |
-| 43 | is_outflag | VARCHAR(2) |  | 出库标志（1=已生成OV=1出库单） |
+| 43 | is_outflag | VARCHAR(4) |  | 出库标志三态（N/A=非商用仓库不适用/0=待出库/1=OV=1出库单已审核） |
 | 44 | status | VARCHAR(2) |  | PB旧状态字段（已废弃，使用plan_status） |
 | 45 | gendate | TIMESTAMP |  | 创建日期 |
 | 46 | opercd | VARCHAR(6) |  | 操作员 |
@@ -3289,6 +3308,64 @@
 | tmm44_pos_r_eid | idx_pos_r_eid_eid | eid |
 | tmm44_pos_r_eid | idx_pos_r_eid_useflg | useflg, eid |
 | tpt01_portal_user | tpt01_portal_user_login_name_key | login_name |
+
+---
+
+### 国标地理表（geo_* 系列）
+
+> 数据来源：[province-city-china](https://github.com/uiwjs/province-city-china)（民政部国标行政区划码）  
+> 导入脚本：`app/migration/import_geo_data.py --sqlite /path/to/data.sqlite`（幂等，支持重复执行更新）  
+> 与老系统 tmm02-05 表**并存**，老表保持不变，新业务使用此组表。
+
+#### geo_province（国标省级，31条）
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | code | VARCHAR(6) | PK NOT NULL | 国标省级代码（2位，如11=北京、31=上海、44=广东） |
+| 2 | name | VARCHAR(50) | NOT NULL | 省级名称 |
+| 3 | created_at | TIMESTAMP | NOT NULL |  |
+| 4 | updated_at | TIMESTAMP | NOT NULL |  |
+
+> 注：不含港澳台（国标行政区划码未收录）。
+
+#### geo_city（国标地级市，342条）
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | code | VARCHAR(6) | PK NOT NULL | 国标地级市代码（4位，如3101=上海市辖区、4401=广州市） |
+| 2 | name | VARCHAR(50) | NOT NULL | 地级市名称 |
+| 3 | province_code | VARCHAR(6) |  | 所属省级代码（关联geo_province.code） |
+| 4 | created_at | TIMESTAMP | NOT NULL |  |
+| 5 | updated_at | TIMESTAMP | NOT NULL |  |
+
+#### geo_area（国标区县，2978条）
+
+**索引**：`idx_geo_area_city_code` (city_code)、`idx_geo_area_province_code` (province_code)
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | code | VARCHAR(6) | PK NOT NULL | 国标区县代码（6位，如310101=黄浦区、310115=浦东新区） |
+| 2 | name | VARCHAR(50) | NOT NULL | 区县名称 |
+| 3 | city_code | VARCHAR(6) |  | 所属地级市代码（关联geo_city.code） |
+| 4 | province_code | VARCHAR(6) |  | 所属省级代码（冗余字段，便于按省直接查询） |
+| 5 | created_at | TIMESTAMP | NOT NULL |  |
+| 6 | updated_at | TIMESTAMP | NOT NULL |  |
+
+#### geo_street（国标街道/乡镇，41352条）
+
+**索引**：`idx_geo_street_area_code` (area_code)、`idx_geo_street_city_code` (city_code)
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | code | VARCHAR(12) | PK NOT NULL | 国标街道代码（9位，如310101002=南京东路街道）末3位：001-099=街道，100-199=镇，200-399=乡 |
+| 2 | name | VARCHAR(100) | NOT NULL | 街道/乡镇名称 |
+| 3 | area_code | VARCHAR(6) |  | 所属区县代码（关联geo_area.code，**前端联动必传此参数**） |
+| 4 | province_code | VARCHAR(6) |  | 所属省级代码（冗余） |
+| 5 | city_code | VARCHAR(6) |  | 所属地级市代码（冗余） |
+| 6 | created_at | TIMESTAMP | NOT NULL |  |
+| 7 | updated_at | TIMESTAMP | NOT NULL |  |
+
+---
 
 ### D.2 业务模块前缀速查
 

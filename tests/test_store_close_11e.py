@@ -16,6 +16,8 @@ from app.extensions import db
 from app.models.itsm import StoreClose
 from app.models.master import Customer, CustPosRl, Eid, EidTrack
 from app.models.sales import PlanCust
+from app.models.system import SysParm
+from app.models.warehouse import StockIn, Warehouse
 from app.repositories.itsm_repository import StoreCloseRepository
 from app.services.itsm_service import StoreCloseService
 
@@ -147,6 +149,15 @@ class TestStoreClose11e:
                 .all()
             )
             assert len(active_rls) == 0, f"应无活跃 rl，实际 {len(active_rls)}"
+
+            # 校验 tmm43_eid.sflg='3'（待检），对齐 PB USP_PLAN_CONFRIM
+            # 注：sflg='2' 是"已报废"，'3' 才是"待检/待核实"
+            closed_eids = (
+                db.session.query(Eid)
+                .filter(Eid.eid.in_(["EIDCL0000001", "EIDCL0000002", "EIDCL0000003"]))
+                .all()
+            )
+            assert all(e.sflg == "3" for e in closed_eids), "关闭门店设备 sflg 应为 '3'（待检）"
 
             # 校验回写 plan_status='01'
             plan = db.session.get(PlanCust, "PL000011")
@@ -288,3 +299,69 @@ class TestStoreClose11e:
             # plan_status 仍回写
             plan = db.session.get(PlanCust, "PL000041")
             assert plan.plan_status == "01"
+
+    def test_store_close_auto_creates_inbound(self, app: Flask) -> None:
+        """门店关闭关单：配置了 recycle_return_whcd 且设备为自有资产时，
+        自动创建回收入库草稿（IV=7）。
+        """
+        with app.app_context():
+            _seed_customer("CUST001", "CARD001")
+            _seed_eid("EIDST00000050")
+            eid_rec = db.session.query(Eid).filter(Eid.eid == "EIDST00000050").first()
+            eid_rec.asset_owner = "02"  # 自有资产
+            _seed_rl("CUST001", "EIDST00000050")
+            close = _seed_store_close()
+            db.session.commit()
+
+            # 配置仓库
+            wh = db.session.get(Warehouse, "W1")
+            if wh is None:
+                db.session.add(Warehouse(whcd="W1", whnm="回收仓", whtyp="01", opercd="T00001"))
+            sp = db.session.get(SysParm, "stock_in_whcd_7")
+            if sp is None:
+                db.session.add(SysParm(parm_cd="stock_in_whcd_7", parm_nm="回收入库仓", parm_val="W1"))
+            else:
+                sp.parm_val = "W1"
+            db.session.commit()
+
+            svc = StoreCloseService()
+            _transition_to_5(svc, close.store_close_id)
+
+            stock_in = (
+                db.session.query(StockIn)
+                .filter(
+                    StockIn.refbillid == close.store_close_id,
+                    StockIn.invtyp == "7",
+                )
+                .first()
+            )
+            assert stock_in is not None, "应自动创建回收入库草稿"
+            assert stock_in.whcd == "W1"
+            assert stock_in.auditflg == "0"
+
+    def test_store_close_no_whcd_no_inbound(self, app: Flask) -> None:
+        """门店关闭关单：未配置 recycle_return_whcd 时不创建入库草稿。"""
+        with app.app_context():
+            _seed_customer("CUST001", "CARD001")
+            _seed_eid("EIDST00000060")
+            eid_rec = db.session.query(Eid).filter(Eid.eid == "EIDST00000060").first()
+            eid_rec.asset_owner = "02"
+            _seed_rl("CUST001", "EIDST00000060")
+            close = _seed_store_close()
+            db.session.commit()
+
+            # 删除可能存在的 sysparm
+            sp = db.session.get(SysParm, "stock_in_whcd_7")
+            if sp is not None:
+                db.session.delete(sp)
+            db.session.commit()
+
+            svc = StoreCloseService()
+            _transition_to_5(svc, close.store_close_id)
+
+            stock_in = (
+                db.session.query(StockIn)
+                .filter(StockIn.refbillid == close.store_close_id)
+                .first()
+            )
+            assert stock_in is None, "未配置仓库不应创建入库草稿"

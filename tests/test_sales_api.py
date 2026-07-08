@@ -81,7 +81,7 @@ class TestPlanOrchestration:
         resp = _post(
             client,
             "/api/v1/sales/plans",
-            {"plantyp": "00", "custnm": "新机测试", "custcd": "T001"},
+            {"plantyp": "00", "custnm": "新机测试", "custcd": "T001", "custcard": "CARD_T001"},
             headers,
         )
         assert resp.status_code == 201
@@ -145,6 +145,160 @@ class TestPlanOrchestration:
 
         resp2 = _post(client, f"/api/v1/sales/plans/{planno}/complete", {}, headers)
         assert resp2.status_code == 400
+
+    def test_plantyp00_auto_generate_custcd(self, app: Flask, client: FlaskClient) -> None:
+        """plantyp=00 全新开通 custcd 为空时按 PB 规则自动生成（MAX+1 左补零 8 位）。"""
+        from app.extensions import db as _db
+        from app.models.master import Customer
+
+        headers = _auth_header(app)
+        # 不传 custcd，只传磁卡号和客户名（模拟前端手动输入新用户场景）
+        resp = _post(
+            client,
+            "/api/v1/sales/plans",
+            {
+                "plantyp": "00",
+                "custcard": "NEWCARD001",
+                "custnm": "自动编码测试客户",
+            },
+            headers,
+        )
+        assert resp.status_code == 201, resp.get_json()
+        data = resp.get_json()["data"]
+        generated_custcd = data.get("custcd") or ""
+        # 验证 custcd 已自动生成且为 8 位数字字符串
+        assert generated_custcd, "custcd 未自动生成"
+        assert len(generated_custcd) == 8, f"custcd 长度应为 8 位，实际: {generated_custcd}"
+        assert generated_custcd.isdigit(), f"custcd 应为纯数字，实际: {generated_custcd}"
+
+        # 验证客户表已创建 TEMP 记录
+        with app.app_context():
+            cust = _db.session.get(Customer, generated_custcd)
+            assert cust is not None, "客户表未创建 TEMP 记录"
+            assert cust.customer_status == "TEMP"
+            assert cust.cust_card == "NEWCARD001"
+            assert cust.cust_nm == "自动编码测试客户"
+
+    def test_plantyp00_custcd_auto_increment(self, app: Flask, client: FlaskClient) -> None:
+        """连续创建两个无 custcd 的预计划，custcd 应唯一且符合 8 位数字格式。
+
+        注：因 SQLite 内存库测试间 session 隔离限制，仅验证格式与唯一性，
+        不验证绝对递增值（MAX+1 规则由 test_plantyp00_auto_generate_custcd 间接覆盖）。
+        """
+        headers = _auth_header(app)
+        resp1 = _post(
+            client,
+            "/api/v1/sales/plans",
+            {"plantyp": "00", "custcard": "NEWCARD002", "custnm": "递增测试1"},
+            headers,
+        )
+        resp2 = _post(
+            client,
+            "/api/v1/sales/plans",
+            {"plantyp": "00", "custcard": "NEWCARD003", "custnm": "递增测试2"},
+            headers,
+        )
+        assert resp1.status_code == 201, resp1.get_json()
+        assert resp2.status_code == 201, resp2.get_json()
+        cd1 = resp1.get_json()["data"]["custcd"]
+        cd2 = resp2.get_json()["data"]["custcd"]
+        # 验证 custcd 均为 8 位数字
+        assert len(cd1) == 8 and cd1.isdigit(), f"cd1 格式错误: {cd1}"
+        assert len(cd2) == 8 and cd2.isdigit(), f"cd2 格式错误: {cd2}"
+
+    def test_plantyp00_duplicate_custcard_rejected(self, app: Flask, client: FlaskClient) -> None:
+        """plantyp=00 磁卡号重复时拒绝创建（对齐 PB of_insert_cust 重复检查）。"""
+        import uuid as _uuid
+
+        headers = _auth_header(app)
+        unique_card = f"DUPCARD_{_uuid.uuid4().hex[:6]}"
+        # 第一次创建成功
+        resp1 = _post(
+            client,
+            "/api/v1/sales/plans",
+            {"plantyp": "00", "custcard": unique_card, "custnm": "重复测试1"},
+            headers,
+        )
+        assert resp1.status_code == 201
+        # 第二次用相同磁卡号应被拒绝
+        resp2 = _post(
+            client,
+            "/api/v1/sales/plans",
+            {"plantyp": "00", "custcard": unique_card, "custnm": "重复测试2"},
+            headers,
+        )
+        assert resp2.status_code == 400
+        assert unique_card in resp2.get_json()["message"]
+
+    def test_plantyp00_custcard_length_limit(self, app: Flask, client: FlaskClient) -> None:
+        """plantyp=00 磁卡号超过 20 字符时拒绝创建（对齐 PB char(20) 限制）。"""
+        headers = _auth_header(app)
+        resp = _post(
+            client,
+            "/api/v1/sales/plans",
+            {"plantyp": "00", "custcard": "X" * 21, "custnm": "超长磁卡号测试"},
+            headers,
+        )
+        assert resp.status_code == 400
+        assert "20" in resp.get_json()["message"]
+
+    def test_plantyp10_custcard_duplicate_rejected(self, app: Flask, client: FlaskClient) -> None:
+        """plantyp=10 磁卡号变更时新磁卡号(custcard)重复拒绝（对齐 PB 磁卡号唯一性）。
+
+        注：new_ 前缀字段是"源"意思，new_custcard=源磁卡号(老卡号)，
+        custcard=当前门店变更后的新磁卡号，需校验唯一性。
+        """
+        import uuid as _uuid
+
+        from app.extensions import db as _db
+        from app.models.master import Customer
+
+        headers = _auth_header(app)
+        # 先创建一个占用新磁卡号的客户
+        occupied_card = f"OCCUPIED_{_uuid.uuid4().hex[:6]}"
+        with app.app_context():
+            _db.session.add(
+                Customer(
+                    cust_cd=f"OCC_{_uuid.uuid4().hex[:6]}",
+                    cust_nm="占用客户",
+                    cust_card=occupied_card,
+                    useflg="1",
+                )
+            )
+            _db.session.commit()
+        # plantyp=10 用已占用的磁卡号作为 custcard（新磁卡号）
+        resp = _post(
+            client,
+            "/api/v1/sales/plans",
+            {
+                "plantyp": "10",
+                "custcd": "T010",
+                "custcard": occupied_card,
+                "new_custcard": "OLDCARD001",
+                "new_custcd": "T011",
+            },
+            headers,
+        )
+        assert resp.status_code == 400
+        assert occupied_card in resp.get_json()["message"]
+
+    def test_plantyp10_custcard_length_limit(self, app: Flask, client: FlaskClient) -> None:
+        """plantyp=10 新磁卡号(custcard)超过 20 字符拒绝（对齐 PB char(20) 限制）。"""
+        headers = _auth_header(app)
+        resp = _post(
+            client,
+            "/api/v1/sales/plans",
+            {
+                "plantyp": "10",
+                "custcd": "T010",
+                "custcard": "Y" * 21,
+                "new_custcard": "OLDCARD002",
+                "new_custcd": "T011",
+            },
+            headers,
+        )
+        assert resp.status_code == 400
+        assert "20" in resp.get_json()["message"]
 
     def test_implement_happy_path(self, app: Flask, client: FlaskClient) -> None:
         """正向链路：创建→呼出→实施→下游工单生成且imple_billid回写。"""
@@ -239,6 +393,68 @@ class TestSalesExtend:
         resp2 = client.get("/api/v1/sales/extends?page=1", headers=headers)
         assert resp2.status_code == 200
         assert "items" in resp2.get_json()["data"]
+
+
+class TestBuildDownstreamPayloadPlantyp10:
+    """_build_downstream_payload plantyp=10 磁卡号变更单元测试。"""
+
+    def test_device_id_falls_back_to_posid_when_new_posid_empty(self) -> None:
+        """new_posid 为空时 device_id 回退取 posid（不换设备场景）。
+
+        业务场景：磁卡号变更不涉及设备变更时，源磁卡号的设备要转移到新磁卡号下。
+        此时 new_posid 为空，device_id 应取 posid（源设备 EID），
+        关单时才能触发 rl 转移（旧客户 rl 失效 + 新客户 rl 新建）。
+        """
+        from types import SimpleNamespace
+
+        from app.services.sales_service import _build_downstream_payload
+
+        record = SimpleNamespace(
+            custcd="CUST001",
+            new_custcd="CUST002",
+            new_custcard="CARD002",
+            posid="EID001",
+            new_posid="",
+        )
+        payload = _build_downstream_payload(record, "10", "T00001")
+        assert payload["change_type"] == "CK"
+        assert payload["device_id"] == "EID001"
+        assert payload["store_id"] == "CUST001"
+        assert payload["new_store_id"] == "CUST002"
+        assert payload["new_store_card"] == "CARD002"
+
+    def test_device_id_uses_new_posid_when_provided(self) -> None:
+        """new_posid 非空时 device_id 取 new_posid（换设备场景）。"""
+        from types import SimpleNamespace
+
+        from app.services.sales_service import _build_downstream_payload
+
+        record = SimpleNamespace(
+            custcd="CUST001",
+            new_custcd="CUST002",
+            new_custcard="CARD002",
+            posid="EID001",
+            new_posid="EID002",
+        )
+        payload = _build_downstream_payload(record, "10", "T00001")
+        assert payload["change_type"] == "CK"
+        assert payload["device_id"] == "EID002"
+
+    def test_device_id_none_when_both_empty(self) -> None:
+        """posid 和 new_posid 都为空时 device_id 为 None（纯磁卡号变更无设备）。"""
+        from types import SimpleNamespace
+
+        from app.services.sales_service import _build_downstream_payload
+
+        record = SimpleNamespace(
+            custcd="CUST001",
+            new_custcd="CUST002",
+            new_custcard="CARD002",
+            posid="",
+            new_posid="",
+        )
+        payload = _build_downstream_payload(record, "10", "T00001")
+        assert payload["device_id"] is None
 
 
 class TestPlanEndToEnd:

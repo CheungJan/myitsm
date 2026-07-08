@@ -130,8 +130,8 @@ class SystemService:
             return True
         return False
 
-    def get_group_members(self, group_cd: str) -> list[dict[str, Any]]:
-        return self._repo.get_group_members(group_cd)
+    def get_group_members(self, group_cd: str, active_only: bool = False) -> list[dict[str, Any]]:
+        return self._repo.get_group_members(group_cd, active_only=active_only)
 
     def add_group_member(self, user_cd: str, group_cd: str) -> bool:
         try:
@@ -560,7 +560,8 @@ class SystemService:
     def _resolve_customer_refs(self, cust: dict[str, Any]) -> dict[str, Any]:
         """解析客户关联字段为中文名称。"""
         # 懒加载码表缓存（类级别，首次调用后复用）
-        if not hasattr(self.__class__, "_ref_cache"):
+        # 若缓存中缺少 geo_province 则重建（升级兼容）
+        if not hasattr(self.__class__, "_ref_cache") or "geo_province" not in getattr(self.__class__, "_ref_cache", {}):
             self.__class__._ref_cache = self._build_ref_cache()  # type: ignore[attr-defined]
         cache = getattr(self.__class__, "_ref_cache")
         # 客户分类
@@ -572,15 +573,17 @@ class SystemService:
         cust["busi_typ_nm"] = cache["bt"].get(cust.get("busi_typ", ""), "")
         # 门店属性 YB
         cust["ppt_code_nm"] = cache["yb"].get(cust.get("ppt_code", ""), "")
+        # 所属云类别 PY
+        cust["yun_type_nm"] = cache["py"].get(cust.get("yun_type", ""), "")
         # 支付方式 ZF
         cust["zf_type_nm"] = cache["zf"].get(cust.get("zf_type", ""), "")
         # 通讯方式
         cust["comm_mode_nm"] = cache["commode"].get(cust.get("comm_mode", ""), "")
-        # 行政区域（area 存储的是整数 area_id，cache key 是字符串）
-        cust["area_nm"] = cache["area"].get(str(cust.get("area") or ""), "")
-        # 环线位置
-        loc_map = {"1": "内环", "2": "中环", "3": "外环"}
-        cust["location_nm"] = loc_map.get(cust.get("location", ""), "")
+        # 负责区域：兼容 area_cd（新）和 area_id（旧数据）
+        _area_val = str(cust.get("area") or "")
+        cust["area_nm"] = cache["area"].get(_area_val, "") or cache["area_by_id"].get(_area_val, "")
+        # 环线位置（WZ 系统字典）
+        cust["location_nm"] = cache["wz"].get(cust.get("location", ""), "")
         # POS 状态（posstatus1 是子码，无独立中文名）
         cust["posstatus_nm"] = cache.get("ps", {}).get(cust.get("posstatus", ""), "")
         # 设备状态
@@ -590,22 +593,36 @@ class SystemService:
         # 生命周期状态
         cust["customer_status_nm"] = cache.get("cs", {}).get(cust.get("customer_status", ""), "")
         cust["source_type_nm"] = cache.get("src", {}).get(cust.get("source_type", ""), "")
-        # 行政区域
+        # 行政区域（老字段）
         cust["country_nm"] = cache.get("country", {}).get(cust.get("country_cd", ""), "")
         cust["prvn_nm"] = cache.get("province", {}).get(cust.get("prvn_cd", ""), "")
         cust["city_nm"] = cache.get("city", {}).get(cust.get("city_cd", ""), "")
         cust["town_nm"] = cache.get("town", {}).get(cust.get("town_cd", ""), "")
+        # 国标地理字段名称解析
+        cust["geo_prvn_nm"] = cache.get("geo_province", {}).get(cust.get("geo_prvn_cd", "") or "", "")
+        cust["geo_city_nm"] = cache.get("geo_city", {}).get(cust.get("geo_city_cd", "") or "", "")
+        cust["geo_area_nm"] = cache.get("geo_area", {}).get(cust.get("geo_area_cd", "") or "", "")
+        # 街道数据量大，按需查询
+        street_cd = cust.get("geo_street_cd") or ""
+        if street_cd:
+            from app.models.master import GeoStreet
+            s = db.session.get(GeoStreet, street_cd)
+            cust["geo_street_nm"] = s.name if s else ""
+        else:
+            cust["geo_street_nm"] = ""
         return cust
 
     @staticmethod
     def _build_ref_cache() -> dict[str, dict[str, str]]:
         """构建码表查找缓存。"""
         repo = SystemRepository()
-        cache: dict[str, dict[str, str]] = {"bt": {}, "yb": {}, "zf": {}, "commode": {}, "area": {}}
+        cache: dict[str, dict[str, str]] = {"bt": {}, "yb": {}, "zf": {}, "commode": {}, "area": {}, "area_by_id": {}, "wz": {}, "py": {}}
         for s in repo.get_syscodes("BT"):
             cache["bt"][s.code_cd] = s.code_nm or ""
         for s in repo.get_syscodes("YB"):
             cache["yb"][s.code_cd] = s.code_nm or ""
+        for s in repo.get_syscodes("PY"):
+            cache["py"][s.code_cd] = s.code_nm or ""
         for s in repo.get_syscodes("ZF"):
             cache["zf"][s.code_cd] = s.code_nm or ""
         for s in repo.get_syscodes("PS"):
@@ -623,10 +640,13 @@ class SystemService:
         for cc in repo.get_cust_classes():
             cache["custclass"] = cache.get("custclass", {})
             cache["custclass"][cc.class_cd] = cc.class_nm or ""
-        for c in repo.get_commodes():
-            cache["commode"][c.cmm_cd] = c.cmm_nm or ""
+        for c in repo.get_syscodes("CM"):
+            cache["commode"][c.code_cd] = c.code_nm or ""
         for a in repo.get_areas():
             cache["area"][a.area_cd] = a.name or a.area_nm or ""
+            cache["area_by_id"][str(a.area_id)] = a.name or a.area_nm or ""
+        for s in repo.get_syscodes("WZ"):
+            cache["wz"][s.code_cd] = s.code_nm or ""
         for c in repo.get_countries():
             cache["country"] = cache.get("country", {})
             cache["country"][c.country_cd] = c.country_nm or ""
@@ -639,6 +659,17 @@ class SystemService:
         for t in repo.get_towns():
             cache["town"] = cache.get("town", {})
             cache["town"][t.town_cd] = t.town_nm or ""
+        # 国标地理码表
+        for p in repo.get_geo_provinces():
+            cache["geo_province"] = cache.get("geo_province", {})
+            cache["geo_province"][p.code] = p.name or ""
+        for c in repo.get_geo_cities():
+            cache["geo_city"] = cache.get("geo_city", {})
+            cache["geo_city"][c.code] = c.name or ""
+        for a in repo.get_geo_areas():
+            cache["geo_area"] = cache.get("geo_area", {})
+            cache["geo_area"][a.code] = a.name or ""
+        # 街道数据量4万条，不全量缓存，按需查询
         return cache
 
     def list_customers(
@@ -647,9 +678,12 @@ class SystemService:
         per_page: int = 20,
         class_cd: str | None = None,
         search: str | None = None,
+        customer_status: str | None = None,
+        useflg: str | None = None,
     ) -> dict[str, Any]:
         items, total = self._repo.get_customers(
-            page=page, per_page=per_page, class_cd=class_cd, search=search
+            page=page, per_page=per_page, class_cd=class_cd, search=search,
+            customer_status=customer_status, useflg=useflg,
         )
         resolved = [self._resolve_customer_refs(c.to_dict()) for c in items]
         return {"items": resolved, "total": total}
@@ -1046,6 +1080,24 @@ class SystemService:
 
     def get_towns(self, city_cd: str | None = None) -> list[dict[str, Any]]:
         return [t.to_dict() for t in self._repo.get_towns(city_cd)]
+
+    # ========== 国标地理表（geo_*）==========
+
+    def get_geo_provinces(self) -> list[dict[str, Any]]:
+        """国标省级列表。"""
+        return [p.to_dict() for p in self._repo.get_geo_provinces()]
+
+    def get_geo_cities(self, province_code: str | None = None) -> list[dict[str, Any]]:
+        """国标地级市列表。"""
+        return [c.to_dict() for c in self._repo.get_geo_cities(province_code)]
+
+    def get_geo_areas(self, city_code: str | None = None, province_code: str | None = None) -> list[dict[str, Any]]:
+        """国标区县列表。"""
+        return [a.to_dict() for a in self._repo.get_geo_areas(city_code, province_code)]
+
+    def get_geo_streets(self, area_code: str | None = None, city_code: str | None = None) -> list[dict[str, Any]]:
+        """国标街道列表。"""
+        return [s.to_dict() for s in self._repo.get_geo_streets(area_code, city_code)]
 
     # ========== SupplierClass CRUD ==========
 

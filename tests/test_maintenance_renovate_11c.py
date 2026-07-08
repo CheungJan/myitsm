@@ -18,6 +18,8 @@ from app.extensions import db
 from app.models.itsm import MaintenanceRenovate
 from app.models.master import Customer, CustPosRl, Eid, EidTrack
 from app.models.sales import PlanCust
+from app.models.system import SysParm
+from app.models.warehouse import StockIn, StockInDetail, Warehouse
 from app.repositories.itsm_repository import MaintenanceRenovateRepository
 from app.services.itsm_service import MaintenanceRenovateService
 
@@ -163,6 +165,12 @@ class TestMaintenanceRenovate11c:
             )
             assert old_rl.useflg == "0"
             assert old_rl.asset_status == "RETURNED"
+
+            # 校验旧机 tmm43_eid.sflg='3'（待检），对齐 PB USP_PLAN_CONFRIM
+            # 注：sflg='2' 是"已报废"，'3' 才是"待检/待核实"
+            old_eid = db.session.query(Eid).filter(Eid.eid == "EIDOLD0000001").first()
+            assert old_eid is not None
+            assert old_eid.sflg == "3"
 
             new_rl = (
                 db.session.query(CustPosRl)
@@ -329,3 +337,123 @@ class TestMaintenanceRenovate11c:
             # plan_status 仍回写（回写逻辑不依赖设备 ID）
             plan = db.session.get(PlanCust, "PL000020")
             assert plan.plan_status == "01"
+
+    def test_renovate_close_auto_creates_recycle_inbound(self, app: Flask) -> None:
+        """翻新单关单：配置了 renovate_return_whcd 且旧机为自有资产时，
+        自动创建回收入库草稿（IV=7）。
+        """
+        with app.app_context():
+            _seed_customer("CUST001", "CARD001")
+            # 旧机为自有资产（asset_owner='02'）
+            _seed_eid("EIDOLD0000050")
+            old_eid = db.session.query(Eid).filter(Eid.eid == "EIDOLD0000050").first()
+            old_eid.asset_owner = "02"
+            _seed_eid("EIDNEW0000050")
+            _seed_rl("CUST001", "EIDOLD0000050")
+            renovate = _seed_renovate(
+                old_device_id="EIDOLD0000050",
+                new_device_id="EIDNEW0000050",
+            )
+            db.session.commit()
+
+            # 配置仓库（get_or_create）
+            wh = db.session.get(Warehouse, "W1")
+            if wh is None:
+                wh = Warehouse(whcd="W1", whnm="回收仓", whtyp="01", opercd="T00001")
+                db.session.add(wh)
+            sp = db.session.get(SysParm, "stock_in_whcd_7")
+            if sp is None:
+                db.session.add(SysParm(parm_cd="stock_in_whcd_7", parm_nm="翻新返还仓", parm_val="W1"))
+            else:
+                sp.parm_val = "W1"
+            db.session.commit()
+
+            svc = MaintenanceRenovateService()
+            _transition_to_5(svc, renovate.renew_id)
+
+            # 校验创建入库草稿 IV=7
+            stock_in = (
+                db.session.query(StockIn)
+                .filter(
+                    StockIn.refbillid == renovate.renew_id,
+                    StockIn.invtyp == "7",
+                )
+                .first()
+            )
+            assert stock_in is not None, "应自动创建回收入库草稿"
+            assert stock_in.whcd == "W1"
+            assert stock_in.auditflg == "0"  # 草稿
+
+            # 校验明细
+            details = (
+                db.session.query(StockInDetail)
+                .filter(StockInDetail.inbillid == stock_in.inbillid)
+                .all()
+            )
+            assert len(details) == 1
+            assert details[0].eid == "EIDOLD0000050"
+
+    def test_renovate_close_no_whcd_no_inbound(self, app: Flask) -> None:
+        """翻新单关单：未配置 renovate_return_whcd 时不创建入库草稿。"""
+        with app.app_context():
+            _seed_customer("CUST001", "CARD001")
+            _seed_eid("EIDOLD0000060")
+            old_eid = db.session.query(Eid).filter(Eid.eid == "EIDOLD0000060").first()
+            old_eid.asset_owner = "02"
+            _seed_eid("EIDNEW0000060")
+            _seed_rl("CUST001", "EIDOLD0000060")
+            renovate = _seed_renovate(
+                old_device_id="EIDOLD0000060",
+                new_device_id="EIDNEW0000060",
+            )
+            db.session.commit()
+
+            # 确保未配置 sysparm（删除可能存在的配置）
+            sp = db.session.get(SysParm, "stock_in_whcd_7")
+            if sp is not None:
+                db.session.delete(sp)
+            db.session.commit()
+
+            svc = MaintenanceRenovateService()
+            _transition_to_5(svc, renovate.renew_id)
+
+            stock_in = (
+                db.session.query(StockIn)
+                .filter(StockIn.refbillid == renovate.renew_id)
+                .first()
+            )
+            assert stock_in is None, "未配置仓库不应创建入库草稿"
+
+    def test_renovate_close_customer_asset_no_inbound(self, app: Flask) -> None:
+        """翻新单关单：旧机为客户资产（asset_owner='01'）时不创建入库草稿。"""
+        with app.app_context():
+            _seed_customer("CUST001", "CARD001")
+            _seed_eid("EIDOLD0000070")
+            old_eid = db.session.query(Eid).filter(Eid.eid == "EIDOLD0000070").first()
+            old_eid.asset_owner = "01"  # 客户资产
+            _seed_eid("EIDNEW0000070")
+            _seed_rl("CUST001", "EIDOLD0000070")
+            renovate = _seed_renovate(
+                old_device_id="EIDOLD0000070",
+                new_device_id="EIDNEW0000070",
+            )
+            wh = db.session.get(Warehouse, "W1")
+            if wh is None:
+                wh = Warehouse(whcd="W1", whnm="回收仓", whtyp="01", opercd="T00001")
+                db.session.add(wh)
+            sp = db.session.get(SysParm, "stock_in_whcd_7")
+            if sp is None:
+                db.session.add(SysParm(parm_cd="stock_in_whcd_7", parm_nm="翻新返还仓", parm_val="W1"))
+            else:
+                sp.parm_val = "W1"
+            db.session.commit()
+
+            svc = MaintenanceRenovateService()
+            _transition_to_5(svc, renovate.renew_id)
+
+            stock_in = (
+                db.session.query(StockIn)
+                .filter(StockIn.refbillid == renovate.renew_id)
+                .first()
+            )
+            assert stock_in is None, "客户资产不应创建回收入库草稿"

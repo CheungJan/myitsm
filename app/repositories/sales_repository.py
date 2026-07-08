@@ -24,8 +24,24 @@ def _gen_id(prefix: str = "") -> str:
 
 
 def _gen_plan_id() -> str:
-    """生成10位计划编号。"""
-    return uuid.uuid4().hex[:10].upper()
+    """生成预计划编号：PL + 6位数字自增（对齐 PB plan_cust.planno 规则）。
+
+    格式：PL000001 ~ PL999999，从 plan_cust 表中 PL 开头最大编号 +1。
+    非 PL 开头的历史记录（如 UUID）不参与计数，避免冲突。
+    """
+    # 查询当前 PL 开头的最大编号
+    max_planno = (
+        db.session.query(PlanCust.planno)
+        .filter(PlanCust.planno.like("PL%"))
+        .order_by(desc(PlanCust.planno))
+        .first()
+    )
+    if max_planno and max_planno[0]:
+        # 提取数字部分 +1
+        seq = int(max_planno[0][2:]) + 1
+    else:
+        seq = 1
+    return f"PL{seq:06d}"
 
 
 class PlanCustRepository:
@@ -39,6 +55,7 @@ class PlanCustRepository:
     def list_by_filters(
         plantyp: str | None = None,
         plan_status: str | None = None,
+        exclude_plan_status: str | None = None,
         custcd: str | None = None,
         planno: str | None = None,
         custnm: str | None = None,
@@ -58,6 +75,8 @@ class PlanCustRepository:
             query = query.filter(PlanCust.plantyp == plantyp)
         if plan_status:
             query = query.filter(PlanCust.plan_status == plan_status)
+        if exclude_plan_status:
+            query = query.filter(PlanCust.plan_status != exclude_plan_status)
         if custcd:
             query = query.filter(PlanCust.custcd == custcd)
         if custnm:
@@ -97,7 +116,8 @@ class PlanCustRepository:
     @staticmethod
     def update(record: PlanCust, data: dict[str, Any]) -> PlanCust:
         for key, value in data.items():
-            setattr(record, key, value)
+            if hasattr(record, key):
+                setattr(record, key, value)
         return record
 
     @staticmethod
@@ -153,6 +173,20 @@ class PlanServeRepository:
             .order_by(desc(PlanServe.gendate))
             .all()
         )
+
+    @staticmethod
+    def count_by_plan(planno: str, status: str | None = None) -> int:
+        """统计指定预计划的呼出单数量。
+
+        - status=None：全部
+        - status='00'：待呼出
+        - status='01'：已呼出
+        - status='09'：已作废
+        """
+        query = db.session.query(PlanServe).filter(PlanServe.planno == planno)
+        if status:
+            query = query.filter(PlanServe.status == status)
+        return query.count()
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> PlanServe:

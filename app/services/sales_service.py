@@ -13,6 +13,7 @@ from typing import Any
 
 from app.extensions import db
 from app.models.master import CustClass, Customer
+from app.models.sales import PlanCust, PlanServe
 from app.repositories.sales_repository import (
     PlanCustRepository,
     PlanServeRepository,
@@ -236,24 +237,18 @@ def _build_downstream_payload(record: Any, plantyp: str, creator: str) -> dict[s
                 "count": 1,
             }
         )
-    elif plantyp == "10":  # 磁卡号变更（含三种子类型）
-        # BG=设备转移(选了源设备), CK=磁卡号变更(源≠目标), BQ=信息变更(源=目标或未选源)
-        src_card = (record.new_custcard or "").strip()
-        tgt_card = (record.custcard or "").strip()
-        has_device_change = bool((record.new_posid or "").strip())
-        if has_device_change:
-            change_type = "BG"  # 磁卡号+设备同时变更（跨客户设备转移）
-        elif src_card and tgt_card and src_card != tgt_card:
-            change_type = "CK"  # 仅磁卡号变更
-        else:
-            change_type = "BQ"  # 信息变更（地址/电话/联系人等）
+    elif plantyp == "10":  # 磁卡号变更（对齐 PB USP_PLAN_IMPLE 硬编码 CK）
+        # PB 当前版本所有新变更单 CHANGE_TYPE 均为 'CK'，设备转移由关单时
+        # 按 device_id + new_store_id 隐式判断（对齐 USP_PLAN_CONFRIM V_NEW_POSID）
+        # device_id 优先取 new_posid（换设备场景），为空则回退 posid（不换设备，
+        # 源磁卡号设备转移到新磁卡号下，对齐 PB V_NEW_POSID 非空分支）
         base.update(
             {
                 "store_id": record.custcd or "",
-                "change_type": change_type,
+                "change_type": "CK",
                 "new_store_card": record.new_custcard or "",
                 "new_store_id": record.new_custcd or "",
-                "device_id": record.new_posid or None,
+                "device_id": record.new_posid or record.posid or None,
             }
         )
     elif plantyp == "20":  # 旧机翻新
@@ -331,13 +326,21 @@ class PlanCustService:
         data = record.to_dict()
         if record.custcd:
             cust = db.session.get(Customer, record.custcd)
-            data["customer_status"] = cust.customer_status if cust else None
+            if cust:
+                data["customer_status"] = cust.customer_status
+                # 从客户表补充地理信息字段（plan_cust 表无这些字段）
+                for geo_field in (
+                    "geo_prvn_cd", "geo_city_cd", "geo_area_cd",
+                    "geo_street_cd", "area_cd", "location",
+                ):
+                    data[geo_field] = getattr(cust, geo_field, None)
         return data
 
     @staticmethod
     def list_records(
         plantyp: str | None = None,
         plan_status: str | None = None,
+        exclude_plan_status: str | None = None,
         custcd: str | None = None,
         planno: str | None = None,
         custnm: str | None = None,
@@ -351,6 +354,7 @@ class PlanCustService:
         items, total = PlanCustRepository.list_by_filters(
             plantyp=plantyp,
             plan_status=plan_status,
+            exclude_plan_status=exclude_plan_status,
             custcd=custcd,
             planno=planno,
             custnm=custnm,
@@ -361,8 +365,81 @@ class PlanCustService:
             page=page,
             per_page=per_page,
         )
+        # 批量查询客户并补充地理信息字段
+        custcds = {item.custcd for item in items if item.custcd}
+        customers: dict[str, Customer] = {}
+        if custcds:
+            customers = {
+                c.cust_cd: c
+                for c in db.session.query(Customer).filter(
+                    Customer.cust_cd.in_(list(custcds))
+                ).all()
+            }
+        geo_fields = (
+            "geo_prvn_cd", "geo_city_cd", "geo_area_cd",
+            "geo_street_cd", "area_cd", "location",
+        )
+        # 批量补充计划任务呼出（servetyp=2）最新记录，供计划实施管理参考
+        plannos = [item.planno for item in items]
+        serve_map: dict[str, dict[str, Any]] = {}
+        if plannos:
+            from sqlalchemy import func as _func
+
+            subq = (
+                db.session.query(
+                    PlanServe.planno,
+                    _func.max(PlanServe.dtlid).label("max_dtlid"),
+                )
+                .filter(
+                    PlanServe.planno.in_(plannos),
+                    PlanServe.servetyp == "2",
+                )
+                .group_by(PlanServe.planno)
+                .subquery()
+            )
+            serve_rows = (
+                db.session.query(PlanServe)
+                .join(subq, PlanServe.dtlid == subq.c.max_dtlid)
+                .all()
+            )
+            for s in serve_rows:
+                serve_map[s.planno] = {
+                    "serve_status": s.status,
+                    "serve_task": s.serve_task,
+                    "serve_back": s.serve_back,
+                    "serve_mark": s.serve_mark,
+                    "serve_opdate": s.opdate,
+                    "serve_opercd": s.opercd,
+                }
+
+        # 批量查询是否存在未完成的实施请求呼出单（servetyp=2 且 status=00）
+        pending_imp_map: dict[str, bool] = {}
+        if plannos:
+            pending_rows = (
+                db.session.query(PlanServe.planno)
+                .filter(
+                    PlanServe.planno.in_(plannos),
+                    PlanServe.servetyp == "2",
+                    PlanServe.status == "00",
+                )
+                .group_by(PlanServe.planno)
+                .all()
+            )
+            pending_imp_map = {r[0]: True for r in pending_rows}
+
+        result_items = []
+        for item in items:
+            data = item.to_dict()
+            cust = customers.get(item.custcd) if item.custcd else None
+            data["customer_status"] = cust.customer_status if cust else None
+            if cust:
+                for field in geo_fields:
+                    data[field] = getattr(cust, field, None)
+            data["latest_serve"] = serve_map.get(item.planno)
+            data["has_pending_imp_serve"] = pending_imp_map.get(item.planno, False)
+            result_items.append(data)
         return {
-            "items": [item.to_dict() for item in items],
+            "items": result_items,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -380,7 +457,17 @@ class PlanCustService:
         # 过滤 Schema 中的非模型字段（call_serve/serve_task 仅在保存时通过 PlanServe 服务处理）
         model_data = {k: v for k, v in data.items() if k not in ("call_serve", "serve_task")}
 
+        # is_outflag 三态初始化：仅商用仓库(pos_from=00)来源需出库，置 '0' 待出库；
+        # 其他来源（门店移机/烟草直调/IT公司/海晟公司等）无出库概念，置 'N/A' 不适用
+        _pos_from_init = (model_data.get("pos_from") or "").strip()
+        model_data["is_outflag"] = "0" if _pos_from_init == "00" else "N/A"
+
         # 磁卡号唯一性检查
+        # custcard 是当前门店磁卡号：
+        # - plantyp=00 全新开通：新客户的新磁卡号
+        # - plantyp=10 磁卡号变更：当前门店变更后的新磁卡号
+        # - plantyp=20/30/40：老客户已有磁卡号（仍校验避免冲突）
+        # new_custcard 是源门店磁卡号（new_ 前缀=源），不校验
         custcard = model_data.get("custcard")
         if custcard:
             existing_customer = CustomerService.check_card_exists(custcard)
@@ -421,7 +508,7 @@ class PlanCustService:
 
         # PB cbx_serve 勾选:生成 servetyp=1 预计划呼出单,并更新 serve_status=01
         if data.get("call_serve"):
-            PlanServeRepository.create(
+            serve_result = PlanServeService.create(
                 {
                     "planno": record.planno,
                     "plantyp": plantyp,
@@ -431,13 +518,22 @@ class PlanCustService:
                 },
                 creator,
             )
-            record.serve_status = "01"
+            # PlanServeService.create 内部已同步 serve_status=01
+            if not serve_result.get("success", True):
+                db.session.rollback()
+                return {"success": False, "error": serve_result.get("error", "呼出单创建失败")}
 
         # 客户生命周期：创建 TEMP 客户
-        custcd = data.get("custcd")
-        if custcd:
+        # plantyp=00 全新开通：custcd 可能为空（手动输入磁卡号的新用户），
+        #   由 CustomerService.create_temp_customer 按 PB 规则自动生成 custcd
+        #   并回写到预计划记录，保证客户主数据唯一性
+        # 其他 plantyp：custcd 必须非空（老客户业务），为空时跳过
+        custcd = data.get("custcd") or ""
+        plantyp_for_cust = data.get("plantyp") or ""
+        need_create_cust = custcd or plantyp_for_cust == "00"
+        if need_create_cust:
             try:
-                CustomerService.create_temp_customer(
+                cust_rec = CustomerService.create_temp_customer(
                     data={
                         "custcd": custcd,
                         "custnm": data.get("custnm"),
@@ -446,10 +542,30 @@ class PlanCustService:
                         "address": data.get("address"),
                         "contactor": data.get("contactor"),
                         "phoneno": data.get("phoneno"),
+                        "yun_type": data.get("yun_type"),
+                        # PB同步字段：从plan_cust同步到tmm22_customers
+                        "classcd": data.get("classcd"),
+                        "pptcode": data.get("pptcode"),
+                        "commmode": data.get("commmode"),
+                        "is_contract": data.get("is_contract"),
+                        "jl_contactor": data.get("jl_contactor"),
+                        "jl_phoneno": data.get("jl_phoneno"),
+                        "custrnm": data.get("custrnm"),
+                        # 地理/区域/环线信息（plan_cust 表无这些字段，必须同步到客户表）
+                        "geo_prvn_cd": data.get("geo_prvn_cd"),
+                        "geo_city_cd": data.get("geo_city_cd"),
+                        "geo_area_cd": data.get("geo_area_cd"),
+                        "geo_street_cd": data.get("geo_street_cd"),
+                        "area_cd": data.get("area_cd"),
+                        "location": data.get("location"),
                     },
                     preplan_id=record.planno,
                     creator=creator,
+                    plantyp=plantyp_for_cust,
                 )
+                # 回写自动生成的 custcd 到预计划记录
+                if not custcd and cust_rec and cust_rec.cust_cd:
+                    record.custcd = cust_rec.cust_cd
             except Exception as exc:
                 db.session.rollback()
                 return {"success": False, "error": f"创建临时客户失败: {exc}"}
@@ -538,6 +654,33 @@ class PlanCustService:
                 "error": f"下游单据已生成（{record.imple_billid}），不可重复实施",
             }
 
+        # 前置条件1：制定计划必须完成（imple_date 非空）
+        if not record.imple_date:
+            return {
+                "success": False,
+                "error": "请先在'制定计划'中填写实施日期后再进行实施确认",
+            }
+
+        # 前置条件2：实施请求呼出（servetyp=2）若存在，必须全部完成（status=01）
+        # 呼出非强制，但已创建的呼出单必须反馈完成，避免遗漏客户确认
+        pending_imp_serve = (
+            db.session.query(PlanServe)
+            .filter(
+                PlanServe.planno == planno,
+                PlanServe.servetyp == "2",
+                PlanServe.status == "00",
+            )
+            .first()
+        )
+        if pending_imp_serve:
+            return {
+                "success": False,
+                "error": (
+                    f"存在未完成的实施请求呼出单（dtlid={pending_imp_serve.dtlid}），"
+                    "请先在呼出管理中完成反馈后再实施确认"
+                ),
+            }
+
         # plantyp 路由 → 通过 ITSM Repository 直接创建（同一事务）
         repo_name = _PLANTYP_REPO_MAP.get(plantyp)
         downstream_id = None
@@ -583,8 +726,9 @@ class PlanCustService:
         # 对齐 PB status='04'（分派中/实施中），complete() 和 create_outbound() 前置要求 04
         record.plan_status = "04"
 
-        # 方案 A 自动出库：posid 已选时自动创建 OV=1 出库单（带 posid EID）
-        if record.posid:
+        # 方案 A 自动出库：商用仓库来源 + posid 已选时自动创建 OV=1 出库单（带 posid EID）
+        # 非商用仓库来源（pos_from != '00'）不涉及我方出库，跳过
+        if record.posid and (record.pos_from or "").strip() == "00":
             try:
                 from app.models.master import Eid as _EidAuto
 
@@ -729,6 +873,38 @@ class PlanCustService:
         if record is None:
             return None
 
+        # 制定计划场景校验：若本次更新包含 imple_date 字段（制定/修改实施计划），
+        # 且本预计划存在未完成的实施请求呼出单（servetyp=2 且 status=00），则拒绝。
+        # 呼出非强制，但已创建的实施请求呼出单必须先完成反馈，避免遗漏客户确认。
+        if "imple_date" in data:
+            # 状态校验：仅 plan_status in ('00','02','04') 允许修改实施计划字段
+            # 00 计划中/02 分派中：制定或修改计划
+            # 04 实施中：允许补录/修正实施日期（下游单据已生成但可补充日期信息）
+            # 01 计划完成/08 退回/09 作废：不允许修改
+            current_status = record.plan_status or "00"
+            if current_status not in ("00", "02", "04"):
+                return {
+                    "success": False,
+                    "error": f"预计划状态为 {current_status}，仅 00（计划中）、02（分派中）或 04（实施中）可制定/修改实施计划",
+                }
+            pending_imp_serve = (
+                db.session.query(PlanServe)
+                .filter(
+                    PlanServe.planno == planno,
+                    PlanServe.servetyp == "2",
+                    PlanServe.status == "00",
+                )
+                .first()
+            )
+            if pending_imp_serve:
+                return {
+                    "success": False,
+                    "error": (
+                        f"存在未完成的实施请求呼出单（dtlid={pending_imp_serve.dtlid}），"
+                        "请先在呼出管理中完成反馈后再制定/修改实施计划"
+                    ),
+                }
+
         # 磁卡号变更检测：custcard 字段变化时同步 Customer 表
         old_custcard = record.custcard
         new_custcard = data.get("custcard")
@@ -749,8 +925,84 @@ class PlanCustService:
             if record.custcd:
                 CustomerService.update_customer_card(record.custcd, new_custcard)
 
-        # 批量 setattr 剩余字段
+        # 提取呼出请求字段（不直接设置到 plan_cust 模型）
+        call_serve = data.pop("call_serve", None)
+        serve_task = data.pop("serve_task", None)
+
+        # DateTime 字段空字符串归一为 None，避免 SQLAlchemy 解析失败导致字段未更新
+        for _dt_field in ("imple_date", "send_date", "train_date"):
+            if _dt_field in data and data[_dt_field] in ("", None):
+                data[_dt_field] = None
+
+        # is_outflag 三态维护：当本次更新变更了 pos_from，按新来源重算标志。
+        # 已出库（is_outflag='1'，OV=1 出库单已审核）不覆盖，避免抹掉出库事实。
+        if "pos_from" in data and (record.is_outflag or "") != "1":
+            _pos_from_upd = (data.get("pos_from") or "").strip()
+            data["is_outflag"] = "0" if _pos_from_upd == "00" else "N/A"
+
+        # 批量 setattr 剩余字段到预计划表
         PlanCustRepository.update(record, data)
+        
+        # 处理呼出请求：编辑时再次勾选 call_serve，更新或创建呼出单
+        if call_serve:
+            pending = (
+                db.session.query(PlanServe)
+                .filter(PlanServe.planno == planno, PlanServe.status == "00")
+                .first()
+            )
+            if pending:
+                # 更新现有待呼出单的任务描述
+                if serve_task:
+                    pending.serve_task = serve_task
+                record.serve_status = "01"
+            else:
+                # 创建新呼出单
+                PlanServeService.create(
+                    {
+                        "planno": record.planno,
+                        "plantyp": record.plantyp,
+                        "servetyp": "1",
+                        "serve_task": serve_task or f"预计划呼出-{record.planno}",
+                        "commmode": data.get("commmode"),
+                    },
+                    operator,
+                )
+        
+        # 同步字段到客户表（如果存在关联客户）
+        if record.custcd:
+            customer_sync_data = {}
+            # 检查需要同步的字段
+            sync_fields = [
+                "classcd", "busityp", "pptcode", "commmode",
+                "is_contract", "yun_type", "jl_contactor",
+                "jl_phoneno", "custnm", "address",
+                "contactor", "phoneno",
+                "geo_prvn_cd", "geo_city_cd", "geo_area_cd",
+                "geo_street_cd", "area_cd", "location",
+                # custrnm 在 plan_cust 中表示理论订货日（1-7），不同步到客户表
+            ]
+            for field in sync_fields:
+                if field in data:
+                    # 字段名映射：plan_cust -> tmm22_customers
+                    customer_field = field
+                    if field == "classcd":
+                        customer_field = "class_cd"
+                    elif field == "busityp":
+                        customer_field = "busi_typ"
+                    elif field == "pptcode":
+                        customer_field = "ppt_code"
+                    elif field == "commmode":
+                        customer_field = "comm_mode"
+                    elif field == "custnm":
+                        customer_field = "cust_nm"
+                    elif field == "phoneno":
+                        customer_field = "phone_no"
+                    customer_sync_data[customer_field] = data[field]
+            
+            # 更新客户表
+            if customer_sync_data:
+                CustomerService.update_customer_fields(record.custcd, customer_sync_data)
+        
         db.session.commit()
 
         # 库存不足自动触发采购需求(先保存草稿、后续才选机型场景)
@@ -897,6 +1149,13 @@ class PlanCustService:
         if record is None:
             return {"success": False, "error": "预计划不存在"}
 
+        # P1：出库门槛判定 —— 仅商用仓库来源（pos_from='00'）需要我方出库
+        if (record.pos_from or "").strip() != "00":
+            return {
+                "success": False,
+                "error": f"设备来源非商用仓库（pos_from={record.pos_from or ''}），无需出库",
+            }
+
         current = record.plan_status or "00"
         if current != "04":
             return {
@@ -963,8 +1222,8 @@ class PlanCustService:
             return {"success": False, "error": str(result["error"])}
 
         outbillid = result.get("outbillid", "")
-        # 记录出库单号到预计划
-        record.is_outflag = "1"
+        # 注：is_outflag 不在此置 '1'。草稿创建阶段仍为 '0'（待出库），
+        # 待 OV=1 出库单审核通过后由 StockOutService.audit 回写 '1'（已出库）。
 
         db.session.commit()
         return {
@@ -972,6 +1231,141 @@ class PlanCustService:
             "planno": planno,
             "outbillid": outbillid,
             "eid_count": len(details_eid),
+        }
+
+    @staticmethod
+    def batch_create_outbound(
+        items: list[dict[str, Any]],
+        whcd: str,
+        operator: str,
+    ) -> dict[str, object]:
+        """批量生成 OV=1 销售出库草稿（方案B：多个预计划合到一个出库单）。
+
+        前置条件：每个预计划 plan_status='04' 且 pos_from='00'。
+        明细行记 ref_planno，审核后按 ref_planno 批量回写 is_outflag='1'。
+
+        参数 items：[{ planno, eids: [eid, ...] }, ...]
+          - 方案 A（预绑定）：预计划已选 posid，eids 可省略，自动带 [posid]
+          - 方案 B（发货时绑定）：传入 eids 列表
+
+        去重：任一预计划已有 OV=1 未作废出库单则整批拒绝（避免部分成功）。
+        """
+        if not items:
+            return {"success": False, "error": "未提供批量出库项"}
+        if not whcd:
+            return {"success": False, "error": "未提供出库仓库"}
+
+        # 预校验所有预计划
+        plannos: list[str] = []
+        for it in items:
+            planno = (it.get("planno") or "").strip()
+            if not planno:
+                return {"success": False, "error": "存在空的预计划号"}
+            plannos.append(planno)
+
+        from app.models.warehouse import StockOut, StockOutDetailEid
+
+        # 去重检查：任一预计划已有未作废 OV=1 出库单（refbillid 或 明细行 ref_planno）
+        existing = (
+            db.session.query(StockOut)
+            .filter(
+                StockOut.invtyp == "1",
+                StockOut.auditflg != "V",
+                StockOut.refbillid.in_(plannos),
+            )
+            .first()
+        )
+        if existing:
+            return {
+                "success": False,
+                "error": f"预计划 {existing.refbillid} 已存在出库单 {existing.outbillid}，请先处理后再批量出库",
+            }
+        # 检查明细行 ref_planno 是否已关联任一预计划
+        existing_detail = (
+            db.session.query(StockOutDetailEid)
+            .filter(
+                StockOutDetailEid.ref_planno.in_(plannos),
+            )
+            .join(StockOut, StockOutDetailEid.outbillid == StockOut.outbillid)
+            .filter(StockOut.invtyp == "1", StockOut.auditflg != "V")
+            .first()
+        )
+        if existing_detail:
+            return {
+                "success": False,
+                "error": f"预计划 {existing_detail.ref_planno} 已在出库单 {existing_detail.outbillid} 明细中，请先处理后再批量出库",
+            }
+
+        # 构造明细：每个预计划的 EID 明细行记 ref_planno
+        details_eid: list[dict[str, Any]] = []
+        from app.models.master import Eid as EidModel
+
+        for it in items:
+            planno = (it.get("planno") or "").strip()
+            record = PlanCustRepository.get_by_id(planno)
+            if record is None:
+                return {"success": False, "error": f"预计划 {planno} 不存在"}
+            if (record.pos_from or "").strip() != "00":
+                return {
+                    "success": False,
+                    "error": f"预计划 {planno} 设备来源非商用仓库（pos_from={record.pos_from or ''}），无需出库",
+                }
+            if (record.plan_status or "00") != "04":
+                return {
+                    "success": False,
+                    "error": f"预计划 {planno} 状态为 {record.plan_status or '00'}，需要 04（实施中）",
+                }
+
+            eids = it.get("eids") or None
+            if not eids and record.posid:
+                eids = [record.posid]
+            if not eids:
+                return {
+                    "success": False,
+                    "error": f"预计划 {planno} 未选 posid 且未传 eids，无法构造出库明细",
+                }
+
+            for eid in eids:
+                eid_rec = db.session.query(EidModel).filter(EidModel.eid == eid).first()
+                if eid_rec is None:
+                    return {"success": False, "error": f"EID {eid} 不存在"}
+                if not eid_rec.itemcd:
+                    return {"success": False, "error": f"EID {eid} 无机型信息"}
+                details_eid.append(
+                    {
+                        "eid": eid,
+                        "itemcd": eid_rec.itemcd,
+                        "outqty": 1,
+                        "ref_planno": planno,
+                    }
+                )
+
+        # 创建单个 OV=1 出库单（refbillid 留空或记首个 planno，审核回写按明细行 ref_planno）
+        from app.services.warehouse_service import StockOutService
+
+        first_planno = plannos[0]
+        out_data: dict[str, Any] = {
+            "invtyp": "1",
+            "whcd": whcd,
+            "refbillid": first_planno,
+            "memo": f"批量销售出库 {len(plannos)} 个预计划",
+        }
+        result = StockOutService.create(
+            data=out_data,
+            details_eid=details_eid,
+            creator=operator,
+        )
+        if not result.get("success") and result.get("error"):
+            return {"success": False, "error": str(result["error"])}
+
+        outbillid = result.get("outbillid", "")
+        db.session.commit()
+        return {
+            "success": True,
+            "outbillid": outbillid,
+            "planno_count": len(plannos),
+            "eid_count": len(details_eid),
+            "plannos": plannos,
         }
 
 
@@ -992,8 +1386,29 @@ class PlanServeService:
 
     @staticmethod
     def list_by_plan(planno: str) -> list[dict[str, Any]]:
+        from app.models.system import User
         items = PlanServeRepository.list_by_plan(planno)
-        return [item.to_dict() for item in items]
+        rows = [item.to_dict() for item in items]
+        # 批量查询人员编码对应姓名（genercd / opercd 为 PB 遗留定长字段，可能带尾部空格，需 strip 后再匹配）
+        cds: set[str] = set()
+        for r in rows:
+            if r.get("genercd"):
+                cds.add(str(r["genercd"]).strip())
+            if r.get("opercd"):
+                cds.add(str(r["opercd"]).strip())
+        if cds:
+            user_map: dict[str, str] = {
+                u.user_cd: (u.user_nm or u.user_cd)
+                for u in db.session.query(User).filter(User.user_cd.in_(cds)).all()
+            }
+        else:
+            user_map = {}
+        for r in rows:
+            gcd = str(r.get("genercd") or "").strip()
+            ocd = str(r.get("opercd") or "").strip()
+            r["genercd_nm"] = user_map.get(gcd, gcd)
+            r["opercd_nm"] = user_map.get(ocd, ocd)
+        return rows
 
     @staticmethod
     def list_records(
@@ -1014,13 +1429,194 @@ class PlanServeService:
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        """创建呼出单（对齐 PB cbx_serve 勾选生成 PLAN_SERVE 记录）。
+
+        - 同一预计划下若已存在 status=00 待呼出单，禁止重复创建（引导用户先完成或作废）
+        - 创建后同步 plan_cust.serve_status=01（已要求呼出）
+        """
+        planno = data.get("planno") or ""
+        if planno:
+            pending = (
+                db.session.query(PlanServe)
+                .filter(PlanServe.planno == planno, PlanServe.status == "00")
+                .first()
+            )
+            if pending:
+                return {
+                    "success": False,
+                    "error": f"预计划 {planno} 已有待呼出单（dtlid={pending.dtlid}），请先完成或作废后再请求再次呼出",
+                }
         record = PlanServeRepository.create(data, creator)
+        # 同步 plan_cust.serve_status=01（已要求呼出）
+        if planno:
+            plan = PlanCustRepository.get_by_id(planno)
+            if plan:
+                plan.serve_status = "01"
         db.session.commit()
-        return record.to_dict()
+        return {"success": True, **record.to_dict()}
+
+    @staticmethod
+    def list_overview(
+        planno: str | None = None,
+        custnm: str | None = None,
+        custcard: str | None = None,
+        plantyp: str | None = None,
+        plan_status: str | None = None,
+        servetyp: str | None = None,
+        serve_status: str | None = None,
+        serve_ercd: str | None = None,
+        only_pending: bool = False,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> dict[str, Any]:
+        """呼出管理列表（对齐 PB d_serve_list，按预计划聚合）。
+
+        以 plan_cust 为基准，关联 plan_serve 聚合：
+        - pre_count / pre_pending / pre_done：预计划呼出（servetyp=1）总数/待呼出/已呼出
+        - imp_count / imp_pending / imp_done：实施任务呼出（servetyp=2）总数/待呼出/已呼出
+        - latest_serve：最近一次呼出记录（用于展示呼出结果/反馈）
+        - serve_ercd：分配呼出人（plan_cust.serve_ercd）
+
+        - only_pending=True：仅返回存在 status=00 待呼出单的预计划
+        - servetyp 过滤：仅显示存在该类型呼出单的预计划
+        - serve_status 过滤：按呼出单状态过滤（00待呼出/01已呼出）
+        - serve_ercd 过滤：按分配呼出人过滤（话务台员工查本人单据）
+        """
+        from sqlalchemy import desc, func
+
+        query = db.session.query(PlanCust).filter(PlanCust.plan_status != "09")
+        if planno:
+            query = query.filter(PlanCust.planno.ilike(f"%{planno}%"))
+        if custnm:
+            query = query.filter(PlanCust.custnm.ilike(f"%{custnm}%"))
+        if custcard:
+            query = query.filter(PlanCust.custcard.ilike(f"%{custcard}%"))
+        if plantyp:
+            query = query.filter(PlanCust.plantyp == plantyp)
+        if plan_status:
+            query = query.filter(PlanCust.plan_status == plan_status)
+        if serve_ercd:
+            query = query.filter(PlanCust.serve_ercd == serve_ercd)
+
+        # 按 servetyp / serve_status 半连接过滤
+        serve_exists = (
+            db.session.query(PlanServe.dtlid)
+            .filter(PlanServe.planno == PlanCust.planno)
+        )
+        if servetyp:
+            serve_exists = serve_exists.filter(PlanServe.servetyp == servetyp)
+        if serve_status:
+            serve_exists = serve_exists.filter(PlanServe.status == serve_status)
+        query = query.filter(serve_exists.exists())
+
+        # 仅待呼出：覆盖 serve_status，强制 status=00
+        if only_pending:
+            pending_exists = (
+                db.session.query(PlanServe.dtlid)
+                .filter(
+                    PlanServe.planno == PlanCust.planno,
+                    PlanServe.status == "00",
+                )
+                .exists()
+            )
+            query = query.filter(pending_exists)
+
+        query = query.order_by(desc(PlanCust.gendate))
+        total: int = query.count()
+        plans: list[PlanCust] = query.offset((page - 1) * per_page).limit(per_page).all()
+
+        plannos = [p.planno for p in plans if p.planno]
+        # 批量聚合 plan_serve 计数（按 planno + servetyp + status 三维分组）
+        stats: dict[str, dict[str, dict[str, int]]] = {}
+        latest: dict[str, PlanServe] = {}
+        if plannos:
+            count_rows = (
+                db.session.query(
+                    PlanServe.planno,
+                    PlanServe.servetyp,
+                    PlanServe.status,
+                    func.count(PlanServe.dtlid),
+                )
+                .filter(PlanServe.planno.in_(plannos))
+                .group_by(PlanServe.planno, PlanServe.servetyp, PlanServe.status)
+                .all()
+            )
+            for pno, styp, st, cnt in count_rows:
+                key = pno or ""
+                typ = (styp or "0").zfill(1)
+                stats.setdefault(key, {"1": {"00": 0, "01": 0, "09": 0}, "2": {"00": 0, "01": 0, "09": 0}})
+                if typ in ("1", "2"):
+                    stats[key][typ][st or "00"] = int(cnt)
+            # 最近一条呼出记录（若 servetyp 过滤，则取该类型最近一条）
+            latest_rows = (
+                db.session.query(PlanServe)
+                .filter(PlanServe.planno.in_(plannos))
+            )
+            if servetyp:
+                latest_rows = latest_rows.filter(PlanServe.servetyp == servetyp)
+            latest_rows = latest_rows.order_by(PlanServe.planno, desc(PlanServe.gendate)).all()
+            for r in latest_rows:
+                if r.planno and r.planno not in latest:
+                    latest[r.planno] = r
+
+        items: list[dict[str, Any]] = []
+        for p in plans:
+            d = p.to_dict()
+            s = stats.get(p.planno, {"1": {"00": 0, "01": 0, "09": 0}, "2": {"00": 0, "01": 0, "09": 0}})
+            pre = s.get("1", {"00": 0, "01": 0, "09": 0})
+            imp = s.get("2", {"00": 0, "01": 0, "09": 0})
+            d["pre_count"] = pre["00"] + pre["01"] + pre["09"]
+            d["pre_pending"] = pre["00"]
+            d["pre_done"] = pre["01"]
+            d["imp_count"] = imp["00"] + imp["01"] + imp["09"]
+            d["imp_pending"] = imp["00"]
+            d["imp_done"] = imp["01"]
+            latest_rec = latest.get(p.planno)
+            if latest_rec:
+                d["latest_servetyp"] = latest_rec.servetyp
+                d["latest_serve_back"] = latest_rec.serve_back
+                d["latest_serve_mark"] = latest_rec.serve_mark
+                d["latest_gendate"] = latest_rec.gendate
+            else:
+                d["latest_servetyp"] = None
+                d["latest_serve_back"] = None
+                d["latest_serve_mark"] = None
+                d["latest_gendate"] = None
+            items.append(d)
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def assign_serve(planno: str, serve_ercd: str, operator: str) -> dict[str, Any]:
+        """分配/更换呼出人（对齐 PB d_serve_list.serve_ercd 字段）。
+
+        将 plan_cust.serve_ercd 设置为指定话务员编码。
+        - 未分配：首次分配
+        - 已分配：更换呼出人（原呼出人休息等场景）
+        - 作废状态：禁止操作
+        """
+        plan = PlanCustRepository.get_by_id(planno)
+        if plan is None:
+            return {"success": False, "error": "预计划不存在"}
+        if plan.plan_status == "09":
+            return {"success": False, "error": "预计划已作废，不可分配"}
+        plan.serve_ercd = serve_ercd
+        plan.opercd = operator
+        db.session.commit()
+        return {"success": True, "planno": planno, "serve_ercd": serve_ercd}
 
     @staticmethod
     def transition(dtlid: int, to_status: str, operator: str) -> dict[str, object]:
-        """呼出单状态流转：00待呼出→01已呼出→09作废。"""
+        """呼出单状态流转：00待呼出→01已呼出→09作废。
+
+        话务台呼出反馈后（00→01）将 plan_cust.serve_status 重置为 00，
+        允许用户再次请求呼出（对齐 PB：每一次呼出结束后才能再次请求呼出）。
+        """
         record = PlanServeRepository.get_by_id(dtlid)
         if record is None:
             return {"success": False, "error": "呼出单不存在"}
@@ -1037,6 +1633,12 @@ class PlanServeService:
             }
 
         PlanServeRepository.update_status(record, to_status)
+        # 00→01 已呼出：话务台反馈完成，重置 plan_cust.serve_status=00
+        # 允许再次请求呼出（对齐 PB：每次呼出结束后才能再次请求呼出）
+        if current == "00" and to_status == "01" and record.planno:
+            plan = PlanCustRepository.get_by_id(record.planno)
+            if plan:
+                plan.serve_status = "00"
         db.session.commit()
         return {"success": True, "dtlid": dtlid, "to_status": to_status}
 

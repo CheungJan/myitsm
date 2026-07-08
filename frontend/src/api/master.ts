@@ -240,6 +240,7 @@ export interface CustQuery {
     per_page?: number | string
     class_cd?: string
     search?: string
+    customer_status?: string
 }
 
 export function fetchCustClassTree() {
@@ -273,7 +274,7 @@ export function fetchAreas() {
 }
 
 export function fetchCommodes() {
-    return request.get<never, { data: { cmm_cd: string; cmm_nm: string }[] }>('/commodes')
+    return request.get<never, { data: { code_cd: string; code_nm: string }[] }>('/commodes')
 }
 
 export function fetchCountries() {
@@ -290,6 +291,29 @@ export function fetchCities(prvnCd?: string) {
 
 export function fetchTowns(cityCd?: string) {
     return request.get<never, { data: { town_cd: string; town_nm: string }[] }>('/towns', { params: cityCd ? { city_cd: cityCd } : {} })
+}
+
+// ---- 国标地理四级联动（geo_*）----
+export function fetchGeoProvinces() {
+    return request.get<never, { data: { code: string; name: string }[] }>('/geo/provinces')
+}
+export function fetchGeoCities(provinceCode?: string) {
+    return request.get<never, { data: { code: string; name: string; province_code: string }[] }>(
+        '/geo/cities', { params: provinceCode ? { province_code: provinceCode } : {} }
+    )
+}
+export function fetchGeoAreas(cityCode?: string, provinceCode?: string) {
+    const params: Record<string, string> = {}
+    if (cityCode) params.city_code = cityCode
+    else if (provinceCode) params.province_code = provinceCode
+    return request.get<never, { data: { code: string; name: string; city_code: string; province_code: string }[] }>(
+        '/geo/areas', { params }
+    )
+}
+export function fetchGeoStreets(areaCode?: string) {
+    return request.get<never, { data: { code: string; name: string; area_code: string }[] }>(
+        '/geo/streets', { params: areaCode ? { area_code: areaCode } : {} }
+    )
 }
 
 // ---- 客户 ----

@@ -16,6 +16,10 @@ from app.models.master import (
     CustPosRl,
     Eid,
     EidTrack,
+    GeoArea,
+    GeoCity,
+    GeoProvince,
+    GeoStreet,
     Item,
     ItemClass,
     PosREid,
@@ -158,16 +162,23 @@ class SystemRepository:
         db.session.commit()
 
     @staticmethod
-    def get_group_members(group_cd: str) -> list[dict[str, Any]]:
-        """获取用户组成员列表（含用户名称）。"""
-        rows = (
-            db.session.query(UserGroup, User.user_nm)
+    def get_group_members(group_cd: str, active_only: bool = False) -> list[dict[str, Any]]:
+        """获取用户组成员列表（含用户名称）。
+
+        Args:
+            group_cd: 用户组编码
+            active_only: 仅返回 status='1' 的有效成员
+        """
+        query = (
+            db.session.query(UserGroup, User.user_nm, User.status)
             .join(User, UserGroup.user_cd == User.user_cd)
             .filter(UserGroup.group_cd == group_cd)
-            .all()
         )
-        return [{"user_cd": ug.user_cd, "group_cd": ug.group_cd, "user_nm": nm}
-                for ug, nm in rows]
+        if active_only:
+            query = query.filter(User.status == "1")
+        rows = query.all()
+        return [{"user_cd": ug.user_cd, "group_cd": ug.group_cd, "user_nm": nm, "status": st}
+                for ug, nm, st in rows]
 
     @staticmethod
     def add_group_member(user_cd: str, group_cd: str) -> None:
@@ -962,11 +973,17 @@ class SystemRepository:
 
     @staticmethod
     def get_customers(page: int = 1, per_page: int = 20, search: str | None = None,
-                      class_cd: str | None = None) -> tuple[list[Customer], int]:
-        """获取客户列表，支持分类筛选和搜索。"""
+                      class_cd: str | None = None,
+                      customer_status: str | None = None,
+                      useflg: str | None = None) -> tuple[list[Customer], int]:
+        """获取客户列表，支持分类筛选、状态筛选和搜索。"""
         q = db.session.query(Customer)
         if class_cd:
             q = q.filter(Customer.class_cd == class_cd)
+        if customer_status:
+            q = q.filter(Customer.customer_status == customer_status)
+        if useflg is not None:
+            q = q.filter(Customer.useflg == useflg)
         if search:
             q = q.filter(db.or_(
                 Customer.cust_card.ilike(f"%{search}%"),
@@ -1402,8 +1419,11 @@ class SystemRepository:
         ).order_by(Area.area_cd).all())
 
     @staticmethod
-    def get_commodes() -> list[ComMode]:
-        return list(db.session.query(ComMode).filter(ComMode.useflg == "1").order_by(ComMode.cmm_cd).all())
+    def get_commodes() -> list[SysCode]:
+        """通讯方式列表（迁移至 tmm31_syscodes，code_typ='CM'）。"""
+        return list(db.session.query(SysCode).filter(
+            SysCode.code_typ == "CM", SysCode.useflg == "1"
+        ).order_by(SysCode.sort_no, SysCode.code_cd).all())
 
     @staticmethod
     def get_countries() -> list[Country]:
@@ -1434,6 +1454,41 @@ class SystemRepository:
         if city_cd:
             q = q.filter(Town.city_cd == city_cd)
         return list(q.order_by(Town.town_cd).all())
+
+    # ========== 国标地理表（geo_*）==========
+
+    @staticmethod
+    def get_geo_provinces() -> list[GeoProvince]:
+        """国标省级列表。"""
+        return list(db.session.query(GeoProvince).order_by(GeoProvince.code).all())
+
+    @staticmethod
+    def get_geo_cities(province_code: str | None = None) -> list[GeoCity]:
+        """国标地级市列表，可按省级代码筛选。"""
+        q = db.session.query(GeoCity)
+        if province_code:
+            q = q.filter(GeoCity.province_code == province_code)
+        return list(q.order_by(GeoCity.code).all())
+
+    @staticmethod
+    def get_geo_areas(city_code: str | None = None, province_code: str | None = None) -> list[GeoArea]:
+        """国标区县列表，可按地级市或省级代码筛选。"""
+        q = db.session.query(GeoArea)
+        if city_code:
+            q = q.filter(GeoArea.city_code == city_code)
+        elif province_code:
+            q = q.filter(GeoArea.province_code == province_code)
+        return list(q.order_by(GeoArea.code).all())
+
+    @staticmethod
+    def get_geo_streets(area_code: str | None = None, city_code: str | None = None) -> list[GeoStreet]:
+        """国标街道列表，可按区县或地级市代码筛选。"""
+        q = db.session.query(GeoStreet)
+        if area_code:
+            q = q.filter(GeoStreet.area_code == area_code)
+        elif city_code:
+            q = q.filter(GeoStreet.city_code == city_code)
+        return list(q.order_by(GeoStreet.code).all())
 
     # ========== SupplierClass CRUD ==========
 

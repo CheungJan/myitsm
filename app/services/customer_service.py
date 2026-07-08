@@ -63,30 +63,161 @@ class CustomerService:
     # 生命周期流转
     # ------------------------------------------------------------------
 
+    # PB 磁卡号录入规则常量（对齐 d_plan_cust_edit.srd / w_plan_cust_befor.srw）
+    CUSTCARD_MAX_LENGTH = 20  # PB DataWindow char(20) + Oracle VARCHAR2(20)
+    CUSTCD_LENGTH = 8  # PB CHAR(8) 固定 8 位
+
+    @staticmethod
+    def validate_custcard(custcard: str, exclude_custcd: str | None = None) -> str | None:
+        """校验磁卡号录入规则，对齐 PB w_plan_cust_befor.srw of_insert_cust。
+
+        校验规则：
+        1. 长度 ≤ 20 字符（PB DataWindow char(20)）
+        2. 磁卡号在 tmm22_customers 中唯一（useflg='1'），对齐 PB 重复检查
+        3. 大小写不限（PB edit.case=any）
+
+        Args:
+            custcard: 待校验磁卡号
+            exclude_custcd: 排除的客户编码（更新场景排除自身）
+
+        Returns:
+            None 表示校验通过，否则返回错误信息字符串
+        """
+        if not custcard or not custcard.strip():
+            return "磁卡号不能为空"
+        if len(custcard) > CustomerService.CUSTCARD_MAX_LENGTH:
+            return f"磁卡号长度不能超过 {CustomerService.CUSTCARD_MAX_LENGTH} 字符"
+        # 磁卡号重复检查（对齐 PB: SELECT count(1) WHERE CUSTCARD=:ls AND USEFLG='1'）
+        from sqlalchemy import func
+
+        query = db.session.query(func.count(Customer.cust_cd)).filter(
+            Customer.cust_card == custcard,
+            Customer.useflg == "1",
+        )
+        if exclude_custcd:
+            query = query.filter(Customer.cust_cd != exclude_custcd)
+        if query.scalar() > 0:
+            return f"磁卡号 {custcard} 已存在，请重新输入"
+        return None
+
+    @staticmethod
+    def validate_custnm_unique(custnm: str, exclude_custcd: str | None = None) -> str | None:
+        """校验客户名称唯一性，对齐 PB w_plan_cust_befor.srw of_insert_cust。
+
+        PB 逻辑：SELECT count(*), max(custcd) WHERE custnm=:ls → 同名客户不允许新建。
+
+        Args:
+            custnm: 待校验客户名称
+            exclude_custcd: 排除的客户编码（更新场景排除自身）
+
+        Returns:
+            None 表示校验通过，否则返回错误信息字符串（含已有 custcd）
+        """
+        if not custnm or not custnm.strip():
+            return "客户名称不能为空"
+        from sqlalchemy import func
+
+        query = db.session.query(
+            func.count(Customer.cust_cd), func.max(Customer.cust_cd)
+        ).filter(Customer.cust_nm == custnm)
+        if exclude_custcd:
+            query = query.filter(Customer.cust_cd != exclude_custcd)
+        count, existing_cd = query.one()
+        if count > 0 and existing_cd:
+            return f"已有此客户，请使用编码 {existing_cd}"
+        return None
+
+    @staticmethod
+    def generate_custcd() -> str:
+        """生成下一个客户编码（custcd）。
+
+        对齐 PB w_plan_cust_befor_new.srw 逻辑：
+            SELECT max(custcd) INTO :ls_Custcd FROM tmm22_customers;
+            ls_fill = 8 - len(string(integer(ls_Custcd)+1))
+            ls_Custcd = fill('0', ls_fill) + string(integer(ls_Custcd)+1)
+
+        规则：取 tmm22_customers.cust_cd 最大值 +1，左侧补零到 8 位。
+        例如 '00008397' → '00008398'。
+        """
+        from sqlalchemy import func
+
+        max_custcd = (
+            db.session.query(func.max(Customer.cust_cd)).scalar() or "0"
+        )
+        try:
+            next_val = int(max_custcd) + 1
+        except (ValueError, TypeError):
+            next_val = 1
+        return str(next_val).zfill(8)
+
     @staticmethod
     def create_temp_customer(
         data: dict[str, Any],
         preplan_id: str,
         creator: str,
+        plantyp: str = "",
     ) -> Customer:
         """从预计划创建/更新客户。
 
         新客户（客户表无记录）→ TEMP。
         已有正式客户（ACTIVE）→ 仅更新信息，保持 ACTIVE。
         已有临时/待确认客户 → 保持原状态。
+
+        custcd 为空时按 PB 规则自动生成（MAX(custcd)+1，左侧补零到 8 位），
+        对齐 PB w_plan_cust_befor_new.srw 全新开通场景。
+
+        PB 校验（仅 plantyp=00 全新开通，对齐 of_insert_cust）：
+        - 磁卡号重复检查 + 长度限制（≤20 字符）
+        - 客户名称重复检查
+
+        注：plantyp=10 磁卡号变更的新磁卡号（new_custcard）校验在
+        sales_service.create 中执行，因为 new_custcard 是预计划字段
+        而非客户表字段。
         """
         custcd = data.get("custcd") or ""
+        custcard = (data.get("custcard") or "").strip()
+        custnm = (data.get("custnm") or "").strip()
+        # custcd 为空时自动生成（全新开通手动输入磁卡号但未填 custcd 的场景）
+        if not custcd:
+            custcd = CustomerService.generate_custcd()
+            data = {**data, "custcd": custcd}
         existing = db.session.get(Customer, custcd) if custcd else None
         is_new = existing is None
         customer = existing or Customer(cust_cd=custcd)
 
+        # PB 校验仅对 plantyp=00 全新开通新客户执行（对齐 of_insert_cust:
+        # if ls_plantyp <> '00' then return 1）
+        if is_new and plantyp == "00":
+            err = CustomerService.validate_custcard(custcard)
+            if err:
+                raise ValueError(err)
+            err = CustomerService.validate_custnm_unique(custnm)
+            if err:
+                raise ValueError(err)
+
         # 基本信息
-        customer.cust_nm = data.get("custnm") or customer.cust_nm or ""
-        customer.cust_card = data.get("custcard") or customer.cust_card
+        customer.cust_nm = custnm or customer.cust_nm or ""
+        customer.cust_card = custcard or customer.cust_card
         customer.busi_typ = data.get("busityp") or customer.busi_typ
         customer.address = data.get("address") or customer.address
         customer.contactor = data.get("contactor") or customer.contactor
         customer.phone_no = data.get("phoneno") or customer.phone_no
+        customer.yun_type = data.get("yun_type") or customer.yun_type
+        # PB同步字段：从plan_cust同步到tmm22_customers
+        customer.class_cd = data.get("classcd") or customer.class_cd
+        customer.ppt_code = data.get("pptcode") or customer.ppt_code
+        customer.comm_mode = data.get("commmode") or customer.comm_mode
+        customer.is_contract = data.get("is_contract") or customer.is_contract
+        customer.jl_contactor = data.get("jl_contactor") or customer.jl_contactor
+        customer.jl_phoneno = data.get("jl_phoneno") or customer.jl_phoneno
+        customer.custrnm = data.get("custrnm") or customer.custrnm
+        # 地理/负责区域/环线信息（从预计划同步到客户表）
+        customer.geo_prvn_cd = data.get("geo_prvn_cd") or customer.geo_prvn_cd
+        customer.geo_city_cd = data.get("geo_city_cd") or customer.geo_city_cd
+        customer.geo_area_cd = data.get("geo_area_cd") or customer.geo_area_cd
+        customer.geo_street_cd = data.get("geo_street_cd") or customer.geo_street_cd
+        customer.area_cd = data.get("area_cd") or customer.area_cd
+        customer.location = data.get("location") or customer.location
 
         # 生命周期字段：新客户=TEMP，已有正式客户=保持ACTIVE
         if is_new:
@@ -135,7 +266,7 @@ class CustomerService:
 
     @staticmethod
     def invalidate_customer(custcd: str, operator: str | None = None) -> Customer | None:
-        """预计划作废时：TEMP/PENDING → INVALID，标记失效。"""
+        """预计划作废时：TEMP/PENDING → INVALID，标记失效（保留记录以复用custcd）。"""
         customer = db.session.get(Customer, custcd)
         if customer is None:
             return None
@@ -159,6 +290,15 @@ class CustomerService:
             return None
         customer.cust_card = new_card
         return customer
+
+    @staticmethod
+    def update_customer_fields(cust_cd: str, data: dict[str, Any]) -> None:
+        """批量更新客户字段（用于预计划同步）。"""
+        customer = db.session.get(Customer, cust_cd)
+        if customer:
+            for field, value in data.items():
+                if hasattr(customer, field) and value is not None:
+                    setattr(customer, field, value)
 
     # ------------------------------------------------------------------
     # 门店经营状态 / 数据有效性（对齐 PB usp_plan_confrim）

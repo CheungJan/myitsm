@@ -67,8 +67,8 @@ export function updateGroup(groupCd: string, data: Record<string, string>) {
 export function deleteGroup(groupCd: string) {
     return request.delete<never, unknown>(`/groups/${groupCd}`)
 }
-export function fetchGroupMembers(groupCd: string) {
-    return request.get<never, { data: { user_cd: string; user_nm: string }[] }>(`/groups/${groupCd}/members`)
+export function fetchGroupMembers(groupCd: string, params?: Record<string, string>) {
+    return request.get<never, { data: { user_cd: string; user_nm: string; status?: string }[] }>(`/groups/${groupCd}/members`, { params })
 }
 export function addGroupMember(groupCd: string, userCd: string) {
     return request.post<never, unknown>(`/groups/${groupCd}/members`, { user_cd: userCd })

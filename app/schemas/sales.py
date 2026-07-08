@@ -12,7 +12,7 @@ class PlanCustCreate(BaseModel):
     custcd: str | None = Field(None, max_length=8, description="客户编码")
     custnm: str | None = Field(None, max_length=80, description="客户名称")
     custcard: str | None = Field(None, max_length=20, description="磁卡号")
-    custrnm: str | None = Field(None, max_length=80, description="客户实名")
+    custrnm: str | None = Field(None, max_length=80, description="理论订货日（门店订货日，1-7 周一到周日）")
     busityp: str | None = Field(None, max_length=2, description="业务类型")
     address: str | None = Field(None, max_length=80, description="地址")
     contactor: str | None = Field(None, max_length=10, description="联系人")
@@ -53,7 +53,7 @@ class PlanCustUpdate(BaseModel):
     plantyp: str | None = Field(None, max_length=2)
     custnm: str | None = Field(None, max_length=80)
     custcard: str | None = Field(None, max_length=20)
-    custrnm: str | None = Field(None, max_length=80)
+    custrnm: str | None = Field(None, max_length=80, description="理论订货日（门店订货日，1-7 周一到周日）")
     busityp: str | None = Field(None, max_length=2)
     address: str | None = Field(None, max_length=80)
     contactor: str | None = Field(None, max_length=10)
@@ -66,6 +66,8 @@ class PlanCustUpdate(BaseModel):
     imple_status: str | None = Field(None, max_length=2)
     serve_status: str | None = Field(None, max_length=2)
     imple_date: str | None = Field(None)
+    send_date: str | None = Field(None)
+    train_date: str | None = Field(None)
     imple_mark: str | None = Field(None, max_length=200)
     imple_result: str | None = Field(None, max_length=10)
     fail_reason: str | None = Field(None, max_length=200)
@@ -90,6 +92,16 @@ class PlanCustUpdate(BaseModel):
     posid: str | None = Field(None, max_length=13)
     jl_contactor: str | None = Field(None, max_length=10)
     jl_phoneno: str | None = Field(None, max_length=60)
+    # 地理信息字段（同步到 tmm22_customers）
+    geo_prvn_cd: str | None = Field(None, max_length=10)
+    geo_city_cd: str | None = Field(None, max_length=10)
+    geo_area_cd: str | None = Field(None, max_length=10)
+    geo_street_cd: str | None = Field(None, max_length=10)
+    area_cd: str | None = Field(None, max_length=10)
+    location: str | None = Field(None, max_length=10)
+    # 呼出请求字段（编辑时支持更新呼出单）
+    call_serve: bool | None = Field(None)
+    serve_task: str | None = Field(None, max_length=200)
 
 
 class SalesBillCreate(BaseModel):
@@ -137,9 +149,12 @@ class PlanVoid(BaseModel):
 
 
 class PlanServeCreate(BaseModel):
-    """创建呼出单。"""
+    """创建呼出单。
 
-    planno: str = Field(..., max_length=10, description="关联预计划单号")
+    planno 由 URL 路径参数注入，schema 中设为可选。
+    """
+
+    planno: str | None = Field(None, max_length=10, description="关联预计划单号（由URL注入）")
     plantyp: str | None = Field(None, max_length=2)
     servetyp: str = Field("0", max_length=2, description="服务类型")
     serve_task: str | None = Field(None, max_length=200, description="服务任务")
@@ -156,11 +171,18 @@ class PlanServeUpdate(BaseModel):
     status: str | None = Field(None, max_length=2, description="状态")
 
 
+class PlanServeAssign(BaseModel):
+    """分配呼出人（对齐 PB d_serve_list.serve_ercd）。"""
+
+    serve_ercd: str = Field(..., max_length=6, description="分配呼出人编码")
+
+
 class SalesQuery(BaseModel):
     """销售查询参数。"""
 
     plantyp: str | None = Field(None, max_length=2)
     plan_status: str | None = Field(None, max_length=2)
+    exclude_plan_status: str | None = Field(None, max_length=2, description="排除指定状态（如 00 计划中）")
     sltyp: str | None = Field(None, max_length=2)
     planno: str | None = Field(None, max_length=10, description="计划单号（模糊）")
     custcd: str | None = Field(None, max_length=8)
