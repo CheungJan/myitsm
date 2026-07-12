@@ -133,7 +133,7 @@ TIT13_MAINTENANCE_OPEN (MaintenanceOpen) — 新机开通单
 TIT15_MAINTENANCE_RENOVATE (MaintenanceRenovate) — 旧机翻新单
   └── TIT15_EQUIPMENT_RENOVATE (EquipmentRenovate)
 
-TIT16_DEVICE_CHANGE (DeviceChange) — 设备变更单
+TIT16_DEVICE_CHANGE (DeviceChange) — 磁卡号变更单
   └── TMM22_CUSTOMERS_HISTORY — 磁卡号变更记录
 
 TIT17_MAINTENANCE (Maintenance) — 日常保养单
@@ -377,7 +377,7 @@ TWH01_WAREHOUSE (Warehouse)
 | 源域 | 目标域 | 关联路径 | 说明 |
 |------|--------|---------|------|
 | ITSM | 主数据 | maintenance.custcd → tmm22_customers.cust_cd | 工单关联客户 |
-| ITSM | 主数据 | device_change → tmm22_customers_history | 设备变更→磁卡号历史 |
+| ITSM | 主数据 | device_change → tmm22_customers_history | 磁卡号变更→磁卡号历史 |
 | ITSM | 主数据 | cust_pos_rl.cust_cd → tmm22_customers.cust_cd | 设备关联客户 |
 | 仓储 | 主数据 | stock_in/out.itemcd → tmm12_items.itemcd | 出入库关联物料 |
 | 仓储 | 主数据 | stock_in/out.suppcd → tmm19_suppliers.suppcd | 出入库关联供应商 |

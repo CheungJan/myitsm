@@ -47,11 +47,24 @@ def _gen_pr_id() -> str:
     return _gen_master_id("PR", "采购订单号")
 
 
-def _gen_master_id(id_type: str, id_type_name: str) -> str:
-    """从 IdMaster 表取号并自增。"""
+def _gen_master_id(id_type: str, id_type_name: str, init_current_no: int = 0) -> str:
+    """从 IdMaster 表取号并自增。
+
+    首次创建 IdMaster 记录时，可用 init_current_no 指定初始值
+    （例如从对应业务表 MAX(主键) 继续自增，避免从 0 开始与已有数据冲突）。
+    """
     id_master = db.session.get(IdMaster, id_type)
     if id_master is None:
-        id_master = IdMaster(id_type=id_type, prefix=id_type, current_no=0, step=1, idtyp=id_type, idtypnm=id_type_name, curbillid="0", useflg="1")
+        id_master = IdMaster(
+            id_type=id_type,
+            prefix=id_type,
+            current_no=init_current_no,
+            step=1,
+            idtyp=id_type,
+            idtypnm=id_type_name,
+            curbillid=str(init_current_no),
+            useflg="1",
+        )
         db.session.add(id_master)
         db.session.flush()
     step = id_master.step or 1

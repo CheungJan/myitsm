@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>呼出管理 - UI效果演示 v2</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --card-bg: #fff; --text: #303133; --text-secondary: #606266;
+    --text-muted: #909399; --border: #e4e7ed; --primary: #409eff; --success: #67c23a;
+    --warning: #e6a23c; --danger: #f56c6c;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    background: var(--bg); color: var(--text); padding: 24px; font-size: 14px;
+  }
+  .page-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; }
+  .page-header h2 { font-size:20px; font-weight:600; }
+  .page-header .subtitle { font-size:13px; color:var(--text-muted); }
+
+  .card { background:var(--card-bg); border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.04); padding:16px 20px; margin-bottom:16px; }
+
+  /* 搜索栏 */
+  .search-bar { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .field { display:flex; align-items:center; gap:6px; }
+  .field label { font-size:13px; color:var(--text-secondary); white-space:nowrap; }
+  .field input, .field select {
+    height:32px; border:1px solid var(--border); border-radius:4px;
+    padding:0 10px; font-size:13px; color:var(--text); outline:none; background:#fff;
+  }
+  .field input:focus, .field select:focus { border-color:var(--primary); }
+  .field input { width:140px; } .field select { width:150px; cursor:pointer; }
+  .btn { height:32px; padding:0 16px; border:none; border-radius:4px; font-size:13px; cursor:pointer; font-weight:500; }
+  .btn-primary { background:var(--primary); color:#fff; } .btn-primary:hover { background:#66b1ff; }
+  .btn-default { background:#fff; color:var(--text); border:1px solid var(--border); }
+  .btn-text { background:none; border:none; color:var(--primary); padding:0 8px; cursor:pointer; font-size:13px; }
+  .btn-text:hover { color:#66b1ff; }
+
+  /* 提示 */
+  .note { background:#f0f9eb; border:1px solid #e1f3d8; border-radius:6px; padding:10px 16px; margin-bottom:16px; font-size:13px; color:#67c23a; display:flex; align-items:center; gap:8px; }
+
+  /* 主表 */
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  thead th {
+    background:#fafafa; color:var(--text-muted); font-weight:600;
+    padding:10px 8px; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  tbody td { padding:10px 8px; border-bottom:1px solid #ebeef5; color:var(--text); white-space:nowrap; }
+  tbody tr:hover { background:#f5f7fa; }
+
+  /* 展开按钮 */
+  .expand-btn {
+    display:inline-flex; align-items:center; gap:4px; cursor:pointer; color:var(--primary);
+    font-size:13px; user-select:none; transition:transform .2s;
+  }
+  .expand-btn .arrow { display:inline-block; transition:transform .2s; font-size:12px; }
+  .expand-btn.expanded .arrow { transform:rotate(90deg); }
+
+  /* 展开行 */
+  tr.expand-row { background:#fafafa; }
+  tr.expand-row td { padding:0; border-bottom:2px solid var(--border); }
+  .expand-inner { padding:12px 24px 12px 48px; }
+  .expand-inner .label { font-size:12px; color:var(--text-muted); margin-bottom:8px; font-weight:600; }
+
+  /* 展开内表 */
+  .sub-table { width:100%; border-collapse:collapse; font-size:13px; background:#fff; border:1px solid #ebeef5; border-radius:4px; overflow:hidden; }
+  .sub-table th { background:#f5f7fa; color:var(--text-muted); font-weight:600; padding:8px 10px; text-align:left; border-bottom:1px solid var(--border); }
+  .sub-table td { padding:8px 10px; border-bottom:1px solid #ebeef5; }
+
+  /* Tag */
+  .tag { display:inline-block; padding:2px 8px; border-radius:3px; font-size:12px; font-weight:500; line-height:20px; }
+  .tag-pre { background:#ecf5ff; color:#409eff; border:1px solid #d9ecff; }
+  .tag-impl { background:#f0f9eb; color:#67c23a; border:1px solid #e1f3d8; }
+  .tag-wait { background:#fdf6ec; color:#e6a23c; border:1px solid #faecd8; }
+  .tag-done { background:#f0f9eb; color:#67c23a; border:1px solid #e1f3d8; }
+  .tag-void { background:#fef0f0; color:#f56c6c; border:1px solid #fde2e2; }
+  .tag-agree { background:#f0f9eb; color:#67c23a; }
+  .tag-deny { background:#fef0f0; color:#f56c6c; }
+  .tag-nocall { background:#fdf6ec; color:#e6a23c; }
+  .tag-yes { background:#ecf5ff; color:#409eff; }
+  .tag-no { background:#f4f4f5; color:#909399; }
+  .count-badge {
+    display:inline-block; background:var(--primary); color:#fff; border-radius:10px;
+    padding:1px 8px; font-size:12px; font-weight:600; min-width:22px; text-align:center;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div>
+    <h2>呼出管理</h2>
+    <p class="subtitle">主行 = 计划公有信息（不重复），展开 = 呼出记录明细（类型标签区分）</p>
+  </div>
+</div>
+
+<div class="note">
+  <span>✅</span>
+  <span><strong>解决臃肿：</strong>客户信息每计划只显一次。同计划有预计划+实施两条呼出时，展开即可看到两条明细，类型标签区分。</span>
+</div>
+
+<!-- 搜索栏 -->
+<div class="card">
+  <div class="search-bar">
+    <div class="field"><label>呼出类型</label><select><option>全部</option><option>预计划呼出</option><option>实施任务呼出</option></select></div>
+    <div class="field"><label>计划单号</label><input placeholder="输入单号"></div>
+    <div class="field"><label>客户名称</label><input placeholder="输入客户"></div>
+    <div class="field"><label>磁卡号</label><input placeholder="输入磁卡号"></div>
+    <div class="field"><label>呼出状态</label><select><option>全部</option><option>待呼出</option><option>已呼出</option></select></div>
+    <button class="btn btn-primary">查询</button>
+    <button class="btn btn-default">重置</button>
+  </div>
+</div>
+
+<!-- 主从表格 -->
+<div class="card" style="padding:0;">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"></th>              <!-- 展开箭头 -->
+          <th style="width:60px">次数</th>
+          <th style="width:90px">分配呼出人</th>
+          <th style="width:110px">计划单号</th>
+          <th style="width:80px">计划类型</th>
+          <th style="width:100px">磁卡号</th>
+          <th style="width:80px">客户代码</th>
+          <th style="width:140px">客户名称</th>
+          <th style="width:120px">有限公司</th>
+          <th style="width:80px">是否合同</th>
+          <th style="width:80px">客户属性</th>
+          <th style="width:80px">计划机型</th>
+          <th style="width:80px">计划状态</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- ============ 第 1 行：P2026-001，展开状态 ============ -->
+        <tr>
+          <td><span class="expand-btn expanded"><span class="arrow">▶</span></span></td>
+          <td><span class="count-badge">2</span></td>
+          <td>王小明</td>
+          <td>P2026-001</td>
+          <td>新机开通</td>
+          <td>8800123456</td>
+          <td>C00123</td>
+          <td>天河区中山大道便利店</td>
+          <td>广州天河贸易有限公司</td>
+          <td><span class="tag tag-yes">是</span></td>
+          <td>合同客户</td>
+          <td>POS-A200</td>
+          <td><span class="tag tag-done">计划中</span></td>
+        </tr>
+        <tr class="expand-row">
+          <td colspan="13">
+            <div class="expand-inner">
+              <div class="label">📋 呼出记录明细（计划 P2026-001）</div>
+              <table class="sub-table">
+                <thead>
+                  <tr>
+                    <th style="width:110px">类型</th>
+                    <th style="width:140px">计划要求 (serve_task)</th>
+                    <th style="width:80px">呼出状态</th>
+                    <th style="width:80px">反馈</th>
+                    <th style="width:80px">通讯方式</th>
+                    <th style="width:100px">创建日期</th>
+                    <th style="width:120px">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="tag tag-pre">预计划呼出</span></td>
+                    <td>确认门店营业情况、安装时间</td>
+                    <td><span class="tag tag-done">已呼出</span></td>
+                    <td><span class="tag tag-agree">同意</span></td>
+                    <td>电话</td>
+                    <td>2026-07-01</td>
+                    <td><button class="btn-text">编辑反馈</button></td>
+                  </tr>
+                  <tr>
+                    <td><span class="tag tag-impl">实施任务呼出</span></td>
+                    <td>确认配送地址、培训时间安排</td>
+                    <td><span class="tag tag-wait">待呼出</span></td>
+                    <td>-</td>
+                    <td>微信</td>
+                    <td>2026-07-03</td>
+                    <td><button class="btn-text">录入反馈</button> <button class="btn-text" style="color:#f56c6c">作废</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+
+        <!-- ============ 第 2 行：P2026-002，折叠状态 ============ -->
+        <tr>
+          <td><span class="expand-btn"><span class="arrow">▶</span></span></td>
+          <td><span class="count-badge">1</span></td>
+          <td>张三</td>
+          <td>P2026-002</td>
+          <td>设备变更</td>
+          <td>8800789012</td>
+          <td>C00567</td>
+          <td>白云区远景路烟酒行</td>
+          <td>广州白云烟酒贸易有限公司</td>
+          <td><span class="tag tag-no">否</span></td>
+          <td>散户</td>
+          <td>POS-B500</td>
+          <td><span class="tag tag-wait">分派中</span></td>
+        </tr>
+
+        <!-- ============ 第 3 行：P2026-003，展开状态 ============ -->
+        <tr>
+          <td><span class="expand-btn expanded"><span class="arrow">▶</span></span></td>
+          <td><span class="count-badge">2</span></td>
+          <td>赵六</td>
+          <td>P2026-003</td>
+          <td>设备取回</td>
+          <td>8800345678</td>
+          <td>C00901</td>
+          <td>海珠区江南西路专卖店</td>
+          <td>广州海珠商贸有限公司</td>
+          <td><span class="tag tag-yes">是</span></td>
+          <td>合同客户</td>
+          <td>POS-C100</td>
+          <td><span class="tag tag-done">计划中</span></td>
+        </tr>
+        <tr class="expand-row">
+          <td colspan="13">
+            <div class="expand-inner">
+              <div class="label">📋 呼出记录明细（计划 P2026-003）</div>
+              <table class="sub-table">
+                <thead>
+                  <tr><th>类型</th><th>计划要求</th><th>呼出状态</th><th>反馈</th><th>通讯方式</th><th>创建日期</th><th>操作</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="tag tag-pre">预计划呼出</span></td>
+                    <td>确认门店关闭、设备回收时间</td>
+                    <td><span class="tag tag-done">已呼出</span></td>
+                    <td><span class="tag tag-deny">不同意</span></td>
+                    <td>电话</td>
+                    <td>2026-06-28</td>
+                    <td><button class="btn-text">编辑反馈</button></td>
+                  </tr>
+                  <tr>
+                    <td><span class="tag tag-impl">实施任务呼出</span></td>
+                    <td>确认设备取回物流安排</td>
+                    <td><span class="tag tag-done">已呼出</span></td>
+                    <td><span class="tag tag-nocall">未接通</span></td>
+                    <td>电话</td>
+                    <td>2026-07-02</td>
+                    <td><button class="btn-text">编辑反馈</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+
+        <!-- ============ 第 4 行：P2026-004，折叠状态 ============ -->
+        <tr>
+          <td><span class="expand-btn"><span class="arrow">▶</span></span></td>
+          <td><span class="count-badge">1</span></td>
+          <td>-</td>
+          <td>P2026-004</td>
+          <td>旧机翻新</td>
+          <td>8800901234</td>
+          <td>C01234</td>
+          <td>番禺区市桥街道便利店</td>
+          <td>广州番禺便利商贸有限公司</td>
+          <td><span class="tag tag-yes">是</span></td>
+          <td>合同客户</td>
+          <td>POS-D300</td>
+          <td><span class="tag tag-void">已作废</span></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:flex; justify-content:flex-end; align-items:center; padding:12px 20px; gap:8px; font-size:13px; color:var(--text-secondary);">
+    <span>共 4 条计划</span>
+    <span style="padding:4px 10px; border-radius:4px; border:1px solid var(--border); cursor:pointer; background:var(--primary); color:#fff;">1</span>
+  </div>
+</div>
+
+<!-- 对比总结 -->
+<div class="card">
+  <h3 style="font-size:15px; margin-bottom:12px;">📋 方案对比</h3>
+  <table style="min-width:auto; font-size:13px;">
+    <thead>
+      <tr><th style="width:120px"></th><th style="width:220px">❌ 扁平列表</th><th style="width:220px">✅ 主从结构</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>客户信息</strong></td>
+        <td>每条 PlanServe 都重复显示，臃肿</td>
+        <td>主行显示一次，不重复</td>
+      </tr>
+      <tr>
+        <td><strong>同计划多类型</strong></td>
+        <td>两行独立，客户列重复</td>
+        <td>展开即见两条明细，Tag 区分</td>
+      </tr>
+      <tr>
+        <td><strong>计划要求归属</strong></td>
+        <td>当前行独立，无歧义</td>
+        <td>展开子行独立，Tag 标注类型，无歧义</td>
+      </tr>
+      <tr>
+        <td><strong>呼出状态</strong></td>
+        <td>每行一个状态</td>
+        <td>子行各自状态，主行"次数"列概览</td>
+      </tr>
+      <tr>
+        <td><strong>信息密度</strong></td>
+        <td>列表冗长，大量冗余</td>
+        <td>紧凑，按需展开</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  // 点击展开/折叠
+  document.querySelectorAll('.expand-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      this.classList.toggle('expanded');
+      const tr = this.closest('tr');
+      const nextTr = tr.nextElementSibling;
+      if (nextTr && nextTr.classList.contains('expand-row')) {
+        nextTr.style.display = nextTr.style.display === 'none' ? '' : 'none';
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

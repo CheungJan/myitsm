@@ -1176,8 +1176,8 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
 | MaintenanceOpenService | 00 | ✅ | ✅ | ✅ | 新机开通（已完成） |
 | DeviceChangeService | 10 | ✅（含设备转移路径写 'T' 客户转移；纯信息变更路径不写） | ✅（含设备转移路径） | ✅ | 磁卡号变更（`CHANGE_TYPE` 始终 `CK`，按数据条件隐式区分两条路径，11b 已完成） |
 | MaintenanceRenovateService | 20 | ✅（旧机写 'R' 回收 + 新机写 'C' 分配） | ✅（旧机失效/新机新建） | ✅ | 旧机翻新（11c 已完成） |
-| RecycleTaskService | 30 | ✅（写 'R' 回收） | ✅（失效） | ✅ | 设备取回（11d 已完成） |
-| StoreCloseService | 40 | ✅（写 'R' 回收，批量） | ✅（全失效） | ✅ | 门店关门（11e 已完成） |
+| RecycleTaskService | 30 | ✅（写 'R' 回收） | ✅（失效） | ✅ | 取机回收（11d 已完成） |
+| StoreCloseService | 40 | ✅（写 'R' 回收，批量） | ✅（全失效） | ✅ | 门店关闭（11e 已完成） |
 
 评估：合理的分阶段交付——plantyp=00 是最高频场景，其他类型按需扩展。
 
@@ -1191,8 +1191,8 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
   - ⚠️ 旧文档描述的 BG/CK/BQ 三子类型是 PB **老版本**语义，当前版本已废弃；`CHANGE_TYPE` 字段值始终为 `CK`
   - 详见 `docs/myitsm/客户状态与磁卡号变更优化设计.md` 与 `docs/core/预计划设备来源与EID绑定_前端操作验收手册.md`
 - **plantyp=20（旧机翻新）**：旧机 type='R'（回收）+ 新机 type='C'（分配）—— 对照 L301-356, L403-405
-- **plantyp=30（设备取回）**：type='R'（回收）—— 对照 type='3' 分支 L591-593
-- **plantyp=40（门店关门）**：type='R'（回收，批量）—— 对照 L414-438（PB 只更新 tmm22，重构版补充 rl 失效）
+- **plantyp=30（取机回收）**：type='R'（回收）—— 对照 type='3' 分支 L591-593
+- **plantyp=40（门店关闭）**：type='R'（回收，批量）—— 对照 L414-438（PB 只更新 tmm22，重构版补充 rl 失效）
 
 **DB 操作层 i/u/d 补齐**（PB 等价）：
 - 在 `Eid` 模型上挂 SQLAlchemy `after_insert/after_update/after_delete` 事件监听
@@ -1229,8 +1229,8 @@ PB 代码：`USP_PLAN_IMPLE` 存储过程生成 ITSM 单据（源码未导出，
 **第二批：plantyp 补齐**（可并行，建议下周）
 4. **11b** plantyp=10 磁卡号变更 BG 子类型（type='T' + rl 转移 + 回写）
 5. **11c** plantyp=20 旧机翻新（旧机 type='R' + 新机 type='C' + rl 旧机失效/新机新建 + 回写）
-6. **11d** plantyp=30 设备取回（type='R' + rl 失效 + 回写）
-7. **11e** plantyp=40 门店关门（type='R' 批量 + rl 全失效 + 回写）
+6. **11d** plantyp=30 取机回收（type='R' + rl 失效 + 回写）
+7. **11e** plantyp=40 门店关闭（type='R' 批量 + rl 全失效 + 回写）
 
 **第三批：扩展**（按需）
 8. **11f** 资产编辑接口写 type='A'（属性变更，纯优化）✅ 已完成（2026-07-02）

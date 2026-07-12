@@ -8,7 +8,7 @@ ITSM 业务模型。
   日常维护：TIT10 系列（主表 + LIABILITY + TRACK + POS_DETAIL + ATTC + ARCHIVE）
   新机开通：TIT13 + TIT14
   旧机翻新：TIT15（主表 + EQUIPMENT）
-  设备变更：TIT16
+  磁卡号变更：TIT16
   日常保养：TIT17（主表 + CUST_POS_DAILY + PLAN）
   门店关闭：TIT18
   配件选取：TIT19
@@ -449,13 +449,13 @@ class EquipmentRenovate(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# TIT16 设备变更单
+# TIT16 磁卡号变更单
 # ---------------------------------------------------------------------------
 
 
 class DeviceChange(BaseModel):
     """
-    设备变更单（TIT16_DEVICE_CHANGE）。
+    磁卡号变更单（TIT16_DEVICE_CHANGE）。
 
     CHANGE_TYPE: CK=仅磁卡号变更, BQ=信息变更, BG=磁卡号+设备变更
     """
@@ -673,7 +673,7 @@ class MaintenanceD2D(BaseModel):
     """
     维护单上门服务表（TIT23_MAINTENANCE_D2D）。
 
-    跨单据复用：日常维护(MD)/新机开通(MO)/旧机翻新(MR)/保养(BY)/设备变更(BG) 均使用。
+    跨单据复用：日常维护(MD)/新机开通(MO)/旧机翻新(MR)/保养(BY)/磁卡号变更(BG) 均使用。
     """
 
     __tablename__ = "tit23_maintenance_d2d"
@@ -814,8 +814,10 @@ class CloseBills(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# TODO(cleanup): 免费更换（TIT28）已废弃，FreeReplace / FreeReplaceDt 模型仅保留
+# 供历史数据查询。当前业务不再创建新免费更换单，后续版本统一清理。
 class FreeReplace(BaseModel):
-    """免费更换维护单（TIT28_FREE_REPLACE）。"""
+    """免费更换维护单（TIT28_FREE_REPLACE）—— 已废弃，仅保留历史数据查询。"""
 
     __tablename__ = "tit28_free_replace"
 

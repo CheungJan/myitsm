@@ -183,7 +183,7 @@ class PlanStatusMachine:
 # 延迟导入，避免循环依赖
 _PLANTYP_SERVICE_MAP: dict[str, tuple[str, str]] = {
     "00": ("MaintenanceOpenService", "new_opening_id"),  # 新机开通 → TIT13
-    "10": ("DeviceChangeService", "device_change_id"),  # 设备变更 → TIT16
+    "10": ("DeviceChangeService", "device_change_id"),  # 磁卡号变更 → TIT16
     "20": ("MaintenanceRenovateService", "renew_id"),  # 旧机翻新 → TIT15
     "30": ("RecycleTaskService", "recycle_id"),  # 取机回收 → TIT20
     "40": ("StoreCloseService", "store_close_id"),  # 门店关闭 → TIT18
@@ -235,6 +235,11 @@ def _build_downstream_payload(record: Any, plantyp: str, creator: str) -> dict[s
                 "from_custcard": record.custcard or "",
                 "from_custcd": record.custcd or "",
                 "count": 1,
+                # PB USP_PLAN_IMPLE 对齐字段
+                "requset_paper_id": record.planno,          # 来源预计划单号
+                "request_time": datetime.now(UTC),           # 请求时间（PB: SYSDATE）
+                "is_old": "N",                              # 是否补单（新单=N）
+                "company_id": record.classcd or "",          # 所属区域公司（classcd→company_id）
             }
         )
     elif plantyp == "10":  # 磁卡号变更（对齐 PB USP_PLAN_IMPLE 硬编码 CK）
@@ -707,7 +712,20 @@ class PlanCustService:
         deposit_amount = record.deposit
         if deposit_amount and float(deposit_amount) != 0 and record.custcd:
             try:
+                from app.models.deposit import Deposit as _Deposit
+                from app.repositories.deposit_repository import DepositRepository
                 from app.services.deposit_service import DepositDetailService
+
+                # 先确保押金主记录存在（DepositDetail.custcd 有外键约束）
+                dep = db.session.get(_Deposit, record.custcd)
+                if dep is None:
+                    DepositRepository.create(
+                        {
+                            "custcd": record.custcd,
+                            "amount_money": float(deposit_amount),
+                            "r_billid": record.planno,
+                        }
+                    )
 
                 DepositDetailService.create(
                     {
@@ -728,18 +746,21 @@ class PlanCustService:
 
         # 方案 A 自动出库：商用仓库来源 + posid 已选时自动创建 OV=1 出库单（带 posid EID）
         # 非商用仓库来源（pos_from != '00'）不涉及我方出库，跳过
+        outbound_id = ""
         if record.posid and (record.pos_from or "").strip() == "00":
             try:
                 from app.models.master import Eid as _EidAuto
 
                 eid_rec = db.session.query(_EidAuto).filter(_EidAuto.eid == record.posid).first()
                 eid_whcd = eid_rec.whcd if eid_rec else ""
-                PlanCustService.create_outbound(
+                outbound_result = PlanCustService.create_outbound(
                     planno=planno,
                     whcd=eid_whcd or "",
                     operator=operator,
                     eids=[record.posid],
                 )
+                if outbound_result and outbound_result.get("success"):
+                    outbound_id = outbound_result.get("outbillid", "")
             except Exception as exc:
                 logger.warning("方案 A 自动出库失败 planno=%s: %s", planno, exc)
 
@@ -753,6 +774,7 @@ class PlanCustService:
             "planno": planno,
             "to_status": "04",
             "downstream_id": downstream_id,
+            "outbillid": outbound_id,
         }
 
     @staticmethod
@@ -933,6 +955,16 @@ class PlanCustService:
         for _dt_field in ("imple_date", "send_date", "train_date"):
             if _dt_field in data and data[_dt_field] in ("", None):
                 data[_dt_field] = None
+            elif _dt_field in data and isinstance(data[_dt_field], str):
+                # 将字符串日期转换为 datetime 对象
+                from datetime import datetime as _dt
+
+                date_str = data[_dt_field]
+                try:
+                    data[_dt_field] = _dt.fromisoformat(date_str.replace("Z", "+00:00"))
+                except ValueError:
+                    # 兼容 "YYYY-MM-DD" 格式
+                    data[_dt_field] = _dt.strptime(date_str, "%Y-%m-%d")
 
         # is_outflag 三态维护：当本次更新变更了 pos_from，按新来源重算标志。
         # 已出库（is_outflag='1'，OV=1 出库单已审核）不覆盖，避免抹掉出库事实。

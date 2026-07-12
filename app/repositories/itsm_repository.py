@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import desc
 
 from app.extensions import db
+from app.repositories.procurement_repository import _gen_master_id
 from app.models.itsm import (
     AccessoriesUpdate,
     CloseBills,
@@ -28,6 +29,7 @@ from app.models.itsm import (
     MaintenancePlan,
     MaintenanceRenovate,
     MaintenanceRV,
+    EquipmentRenovate,
     NoCloseTrack,
     OnChooseDt,
     PayList,
@@ -38,12 +40,36 @@ from app.models.itsm import (
     StoreClose,
     TimepointArea,
 )
-from app.models.master import CustomerHistory
+from app.models.master import CustomerHistory, IdMaster
 
 
 def _gen_id(prefix: str = "") -> str:
     """生成8位唯一ID。"""
     return (prefix + uuid.uuid4().hex[:8].upper())[:8]
+
+
+def _gen_itsm_id(id_type: str, id_type_name: str, model_cls: Any, pk_field: str) -> str:
+    """ITSM 单据自增编号：首次取号时从对应业务表 MAX(主键) 初始化 IdMaster。
+
+    避免从 000001 开始与已有历史数据冲突。
+    """
+    from sqlalchemy import func
+
+    id_master = db.session.get(IdMaster, id_type)
+    if id_master is None:
+        # 从业务表 MAX(主键) 提取当前最大序号
+        max_pk = db.session.query(func.max(getattr(model_cls, pk_field))).scalar()
+        init_no = 0
+        if max_pk:
+            # 去掉前缀，取数字部分
+            num_part = "".join(ch for ch in str(max_pk) if ch.isdigit())
+            if num_part:
+                try:
+                    init_no = int(num_part)
+                except ValueError:
+                    init_no = 0
+        return _gen_master_id(id_type, id_type_name, init_current_no=init_no)
+    return _gen_master_id(id_type, id_type_name)
 
 
 class MaintenanceDailyRepository:
@@ -75,7 +101,7 @@ class MaintenanceDailyRepository:
     def create(data: dict[str, Any], creator: str) -> MaintenanceDaily:
         now = datetime.now(UTC)
         record = MaintenanceDaily(
-            maintenance_id=_gen_id(),
+            maintenance_id=_gen_itsm_id("MD", "日常维护单号", MaintenanceDaily, "maintenance_id"),
             current_status="1",
             create_time=now,
             creator=creator,
@@ -153,7 +179,7 @@ class MaintenanceOpenRepository:
     def create(data: dict[str, Any], creator: str) -> MaintenanceOpen:
         now = datetime.now(UTC)
         record = MaintenanceOpen(
-            new_opening_id=_gen_id(),
+            new_opening_id=_gen_itsm_id("MO", "新机开通单号", MaintenanceOpen, "new_opening_id"),
             current_status="1",
             create_time=now,
             creator=creator,
@@ -163,6 +189,35 @@ class MaintenanceOpenRepository:
         )
         db.session.add(record)
         return record
+
+    @staticmethod
+    def update(record: MaintenanceOpen, data: dict[str, Any], updator: str) -> MaintenanceOpen:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
+        return record
+
+    # ---- TIT14 设备明细 ----
+    @staticmethod
+    def add_equipment(opening_id: str, data: dict[str, Any]) -> EquipmentOpen:
+        now = datetime.now(UTC)
+        eq = EquipmentOpen(
+            new_opening_id=opening_id,
+            create_time=now, creator=data.get("creator", ""),
+            update_time=now, updator=data.get("creator", ""),
+            **{k: v for k, v in data.items() if k != "creator"},
+        )
+        db.session.add(eq)
+        return eq
+
+    @staticmethod
+    def delete_equipment(opening_id: str, eq_id: int) -> bool:
+        eq = db.session.get(EquipmentOpen, eq_id)
+        if eq is None or eq.new_opening_id != opening_id:
+            return False
+        db.session.delete(eq)
+        return True
 
     @staticmethod
     def update_status(
@@ -204,7 +259,7 @@ class MaintenanceRenovateRepository:
     def create(data: dict[str, Any], creator: str) -> MaintenanceRenovate:
         now = datetime.now(UTC)
         record = MaintenanceRenovate(
-            renew_id=_gen_id(),
+            renew_id=_gen_itsm_id("MR", "旧机翻新单号", MaintenanceRenovate, "renew_id"),
             current_status="1",
             create_time=now,
             creator=creator,
@@ -214,6 +269,41 @@ class MaintenanceRenovateRepository:
         )
         db.session.add(record)
         return record
+
+    @staticmethod
+    def update(record: MaintenanceRenovate, data: dict[str, Any], updator: str) -> MaintenanceRenovate:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
+        return record
+
+    # ---- TIT15 设备明细 ----
+    @staticmethod
+    def list_equipments(renew_id: str) -> list[EquipmentRenovate]:
+        return db.session.query(EquipmentRenovate).filter(
+            EquipmentRenovate.renovate_id == renew_id
+        ).order_by(EquipmentRenovate.id).all()
+
+    @staticmethod
+    def add_equipment(renew_id: str, data: dict[str, Any]) -> EquipmentRenovate:
+        now = datetime.now(UTC)
+        eq = EquipmentRenovate(
+            renovate_id=renew_id,
+            create_time=now, creator=data.get("creator", ""),
+            update_time=now, updator=data.get("creator", ""),
+            **{k: v for k, v in data.items() if k != "creator"},
+        )
+        db.session.add(eq)
+        return eq
+
+    @staticmethod
+    def delete_equipment(renew_id: str, eq_id: int) -> bool:
+        eq = db.session.get(EquipmentRenovate, eq_id)
+        if eq is None or eq.renovate_id != renew_id:
+            return False
+        db.session.delete(eq)
+        return True
 
     @staticmethod
     def update_status(
@@ -228,7 +318,7 @@ class MaintenanceRenovateRepository:
 
 
 class DeviceChangeRepository:
-    """设备变更单数据访问。"""
+    """磁卡号变更单数据访问。"""
 
     @staticmethod
     def get_by_id(change_id: str) -> DeviceChange | None:
@@ -258,7 +348,7 @@ class DeviceChangeRepository:
     def create(data: dict[str, Any], creator: str) -> DeviceChange:
         now = datetime.now(UTC)
         record = DeviceChange(
-            device_change_id=_gen_id(),
+            device_change_id=_gen_itsm_id("BG", "磁卡号变更单号", DeviceChange, "device_change_id"),
             current_status="1",
             create_time=now,
             creator=creator,
@@ -267,6 +357,14 @@ class DeviceChangeRepository:
             **data,
         )
         db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: DeviceChange, data: dict[str, Any], updator: str) -> DeviceChange:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
         return record
 
     @staticmethod
@@ -316,7 +414,7 @@ class StoreCloseRepository:
     def create(data: dict[str, Any], creator: str) -> StoreClose:
         now = datetime.now(UTC)
         record = StoreClose(
-            store_close_id=_gen_id(),
+            store_close_id=_gen_itsm_id("GB", "门店关闭单号", StoreClose, "store_close_id"),
             current_status="1",
             create_time=now,
             creator=creator,
@@ -325,6 +423,14 @@ class StoreCloseRepository:
             **data,
         )
         db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: StoreClose, data: dict[str, Any], updator: str) -> StoreClose:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
         return record
 
     @staticmethod
@@ -502,7 +608,7 @@ class RecycleTaskRepository:
     def create(data: dict[str, Any], creator: str) -> RecycleTask:
         now = datetime.now(UTC)
         record = RecycleTask(
-            recycle_id=_gen_id("R"),
+            recycle_id=_gen_itsm_id("RC", "取机回收任务单号", RecycleTask, "recycle_id"),
             task_status="1",
             create_time=now,
             creator=creator,
@@ -511,6 +617,16 @@ class RecycleTaskRepository:
             **data,
         )
         db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: RecycleTask, data: dict[str, Any], updator: str) -> RecycleTask:
+        for key, value in data.items():
+            if key == "task_status":
+                continue  # 状态通过 transition() 流转，不直接修改
+            setattr(record, key, value)
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
         return record
 
     @staticmethod
@@ -525,6 +641,14 @@ class RecycleTaskRepository:
         dtl = RecycleTaskDtl(recycle_id=recycle_id, **data)
         db.session.add(dtl)
         return dtl
+
+    @staticmethod
+    def delete_detail(recycle_id: str, asset_id: str) -> bool:
+        dtl = db.session.get(RecycleTaskDtl, (recycle_id, asset_id))
+        if dtl is None:
+            return False
+        db.session.delete(dtl)
+        return True
 
     @staticmethod
     def list_details(recycle_id: str) -> list[RecycleTaskDtl]:
@@ -591,8 +715,11 @@ class MaintenanceT17Repository:
         return items, total
 
 
+# TODO(cleanup): 免费更换（TIT28）在重构版本中已废弃，以下 FreeReplaceRepository 仅保留
+# 供历史数据查询。FR/GH 均为 PB 老版本遗留号段，当前业务不再创建新免费更换单。
+# 后续版本统一清理：Repository / Service / Model / Schema / API 端点。
 class FreeReplaceRepository:
-    """免费更换工单数据访问（TIT28_FREE_REPLACE）。"""
+    """免费更换工单数据访问（TIT28_FREE_REPLACE）—— 已废弃，仅保留历史数据查询。"""
 
     @staticmethod
     def get_by_id(renew_id: str) -> FreeReplace | None:
@@ -619,7 +746,7 @@ class FreeReplaceRepository:
     def create(data: dict[str, Any], creator: str) -> FreeReplace:
         now = datetime.now(UTC)
         record = FreeReplace(
-            renew_id=_gen_id(),
+            renew_id=_gen_itsm_id("FR", "免费更换单号", FreeReplace, "renew_id"),
             current_status="1",
             create_time=now,
             creator=creator,

@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from app.extensions import db
-from app.models.master import Customer
+from app.models.master import CustPosRl, Customer, Eid
 from app.repositories.itsm_repository import (
     AccessoriesUpdateRepository,
     CloseBillRepository,
@@ -60,6 +60,10 @@ TRACK_TYPE_ALLOCATE = "C"  # 客户分配
 TRACK_TYPE_RECYCLE = "R"  # 回收
 TRACK_TYPE_TRANSFER = "T"  # 客户转移
 TRACK_TYPE_ATTRIBUTE = "A"  # 属性变更
+
+# tmm43_eid.asset_owner：资产归属
+ASSET_OWNER_CUSTOMER = "01"  # 客户资产
+# asset_owner 不等于 "01" 即为自有资产（02=公司等）
 
 # ITSM 单据关单状态
 CLOSE_STATUS = "5"
@@ -286,7 +290,7 @@ class MaintenanceDailyService(_BaseMaintenanceService):
             db.session.query(EidModel)
             .filter(
                 EidModel.eid.in_(eids),
-                EidModel.asset_owner != "01",
+                EidModel.asset_owner != ASSET_OWNER_CUSTOMER,
             )
             .all()
         )
@@ -336,6 +340,7 @@ class MaintenanceOpenService(_BaseMaintenanceService):
         # 附带 equipments 子表（TIT14_EQUIPMENT_OPEN）
         data["equipments"] = [
             {
+                "id": eq.id,
                 "device_id": eq.device_id,
                 "item_cd": None,  # EquipmentOpen 无 item_cd 字段，前端按 device_id 显示
                 "price": float(eq.price) if eq.price is not None else None,
@@ -361,8 +366,9 @@ class MaintenanceOpenService(_BaseMaintenanceService):
         items, total = MaintenanceOpenRepository.list_by_filters(
             status=status, store_id=store_id, page=page, per_page=per_page
         )
+        enriched = _enrich_store_card([item.to_dict() for item in items])
         return {
-            "items": [item.to_dict() for item in items],
+            "items": enriched,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -373,6 +379,30 @@ class MaintenanceOpenService(_BaseMaintenanceService):
         record = MaintenanceOpenRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
+
+    @staticmethod
+    def update(opening_id: str, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = MaintenanceOpenRepository.get_by_id(opening_id)
+        if record is None:
+            return None
+        MaintenanceOpenRepository.update(record, data, updator)
+        db.session.commit()
+        return record.to_dict()
+
+    # ---- TIT14 设备明细 ----
+    @staticmethod
+    def add_equipment(opening_id: str, data: dict[str, Any], creator: str) -> dict[str, Any]:
+        data["creator"] = creator
+        eq = MaintenanceOpenRepository.add_equipment(opening_id, data)
+        db.session.commit()
+        return eq.to_dict()
+
+    @staticmethod
+    def delete_equipment(opening_id: str, eq_id: int) -> bool:
+        ok = MaintenanceOpenRepository.delete_equipment(opening_id, eq_id)
+        if ok:
+            db.session.commit()
+        return ok
 
     def transition(
         self,
@@ -576,6 +606,34 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
         db.session.commit()
         return record.to_dict()
 
+    @staticmethod
+    def update(renew_id: str, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = MaintenanceRenovateRepository.get_by_id(renew_id)
+        if record is None:
+            return None
+        MaintenanceRenovateRepository.update(record, data, updator)
+        db.session.commit()
+        return record.to_dict()
+
+    # ---- TIT15 设备明细 ----
+    @staticmethod
+    def list_equipments(renew_id: str) -> list[dict[str, Any]]:
+        return [e.to_dict() for e in MaintenanceRenovateRepository.list_equipments(renew_id)]
+
+    @staticmethod
+    def add_equipment(renew_id: str, data: dict[str, Any], creator: str) -> dict[str, Any]:
+        data["creator"] = creator
+        eq = MaintenanceRenovateRepository.add_equipment(renew_id, data)
+        db.session.commit()
+        return eq.to_dict()
+
+    @staticmethod
+    def delete_equipment(renew_id: str, eq_id: int) -> bool:
+        ok = MaintenanceRenovateRepository.delete_equipment(renew_id, eq_id)
+        if ok:
+            db.session.commit()
+        return ok
+
     def transition(
         self,
         renew_id: str,
@@ -750,7 +808,7 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
         eid_rec = (
             db.session.query(EidModel).filter(EidModel.eid == record.old_device_id).first()
         )
-        if not eid_rec or eid_rec.asset_owner == "01":
+        if not eid_rec or eid_rec.asset_owner == ASSET_OWNER_CUSTOMER:
             return  # 客户资产不回收
 
         whcd = _get_sysparm_whcd(SYSPARM_RENOVATE_RETURN_WHCD)
@@ -791,7 +849,7 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
 
 
 class DeviceChangeService(_BaseMaintenanceService):
-    """设备变更单业务服务（含P0-4磁卡号历史优化）。"""
+    """磁卡号变更单业务服务（含P0-4磁卡号历史优化）。"""
 
     @staticmethod
     def get(change_id: str) -> dict[str, Any] | None:
@@ -815,8 +873,9 @@ class DeviceChangeService(_BaseMaintenanceService):
             page=page,
             per_page=per_page,
         )
+        enriched = _enrich_store_card([item.to_dict() for item in items])
         return {
-            "items": [item.to_dict() for item in items],
+            "items": enriched,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -825,6 +884,15 @@ class DeviceChangeService(_BaseMaintenanceService):
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
         record = DeviceChangeRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(change_id: str, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = DeviceChangeRepository.get_by_id(change_id)
+        if record is None:
+            return None
+        DeviceChangeRepository.update(record, data, updator)
         db.session.commit()
         return record.to_dict()
 
@@ -901,7 +969,7 @@ class DeviceChangeService(_BaseMaintenanceService):
             install_date=eid_rec.install_date,
             n_install_date=eid_rec.install_date,
             remark=(
-                f"设备变更单 {record.device_change_id} 关单，设备从 "
+                f"磁卡号变更单 {record.device_change_id} 关单，设备从 "
                 f"{record.store_id} 转移到 {record.new_store_id}"
             ),
         )
@@ -1095,8 +1163,9 @@ class StoreCloseService(_BaseMaintenanceService):
         items, total = StoreCloseRepository.list_by_filters(
             status=status, store_id=store_id, page=page, per_page=per_page
         )
+        enriched = _enrich_store_card([item.to_dict() for item in items])
         return {
-            "items": [item.to_dict() for item in items],
+            "items": enriched,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -1105,6 +1174,15 @@ class StoreCloseService(_BaseMaintenanceService):
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
         record = StoreCloseRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(close_id: str, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = StoreCloseRepository.get_by_id(close_id)
+        if record is None:
+            return None
+        StoreCloseRepository.update(record, data, updator)
         db.session.commit()
         return record.to_dict()
 
@@ -1251,7 +1329,7 @@ class StoreCloseService(_BaseMaintenanceService):
             db.session.query(EidModel)
             .filter(
                 EidModel.eid.in_(eid_vals),
-                EidModel.asset_owner != "01",
+                EidModel.asset_owner != ASSET_OWNER_CUSTOMER,
             )
             .all()
         )
@@ -1295,6 +1373,39 @@ class StoreCloseService(_BaseMaintenanceService):
         plan.plan_status = PLAN_STATUS_COMPLETED
         plan.update_time = datetime.now(UTC)
         plan.updator = operator
+
+
+# ---------------------------------------------------------------------------
+# 设备资产与收费判断
+# ---------------------------------------------------------------------------
+
+
+class ChargeService:
+    """ITSM 收费判断服务。"""
+
+    @staticmethod
+    def should_charge(store_id: str) -> dict[str, Any]:
+        """判断门店是否需要收费及收费原因。
+
+        客户资产（asset_owner='01'）为收费对象，保修期内预留免费逻辑。
+        """
+        assets = (
+            db.session.query(CustPosRl)
+            .filter(CustPosRl.cust_cd == store_id, CustPosRl.useflg == "1")
+            .join(Eid, CustPosRl.eid == Eid.eid)
+            .all()
+        )
+
+        chargeable: list[dict[str, Any]] = []
+        for a in assets:
+            if a.eid and getattr(a.eid, "asset_owner", None) == ASSET_OWNER_CUSTOMER:
+                chargeable.append({"eid": a.eid.eid, "reason": "客户资产"})
+
+        return {
+            "should_charge": len(chargeable) > 0,
+            "chargeable_assets": chargeable,
+            "count": len(chargeable),
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -1401,8 +1512,9 @@ class RecycleTaskService(_BaseMaintenanceService):
         items, total = RecycleTaskRepository.list_by_filters(
             task_status=task_status, cust_cd=cust_cd, page=page, per_page=per_page
         )
+        enriched = _enrich_store_card([item.to_dict() for item in items], key="cust_cd")
         return {
-            "items": [item.to_dict() for item in items],
+            "items": enriched,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -1411,6 +1523,15 @@ class RecycleTaskService(_BaseMaintenanceService):
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
         record = RecycleTaskRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(recycle_id: str, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = RecycleTaskRepository.get_by_id(recycle_id)
+        if record is None:
+            return None
+        RecycleTaskRepository.update(record, data, updator)
         db.session.commit()
         return record.to_dict()
 
@@ -1541,7 +1662,7 @@ class RecycleTaskService(_BaseMaintenanceService):
             db.session.query(EidModel)
             .filter(
                 EidModel.eid.in_(eid_vals),
-                EidModel.asset_owner != "01",
+                EidModel.asset_owner != ASSET_OWNER_CUSTOMER,
             )
             .all()
         )
@@ -1587,6 +1708,12 @@ class RecycleTaskService(_BaseMaintenanceService):
         dtl = RecycleTaskRepository.add_detail(recycle_id, data)
         db.session.commit()
         return dtl.to_dict()
+
+    @staticmethod
+    @staticmethod
+    def delete_detail(recycle_id: str, asset_id: str) -> bool:
+        """删除回收任务明细。"""
+        return RecycleTaskRepository.delete_detail(recycle_id, asset_id)
 
     @staticmethod
     def list_details(recycle_id: str) -> list[dict[str, Any]]:
@@ -1674,8 +1801,10 @@ class MaintenanceT17Service(_BaseMaintenanceService):
         return result
 
 
+# TODO(cleanup): 免费更换（TIT28）已废弃，FreeReplaceService 不再被业务调用。
+# 保留仅供历史数据查询，后续版本与 Repository/Model/Schema/API 一并清理。
 class FreeReplaceService(_BaseMaintenanceService):
-    """免费更换工单服务（TIT28_FREE_REPLACE）。"""
+    """免费更换工单服务（TIT28_FREE_REPLACE）—— 已废弃。"""
 
     @staticmethod
     def get(renew_id: str) -> dict[str, Any] | None:

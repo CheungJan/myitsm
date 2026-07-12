@@ -330,6 +330,12 @@ export function updateCustomer(custCd: string, data: Partial<CustRecord>) {
 export function deleteCustomer(custCd: string) {
     return request.delete<never, unknown>(`/customers/${custCd}`)
 }
+export function fetchCustomerDetail(custCd: string) {
+    return request.get<never, { data: CustRecord }>(`/customers/${custCd}`)
+}
+export function fetchCustomerAssets(custCd: string, params?: { page?: number | string; per_page?: number | string }) {
+    return request.get<never, { data: { items: Record<string, unknown>[]; total: number } }>(`/customers/${custCd}/assets`, { params })
+}
 
 // ---- 仓库 ----
 

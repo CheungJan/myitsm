@@ -457,7 +457,7 @@
 | old_device_id | character varying | 50 | YES | | 旧设备ID |
 | current_status | character varying | 20 | YES | | 当前状态 |
 
-#### tit16_device_change - 设备变更单
+#### tit16_device_change - 磁卡号变更单
 | 字段名 | 数据类型 | 长度 | 可空 | 默认值 | 说明 |
 |--------|----------|------|------|--------|------|
 | change_id | character varying | 20 | NO | | 变更单ID |

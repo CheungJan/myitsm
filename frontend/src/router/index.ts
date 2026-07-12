@@ -227,7 +227,6 @@ const router = createRouter({
                 { path: 'reports/center', name: 'ReportCenter', component: () => import('@/views/reports/ReportCenter.vue'), meta: { title: '报表中心' } },
                 { path: 'warehouse/overlost', name: 'OverLostList', component: () => import('@/views/warehouse/OverLostList.vue'), meta: { title: '盘盈盘亏' } },
 { path: 'warehouse/reports', name: 'StockReports', component: () => import('@/views/warehouse/StockReports.vue'), meta: { title: '仓库报表' } },
-                { path: 'itsm/free-replace', name: 'FreeReplaceList', component: () => import('@/views/itsm/FreeReplaceList.vue'), meta: { title: '免费更换' } },
                 { path: 'procurement/returns', name: 'ReturnPurchaseList', component: () => import('@/views/procurement/ReturnPurchaseList.vue'), meta: { title: '采购退货' } },
                 { path: 'transactions/bills', name: 'AllTransactionsList', component: () => import('@/views/transactions/AllTransactionsList.vue'), meta: { title: '全模块查询' } },
                 { path: 'transactions/transfer', name: 'TransferList', component: () => import('@/views/transactions/TransferList.vue'), meta: { title: '调拨流转' } },

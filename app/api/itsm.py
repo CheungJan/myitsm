@@ -18,9 +18,8 @@ from app.schemas.itsm import (
     CloseBillCreate,
     D2DCreate,
     DeviceChangeCreate,
+    DeviceChangeUpdate,
     DispatchCreate,
-    FreeReplaceCreate,
-    FreeReplaceDetailCreate,
     LiabilityRegCreate,
     LiabilityRegDetailCreate,
     MaintenanceAttcCreate,
@@ -29,10 +28,12 @@ from app.schemas.itsm import (
     MaintenanceLiabilityCreate,
     MaintenanceLiabilityUpdate,
     MaintenanceOpenCreate,
+    MaintenanceOpenUpdate,
     MaintenancePlanCreate,
     MaintenancePlanUpdate,
     MaintenanceQuery,
     MaintenanceRenovateCreate,
+    MaintenanceRenovateUpdate,
     NoCloseTrackCreate,
     OnChooseDtCreate,
     PayListCreate,
@@ -40,21 +41,23 @@ from app.schemas.itsm import (
     RecycleTaskCreate,
     RecycleTaskDtlCreate,
     RecycleTaskQuery,
+    RecycleTaskUpdate,
     RepairInfoCreate,
     RVCreate,
     StatusTransition,
     StoreCloseCreate,
+    StoreCloseUpdate,
     TimepointAreaCreate,
     TimepointAreaUpdate,
 )
 from app.services.archive_service import ArchiveService
 from app.services.itsm_service import (
     AccessoriesUpdateService,
+    ChargeService,
     CloseBillService,
     D2DService,
     DeviceChangeService,
     DispatchService,
-    FreeReplaceService,
     LiabilityRegService,
     MaintenanceAttcService,
     MaintenanceDailyService,
@@ -86,7 +89,6 @@ _renovate_svc = MaintenanceRenovateService()
 _device_change_svc = DeviceChangeService()
 _recycle_svc = RecycleTaskService()
 _store_close_svc = StoreCloseService()
-_free_replace_svc = FreeReplaceService()
 _t17_svc = MaintenanceT17Service()
 
 
@@ -220,6 +222,39 @@ def transition_open(opening_id: str):  # type: ignore[no-untyped-def]
     return success_response(data=result)
 
 
+@itsm_bp.put("/maintenance-open/<opening_id>")
+@login_required
+def update_open(opening_id: str):  # type: ignore[no-untyped-def]
+    """更新新机开通单。"""
+    body = MaintenanceOpenUpdate(**request.get_json(force=True))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = MaintenanceOpenService.update(opening_id, body.model_dump(exclude_none=True), updator=user_cd)
+    if data is None:
+        return error_response(message="开通单不存在", code=404)
+    return success_response(data=data)
+
+
+# ---- TIT14 新机开通设备明细 ----
+@itsm_bp.post("/maintenance-open/<opening_id>/equipments")
+@login_required
+def add_open_equipment(opening_id: str):  # type: ignore[no-untyped-def]
+    """添加开通设备明细。"""
+    body = request.get_json(force=True)
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = MaintenanceOpenService.add_equipment(opening_id, body, creator=user_cd)
+    return success_response(data=data, code=201)
+
+
+@itsm_bp.delete("/maintenance-open/<opening_id>/equipments/<int:eq_id>")
+@login_required
+def delete_open_equipment(opening_id: str, eq_id: int):  # type: ignore[no-untyped-def]
+    """删除开通设备明细。"""
+    ok = MaintenanceOpenService.delete_equipment(opening_id, eq_id)
+    if not ok:
+        return error_response(message="明细不存在", code=404)
+    return success_response(message="已删除")
+
+
 # ---- 旧机翻新 (MR) ----
 
 
@@ -275,6 +310,47 @@ def transition_renovate(renew_id: str):  # type: ignore[no-untyped-def]
     if not result.get("success"):
         return error_response(message=str(result.get("error", "")), code=400)
     return success_response(data=result)
+
+
+@itsm_bp.put("/maintenance-renovate/<renew_id>")
+@login_required
+def update_renovate(renew_id: str):  # type: ignore[no-untyped-def]
+    """更新旧机翻新单。"""
+    body = MaintenanceRenovateUpdate(**request.get_json(force=True))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = MaintenanceRenovateService.update(renew_id, body.model_dump(exclude_none=True), updator=user_cd)
+    if data is None:
+        return error_response(message="翻新单不存在", code=404)
+    return success_response(data=data)
+
+
+# ---- TIT15 翻新设备明细 ----
+@itsm_bp.get("/maintenance-renovate/<renew_id>/equipments")
+@login_required
+def list_renovate_equipments(renew_id: str):  # type: ignore[no-untyped-def]
+    """翻新设备明细列表。"""
+    data = MaintenanceRenovateService.list_equipments(renew_id)
+    return success_response(data=data)
+
+
+@itsm_bp.post("/maintenance-renovate/<renew_id>/equipments")
+@login_required
+def add_renovate_equipment(renew_id: str):  # type: ignore[no-untyped-def]
+    """添加翻新设备明细。"""
+    body = request.get_json(force=True)
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = MaintenanceRenovateService.add_equipment(renew_id, body, creator=user_cd)
+    return success_response(data=data, code=201)
+
+
+@itsm_bp.delete("/maintenance-renovate/<renew_id>/equipments/<int:eq_id>")
+@login_required
+def delete_renovate_equipment(renew_id: str, eq_id: int):  # type: ignore[no-untyped-def]
+    """删除翻新设备明细。"""
+    ok = MaintenanceRenovateService.delete_equipment(renew_id, eq_id)
+    if not ok:
+        return error_response(message="明细不存在", code=404)
+    return success_response(message="已删除")
 
 
 # ---- 设备变更 (BG) ----
@@ -336,6 +412,18 @@ def transition_device_change(change_id: str):  # type: ignore[no-untyped-def]
     return success_response(data=result)
 
 
+@itsm_bp.put("/device-change/<change_id>")
+@login_required
+def update_device_change(change_id: str):  # type: ignore[no-untyped-def]
+    """更新磁卡号变更单。"""
+    body = DeviceChangeUpdate(**request.get_json(force=True))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = DeviceChangeService.update(change_id, body.model_dump(exclude_none=True), updator=user_cd)
+    if data is None:
+        return error_response(message="变更单不存在", code=404)
+    return success_response(data=data)
+
+
 # ---- 门店关闭 (GB) ----
 
 
@@ -393,61 +481,16 @@ def transition_store_close(close_id: str):  # type: ignore[no-untyped-def]
     return success_response(data=result)
 
 
-# ---- 免费更换 (TIT28) ----
-
-
-@itsm_bp.get("/free-replace")
+@itsm_bp.put("/store-close/<close_id>")
 @login_required
-def list_free_replace():  # type: ignore[no-untyped-def]
-    """免费更换工单列表。"""
-    params = MaintenanceQuery.model_validate(request.args.to_dict())
-    data = FreeReplaceService.list_records(
-        status=params.status,
-        store_id=params.store_id,
-        page=params.page,
-        per_page=params.per_page,
-    )
-    return success_response(data=data)
-
-
-@itsm_bp.get("/free-replace/<renew_id>")
-@login_required
-def get_free_replace(renew_id: str):  # type: ignore[no-untyped-def]
-    """免费更换工单详情。"""
-    data = FreeReplaceService.get(renew_id)
+def update_store_close(close_id: str):  # type: ignore[no-untyped-def]
+    """更新门店关闭单。"""
+    body = StoreCloseUpdate(**request.get_json(force=True))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = StoreCloseService.update(close_id, body.model_dump(exclude_none=True), updator=user_cd)
     if data is None:
-        return error_response(message="免费更换单不存在", code=404)
+        return error_response(message="关闭单不存在", code=404)
     return success_response(data=data)
-
-
-@itsm_bp.post("/free-replace")
-@login_required
-def create_free_replace():  # type: ignore[no-untyped-def]
-    """创建免费更换工单。"""
-    json_data = request.get_json(silent=True) or {}
-    body = FreeReplaceCreate.model_validate(json_data)
-    raw_details = json_data.get("details", [])
-    details = [FreeReplaceDetailCreate.model_validate(d).model_dump() for d in raw_details]
-    user_cd: str = g.current_user
-    data = _free_replace_svc.create(body.model_dump(exclude_none=True), details, user_cd)
-    return success_response(data=data, message="创建成功", code=201)
-
-
-@itsm_bp.post("/free-replace/<renew_id>/transition")
-@login_required
-def transition_free_replace(renew_id: str):  # type: ignore[no-untyped-def]
-    """免费更换工单状态流转。"""
-    body = StatusTransition(**request.get_json(force=True))
-    user_cd: str = g.current_user
-    result = _free_replace_svc.transition(
-        renew_id,
-        to_status=body.to_status,
-        operator=user_cd,
-        remark=body.remark,
-    )
-    if not result.get("success"):
-        return error_response(message=str(result.get("error", "")), code=400)
-    return success_response(data=result)
 
 
 # ---- 公用附表 API ----
@@ -613,6 +656,29 @@ def add_recycle_detail(recycle_id: str):  # type: ignore[no-untyped-def]
     return success_response(data=data, code=201)
 
 
+@itsm_bp.put("/recycle-task/<recycle_id>")
+@login_required
+def update_recycle_task(recycle_id: str):  # type: ignore[no-untyped-def]
+    """更新回收任务单。"""
+    body = RecycleTaskUpdate(**request.get_json(force=True))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = RecycleTaskService.update(recycle_id, body.model_dump(exclude_none=True), updator=user_cd)
+    if data is None:
+        return error_response(message="回收任务不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.delete("/recycle-task/<recycle_id>/details/<asset_id>")
+@login_required
+def delete_recycle_detail(recycle_id: str, asset_id: str):  # type: ignore[no-untyped-def]
+    """删除回收任务明细。"""
+    ok = RecycleTaskService.delete_detail(recycle_id, asset_id)
+    if not ok:
+        return error_response(message="明细不存在", code=404)
+    db.session.commit()
+    return success_response(message="已删除")
+
+
 # ---- 保养计划 (TIT17_PLAN) ----
 
 
@@ -732,7 +798,6 @@ def itsm_no_close_stats():  # type: ignore[no-untyped-def]
     from app.extensions import db as _db
     from app.models.itsm import (
         DeviceChange,
-        FreeReplace,
         Maintenance,
         MaintenanceDaily,
         MaintenanceOpen,
@@ -751,8 +816,7 @@ def itsm_no_close_stats():  # type: ignore[no-untyped-def]
         "maintenance_renovate": _count_open(MaintenanceRenovate, "renew_id"),
         "device_change": _count_open(DeviceChange, "device_change_id"),
         "store_close": _count_open(StoreClose, "store_close_id"),
-        "free_replace": _count_open(FreeReplace, "renew_id"),
-        "maintenance_t17": _count_open(Maintenance, "daily_maintenance_id"),
+                "maintenance_t17": _count_open(Maintenance, "daily_maintenance_id"),
     }
     data["total"] = sum(data.values())
     return success_response(data=data)
@@ -1143,3 +1207,14 @@ def create_on_choose():  # type: ignore[no-untyped-def]
     body = OnChooseDtCreate.model_validate(request.get_json(silent=True) or {})
     data = OnChooseDtService.create(body.model_dump(exclude_none=True))
     return success_response(data=data, message="创建成功", code=201)
+
+
+@itsm_bp.get("/should-charge")
+@login_required
+def should_charge():  # type: ignore[no-untyped-def]
+    """判断门店是否应收费（基于客户资产）。"""
+    store_id = request.args.get("store_id", "")
+    if not store_id:
+        return error_response(message="缺少 store_id", code=400)
+    data = ChargeService.should_charge(store_id)
+    return success_response(data=data)

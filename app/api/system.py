@@ -988,6 +988,24 @@ def delete_customer(cust_cd: str):  # type: ignore[no-untyped-def]
     return success_response() if _service.delete_customer(cust_cd) else error_response("不存在", 404)
 
 
+@system_bp.get("/customers/<cust_cd>")
+@login_required
+def get_customer(cust_cd: str):  # type: ignore[no-untyped-def]
+    """客户详情，含 TMM22 全部字段与中文解析。"""
+    r = _service.get_customer(cust_cd)
+    return success_response(data=r) if r else error_response("客户不存在", 404)
+
+
+@system_bp.get("/customers/<cust_cd>/assets")
+@login_required
+def get_customer_assets(cust_cd: str):  # type: ignore[no-untyped-def]
+    """门店在网资产列表（用于 ITSM 详情页设备资产 Tab）。"""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 100, type=int)
+    result = _service.get_customer_assets(cust_cd=cust_cd, page=page, per_page=per_page)
+    return success_response(data=result)
+
+
 @system_bp.get("/eid/tree")
 @login_required
 def get_eid_tree():  # type: ignore[no-untyped-def]

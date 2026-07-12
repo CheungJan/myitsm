@@ -1321,6 +1321,7 @@ class SystemRepository:
         result = []
         for e, r, bom_eid, cust_nm, parentcd, _cd, cust_card, item_nm, cust_class_nm in rows:
             d = e.to_dict()
+            d["item_nm"] = item_nm or ""
             if r:
                 d["id"] = r.id
                 d["cust_nm"] = cust_nm or "库存"
@@ -1328,6 +1329,8 @@ class SystemRepository:
                 d["cust_class_nm"] = cust_class_nm or ""
                 d["useflg"] = r.useflg or (e.useflg or "1")
                 d["asset_status"] = getattr(r, 'asset_status', None) or ""
+                d["posupddate"] = r.posupddate.isoformat() if r.posupddate else ""
+                d["maintenanceno"] = r.maintenanceno or ""
                 d["parentcd"] = (parentcd or "").strip()
             elif e.eid in bom_map:
                 bm = bom_map[e.eid]

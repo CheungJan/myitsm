@@ -231,7 +231,7 @@ __all__ = [
     # ITSM 旧机翻新
     "MaintenanceRenovate",
     "EquipmentRenovate",
-    # ITSM 设备变更
+    # ITSM 磁卡号变更
     "DeviceChange",
     # ITSM 日常保养
     "Maintenance",

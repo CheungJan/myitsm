@@ -7,6 +7,7 @@
 ## 目录结构识别约定（重构关键）
 - `app/` 为重构后的 Python 后端代码目录（Flask 应用工厂模式）。
 - `PBsrc/` 为 PB 原始源码目录，包含 25 个 `.pbl` 模块及参考数据文件。
+- `PBsrc/pb_oracle_*/` 为 PB 原 Oracle 数据库（CCGL_TEST）导出的数据库对象源码目录，按对象类型分目录存放（PROCEDURE/FUNCTION/PACKAGE/TRIGGER/TYPE/VIEW/SEQUENCE/INDEX），详见 `docs/core/PB_Oracle_数据库对象导出清单.md`。
 - `docs/core/` 为核心文档目录，`docs/archive/` 为归档文档目录（旧重构资料）。
 - `_backup/` 为备份目录（存放旧重构代码 `app_old/`）。
 - PB→Python 重构时，必须按 `PBsrc/` 下 `.pbl` 模块边界建立映射与迁移清单，禁止跨模块混迁。
@@ -19,6 +20,7 @@
 - 涉及数据库表结构、字段语义、字段说明、口径对齐时，优先参考 `docs/core/数据库字典_精简后_最终版.md`。
 - 涉及代码重构优化方案、业务模型改进时，优先参考 `docs/core/PB_TO_PYTHON_OPTIMIZATION_REQUIREMENTS.md`。
 - 涉及功能范围确认、缺失功能规划、扩展需求时，优先参考 `docs/core/系统功能对比分析与扩展规划.md`。
+- 涉及 PB 存储过程/函数/视图/触发器/序列/索引等数据库对象逻辑还原时，优先参考 `PBsrc/pb_oracle_*/` 下导出源码与 `docs/core/PB_Oracle_数据库对象导出清单.md`。
 - 若实现逻辑与参考产物存在冲突，先记录差异并在 `docs` 补充说明后再实施变更。
 
 ## 重构开工前必读清单（每次任务开始前执行）
@@ -136,6 +138,7 @@
 - 修改代码/配置/文档前必须先读取文件确认内容，避免覆盖他人修改。
 - 使用 Git 进行版本管理，提交前确保质量门禁通过。
 - 按需使用项目提供的 pre-commit 钩子（black/isort/ruff）进行本地检查。
+- 查询 PB 原 Oracle 数据库（CCGL_TEST）使用 `sqlplus ccgl/ccgl@CCGL_TEST`，常用查询模板与注意事项见 `docs/core/PB_Oracle_数据库对象导出清单.md` §2.1。静态导出源码优先查 `PBsrc/pb_oracle_*/`，动态查询（跨对象搜索/最新状态/动态统计）才连 sqlplus。
 
 ## ITSM业务表结构约定（主子表+公用类型表）
 

@@ -207,7 +207,7 @@ Authorization: Bearer <token>
 | POST | `/maintenance-renovate` | 创建 | Body: `MaintenanceRenovateCreate` |
 | POST | `/maintenance-renovate/<renew_id>/transition` | 状态流转 | Body: `StatusTransition` |
 
-#### 设备变更 (BG)
+#### 磁卡号变更 (BG)
 
 | 方法 | 路径 | 说明 | 查询/请求参数 |
 |------|------|------|-------------|
@@ -216,7 +216,7 @@ Authorization: Bearer <token>
 | POST | `/device-change` | 创建 | Body: `DeviceChangeCreate` |
 | POST | `/device-change/<change_id>/transition` | 状态流转 | Body: `StatusTransition` |
 
-> `change_type` 枚举：CK=改磁卡号, BQ=信息变更, BG=设备变更。CK 类型流转完成后自动保存磁卡号历史到 `TMM22_CUSTOMERS_HISTORY`。
+> `change_type` 枚举：CK=改磁卡号, BQ=信息变更, BG=磁卡号+设备变更。CK 类型流转完成后自动保存磁卡号历史到 `TMM22_CUSTOMERS_HISTORY`。
 
 #### 门店关闭 (GB)
 

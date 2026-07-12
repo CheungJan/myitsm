@@ -64,3 +64,7 @@ htmlcov/
 # OS
 Thumbs.db
 .claude/settings.local.json
+.history/
+.playwright-mcp/
+.playwright-mcp/
+.history/

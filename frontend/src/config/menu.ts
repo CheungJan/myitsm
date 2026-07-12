@@ -68,13 +68,12 @@ export const FRONTEND_MENUS: MenuConfig[] = [
         children: [
             { menu_cd: 'maintenance', menu_nm: '日常维修', path: '/itsm/maintenance' },
             { menu_cd: 'renovate', menu_nm: '旧机翻新', path: '/itsm/renovate' },
-            { menu_cd: 'device-change', menu_nm: '设备变更', path: '/itsm/device-change' },
+            { menu_cd: 'device-change', menu_nm: '磁卡号变更', path: '/itsm/device-change' },
             { menu_cd: 'store-close', menu_nm: '门店关闭', path: '/itsm/store-close' },
             { menu_cd: 'itsm-open', menu_nm: '新机开通', path: '/itsm/open' },
             { menu_cd: 'recycle', menu_nm: '回收任务', path: '/itsm/recycle' },
             { menu_cd: 'maint-plans', menu_nm: '保养计划', path: '/itsm/maintenance-plans' },
             { menu_cd: 'maint-t17', menu_nm: '保养工单', path: '/itsm/maintenance-t17' },
-            { menu_cd: 'free-replace', menu_nm: '免费更换', path: '/itsm/free-replace' },
             { menu_cd: 'archives', menu_nm: '归档记录', path: '/itsm/archives' }
         ]
     },

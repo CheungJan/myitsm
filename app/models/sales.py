@@ -25,7 +25,7 @@ class PlanCust(BaseModel):
     __tablename__ = "plan_cust"
 
     planno = db.Column(db.String(10), primary_key=True, comment="计划编号")
-    plantyp = db.Column(db.String(2), comment="计划类型（00新机开通/10设备变更/20旧机翻新/30设备取回/40门店关闭）")
+    plantyp = db.Column(db.String(2), comment="计划类型（00新机开通/10磁卡号变更/20旧机翻新/30取机回收/40门店关闭）")
     custnew = db.Column(db.String(2), comment="新旧客户标志（Y=新客户/N=已有客户）")
     custcard = db.Column(db.String(20), comment="客户磁卡号")
     custcd = db.Column(db.String(8), comment="客户编码")

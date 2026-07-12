@@ -688,6 +688,26 @@ class SystemService:
         resolved = [self._resolve_customer_refs(c.to_dict()) for c in items]
         return {"items": resolved, "total": total}
 
+    def get_customer(self, cust_cd: str) -> dict[str, Any] | None:
+        """获取客户详情，含中文解析。"""
+        r = self._repo.get_customer(cust_cd)
+        return self._resolve_customer_refs(r.to_dict()) if r else None
+
+    def get_customer_assets(
+        self,
+        cust_cd: str,
+        page: int = 1,
+        per_page: int = 100,
+        useflg: str = "1",
+    ) -> dict[str, Any]:
+        """获取门店在网资产列表。"""
+        return self.list_assets(
+            page=page,
+            per_page=per_page,
+            cust_cd=cust_cd,
+            useflg=useflg,
+        )
+
     # ——— EID ———
 
     def get_eid_itemcd_tree(self) -> list[dict[str, Any]]:
