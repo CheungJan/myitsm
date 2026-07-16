@@ -270,11 +270,33 @@ export function fetchSyscodes(codeTyp: string) {
 }
 
 export function fetchAreas() {
-    return request.get<never, { data: { area_cd: string; area_nm: string; area_id: number; name: string }[] }>('/areas')
+    return request.get<never, { data: { area_cd: string; area_nm: string; area_id: number; name: string; usercd?: string; usercd_nm?: string }[] }>('/areas')
 }
 
-export function fetchCommodes() {
-    return request.get<never, { data: { code_cd: string; code_nm: string }[] }>('/commodes')
+// ---- 区域管理 CRUD ----
+export interface AreaRecord { area_cd: string; area_nm: string; parent_cd?: string; usercd?: string; usercd_nm?: string; useflg?: string }
+export function createArea(data: Record<string, unknown>) {
+    return request.post<never, { data: AreaRecord }>('/areas', data)
+}
+export function updateArea(area_cd: string, data: Record<string, unknown>) {
+    return request.put<never, { data: AreaRecord }>(`/areas/${area_cd}`, data)
+}
+export function deleteArea(area_cd: string) {
+    return request.delete<never, { data: null }>(`/areas/${area_cd}`)
+}
+
+// ---- 区域用户关联 ----
+export interface AreaUserRecord { user_cd: string; user_nm: string; dept_cd?: string; choose: number }
+export function fetchAreaUsers(area_cd: string) {
+    return request.get<never, { data: AreaUserRecord[] }>(`/areas/${area_cd}/users`)
+}
+export function setAreaUsers(area_cd: string, user_cds: string[]) {
+    return request.put<never, { data: null }>(`/areas/${area_cd}/users`, { area_cd, user_cds })
+}
+
+// ---- 有限公司下拉（tmm22.class_cd 关联客户分类 class_nm） ----
+export function fetchYXCompanies() {
+    return request.get<never, { data: { class_cd: string; class_nm: string }[] }>('/yx-companies')
 }
 
 export function fetchCountries() {

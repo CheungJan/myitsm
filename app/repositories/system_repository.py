@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from app.extensions import db
+from app.models.itsm import UserArea
 from app.models.master import (
     Area,
     City,
-    ComMode,
     Country,
     CustClass,
     Customer,
@@ -50,11 +50,19 @@ class SystemRepository:
         user_cd: str | None = None,
         user_nm: str | None = None,
         dept_cd: str | None = None,
+        useflg: str | None = None,
     ) -> list[User]:
-        """获取用户列表，支持多条件筛选。"""
+        """获取用户列表，支持多条件筛选。
+
+        Args:
+            status: 登录启用标志（1=可登录/0=禁用登录）
+            useflg: 在职有效标志（1=在职/0=离职停用）
+        """
         query = db.session.query(User)
         if status:
             query = query.filter(User.status == status)
+        if useflg:
+            query = query.filter(User.useflg == useflg)
         if user_cd:
             query = query.filter(User.user_cd.ilike(f"%{user_cd}%"))
         if user_nm:
@@ -175,7 +183,7 @@ class SystemRepository:
             .filter(UserGroup.group_cd == group_cd)
         )
         if active_only:
-            query = query.filter(User.status == "1")
+            query = query.filter(User.useflg == "1")
         rows = query.all()
         return [{"user_cd": ug.user_cd, "group_cd": ug.group_cd, "user_nm": nm, "status": st}
                 for ug, nm, st in rows]
@@ -1378,6 +1386,25 @@ class SystemRepository:
             CustPosRl.cust_cd == cust_cd, CustPosRl.useflg == "1"
         ).count()
 
+    @staticmethod
+    def get_cust_latest_itemnm(cust_cd: str) -> str:
+        """取客户有效设备中最新日期对应的机型名称（对齐 PB uf_storeposinfo）。
+
+        优先按 posupddate 倒序，回退 created_at，取首条有效设备的 item_nm。
+        """
+        from sqlalchemy import func
+        row = (
+            db.session.query(Item.item_nm)
+            .join(CustPosRl, CustPosRl.item_cd == Item.item_cd)
+            .filter(CustPosRl.cust_cd == cust_cd, CustPosRl.useflg == "1")
+            .order_by(
+                CustPosRl.posupddate.desc().nullslast(),
+                CustPosRl.created_at.desc().nullslast(),
+            )
+            .first()
+        )
+        return row[0] if row else ""
+
     # ——— 码表查询 ———
 
     @staticmethod
@@ -1422,11 +1449,33 @@ class SystemRepository:
         ).order_by(Area.area_cd).all())
 
     @staticmethod
-    def get_commodes() -> list[SysCode]:
-        """通讯方式列表（迁移至 tmm31_syscodes，code_typ='CM'）。"""
-        return list(db.session.query(SysCode).filter(
-            SysCode.code_typ == "CM", SysCode.useflg == "1"
-        ).order_by(SysCode.sort_no, SysCode.code_cd).all())
+    def get_area_by_cd(area_cd: str) -> Area | None:
+        return db.session.query(Area).filter(Area.area_cd == area_cd).first()
+
+    @staticmethod
+    def create_area(data: dict[str, Any]) -> Area:
+        record = Area(**data)
+        db.session.add(record)
+        db.session.flush()
+        return record
+
+    @staticmethod
+    def update_area(record: Area, data: dict[str, Any]) -> None:
+        for k, v in data.items():
+            if hasattr(record, k):
+                setattr(record, k, v)
+        db.session.flush()
+
+    @staticmethod
+    def delete_area(record: Area) -> None:
+        db.session.delete(record)
+        db.session.commit()
+
+    @staticmethod
+    def count_userarea_by_area_cd(area_cd: str) -> int:
+        """统计区域下的用户关联数（删除区域前校验）。"""
+        from app.models.itsm import UserArea
+        return db.session.query(UserArea).filter(UserArea.area_cd == area_cd).count()
 
     @staticmethod
     def get_countries() -> list[Country]:
@@ -1711,3 +1760,24 @@ class SystemRepository:
     def delete_supplier_price(obj: Any) -> None:
         db.session.delete(obj)
         db.session.commit()
+
+
+class UserAreaRepository:
+    """区域-用户关联数据访问（TIT06_USERAREA）。"""
+
+    @staticmethod
+    def list_by_area_cd(area_cd: str) -> list[UserArea]:
+        return list(db.session.query(UserArea).filter(UserArea.area_cd == area_cd).all())
+
+    @staticmethod
+    def list_user_cds_by_area_cd(area_cd: str) -> set[str]:
+        rows = db.session.query(UserArea.user_cd).filter(UserArea.area_cd == area_cd).all()
+        return {r[0] for r in rows}
+
+    @staticmethod
+    def set_users(area_cd: str, user_cds: list[str]) -> None:
+        """批量替换区域用户关联（删除旧关联 + 插入新关联）。"""
+        db.session.query(UserArea).filter(UserArea.area_cd == area_cd).delete()
+        for cd in user_cds:
+            db.session.add(UserArea(area_cd=area_cd, user_cd=cd))
+        db.session.flush()

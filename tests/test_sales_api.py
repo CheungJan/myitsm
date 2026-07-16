@@ -22,6 +22,10 @@ def _post(client: FlaskClient, url: str, data: dict[str, Any], headers: dict[str
     return client.post(url, data=json.dumps(data), content_type="application/json", headers=headers)
 
 
+def _put(client: FlaskClient, url: str, data: dict[str, Any], headers: dict[str, str]) -> Any:
+    return client.put(url, data=json.dumps(data), content_type="application/json", headers=headers)
+
+
 class TestPlanCust:
     """预计划测试。"""
 
@@ -115,6 +119,7 @@ class TestPlanOrchestration:
         )
         planno = resp.get_json()["data"]["planno"]
         _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
+        _put(client, f"/api/v1/sales/plans/{planno}", {"imple_date": "2026-07-11"}, headers)
 
         resp3 = _post(client, f"/api/v1/sales/plans/{planno}/implement", {}, headers)
         assert resp3.status_code == 200, resp3.get_json()
@@ -328,6 +333,7 @@ class TestPlanOrchestration:
 
         # 3. 状态流转 00→02（计划中→分派中）
         _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
+        _put(client, f"/api/v1/sales/plans/{planno}", {"imple_date": "2026-07-11"}, headers)
 
         # 4. 实施确认
         impl_resp = _post(client, f"/api/v1/sales/plans/{planno}/implement", {}, headers)
@@ -486,8 +492,8 @@ class TestPlanEndToEnd:
                 (_ET, _ET.eid == "EID0000000001"),
                 (_RL, _RL.eid == "EID0000000001"),
                 (_MO, _MO.from_custcard == "HP001"),
-                (_SO, _SO.refbillid.like("C%")),
-                (_PS, _PS.planno.like("C%")),
+                (_SO, _SO.refbillid.like("PL%")),
+                (_PS, _PS.planno.like("PL%")),
                 (_PC, _PC.custcard == "HP001"),
                 (_CUST, _CUST.cust_card == "HP001"),
                 (SdModel, SdModel.whcd == "W1"),
@@ -527,8 +533,8 @@ class TestPlanEndToEnd:
         app: Flask,
         client: FlaskClient,
         headers: dict[str, str],
-    ) -> tuple[str, str]:
-        """创建预计划→呼出→流转02→实施，返回 (planno, downstream_id)。"""
+    ) -> tuple[str, str, str]:
+        """创建预计划→呼出→流转02→实施，返回 (planno, downstream_id, outbillid)。"""
         # 1. 创建预计划 plantyp=00，指定 posid（EID）
         resp = _post(
             client,
@@ -539,6 +545,7 @@ class TestPlanEndToEnd:
                 "custcd": "T010",
                 "custcard": "HP001",
                 "posid": "EID0000000001",
+                "pos_from": "00",
             },
             headers,
         )
@@ -549,6 +556,7 @@ class TestPlanEndToEnd:
 
         # 3. 预计划 transition 00→02
         _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
+        _put(client, f"/api/v1/sales/plans/{planno}", {"imple_date": "2026-07-11"}, headers)
 
         # 4. 实施确认 → 04，生成下游 MO（P0）
         impl_resp = _post(client, f"/api/v1/sales/plans/{planno}/implement", {}, headers)
@@ -557,25 +565,17 @@ class TestPlanEndToEnd:
         assert impl_data["to_status"] == "04"  # P0: 02→04
         downstream_id = impl_data["downstream_id"]
         assert downstream_id
-        return planno, downstream_id
+        outbillid = impl_data.get("outbillid", "")
+        assert outbillid, "方案 A 自动出库未生成"
+        return planno, downstream_id, outbillid
 
     def _create_and_audit_outbound(
         self,
         client: FlaskClient,
         headers: dict[str, str],
-        planno: str,
+        outbillid: str,
     ) -> str:
-        """审核出库单（P2）—— 方案 A：implement 已自动创建出库单，直接查询并审核。"""
-        from app.extensions import db as _db
-        from app.models.warehouse import StockOut
-
-        outbillid = (
-            _db.session.query(StockOut.outbillid)
-            .filter(StockOut.refbillid == planno, StockOut.invtyp == "1")
-            .scalar()
-        )
-        assert outbillid, f"方案 A 自动出库未生成，planno={planno}"
-
+        """审核出库单（P2）—— 方案 A：implement 已自动创建出库单，直接审核。"""
         audit_resp = _post(
             client,
             f"/api/v1/warehouse/stock-out/{outbillid}/audit",
@@ -590,8 +590,8 @@ class TestPlanEndToEnd:
         self._seed_inventory(app)
         headers = _auth_header(app)
 
-        planno, downstream_id = self._create_and_implement(app, client, headers)
-        self._create_and_audit_outbound(client, headers, planno)
+        planno, downstream_id, outbillid = self._create_and_implement(app, client, headers)
+        self._create_and_audit_outbound(client, headers, outbillid)
 
         # MO 状态机：1（新建）→ 2（分配）→ 5（已解决/关单）
         # 写 EidTrack type='C' (P3) + CustPosRl (P4) + 回写 plan_status='01' (P4)
@@ -639,8 +639,8 @@ class TestPlanEndToEnd:
         self._seed_inventory(app)
         headers = _auth_header(app)
 
-        planno, _downstream_id = self._create_and_implement(app, client, headers)
-        self._create_and_audit_outbound(client, headers, planno)
+        planno, _downstream_id, outbillid = self._create_and_implement(app, client, headers)
+        self._create_and_audit_outbound(client, headers, outbillid)
 
         # 完成预计划 → 01，写 EidTrack type='u' (P5)
         complete_resp = _post(client, f"/api/v1/sales/plans/{planno}/complete", {}, headers)
@@ -776,6 +776,7 @@ class TestPlanEndToEnd:
 
         # 3. 预计划 transition 00→02
         _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
+        _put(client, f"/api/v1/sales/plans/{planno}", {"imple_date": "2026-07-11"}, headers)
 
         # 4. 实施确认 → 04，生成下游翻新单
         impl_resp = _post(client, f"/api/v1/sales/plans/{planno}/implement", {}, headers)
@@ -966,6 +967,7 @@ class TestPlanEndToEnd:
 
         # 3. 预计划 transition 00→02
         _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
+        _put(client, f"/api/v1/sales/plans/{planno}", {"imple_date": "2026-07-11"}, headers)
 
         # 4. 实施确认 → 04，生成下游回收任务
         impl_resp = _post(client, f"/api/v1/sales/plans/{planno}/implement", {}, headers)
@@ -1136,6 +1138,7 @@ class TestPlanEndToEnd:
 
         # 3. 预计划 transition 00→02
         _post(client, f"/api/v1/sales/plans/{planno}/transition", {"to_status": "02"}, headers)
+        _put(client, f"/api/v1/sales/plans/{planno}", {"imple_date": "2026-07-11"}, headers)
 
         # 4. 实施确认 → 04，生成下游门店关闭单
         impl_resp = _post(client, f"/api/v1/sales/plans/{planno}/implement", {}, headers)

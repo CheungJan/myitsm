@@ -322,7 +322,7 @@ import {
     fetchCustomers, createCustomer, updateCustomer, deleteCustomer,
     fetchCustClassTree, fetchCustClasses,
     createCustClass, updateCustClass, deleteCustClass,
-    fetchSyscodes, fetchAreas, fetchCommodes,
+    fetchSyscodes, fetchAreas,
     fetchCountries, fetchProvinces, fetchCities, fetchTowns,
     fetchGeoProvinces, fetchGeoCities, fetchGeoAreas, fetchGeoStreets,
 } from '@/api/master'
@@ -501,7 +501,7 @@ async function loadLookups() {
         const [bt, yb, zf, ps, ar, cm, ct, pv] = await Promise.all([
             fetchSyscodes('BT'), fetchSyscodes('YB'), fetchSyscodes('ZF'),
             fetchSyscodes('PS'),
-            fetchAreas(), fetchCommodes(),
+            fetchAreas(), fetchSyscodes('CM'),
             fetchCountries(), fetchProvinces(),
         ])
         businessTypes.value = bt.data || []

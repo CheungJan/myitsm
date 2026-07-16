@@ -56,16 +56,22 @@ export function fetchHistoryByStore(type: string, storeId: string) {
 export interface SubRecord { id?:number; maintenance_id?:string; [key:string]: unknown }
 export function fetchD2D(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/d2d/${maintenance_id}`)}
 export function createD2D(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/d2d',data)}
+export function updateD2D(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/d2d/${record_id}`,data)}
 export function fetchRV(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/rv/${maintenance_id}`)}
 export function createRV(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/rv',data)}
+export function updateRV(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/rv/${record_id}`,data)}
 export function fetchAccessories(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/accessories/${maintenance_id}`)}
 export function createAccessories(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/accessories',data)}
+export function updateAccessories(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/accessories/${record_id}`,data)}
 export function fetchPayList(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/paylist/${maintenance_id}`)}
 export function createPayList(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/paylist',data)}
+export function updatePayList(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/paylist/${record_id}`,data)}
 export function fetchDispatch(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/dispatch/${maintenance_id}`)}
 export function createDispatch(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/dispatch',data)}
+export function updateDispatch(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/dispatch/${record_id}`,data)}
 export function fetchCloseBills(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/close-bill/${maintenance_id}`)}
 export function createCloseBill(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/close-bill',data)}
+export function updateCloseBill(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/close-bill/${record_id}`,data)}
 
 // ---- 设备明细 API ----
 export function addOpenEquipment(opening_id:string, data:Record<string,unknown>){return request.post<never,{data:SubRecord}>(`/itsm/maintenance-open/${opening_id}/equipments`,data)}
@@ -76,3 +82,24 @@ export function deleteRenovateEquipment(renew_id:string, eq_id:number){return re
 export function fetchRecycleDetails(recycle_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/recycle-task/${recycle_id}/details`)}
 export function addRecycleDetail(recycle_id:string, data:Record<string,unknown>){return request.post<never,{data:SubRecord}>(`/itsm/recycle-task/${recycle_id}/details`,data)}
 export function deleteRecycleDetail(recycle_id:string, asset_id:string){return request.delete<never,{data:null}>(`/itsm/recycle-task/${recycle_id}/details/${asset_id}`)}
+
+// ---- 派单规则 (TIT30) ----
+export interface DispatchRule {
+    rule_id?: number
+    rule_name: string
+    priority: number
+    fault_type?: string | null
+    store_id?: string | null
+    target_type?: string | null
+    target_value?: string | null
+    fallback_type?: string | null
+    fallback_value?: string | null
+    ultimate_fallback_type?: string | null
+    ultimate_fallback_value?: string | null
+    useflg?: string
+}
+export function fetchDispatchRules(){return request.get<never,{data:DispatchRule[]}>('/itsm/dispatch-rules')}
+export function createDispatchRule(data:Record<string,unknown>){return request.post<never,{data:DispatchRule}>('/itsm/dispatch-rules',data)}
+export function updateDispatchRule(rule_id:number, data:Record<string,unknown>){return request.put<never,{data:DispatchRule}>(`/itsm/dispatch-rules/${rule_id}`,data)}
+export function deleteDispatchRule(rule_id:number){return request.delete<never,{data:null}>(`/itsm/dispatch-rules/${rule_id}`)}
+export function fetchDispatchResolve(faultType:string, storeId:string){return request.get<never,{data:Record<string,unknown>}>(`/itsm/dispatch-rules/resolve?fault_type=${faultType}&store_id=${storeId}`)}

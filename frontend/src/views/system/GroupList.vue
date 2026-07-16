@@ -12,6 +12,12 @@
             <el-table :data="groups" v-loading="loading" stripe>
                 <el-table-column prop="group_cd" label="组编码" width="120" />
                 <el-table-column prop="group_nm" label="组名称" width="200" />
+                <el-table-column label="组长" width="160">
+                    <template #default="{ row }">
+                        <span v-if="row.leader_cd">{{ row.leader_nm || row.leader_cd }}</span>
+                        <el-tag v-else type="info" size="small">未设置</el-tag>
+                    </template>
+                </el-table-column>
                 <el-table-column label="状态" width="80">
                     <template #default="{ row }">
                         <el-tag :type="row.status === '1' ? 'success' : 'danger'" size="small">
@@ -44,6 +50,11 @@
                     <el-select v-model="form.status" style="width:100%">
                         <el-option label="有效" value="1" />
                         <el-option label="无效" value="0" />
+                    </el-select>
+                </el-form-item>
+                <el-form-item label="组长">
+                    <el-select v-model="form.leader_cd" filterable clearable placeholder="选择组长（可空）" style="width:100%">
+                        <el-option v-for="u in allUsers" :key="u.user_cd" :label="`${u.user_nm} (${u.user_cd})`" :value="u.user_cd" />
                     </el-select>
                 </el-form-item>
             </el-form>
@@ -118,7 +129,7 @@ const groups = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const page = ref(1); const perPage = ref(20); const total = ref(0)
 
 const dialogVisible = ref(false); const editing = ref<Record<string,string>|null>(null); const saving = ref(false)
-const form = reactive({ group_cd: '', group_nm: '', status: '1' })
+const form = reactive({ group_cd: '', group_nm: '', status: '1', leader_cd: '' })
 
 const memberVisible = ref(false); const memberLoading = ref(false)
 const currentGroupCd = ref('')
@@ -153,10 +164,13 @@ function openDialog(row?: Record<string,string>) {
         form.group_cd = row.group_cd || ''
         form.group_nm = row.group_nm || ''
         form.status = row.status || '1'
+        form.leader_cd = row.leader_cd || ''
     } else {
-        form.group_cd = ''; form.group_nm = ''; form.status = '1'
+        form.group_cd = ''; form.group_nm = ''; form.status = '1'; form.leader_cd = ''
     }
     dialogVisible.value = true
+    // 编辑时预载用户列表供组长选择
+    if (!allUsers.value.length) loadAllUsers()
 }
 
 async function handleSave() {
@@ -166,7 +180,7 @@ async function handleSave() {
     }
     saving.value = true
     try {
-        const payload: Record<string, string> = { group_nm: form.group_nm, status: form.status, useflg: '1' }
+        const payload: Record<string, string> = { group_nm: form.group_nm, status: form.status, useflg: '1', leader_cd: form.leader_cd || '' }
         if (editing.value) {
             await updateGroup(editing.value.group_cd, payload)
             ElMessage.success('更新成功')
@@ -204,14 +218,14 @@ async function openMembers(row: Record<string,string>) {
 async function loadMembers() {
     memberLoading.value = true
     try {
-        const res = await fetchGroupMembers(currentGroupCd.value)
+        const res = await fetchGroupMembers(currentGroupCd.value, { active_only: '1' })
         members.value = (res.data || []) as { user_cd: string; user_nm: string }[]
     } finally { memberLoading.value = false }
 }
 
 async function loadAllUsers() {
     try {
-        const res = await fetchUsers()
+        const res = await fetchUsers({ useflg: '1' })
         allUsers.value = ((res.data || []) as { user_cd: string; user_nm: string }[])
             .filter(u => u.user_cd)
     } catch {

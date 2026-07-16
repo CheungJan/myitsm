@@ -49,6 +49,11 @@ def _init_extensions(app: Flask) -> None:
 
     register_eid_listeners()
 
+    # 注册审计字段自动维护（update_time / updator 兜底赋值）
+    from app.extensions.audit_listeners import register_audit_listeners
+
+    register_audit_listeners()
+
 
 def _register_blueprints(app: Flask) -> None:
     """注册蓝图。"""

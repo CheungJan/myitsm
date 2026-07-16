@@ -7,7 +7,8 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from app.extensions import db
-from app.models.master import CustPosRl, Customer, Eid
+from app.models.master import Area, CustPosRl, Customer, Eid, SysCode
+from app.models.system import User
 from app.repositories.itsm_repository import (
     AccessoriesUpdateRepository,
     CloseBillRepository,
@@ -132,19 +133,228 @@ def _create_stock_in_draft(
 
 
 def _enrich_store_card(items: list[dict[str, Any]], key: str = "store_id") -> list[dict[str, Any]]:
-    """为维护单记录补充 store_cust_card（从 tmm22_customers 关联查询）。"""
+    """为维护单记录补充 store_cust_card / area_cd / area_nm（从 tmm22_customers 关联查询）。"""
     ids = {r.get(key) for r in items if r.get(key)}
     if not ids:
         return items
-    cards = dict(
-        db.session.query(Customer.cust_cd, Customer.cust_card)
+    rows = (
+        db.session.query(Customer.cust_cd, Customer.cust_card, Customer.area_cd, Area.area_nm)
+        .outerjoin(Area, Area.area_cd == Customer.area_cd)
         .filter(Customer.cust_cd.in_(ids))
         .all()
     )
+    cards: dict[str, str] = {}
+    area_cds: dict[str, str] = {}
+    area_nms: dict[str, str] = {}
+    for cust_cd, cust_card, area_cd, area_nm in rows:
+        cards[cust_cd] = cust_card or ""
+        if area_cd:
+            area_cds[cust_cd] = area_cd
+            area_nms[cust_cd] = area_nm or ""
     for r in items:
         sid = r.get(key)
         if sid and sid in cards:
             r["store_cust_card"] = cards[sid]
+            if sid in area_cds:
+                r["area_cd"] = area_cds[sid]
+                r["area_nm"] = area_nms[sid]
+    return items
+
+
+def _enrich_user_names(
+    items: list[dict[str, Any]],
+    fields: list[str],
+) -> list[dict[str, Any]]:
+    """为子表记录批量翻译人员编码→姓名（tmc13_users）。
+
+    对 items 中每个 field 追加 field_nm 字段。
+    """
+    if not items or not fields:
+        return items
+    codes: set[str] = set()
+    for r in items:
+        for f in fields:
+            v = str(r.get(f, "")).strip()
+            if v:
+                codes.add(v)
+    if not codes:
+        return items
+    from app.models.system import User
+
+    user_map = {
+        u.user_cd: u.user_nm or u.user_cd
+        for u in db.session.query(User).filter(User.user_cd.in_(codes)).all()
+    }
+    for r in items:
+        for f in fields:
+            v = str(r.get(f, "")).strip()
+            if v and v in user_map:
+                r[f"{f}_nm"] = user_map[v]
+    return items
+
+
+def _enrich_group_names(
+    items: list[dict[str, Any]],
+    field: str = "accpectd_group",
+) -> list[dict[str, Any]]:
+    """为子表记录翻译组编码→组名（tmc12_groups）。"""
+    if not items:
+        return items
+    codes = {str(r.get(field, "")).strip() for r in items if r.get(field)}
+    if not codes:
+        return items
+    from app.models.system import Group
+
+    group_map = {
+        g.group_cd: g.group_nm or g.group_cd
+        for g in db.session.query(Group).filter(Group.group_cd.in_(codes)).all()
+    }
+    for r in items:
+        v = str(r.get(field, "")).strip()
+        if v and v in group_map:
+            r[f"{field}_nm"] = group_map[v]
+    return items
+
+
+def _enrich_sys_codes(
+    items: list[dict[str, Any]],
+    field: str,
+    code_typ: str,
+) -> list[dict[str, Any]]:
+    """为子表记录翻译系统字典代码→名称（tmm31_syscodes）。
+
+    Args:
+        items: 记录列表
+        field: 待翻译的字段名
+        code_typ: 字典类型（如 ZT=状态, GZ=故障类型, MY=满意度评价）
+
+    Returns:
+        补充 {field}_nm 字段后的记录列表
+    """
+    if not items:
+        return items
+    codes = {str(r.get(field, "")).strip() for r in items if r.get(field)}
+    if not codes:
+        return items
+    code_map = dict(
+        db.session.query(SysCode.code_cd, SysCode.code_nm)
+        .filter(SysCode.code_typ == code_typ, SysCode.code_cd.in_(codes))
+        .all()
+    )
+    for r in items:
+        v = str(r.get(field, "")).strip()
+        if v and v in code_map:
+            r[f"{field}_nm"] = code_map[v]
+    return items
+
+
+def _enrich_notify_status(
+    items: list[dict[str, Any]],
+    ref_type: str,
+) -> list[dict[str, Any]]:
+    """为子表记录补充通知状态字段（重构 PB fxbz/ywfx）。
+
+    PB 原 fxbz（飞信状态）= 已发/未发
+    PB 原 ywfx（飞信数据）= 已产生/未产生
+
+    重构后通过 TNTF02_NOTIFICATION 表查询：
+    - notify_status: sent=已发, pending=未发, failed=失败, 无记录=未发
+    - notify_data: Y=已产生通知数据, N=未产生
+
+    Args:
+        items: 记录列表
+        ref_type: 通知关联业务类型（如 dispatch/maintenance）
+
+    Returns:
+        补充 notify_status / notify_data 字段后的记录列表
+    """
+    if not items:
+        return items
+    from app.models.notification import Notification
+
+    # 按 maintenance_id 批量查询通知记录
+    # 按 dispatch_id 精确匹配（同一工单多次派工各自独立追踪通知状态）
+    dispatch_ids = {r.get("id") for r in items if r.get("id")}
+    if not dispatch_ids:
+        return items
+    rows = (
+        db.session.query(
+            Notification.dispatch_id, Notification.send_status, Notification.read_status
+        )
+        .filter(Notification.ref_type == ref_type, Notification.dispatch_id.in_(dispatch_ids))
+        .all()
+    )
+    status_order = {"sent": 3, "pending": 2, "failed": 1}
+    notify_map: dict[int, dict[str, str]] = {}
+    for did, send_st, read_st in rows:
+        if did is None:
+            continue
+        prev = notify_map.get(did)
+        if prev is None or status_order.get(send_st, 0) > status_order.get(prev.get("send", ""), 0):
+            notify_map[did] = {"send": send_st or "", "read": read_st or "unread"}
+    for r in items:
+        did = r.get("id")
+        if did and did in notify_map:
+            info = notify_map[did]
+            r["notify_status"] = info["send"]
+            r["notify_data"] = "Y"
+            r["notify_read"] = "Y" if info.get("read") == "read" else "N"
+        else:
+            r["notify_status"] = "N"
+            r["notify_data"] = "N"
+            r["notify_read"] = "N"
+    return items
+
+
+def _enrich_daily_refs(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """为日常维护单记录补充字典翻译字段（对齐 PB d_maintenanceday_one 显示）。
+
+    补充字段：
+    - fault_type_nm：故障类型名称（tmm31_syscodes code_typ='GZ'）
+    - current_status_nm：当前状态名称（tmm31_syscodes code_typ='ZT'）
+    - creator_nm / updator_nm / firstor_nm：人员姓名（tmc13_users.user_nm）
+    """
+    if not items:
+        return items
+
+    # 故障类型字典（GZ）
+    fault_codes = {r.get("fault_type") for r in items if r.get("fault_type")}
+    fault_map: dict[str, str] = {}
+    if fault_codes:
+        fault_map = dict(
+            db.session.query(SysCode.code_cd, SysCode.code_nm)
+            .filter(SysCode.code_typ == "GZ", SysCode.code_cd.in_(fault_codes))
+            .all()
+        )
+
+    # 当前状态字典（ZT）
+    status_codes = {r.get("current_status") for r in items if r.get("current_status")}
+    status_map: dict[str, str] = {}
+    if status_codes:
+        status_map = dict(
+            db.session.query(SysCode.code_cd, SysCode.code_nm)
+            .filter(SysCode.code_typ == "ZT", SysCode.code_cd.in_(status_codes))
+            .all()
+        )
+
+    # 人员编码 → 姓名（creator / updator / firstor）
+    user_codes = {
+        r.get(k) for r in items for k in ("creator", "updator", "firstor") if r.get(k)
+    }
+    user_map: dict[str, str] = {}
+    if user_codes:
+        user_map = dict(
+            db.session.query(User.user_cd, User.user_nm)
+            .filter(User.user_cd.in_(user_codes))
+            .all()
+        )
+
+    for r in items:
+        r["fault_type_nm"] = fault_map.get(r.get("fault_type") or "", "")
+        r["current_status_nm"] = status_map.get(r.get("current_status") or "", "")
+        r["creator_nm"] = user_map.get(r.get("creator") or "", "")
+        r["updator_nm"] = user_map.get(r.get("updator") or "", "")
+        r["firstor_nm"] = user_map.get(r.get("firstor") or "", "")
     return items
 
 
@@ -196,7 +406,9 @@ class MaintenanceDailyService(_BaseMaintenanceService):
         record = MaintenanceDailyRepository.get_by_id(maintenance_id)
         if record is None:
             return None
-        return record.to_dict()
+        enriched = _enrich_store_card([record.to_dict()])
+        enriched = _enrich_daily_refs(enriched)
+        return enriched[0]
 
     @staticmethod
     def list_records(
@@ -204,11 +416,49 @@ class MaintenanceDailyService(_BaseMaintenanceService):
         store_id: str | None = None,
         page: int = 1,
         per_page: int = 20,
+        *,
+        current_status: str | None = None,
+        maintenance_id: str | None = None,
+        company_id: str | None = None,
+        area_cd: str | None = None,
+        firstor: str | None = None,
+        cust_card: str | None = None,
+        cust_nm: str | None = None,
+        address: str | None = None,
+        fault_type: str | None = None,
+        short_description: str | None = None,
+        request_begin: str | None = None,
+        request_end: str | None = None,
+        first_begin: str | None = None,
+        first_end: str | None = None,
+        dispatch_to: str | None = None,
+        area_user: str | None = None,
     ) -> dict[str, Any]:
+        # 兼容前端 current_status 参数，与 status 合并
+        effective_status = status or current_status
         items, total = MaintenanceDailyRepository.list_by_filters(
-            status=status, store_id=store_id, page=page, per_page=per_page
+            status=effective_status,
+            store_id=store_id,
+            page=page,
+            per_page=per_page,
+            maintenance_id=maintenance_id,
+            company_id=company_id,
+            area_cd=area_cd,
+            firstor=firstor,
+            cust_card=cust_card,
+            cust_nm=cust_nm,
+            address=address,
+            fault_type=fault_type,
+            short_description=short_description,
+            request_begin=request_begin,
+            request_end=request_end,
+            first_begin=first_begin,
+            first_end=first_end,
+            dispatch_to=dispatch_to,
+            area_user=area_user,
         )
         enriched = _enrich_store_card([item.to_dict() for item in items])
+        enriched = _enrich_daily_refs(enriched)
         return {
             "items": enriched,
             "total": total,
@@ -220,6 +470,12 @@ class MaintenanceDailyService(_BaseMaintenanceService):
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
         record = MaintenanceDailyRepository.create(data, creator)
         db.session.commit()
+        # 自动派单：按规则引擎解析目标（故障类型 + 门店）
+        store_id = record.store_id or data.get("store_id")
+        if store_id:
+            DispatchService.auto_create(
+                record.maintenance_id, store_id, creator, record.fault_type
+            )
         return record.to_dict()
 
     @staticmethod
@@ -581,7 +837,8 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
         record = MaintenanceRenovateRepository.get_by_id(renew_id)
         if record is None:
             return None
-        return record.to_dict()
+        enriched = _enrich_store_card([record.to_dict()])
+        return enriched[0]
 
     @staticmethod
     def list_records(
@@ -856,7 +1113,8 @@ class DeviceChangeService(_BaseMaintenanceService):
         record = DeviceChangeRepository.get_by_id(change_id)
         if record is None:
             return None
-        return record.to_dict()
+        enriched = _enrich_store_card([record.to_dict()])
+        return enriched[0]
 
     @staticmethod
     def list_records(
@@ -1151,7 +1409,8 @@ class StoreCloseService(_BaseMaintenanceService):
         record = StoreCloseRepository.get_by_id(close_id)
         if record is None:
             return None
-        return record.to_dict()
+        enriched = _enrich_store_card([record.to_dict()])
+        return enriched[0]
 
     @staticmethod
     def list_records(
@@ -1419,11 +1678,24 @@ class D2DService:
     @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
         items = D2DRepository.list_by_maintenance_id(maintenance_id)
-        return [item.to_dict() for item in items]
+        result = [item.to_dict() for item in items]
+        result = _enrich_user_names(result, ["d2d_engineer", "creator", "updator"])
+        result = _enrich_sys_codes(result, "d2d_type", "D2D")
+        result = _enrich_sys_codes(result, "jjbz", "ZT")
+        return result
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
         record = D2DRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(record_id: int, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = D2DRepository.get_by_id(record_id)
+        if record is None:
+            return None
+        D2DRepository.update(record, data, updator)
         db.session.commit()
         return record.to_dict()
 
@@ -1434,11 +1706,23 @@ class RVService:
     @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
         items = RVRepository.list_by_maintenance_id(maintenance_id)
-        return [item.to_dict() for item in items]
+        result = [item.to_dict() for item in items]
+        result = _enrich_user_names(result, ["rv_operator", "creator", "updator"])
+        result = _enrich_sys_codes(result, "satisfaction", "MY")
+        return result
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
         record = RVRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(record_id: int, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = RVRepository.get_by_id(record_id)
+        if record is None:
+            return None
+        RVRepository.update(record, data, updator)
         db.session.commit()
         return record.to_dict()
 
@@ -1449,11 +1733,22 @@ class AccessoriesUpdateService:
     @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
         items = AccessoriesUpdateRepository.list_by_maintenance_id(maintenance_id)
-        return [item.to_dict() for item in items]
+        result = [item.to_dict() for item in items]
+        result = _enrich_user_names(result, ["engineer_id", "creator", "updator"])
+        return result
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
         record = AccessoriesUpdateRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(record_id: int, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = AccessoriesUpdateRepository.get_by_id(record_id)
+        if record is None:
+            return None
+        AccessoriesUpdateRepository.update(record, data, updator)
         db.session.commit()
         return record.to_dict()
 
@@ -1464,13 +1759,265 @@ class CloseBillService:
     @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
         items = CloseBillRepository.list_by_maintenance_id(maintenance_id)
-        return [item.to_dict() for item in items]
+        result = [item.to_dict() for item in items]
+        result = _enrich_user_names(result, ["creator", "updator"])
+        return result
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
         record = CloseBillRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
+
+    @staticmethod
+    def update(record_id: int, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = CloseBillRepository.get_by_id(record_id)
+        if record is None:
+            return None
+        CloseBillRepository.update(record, data, updator)
+        db.session.commit()
+        return record.to_dict()
+
+
+class DispatchRuleService:
+    """派单规则引擎（TIT30_DISPATCH_RULE）。
+
+    按故障类型匹配规则，依次尝试 target → fallback → ultimate_fallback，
+    解析出 (accpectd_group, accpectder)。target_type 含义：
+      - area_manager: 查门店所属区域的 usercd，组默认 'A1'
+      - group_leader: 查 target_value 组编码的 leader_cd
+      - manual: 不自动派单，返回 None
+    """
+
+    @staticmethod
+    def resolve(
+        fault_type: str | None,
+        store_id: str | None,
+    ) -> dict[str, Any] | None:
+        """解析派单目标。
+
+        Returns:
+            {"accpectd_group": str, "accpectder": str, "rule_id": int} 或 None
+        """
+        from app.models.itsm import DispatchRule
+        from app.models.system import Group
+
+        # 按 priority 升序查询有效规则
+        rules = (
+            db.session.query(DispatchRule)
+            .filter(DispatchRule.useflg == "1")
+            .order_by(DispatchRule.priority.asc())
+            .all()
+        )
+        if not rules:
+            return None
+
+        # 匹配优先级：fault_type + store_id 精确 > fault_type 精确 > store_id 精确 > 通用
+        def _score(rule: DispatchRule) -> int:
+            score = 0
+            if fault_type and rule.fault_type and rule.fault_type == fault_type:
+                score += 2
+            if store_id and rule.store_id and rule.store_id == store_id:
+                score += 1
+            return score
+
+        # 仅保留有匹配的规则，按分数降序（priority 已升序）
+        scored = [(r, _score(r)) for r in rules]
+        max_score = max(s for _, s in scored) if scored else 0
+        # fault_type 或 store_id 至少有一项匹配，或通用规则（score=0 但 fault_type/store_id 均空）
+        matched_candidates = [
+            r for r, s in scored
+            if s == max_score and (
+                (fault_type and r.fault_type and r.fault_type == fault_type)
+                or (store_id and r.store_id and r.store_id == store_id)
+                or (not r.fault_type and not r.store_id)
+            )
+        ]
+        matched = matched_candidates[0] if matched_candidates else None
+        if matched is None:
+            return None
+
+        # 解析区域经理
+        def _resolve_area_manager() -> tuple[str, str] | None:
+            if not store_id:
+                return None
+            customer = db.session.query(Customer).filter(Customer.cust_cd == store_id).first()
+            if customer is None or not customer.area_cd:
+                return None
+            area = (
+                db.session.query(Area)
+                .filter(Area.area_cd == customer.area_cd, Area.useflg == "1")
+                .first()
+            )
+            if area is None or not area.usercd:
+                return None
+            return ("A1", area.usercd)
+
+        # 解析组长
+        def _resolve_group_leader(group_cd: str | None) -> tuple[str, str] | None:
+            if not group_cd:
+                return None
+            group = db.session.get(Group, group_cd)
+            if group is None or not group.leader_cd:
+                return None
+            return (group_cd, group.leader_cd)
+
+        # 负载均衡：组内成员中当前未关单派工数最少者
+        def _resolve_group_load_balance(group_cd: str | None) -> tuple[str, str] | None:
+            if not group_cd:
+                return None
+            from app.models.itsm import MaintenanceDispatch, UserGroup
+            from app.models.system import User
+
+            # 组内在职成员
+            members = (
+                db.session.query(UserGroup.user_cd)
+                .join(User, User.user_cd == UserGroup.user_cd)
+                .filter(UserGroup.group_cd == group_cd, User.status == "1")
+                .all()
+            )
+            member_cds = [m[0] for m in members]
+            if not member_cds:
+                return None
+            # 统计每位成员当前未关单（维护单状态非 3/9）的派工数
+            closed = ("3", "9")
+            rows = (
+                db.session.query(
+                    MaintenanceDispatch.accpectder,
+                    db.func.count(MaintenanceDispatch.id),
+                )
+                .join(MaintenanceDaily, MaintenanceDaily.maintenance_id == MaintenanceDispatch.maintenance_id)
+                .filter(
+                    MaintenanceDispatch.accpectd_group == group_cd,
+                    MaintenanceDispatch.accpectder.in_(member_cds),
+                    ~MaintenanceDaily.current_status.in_(closed),
+                )
+                .group_by(MaintenanceDispatch.accpectder)
+                .all()
+            )
+            load_map = {r[0]: r[1] for r in rows}
+            # 选负载最少者（0 负载优先），并列时取 member_cds 顺序第一个
+            sorted_members = sorted(member_cds, key=lambda cd: load_map.get(cd, 0))
+            return (group_cd, sorted_members[0])
+
+        # 依次尝试三级目标
+        for t_type, t_value in (
+            (matched.target_type, matched.target_value),
+            (matched.fallback_type, matched.fallback_value),
+            (matched.ultimate_fallback_type, matched.ultimate_fallback_value),
+        ):
+            if not t_type:
+                continue
+            if t_type == "manual":
+                return None
+            if t_type == "area_manager":
+                res = _resolve_area_manager()
+                if res:
+                    return {
+                        "accpectd_group": res[0],
+                        "accpectder": res[1],
+                        "rule_id": matched.rule_id,
+                        "target_type": t_type,
+                        "target_value": t_value,
+                        "auto_dispatch": getattr(matched, "auto_dispatch", "1") or "1",
+                    }
+            elif t_type == "group_leader":
+                res = _resolve_group_leader(t_value)
+                if res:
+                    return {
+                        "accpectd_group": res[0],
+                        "accpectder": res[1],
+                        "rule_id": matched.rule_id,
+                        "target_type": t_type,
+                        "target_value": t_value,
+                        "auto_dispatch": getattr(matched, "auto_dispatch", "1") or "1",
+                    }
+            elif t_type == "load_balance":
+                res = _resolve_group_load_balance(t_value)
+                if res:
+                    return {
+                        "accpectd_group": res[0],
+                        "accpectder": res[1],
+                        "rule_id": matched.rule_id,
+                        "target_type": t_type,
+                        "target_value": t_value,
+                        "auto_dispatch": getattr(matched, "auto_dispatch", "1") or "1",
+                    }
+        return None
+
+    @staticmethod
+    def list_rules() -> list[dict[str, Any]]:
+        from app.models.itsm import DispatchRule
+
+        rules = (
+            db.session.query(DispatchRule)
+            .filter(DispatchRule.useflg == "1")
+            .order_by(DispatchRule.priority.asc())
+            .all()
+        )
+        return [r.to_dict() for r in rules]
+
+    @staticmethod
+    def create_rule(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        """新增派单规则。"""
+        from datetime import datetime
+
+        from app.models.itsm import DispatchRule
+
+        rule = DispatchRule(
+            rule_name=data.get("rule_name", ""),
+            priority=data.get("priority", 99),
+            fault_type=data.get("fault_type") or None,
+            store_id=data.get("store_id") or None,
+            target_type=data.get("target_type") or None,
+            target_value=data.get("target_value") or None,
+            fallback_type=data.get("fallback_type") or None,
+            fallback_value=data.get("fallback_value") or None,
+            ultimate_fallback_type=data.get("ultimate_fallback_type") or None,
+            ultimate_fallback_value=data.get("ultimate_fallback_value") or None,
+            useflg="1",
+            creator=creator,
+            create_time=datetime.now(),
+        )
+        db.session.add(rule)
+        db.session.commit()
+        return rule.to_dict()
+
+    @staticmethod
+    def update_rule(rule_id: int, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        """更新派单规则。"""
+        from datetime import datetime
+
+        from app.models.itsm import DispatchRule
+
+        rule = db.session.get(DispatchRule, rule_id)
+        if rule is None:
+            return None
+        for k in (
+            "rule_name", "priority", "fault_type", "store_id",
+            "target_type", "target_value",
+            "fallback_type", "fallback_value",
+            "ultimate_fallback_type", "ultimate_fallback_value",
+            "useflg",
+        ):
+            if k in data:
+                setattr(rule, k, data[k] if data[k] != "" else None)
+        rule.updator = updator
+        rule.update_time = datetime.now()
+        db.session.commit()
+        return rule.to_dict()
+
+    @staticmethod
+    def delete_rule(rule_id: int) -> bool:
+        """删除派单规则（物理删除）。"""
+        from app.models.itsm import DispatchRule
+
+        rule = db.session.get(DispatchRule, rule_id)
+        if rule is None:
+            return False
+        db.session.delete(rule)
+        db.session.commit()
+        return True
 
 
 class DispatchService:
@@ -1479,13 +2026,162 @@ class DispatchService:
     @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
         items = DispatchRepository.list_by_maintenance_id(maintenance_id)
-        return [item.to_dict() for item in items]
+        result = [item.to_dict() for item in items]
+        result = _enrich_user_names(result, ["operator", "accpectder", "creator", "updator"])
+        result = _enrich_group_names(result, "accpectd_group")
+        result = _enrich_sys_codes(result, "maintenance_type", "MT")
+        result = _enrich_notify_status(result, "dispatch")
+        return result
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        # 派工时间默认当前时间
+        if not data.get("dispatch_time"):
+            data["dispatch_time"] = datetime.now()
         record = DispatchRepository.create(data, creator)
+        # 业务操作流水ID：派工记录自身主键，flush 获取 id 后回填
+        db.session.flush()
+        if not record.business_operation_id:
+            from sqlalchemy import func
+            from app.models.itsm import MaintenanceDispatch as _MD
+            max_op = db.session.query(func.max(_MD.business_operation_id)).filter(
+                _MD.maintenance_id == record.maintenance_id
+            ).scalar()
+            record.business_operation_id = (max_op or 0) + 1
         db.session.commit()
         return record.to_dict()
+
+    @staticmethod
+    def update(record_id: int, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = DispatchRepository.get_by_id(record_id)
+        if record is None:
+            return None
+        DispatchRepository.update(record, data, updator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def auto_create(
+        maintenance_id: str,
+        store_id: str,
+        creator: str,
+        fault_type: str | None = None,
+    ) -> dict[str, Any] | None:
+        """维护单创建时按派单规则自动生成派工记录。
+
+        逻辑链：
+        1. DispatchRuleService.resolve(fault_type, store_id) 解析目标
+           - area_manager: 门店→区域→区域负责人
+           - group_leader: 组编码→组长
+           - manual: 不自动派单
+           - 失败时按 fallback → ultimate_fallback 链式兜底
+        2. 解析成功则插入 tit21_maintenance_dispatch 记录
+        3. 创建时一次性渲染 DISPATCH 通知模板快照写入 TNTF02_NOTIFICATION
+
+        Args:
+            maintenance_id: 维护单号
+            store_id: 门店ID（即客户编码 custcd）
+            creator: 创建人编码
+            fault_type: 故障类型（用于规则匹配）
+
+        Returns:
+            派工记录 dict 或 None（规则命中 manual 或全部兜底失败时跳过）
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            target = DispatchRuleService.resolve(fault_type, store_id)
+            if target is None or target.get("auto_dispatch") == "0":
+                logger.info(
+                    f"自动派单跳过：maintenance_id={maintenance_id}, "
+                    f"fault_type={fault_type} 命中 manual 或无可用目标"
+                )
+                return None
+            data = {
+                "maintenance_id": maintenance_id,
+                "operator": creator,
+                "accpectd_group": target["accpectd_group"],
+                "accpectder": target["accpectder"],
+                "dispatch_time": datetime.now(),
+            }
+            record = DispatchRepository.create(data, creator)
+            db.session.flush()
+            # 业务操作流水ID：派工记录自身主键
+            if not record.business_operation_id:
+                from sqlalchemy import func
+                from app.models.itsm import MaintenanceDispatch as _MD2
+                max_op = db.session.query(func.max(_MD2.business_operation_id)).filter(
+                    _MD2.maintenance_id == record.maintenance_id
+                ).scalar()
+                record.business_operation_id = (max_op or 0) + 1
+            # 创建通知快照（与派工同事务，一次性渲染模板）
+            DispatchService._create_notification(record, store_id, fault_type, creator)
+            db.session.commit()
+            logger.info(
+                f"自动派单成功：maintenance_id={maintenance_id}, "
+                f"accpectder={target['accpectder']}, rule_id={target.get('rule_id')}"
+            )
+            return record.to_dict()
+        except Exception as e:
+            db.session.rollback()
+            logger.warning(f"自动派单失败 maintenance_id={maintenance_id}: {e}")
+            return None
+
+    @staticmethod
+    def _create_notification(
+        record: Any,
+        store_id: str | None,
+        fault_type: str | None,
+        creator: str,
+    ) -> None:
+        """派工创建时一次性渲染 DISPATCH 模板写入通知快照。
+
+        模板渲染采用 Jinja2，占位符一次性替换后落库，后续不再重渲染。
+        """
+        import logging
+        from jinja2 import Template
+
+        from app.models.notification import NotificationTemplate
+        from app.repositories.notification_repository import NotificationRepository
+
+        logger = logging.getLogger(__name__)
+        try:
+            tpl = db.session.get(NotificationTemplate, "DISPATCH")
+            if tpl is None:
+                logger.warning("DISPATCH 通知模板未配置，跳过通知创建")
+                return
+            # 解析分派人姓名
+            accpectder = record.accpectder or ""
+            accpectder_name = accpectder
+            if accpectder:
+                user = db.session.query(User).filter(User.user_cd == accpectder).first()
+                if user and user.user_nm:
+                    accpectder_name = user.user_nm
+            context = {
+                "maintenance_id": record.maintenance_id,
+                "store_id": store_id or "",
+                "accpectder_name": accpectder_name,
+                "accpectd_group": record.accpectd_group or "",
+                "fault_type": fault_type or "",
+            }
+            subject = Template(tpl.subject or "").render(**context)
+            body = Template(tpl.body or "").render(**context)
+            NotificationRepository.create(
+                {
+                    "template_id": "DISPATCH",
+                    "channel": "internal",
+                    "recipient": accpectder,
+                    "subject": subject,
+                    "body": body,
+                    "ref_type": "dispatch",
+                    "ref_id": str(record.maintenance_id),
+                    "dispatch_id": getattr(record, "id", None),
+                    "send_status": "pending",
+                },
+                creator,
+            )
+        except Exception as e:
+            logger.warning(f"派工通知创建失败 maintenance_id={record.maintenance_id}: {e}")
 
 
 class RecycleTaskService(_BaseMaintenanceService):
@@ -1500,7 +2196,8 @@ class RecycleTaskService(_BaseMaintenanceService):
         record = RecycleTaskRepository.get_by_id(recycle_id)
         if record is None:
             return None
-        return record.to_dict()
+        enriched = _enrich_store_card([record.to_dict()], key="cust_cd")
+        return enriched[0]
 
     @staticmethod
     def list_records(
@@ -1710,7 +2407,6 @@ class RecycleTaskService(_BaseMaintenanceService):
         return dtl.to_dict()
 
     @staticmethod
-    @staticmethod
     def delete_detail(recycle_id: str, asset_id: str) -> bool:
         """删除回收任务明细。"""
         return RecycleTaskRepository.delete_detail(recycle_id, asset_id)
@@ -1765,7 +2461,8 @@ class MaintenanceT17Service(_BaseMaintenanceService):
         record = MaintenanceT17Repository.get_by_id(maintenance_id)
         if record is None:
             return None
-        return record.to_dict()
+        enriched = _enrich_store_card([record.to_dict()])
+        return enriched[0]
 
     @staticmethod
     def list_records(
@@ -1875,11 +2572,22 @@ class PayListService:
     @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[dict[str, Any]]:
         items = PayListRepository.list_by_maintenance_id(maintenance_id)
-        return [item.to_dict() for item in items]
+        result = [item.to_dict() for item in items]
+        result = _enrich_user_names(result, ["engineer_id", "creator", "updator"])
+        return result
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
         record = PayListRepository.create(data, creator)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def update(record_id: int, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        record = PayListRepository.get_by_id(record_id)
+        if record is None:
+            return None
+        PayListRepository.update(record, data, updator)
         db.session.commit()
         return record.to_dict()
 

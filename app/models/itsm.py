@@ -125,10 +125,10 @@ class UserArea(BaseModel):
     __tablename__ = "tit06_userarea"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    area_id = db.Column(db.Integer, nullable=False, comment="区域ID")
+    area_cd = db.Column(db.String(20), nullable=False, comment="区域编码（FK→tmm46_area.area_cd）")
     user_cd = db.Column(db.String(6), nullable=False, comment="人员编号")
 
-    __table_args__ = (db.UniqueConstraint("area_id", "user_cd", name="uq_userarea"),)
+    __table_args__ = (db.UniqueConstraint("area_cd", "user_cd", name="uq_userarea"),)
 
 
 # ---------------------------------------------------------------------------
@@ -653,7 +653,7 @@ class MaintenanceDispatch(BaseModel):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     maintenance_id = db.Column(db.String(8), nullable=False, comment="维护单ID")
     business_operation_id = db.Column(db.Integer, comment="业务操作流水表ID")
-    maintenance_type = db.Column(db.String(2), comment="维护类型")
+    maintenance_type = db.Column(db.String(2), comment="维护类型（PB未使用，重构已废弃，保留历史兼容）")
     operator = db.Column(db.String(6), comment="操作人")
     accpectd_group = db.Column(db.String(2), comment="分派组")
     accpectder = db.Column(db.String(6), comment="分派人")
@@ -982,3 +982,36 @@ class PosStatus(BaseModel):
     gendate = db.Column(db.DateTime, comment="创建日期")
     upddate = db.Column(db.DateTime, comment="更新日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+
+# ---------------------------------------------------------------------------
+# 派单规则 (TIT30_DISPATCH_RULE)
+# ---------------------------------------------------------------------------
+
+
+class DispatchRule(BaseModel):
+    """派单规则（TIT30_DISPATCH_RULE，新增）。
+
+    按故障类型配置派单目标与兜底链路，替代 PB 硬编码默认组 'A1'。
+    target_type: area_manager / group_leader / load_balance / manual
+    """
+
+    __tablename__ = "tit30_dispatch_rule"
+
+    rule_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    rule_name = db.Column(db.String(50), nullable=False, comment="规则名称")
+    priority = db.Column(db.Integer, default=99, comment="优先级（小优先）")
+    fault_type = db.Column(db.String(2), comment="故障类型（GZ字典，空=全匹配）")
+    store_id = db.Column(db.String(8), comment="门店编码（可选，定向派单）")
+    target_type = db.Column(db.String(20), comment="派单目标: area_manager/group_leader/load_balance/manual")
+    target_value = db.Column(db.String(20), comment="目标值（group_leader/load_balance 时=组编码）")
+    fallback_type = db.Column(db.String(20), comment="一级兜底目标")
+    fallback_value = db.Column(db.String(20), comment="一级兜底值")
+    ultimate_fallback_type = db.Column(db.String(20), comment="最终兜底目标")
+    ultimate_fallback_value = db.Column(db.String(20), comment="最终兜底值")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    auto_dispatch = db.Column(db.String(1), default="1", comment="自动派单开关: 1=启用/0=禁用")
+    creator = db.Column(db.String(6), comment="创建人")
+    create_time = db.Column(db.DateTime, comment="创建时间")
+    updator = db.Column(db.String(6), comment="更新人")
+    update_time = db.Column(db.DateTime, comment="更新时间")

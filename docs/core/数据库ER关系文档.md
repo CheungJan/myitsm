@@ -111,7 +111,7 @@ TMM47_COMMODE (ComMode) — 通讯方式
 | IdMaster | tmm34_idmaster | id | ID 流水号生成器 |
 | CustPosRl | tmm35_cust_pos_rl | id | 客户-设备关联（资产台账） |
 | Area | tmm46_area | areacd | 区域 |
-| ComMode | tmm47_commode | commodecd | 通讯方式 |
+| ComMode | ~~tmm47_commode~~ → tmm31_syscodes(CM) | — | 通讯方式（已迁移至系统字典） |
 
 ---
 

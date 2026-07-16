@@ -85,7 +85,6 @@ from app.models.master import (
     AssetAttribList,
     Bom,
     BomDt,
-    ComMode,
     Company,
     CustClass,
     CustItems,
@@ -193,7 +192,6 @@ __all__ = [
     # 主数据
     "Company",
     "Area",
-    "ComMode",
     "CustClass",
     "Customer",
     "CustomerHistory",

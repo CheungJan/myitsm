@@ -158,7 +158,7 @@ Authorization: Bearer <token>
 |------|------|------|---------|
 | GET | `/syscodes` | 按类型查编码 | `code_typ`(BT/YB/ZF/ES/QS/PS/SS/CS/SRC等) |
 | GET | `/areas` | 区域列表 | - |
-| GET | `/commodes` | 通讯方式列表 | - |
+| GET | `/syscodes?code_typ=CM` | 通讯方式列表（已迁移至系统字典） | `code_typ=CM` |
 | GET | `/countries` | 国家列表 | - |
 | GET | `/provinces` | 省份列表 | - |
 | GET | `/cities` | 城市列表 | `prvn_cd` |

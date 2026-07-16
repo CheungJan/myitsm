@@ -10,8 +10,8 @@
         <div class="field"><label>磁卡号</label><el-input v-model="searchCustcard" placeholder="磁卡号模糊" size="small" style="width:130px" clearable @keyup.enter="onSearch" /></div>
         <div class="field"><label>客户名称</label><el-input v-model="searchCustNm" placeholder="输入客户" size="small" style="width:130px" clearable @keyup.enter="onSearch" /></div>
         <div class="field"><label>计划类型</label><el-select v-model="searchPlantyp" size="small" style="width:110px" clearable>
-          <el-option label="新机开通" value="00" /><el-option label="设备变更" value="10" />
-          <el-option label="旧机翻新" value="20" /><el-option label="设备取回" value="30" />
+          <el-option label="新机开通" value="00" /><el-option label="磁卡号变更" value="10" />
+          <el-option label="旧机翻新" value="20" /><el-option label="取机回收" value="30" />
           <el-option label="门店关闭" value="40" /></el-select></div>
         <div class="field"><label>状态</label><el-select v-model="searchStatus" size="small" style="width:110px" clearable>
           <el-option label="计划中" value="00" /><el-option label="计划完成" value="01" />

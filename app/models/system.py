@@ -61,6 +61,7 @@ class Group(BaseModel):
     status = db.Column(db.String(1), default="1", comment="状态")
     # --- Oracle 原表恢复字段 ---
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    leader_cd = db.Column(db.String(6), comment="组长用户编码（tmc13_users.user_cd）")
 
     members = db.relationship("UserGroup", back_populates="group", lazy="dynamic")
     rights = db.relationship("GroupRight", back_populates="group", lazy="dynamic")

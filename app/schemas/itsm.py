@@ -54,7 +54,7 @@ class DispatchCreate(BaseModel):
     """创建分派。"""
 
     maintenance_id: str = Field(..., max_length=8, description="维护单ID")
-    maintenance_type: str = Field(..., max_length=2, description="维护类型")
+    maintenance_type: str | None = Field(None, max_length=2, description="维护类型（已废弃，保留兼容）")
     operator: str | None = Field(None, max_length=6, description="操作人")
     accpectd_group: str | None = Field(None, max_length=2, description="分派组")
     accpectder: str | None = Field(None, max_length=6, description="分派人")
@@ -290,10 +290,26 @@ class RecycleTaskQuery(BaseModel):
 
 
 class MaintenanceQuery(BaseModel):
-    """维护单列表查询参数。"""
+    """维护单列表查询参数（对齐 PB u_itsm_rep_maintenanceday 报表查询条件）。"""
 
-    status: str | None = Field(None, max_length=2, description="状态码过滤")
+    status: str | None = Field(None, max_length=2, description="状态码过滤（多值逗号分隔，如 1,2,5）")
+    current_status: str | None = Field(None, max_length=50, description="状态码过滤（兼容前端 current_status 参数）")
     store_id: str | None = Field(None, max_length=8, description="门店ID过滤")
+    maintenance_id: str | None = Field(None, max_length=8, description="维护单号模糊过滤")
+    company_id: str | None = Field(None, max_length=8, description="有限公司（上级公司）过滤")
+    area_cd: str | None = Field(None, max_length=20, description="负责区域过滤")
+    firstor: str | None = Field(None, max_length=6, description="上门工程师过滤")
+    cust_card: str | None = Field(None, max_length=30, description="门店磁卡号模糊过滤")
+    cust_nm: str | None = Field(None, max_length=100, description="店名模糊过滤")
+    address: str | None = Field(None, max_length=200, description="地址模糊过滤")
+    fault_type: str | None = Field(None, max_length=8, description="故障类型过滤")
+    short_description: str | None = Field(None, max_length=80, description="维护分类（简述）模糊过滤")
+    request_begin: str | None = Field(None, description="请求日期起始（YYYY-MM-DD）")
+    request_end: str | None = Field(None, description="请求日期结束（YYYY-MM-DD）")
+    first_begin: str | None = Field(None, description="上门日期起始（YYYY-MM-DD）")
+    first_end: str | None = Field(None, description="上门日期结束（YYYY-MM-DD）")
+    dispatch_to: str | None = Field(None, max_length=6, description="派给我：按派工人 accpectder 过滤")
+    area_user: str | None = Field(None, max_length=6, description="本区域：按用户编码查其所属区域过滤")
     page: int = Field(1, ge=1, description="页码")
     per_page: int = Field(20, ge=1, le=100, description="每页条数")
 

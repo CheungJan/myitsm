@@ -71,6 +71,7 @@ class NotificationRepository:
         channel: str | None = None,
         send_status: str | None = None,
         ref_type: str | None = None,
+        ref_id: str | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> tuple[list[Notification], int]:
@@ -81,6 +82,8 @@ class NotificationRepository:
             query = query.filter(Notification.send_status == send_status)
         if ref_type:
             query = query.filter(Notification.ref_type == ref_type)
+        if ref_id:
+            query = query.filter(Notification.ref_id == ref_id)
         query = query.order_by(desc(Notification.gendate))
         total: int = query.count()
         items: list[Notification] = query.offset((page - 1) * per_page).limit(per_page).all()
@@ -106,7 +109,15 @@ class NotificationRepository:
 
     @staticmethod
     def mark_failed(record: Notification, error: str) -> Notification:
-        """标记为发送失败。"""
+        """标记为发送失败，累加重试次数。"""
         record.send_status = "failed"
         record.error_msg = error
+        record.retry_count = (record.retry_count or 0) + 1
+        return record
+
+    @staticmethod
+    def mark_read(record: Notification) -> Notification:
+        """标记为已读（站内通知专用）。"""
+        record.read_status = "read"
+        record.read_time = datetime.now(UTC)
         return record

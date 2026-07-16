@@ -70,7 +70,7 @@
 
 #### 1.6 其他主数据表 (6张)
 - **tmm46_area** - 区域
-- **tmm47_commode** - 通讯方式
+- ~~**tmm47_commode**~~ - 通讯方式（已迁移至 `tmm31_syscodes` code_typ='CM'，2026-07-13 drop）
 - **tmm61_deposit** - 押金主表
 - **tmm62_deposit_detail** - 押金明细
 - **tmm62_asset_attrib_list** - 资产属性列表
@@ -304,7 +304,7 @@
 | area_name | character varying | 100 | NO | | 区域名称 |
 | usercd | character varying | 20 | YES | | 负责人 |
 
-#### tmm47_commode - 通讯方式
+#### ~~tmm47_commode~~ - 通讯方式（已废弃，2026-07-13 drop，迁移至 tmm31_syscodes CM）
 | 字段名 | 数据类型 | 长度 | 可空 | 默认值 | 说明 |
 |--------|----------|------|------|--------|------|
 | mode_cd | character varying | 10 | NO | | 方式代码 |

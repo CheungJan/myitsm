@@ -58,11 +58,9 @@
               <el-table-column label="操作" width="50"><template #default="{row}"><el-button size="small" type="danger" @click="delRenEq(row)">删</el-button></template></el-table-column>
             </el-table>
           </el-tab-pane>
+          <ItsmSubTablePanes :maintenance-id="(detail.renew_id as string) || ''" :area-cd="((detail as any).area_cd as string) || ''" :current-status="((detail as any).current_status as string) || ''" />
           <el-tab-pane label="设备资产" name="asset">
             <AssetTab :store-id="(detail.store_id as string) || ''" />
-          </el-tab-pane>
-          <el-tab-pane label="业务附表" name="sub">
-            <ItsmSubTables :maintenance-id="(detail.renew_id as string) || ''" />
           </el-tab-pane>
         </el-tabs>
       </template>
@@ -101,7 +99,7 @@ import {ElMessage} from 'element-plus'
 import ItsmDetailLayout from './ItsmDetailLayout.vue'
 import CustomerInfoTab from './CustomerInfoTab.vue'
 import AssetTab from './AssetTab.vue'
-import ItsmSubTables from './ItsmSubTables.vue'
+import ItsmSubTablePanes from './ItsmSubTablePanes.vue'
 
 const {items,loading,page,perPage,total,onSearch} = useListPage<MntRecord>(fetchMaintenanceRenovate)
 const {userName} = useUserNames()

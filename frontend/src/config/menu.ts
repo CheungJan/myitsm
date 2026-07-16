@@ -74,6 +74,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
             { menu_cd: 'recycle', menu_nm: '回收任务', path: '/itsm/recycle' },
             { menu_cd: 'maint-plans', menu_nm: '保养计划', path: '/itsm/maintenance-plans' },
             { menu_cd: 'maint-t17', menu_nm: '保养工单', path: '/itsm/maintenance-t17' },
+            { menu_cd: 'area-management', menu_nm: '区域人员管理', path: '/itsm/area-management' },
+            { menu_cd: 'dispatch-rules', menu_nm: '派单规则', path: '/itsm/dispatch-rules' },
             { menu_cd: 'archives', menu_nm: '归档记录', path: '/itsm/archives' }
         ]
     },

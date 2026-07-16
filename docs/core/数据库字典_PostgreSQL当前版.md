@@ -121,6 +121,7 @@
 | 4 | created_at | TIMESTAMP | NOT NULL |  |
 | 5 | updated_at | TIMESTAMP | NOT NULL |  |
 | 6 | useflg | VARCHAR(1) |  | 有效标志 |
+| 7 | leader_cd | VARCHAR(6) |  | 组长用户编码（2026-07-15新增，FK→tmc13_users.user_cd） |
 
 #### 6. tmc13_users
 
@@ -740,18 +741,9 @@
 | 8 | name | VARCHAR(50) |  | ⚠️**废弃**：Oracle原表NAME的备份，已迁移至area_nm，业务代码不再使用，待删除 |
 | 9 | usercd | VARCHAR(6) |  | 负责人编码 |
 
-#### 24. tmm47_commode
+#### 24. tmm47_commode（已废弃，2026-07-13 drop）
 
-| # | 列名 | 类型 | 约束 | 说明 |
-|---|------|------|------|------|
-| 1 | cmm_cd | VARCHAR(20) | PK NOT NULL | 通讯方式编码 |
-| 2 | cmm_nm | VARCHAR(50) | NOT NULL | 通讯方式名称 |
-| 3 | cmm_type | VARCHAR(10) |  | 类型 |
-| 4 | useflg | VARCHAR(1) |  | 有效标志 |
-| 5 | created_at | TIMESTAMP | NOT NULL |  |
-| 6 | updated_at | TIMESTAMP | NOT NULL |  |
-| 7 | parent | VARCHAR(20) |  | 上级编码 |
-| 8 | childflg | VARCHAR(1) |  | 子节点标志 |
+> 数据已迁移至 `tmm31_syscodes`（`code_typ='CM'`），旧表已删除。前端通过 `useDict('CM')` 读取，后端 `system_service.py` 补充 `comm_mode_nm`。
 
 #### 25. tmm62_asset_attrib_list
 
@@ -864,12 +856,12 @@
 
 #### 6. tit06_userarea
 
-**索引**: `uq_userarea` (area_id, user_cd)
+**索引**: `uq_userarea` (area_cd, user_cd)
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | id | INTEGER | PK NOT NULL |  |
-| 2 | area_id | INTEGER | NOT NULL | 区域ID |
+| 2 | area_cd | VARCHAR(20) | NOT NULL | 区域编码（FK→tmm46_area.area_cd） |
 | 3 | user_cd | VARCHAR(6) | NOT NULL | 人员编号 |
 | 4 | created_at | TIMESTAMP | NOT NULL |  |
 | 5 | updated_at | TIMESTAMP | NOT NULL |  |
@@ -1516,6 +1508,34 @@
 | 15 | updated_at | TIMESTAMP | NOT NULL |  |
 | 16 | cause_mian | VARCHAR(20) |  | 原因大类（Oracle原字段名） |
 
+
+#### 34. tit30_dispatch_rule
+
+> 2026-07-15 新增。派单规则引擎：故障类型→目标→两级兜底链。
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | rule_id | INTEGER | PK | 规则ID |
+| 2 | rule_name | VARCHAR(50) | NOT NULL | 规则名称 |
+| 3 | priority | INTEGER | | 优先级（小优先） |
+| 4 | fault_type | VARCHAR(2) | | 故障类型（空=全匹配） |
+| 5 | store_id | VARCHAR(8) | | 门店编码（预留） |
+| 6 | target_type | VARCHAR(20) | | area_manager/group_leader/manual |
+| 7 | target_value | VARCHAR(20) | | 目标值 |
+| 8 | fallback_type | VARCHAR(20) | | 一级兜底 |
+| 9 | fallback_value | VARCHAR(20) | | 一级兜底值 |
+| 10 | ultimate_fallback_type | VARCHAR(20) | | 最终兜底 |
+| 11 | ultimate_fallback_value | VARCHAR(20) | | 最终兜底值 |
+| 12 | useflg | VARCHAR(1) | | 有效标志 |
+| 13 | creator | VARCHAR(6) | | 创建人 |
+| 14 | create_time | TIMESTAMP | | 创建时间 |
+| 15 | updator | VARCHAR(6) | | 更新人 |
+| 12a | auto_dispatch | VARCHAR(1) | | 自动派单开关 1=启用/0=禁用（2026-07-16新增） |
+| 16 | update_time | TIMESTAMP | | 更新时间 |
+| 17 | created_at | TIMESTAMP | | 创建时间（TimestampMixin，2026-07-15补） |
+| 18 | updated_at | TIMESTAMP | | 更新时间（TimestampMixin，2026-07-15补） |
+
+**预置规则**：P10 POS→区域负责人 / P20 视频→A1组长 / P30 取机→区域负责人 / P99 兜底→A1组长
 
 ### 仓储 (twh) — 15 张表
 > 入库/出库/库存/调拨
@@ -2589,6 +2609,10 @@
 | 9 | send_status | VARCHAR(10) |  | 发送状态: pending/sent/failed |
 | 10 | send_time | TIMESTAMP |  | 发送时间 |
 | 11 | error_msg | VARCHAR(500) |  | 错误信息 |
+| 8a | dispatch_id | INTEGER |  | FK→tit21_maintenance_dispatch.id，区分同一工单多次派工通知（2026-07-15新增） |
+| 11a | retry_count | INTEGER |  | 重试次数（2026-07-15新增） |
+| 11b | read_status | VARCHAR(10) |  | 已读状态 unread/read（2026-07-15新增） |
+| 11c | read_time | TIMESTAMP |  | 已读时间（2026-07-15新增） |
 | 12 | opercd | VARCHAR(6) |  | 操作员 |
 | 13 | gendate | TIMESTAMP |  | 创建日期 |
 | 14 | useflg | VARCHAR(1) |  | 有效标志 |
@@ -3297,7 +3321,7 @@
 | tio01_device_conn | tio01_device_conn_eid_key | eid |
 | tit02_liabilityregdt | uq_liabilityregdt | lbdt_cd, liab_cd |
 | tit05_repairinfo | uq_repairinfo | rep_type, obj_cd |
-| tit06_userarea | uq_userarea | area_id, user_cd |
+| tit06_userarea | uq_userarea | area_cd, user_cd |
 | tit17_maintenance_plan | uq_maintenance_plan | plan_y, plan_yymm, area_id |
 | tmc21_usergroup | uq_usergroup | user_cd, group_cd |
 | tmm22_customers | tmm22_customers_cust_card_key | cust_card |

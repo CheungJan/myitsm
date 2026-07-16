@@ -98,11 +98,27 @@ _t17_svc = MaintenanceT17Service()
 @itsm_bp.get("/maintenance-daily")
 @login_required
 def list_daily():  # type: ignore[no-untyped-def]
-    """日常维护单列表。"""
+    """日常维护单列表（对齐 PB u_itsm_rep_maintenanceday 报表查询条件）。"""
     params = MaintenanceQuery.model_validate(request.args.to_dict())
     data = MaintenanceDailyService.list_records(
         status=params.status,
+        current_status=params.current_status,
         store_id=params.store_id,
+        maintenance_id=params.maintenance_id,
+        company_id=params.company_id,
+        area_cd=params.area_cd,
+        firstor=params.firstor,
+        cust_card=params.cust_card,
+        cust_nm=params.cust_nm,
+        address=params.address,
+        fault_type=params.fault_type,
+        short_description=params.short_description,
+        request_begin=params.request_begin,
+        request_end=params.request_end,
+        first_begin=params.first_begin,
+        first_end=params.first_end,
+        dispatch_to=params.dispatch_to,
+        area_user=params.area_user,
         page=params.page,
         per_page=params.per_page,
     )
@@ -584,6 +600,79 @@ def create_dispatch():  # type: ignore[no-untyped-def]
     user_cd: str = request.headers.get("X-User-Cd", "system")
     data = DispatchService.create(body.model_dump(exclude_none=True), creator=user_cd)
     return success_response(data=data, code=201)
+
+
+@itsm_bp.put("/d2d/<int:record_id>")
+@login_required
+def update_d2d(record_id: int):  # type: ignore[no-untyped-def]
+    """更新上门服务记录。"""
+    body = request.get_json(force=True)
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = D2DService.update(record_id, body, updator=user_cd)
+    if data is None:
+        return error_response(message="记录不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.put("/rv/<int:record_id>")
+@login_required
+def update_rv(record_id: int):  # type: ignore[no-untyped-def]
+    """更新回访记录。"""
+    body = request.get_json(force=True)
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = RVService.update(record_id, body, updator=user_cd)
+    if data is None:
+        return error_response(message="记录不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.put("/accessories/<int:record_id>")
+@login_required
+def update_accessories(record_id: int):  # type: ignore[no-untyped-def]
+    """更新配件更新记录。"""
+    body = request.get_json(force=True)
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = AccessoriesUpdateService.update(record_id, body, updator=user_cd)
+    if data is None:
+        return error_response(message="记录不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.put("/dispatch/<int:record_id>")
+@login_required
+def update_dispatch(record_id: int):  # type: ignore[no-untyped-def]
+    """更新分派记录。"""
+    body = request.get_json(force=True)
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = DispatchService.update(record_id, body, updator=user_cd)
+    if data is None:
+        return error_response(message="记录不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.put("/close-bill/<int:record_id>")
+@login_required
+def update_close_bill(record_id: int):  # type: ignore[no-untyped-def]
+    """更新关单记录。"""
+    body = request.get_json(force=True)
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = CloseBillService.update(record_id, body, updator=user_cd)
+    if data is None:
+        return error_response(message="记录不存在", code=404)
+    return success_response(data=data)
+
+
+@itsm_bp.put("/paylist/<int:record_id>")
+@login_required
+def update_paylist(record_id: int):  # type: ignore[no-untyped-def]
+    """更新收费记录。"""
+    body = request.get_json(force=True)
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = PayListService.update(record_id, body, updator=user_cd)
+    if data is None:
+        return error_response(message="记录不存在", code=404)
+    db.session.commit()
+    return success_response(data=data)
 
 
 # ---- 回收任务 (TIT20，P0-1/优化4.2) ----
@@ -1218,3 +1307,67 @@ def should_charge():  # type: ignore[no-untyped-def]
         return error_response(message="缺少 store_id", code=400)
     data = ChargeService.should_charge(store_id)
     return success_response(data=data)
+
+
+# ---- 派单规则 (TIT30) ----
+
+
+@itsm_bp.get("/dispatch-rules")
+@login_required
+def list_dispatch_rules():  # type: ignore[no-untyped-def]
+    """派单规则列表（按 priority 升序）。"""
+    from app.services.itsm_service import DispatchRuleService
+
+    return success_response(data=DispatchRuleService.list_rules())
+
+
+@itsm_bp.post("/dispatch-rules")
+@login_required
+def create_dispatch_rule():  # type: ignore[no-untyped-def]
+    """新增派单规则。"""
+    from app.services.itsm_service import DispatchRuleService
+
+    body = request.get_json(silent=True) or {}
+    if not body.get("rule_name"):
+        return error_response(message="规则名称不能为空", code=400)
+    user_cd: str = g.current_user
+    data = DispatchRuleService.create_rule(body, user_cd)
+    return success_response(data=data, message="创建成功", code=201)
+
+
+@itsm_bp.put("/dispatch-rules/<int:rule_id>")
+@login_required
+def update_dispatch_rule(rule_id: int):  # type: ignore[no-untyped-def]
+    """更新派单规则。"""
+    from app.services.itsm_service import DispatchRuleService
+
+    body = request.get_json(silent=True) or {}
+    user_cd: str = g.current_user
+    r = DispatchRuleService.update_rule(rule_id, body, user_cd)
+    return success_response(data=r) if r else error_response(message="规则不存在", code=404)
+
+
+@itsm_bp.delete("/dispatch-rules/<int:rule_id>")
+@login_required
+def delete_dispatch_rule(rule_id: int):  # type: ignore[no-untyped-def]
+    """删除派单规则。"""
+    from app.services.itsm_service import DispatchRuleService
+
+    return (
+        success_response(message="已删除")
+        if DispatchRuleService.delete_rule(rule_id)
+        else error_response(message="规则不存在", code=404)
+    )
+
+
+@itsm_bp.get("/dispatch-rules/resolve")
+@login_required
+def resolve_dispatch_rule():  # type: ignore[no-untyped-def]
+    """按故障类型+门店解析派单目标（供手动派工表单默认值）。"""
+    fault_type = request.args.get("fault_type", "")
+    store_id = request.args.get("store_id", "")
+    if not store_id:
+        return error_response(message="缺少 store_id", code=400)
+    from app.services.itsm_service import DispatchRuleService
+    target = DispatchRuleService.resolve(fault_type or None, store_id)
+    return success_response(data=target or {})

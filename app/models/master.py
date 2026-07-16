@@ -4,7 +4,7 @@
 对应数据库表：TMM01_COMPANY, TMM11_ITEMCLASS, TMM12_ITEMS,
 TMM18_SUPPLIERCLASS, TMM19_SUPPLIERS, TMM21_CUSTCLASS,
 TMM22_CUSTOMERS, TMM31_SYSCODES, TMM34_IDMASTER,
-TMM35_CUST_POS_RL, TMM46_AREA, TMM47_COMMODE
+TMM35_CUST_POS_RL, TMM46_AREA
 """
 
 from __future__ import annotations
@@ -94,20 +94,6 @@ class Area(BaseModel):
     area_id = db.Column(db.Integer, comment="【废弃】Oracle原表ID的整数备份，已回填为area_cd::int，业务代码不再使用")
     name = db.Column(db.String(50), comment="【废弃】Oracle原表NAME的备份，已迁移至area_nm，业务代码不再使用")
     usercd = db.Column(db.String(6), comment="负责人编码")
-
-
-class ComMode(BaseModel):
-    """通讯方式表（TMM47_COMMODE）。"""
-
-    __tablename__ = "tmm47_commode"
-
-    cmm_cd = db.Column(db.String(20), primary_key=True, comment="通讯方式编码")
-    cmm_nm = db.Column(db.String(50), nullable=False, comment="通讯方式名称")
-    cmm_type = db.Column(db.String(10), comment="类型")
-    useflg = db.Column(db.String(1), default="1", comment="有效标志")
-    # --- Oracle 原表恢复字段 ---
-    parent = db.Column(db.String(20), comment="上级编码")
-    childflg = db.Column(db.String(1), comment="子节点标志")
 
 
 class CustClass(BaseModel):

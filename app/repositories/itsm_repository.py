@@ -85,13 +85,91 @@ class MaintenanceDailyRepository:
         store_id: str | None = None,
         page: int = 1,
         per_page: int = 20,
+        *,
+        maintenance_id: str | None = None,
+        company_id: str | None = None,
+        area_cd: str | None = None,
+        firstor: str | None = None,
+        cust_card: str | None = None,
+        cust_nm: str | None = None,
+        address: str | None = None,
+        fault_type: str | None = None,
+        short_description: str | None = None,
+        request_begin: str | None = None,
+        request_end: str | None = None,
+        first_begin: str | None = None,
+        first_end: str | None = None,
+        dispatch_to: str | None = None,
+        area_user: str | None = None,
     ) -> tuple[list[MaintenanceDaily], int]:
-        """分页查询日常维护单。"""
+        """分页查询日常维护单（对齐 PB u_itsm_rep_maintenanceday 报表查询条件）。
+
+        status 支持单值或逗号分隔多值（如 "1,2,5"）。
+        dispatch_to: 派给我——按派工人 accpectder 过滤（关联 TIT21）。
+        area_user: 本区域——按用户编码查 TIT06 所属区域，过滤门店 area_cd。
+        """
+        from app.models.itsm import MaintenanceDispatch, UserArea
+        from app.models.master import Customer
+
         query = db.session.query(MaintenanceDaily)
+        # 状态过滤（支持多值）
         if status:
-            query = query.filter(MaintenanceDaily.current_status == status)
+            statuses = [s.strip() for s in status.split(",") if s.strip()]
+            if len(statuses) == 1:
+                query = query.filter(MaintenanceDaily.current_status == statuses[0])
+            elif statuses:
+                query = query.filter(MaintenanceDaily.current_status.in_(statuses))
         if store_id:
             query = query.filter(MaintenanceDaily.store_id == store_id)
+        if maintenance_id:
+            query = query.filter(MaintenanceDaily.maintenance_id.ilike(f"%{maintenance_id}%"))
+        if company_id:
+            query = query.filter(MaintenanceDaily.company_id == company_id)
+        if firstor:
+            query = query.filter(MaintenanceDaily.firstor == firstor)
+        if fault_type:
+            query = query.filter(MaintenanceDaily.fault_type == fault_type)
+        if short_description:
+            query = query.filter(MaintenanceDaily.short_description.ilike(f"%{short_description}%"))
+        # 请求时间范围
+        if request_begin:
+            query = query.filter(MaintenanceDaily.request_time >= request_begin)
+        if request_end:
+            query = query.filter(MaintenanceDaily.request_time <= f"{request_end} 23:59:59")
+        # 上门时间范围
+        if first_begin:
+            query = query.filter(MaintenanceDaily.first_time >= first_begin)
+        if first_end:
+            query = query.filter(MaintenanceDaily.first_time <= f"{first_end} 23:59:59")
+        # 关联 tmm22_customers 查询磁卡号/店名/地址/区域
+        if cust_card or cust_nm or address or area_cd or area_user:
+            query = query.join(Customer, Customer.cust_cd == MaintenanceDaily.store_id)
+            if cust_card:
+                query = query.filter(Customer.cust_card.ilike(f"%{cust_card}%"))
+            if cust_nm:
+                query = query.filter(Customer.cust_nm.ilike(f"%{cust_nm}%"))
+            if address:
+                query = query.filter(Customer.address.ilike(f"%{address}%"))
+            if area_cd:
+                query = query.filter(Customer.area_cd == area_cd)
+            # 本区域：按用户编码查 TIT06 所属区域集合
+            if area_user:
+                area_subq = (
+                    db.session.query(UserArea.area_cd)
+                    .filter(UserArea.user_cd == area_user)
+                    .subquery()
+                )
+                query = query.filter(Customer.area_cd.in_(db.select(area_subq)))
+        # 派给我：按派工人 accpectder 过滤（关联 TIT21）
+        if dispatch_to:
+            md_subq = (
+                db.session.query(MaintenanceDispatch.maintenance_id)
+                .filter(MaintenanceDispatch.accpectder == dispatch_to)
+                .subquery()
+            )
+            query = query.filter(
+                MaintenanceDaily.maintenance_id.in_(db.select(md_subq))
+            )
         query = query.order_by(desc(MaintenanceDaily.create_time))
         total: int = query.count()
         items: list[MaintenanceDaily] = query.offset((page - 1) * per_page).limit(per_page).all()
@@ -454,6 +532,10 @@ class D2DRepository:
     """上门服务记录数据访问（公用附表 TIT23）。"""
 
     @staticmethod
+    def get_by_id(record_id: int) -> MaintenanceD2D | None:
+        return db.session.get(MaintenanceD2D, record_id)
+
+    @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[MaintenanceD2D]:
         return (
             db.session.query(MaintenanceD2D)
@@ -475,9 +557,21 @@ class D2DRepository:
         db.session.add(record)
         return record
 
+    @staticmethod
+    def update(record: MaintenanceD2D, data: dict[str, Any], updator: str) -> MaintenanceD2D:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
+        return record
+
 
 class RVRepository:
     """客户回访数据访问（公用附表 TIT24）。"""
+
+    @staticmethod
+    def get_by_id(record_id: int) -> MaintenanceRV | None:
+        return db.session.get(MaintenanceRV, record_id)
 
     @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[MaintenanceRV]:
@@ -501,9 +595,21 @@ class RVRepository:
         db.session.add(record)
         return record
 
+    @staticmethod
+    def update(record: MaintenanceRV, data: dict[str, Any], updator: str) -> MaintenanceRV:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
+        return record
+
 
 class AccessoriesUpdateRepository:
     """配件更新数据访问（TIT25）。"""
+
+    @staticmethod
+    def get_by_id(record_id: int) -> AccessoriesUpdate | None:
+        return db.session.get(AccessoriesUpdate, record_id)
 
     @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[AccessoriesUpdate]:
@@ -527,9 +633,21 @@ class AccessoriesUpdateRepository:
         db.session.add(record)
         return record
 
+    @staticmethod
+    def update(record: AccessoriesUpdate, data: dict[str, Any], updator: str) -> AccessoriesUpdate:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
+        return record
+
 
 class CloseBillRepository:
     """关单数据访问（TIT27）。"""
+
+    @staticmethod
+    def get_by_id(record_id: int) -> CloseBills | None:
+        return db.session.get(CloseBills, record_id)
 
     @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[CloseBills]:
@@ -553,9 +671,21 @@ class CloseBillRepository:
         db.session.add(record)
         return record
 
+    @staticmethod
+    def update(record: CloseBills, data: dict[str, Any], updator: str) -> CloseBills:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
+        return record
+
 
 class DispatchRepository:
     """维护单分派数据访问（TIT21）。"""
+
+    @staticmethod
+    def get_by_id(record_id: int) -> MaintenanceDispatch | None:
+        return db.session.get(MaintenanceDispatch, record_id)
 
     @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[MaintenanceDispatch]:
@@ -577,6 +707,14 @@ class DispatchRepository:
             **data,
         )
         db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: MaintenanceDispatch, data: dict[str, Any], updator: str) -> MaintenanceDispatch:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
         return record
 
 
@@ -787,6 +925,10 @@ class PayListRepository:
     """收费记录数据访问（TIT26_PAYLIST）。"""
 
     @staticmethod
+    def get_by_id(record_id: int) -> PayList | None:
+        return db.session.get(PayList, record_id)
+
+    @staticmethod
     def list_by_maintenance_id(maintenance_id: str) -> list[PayList]:
         return (
             db.session.query(PayList)
@@ -800,6 +942,14 @@ class PayListRepository:
         now = datetime.now(UTC)
         record = PayList(create_time=now, creator=creator, update_time=now, updator=creator, **data)
         db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: PayList, data: dict[str, Any], updator: str) -> PayList:
+        for key, value in data.items():
+            setattr(record, key, value)
+        record.update_time = datetime.now(UTC)
+        record.updator = updator
         return record
 
 

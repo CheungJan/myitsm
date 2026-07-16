@@ -120,13 +120,25 @@
     - `docs/core/ITSM单据主子表与业务操作现状分析.md`
     - 状态：✅ P0-P3 全部完成
 
-40. **ITSM 详情页 UI 优化统一设计方案**（2026-07-11，整合 Windsurf 规划与讨论共识：PB 五区域模式 + 行业 ITSM 对标 + 6 项前置决策 + 7 类单据 Tab 矩阵 + 收费自动判断 + 通用组件设计 + 实施路线 P0-P4；**2026-07-11 更新**：补齐 PB 客户信息 TMM22 字段、摘要区考核/回访/关单/创建时间等字段清单、各业务类型摘要区字段）
+40. **ITSM 详情页 UI 优化统一设计方案**（2026-07-11，整合 Windsurf 规划与讨论共识：PB 五区域模式 + 行业 ITSM 对标 + 6 项前置决策 + 7 类单据 Tab 矩阵 + 收费自动判断 + 通用组件设计 + 实施路线 P0-P4）
+
+41. **数据流与代码链路详解 — 以通讯方式为例**（2026-07-13，教学文档：以 MDA33257 日常维护单为例，逐层追踪"通讯方式"从 PostgreSQL → ORM → Service 字典翻译 → API → 浏览器渲染的完整 8 层代码链路，含编码翻译模式总结与同类字段速查表）
+    - `docs/core/数据流与代码链路详解_以通讯方式为例.md`
+    - 状态：✅ 定稿
     - `docs/core/ITSM详情页UI优化统一设计方案.md`
     - 状态：✅ 定稿，P0 实施基线
 
 39. **PB Oracle 数据库对象导出清单**（2026-07-11，从 PB 原 Oracle 库 CCGL_TEST 全量导出 286 个数据库对象源码：49 存储过程 + 22 函数 + 21 视图 + 15 序列 + 160 索引 + 12 触发器 + 1 包 + 5 类型，存放 `PBsrc/pb_oracle_*/`，含关键 SP/函数/视图/触发器业务作用与重构对应关系映射）
     - `docs/core/PB_Oracle_数据库对象导出清单.md`
     - 状态：✅ 定稿（PB→Python 重构的数据库侧权威参考）
+
+42. **区域人员管理与自动派单技术方案**（2026-07-14，PB u_mc_area/d_mc_area_list/d_mc_area_form/d_mc_areausers 功能重构 + UserArea 模型修复 + Area CRUD + 自动派单 store_id→area_cd→usercd 链路 + 派工 Tab maintenance_type 清理）
+    - `docs/core/区域人员管理与自动派单技术方案.md`
+    - 状态：📋 方案定稿，待实施
+
+43. **派工与通知优化技术方案**（2026-07-15，6个UI/校验问题修复 + 派单规则引擎 tit30_dispatch_rule + tmc12_groups.leader_cd 组长 + 派工创建自动建Notification + 派工Tab编辑通知入口 + 维护单列表"派给我/本区域"Tab + 对齐PB of_newfetion/w_r_itsm_fetion 飞信流程）
+    - `docs/core/派工与通知优化技术方案.md`
+    - 状态：📋 方案定稿，待实施
 
 ---
 

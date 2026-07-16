@@ -34,7 +34,10 @@ def list_users():  # type: ignore[no-untyped-def]
     user_cd = request.args.get("user_cd")
     user_nm = request.args.get("user_nm")
     dept_cd = request.args.get("dept_cd")
-    users = _service.list_users(status=status, user_cd=user_cd, user_nm=user_nm, dept_cd=dept_cd)
+    useflg = request.args.get("useflg")
+    users = _service.list_users(
+        status=status, user_cd=user_cd, user_nm=user_nm, dept_cd=dept_cd, useflg=useflg
+    )
     return success_response(data=users)
 
 
@@ -299,11 +302,62 @@ def list_areas():  # type: ignore[no-untyped-def]
     return success_response(data=_service.get_areas())
 
 
-@system_bp.get("/commodes")
+@system_bp.get("/areas/<area_cd>")
 @login_required
-def list_commodes():  # type: ignore[no-untyped-def]
-    """通讯方式列表。"""
-    return success_response(data=_service.get_commodes())
+def get_area(area_cd: str):  # type: ignore[no-untyped-def]
+    """区域详情。"""
+    r = _service.get_area(area_cd)
+    return success_response(data=r) if r else error_response("区域不存在", 404)
+
+
+@system_bp.post("/areas")
+@login_required
+def create_area():  # type: ignore[no-untyped-def]
+    """新增区域。"""
+    body = request.get_json(silent=True) or {}
+    try:
+        return success_response(data=_service.create_area(body), code=201)
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+
+@system_bp.put("/areas/<area_cd>")
+@login_required
+def update_area(area_cd: str):  # type: ignore[no-untyped-def]
+    """编辑区域。"""
+    body = request.get_json(silent=True) or {}
+    r = _service.update_area(area_cd, body)
+    return success_response(data=r) if r else error_response("区域不存在", 404)
+
+
+@system_bp.delete("/areas/<area_cd>")
+@login_required
+def delete_area(area_cd: str):  # type: ignore[no-untyped-def]
+    """删除区域（有关联用户时拒绝）。"""
+    try:
+        return success_response() if _service.delete_area(area_cd) else error_response("区域不存在", 404)
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+
+@system_bp.get("/areas/<area_cd>/users")
+@login_required
+def list_area_users(area_cd: str):  # type: ignore[no-untyped-def]
+    """区域用户列表（带 choose 标记）。"""
+    from app.services.system_service import UserAreaService
+    return success_response(data=UserAreaService().list_users_by_area_cd(area_cd))
+
+
+@system_bp.put("/areas/<area_cd>/users")
+@login_required
+def set_area_users(area_cd: str):  # type: ignore[no-untyped-def]
+    """批量分配用户到区域。"""
+    from app.services.system_service import UserAreaService
+    body = request.get_json(silent=True) or {}
+    user_cds = body.get("user_cds", [])
+    if not isinstance(user_cds, list):
+        return error_response("user_cds 必须为数组", 400)
+    return success_response(data=UserAreaService().set_users(area_cd, user_cds))
 
 
 @system_bp.get("/countries")
@@ -948,6 +1002,13 @@ def delete_cust_class(class_cd: str):  # type: ignore[no-untyped-def]
 
 
 # ---- 客户 ----
+
+
+@system_bp.get("/yx-companies")
+@login_required
+def list_yx_companies():  # type: ignore[no-untyped-def]
+    """有限公司下拉数据（busityp='YX' 的有效客户，对齐 PB u_itsm_rep_maintenanceday.of_getyxgs）。"""
+    return success_response(data=_service.list_yx_companies())
 
 
 @system_bp.get("/customers")

@@ -44,10 +44,11 @@ class SystemService:
         user_cd: str | None = None,
         user_nm: str | None = None,
         dept_cd: str | None = None,
+        useflg: str | None = None,
     ) -> list[dict[str, Any]]:
         """获取用户列表，支持多条件筛选。"""
         users = self._repo.get_users(
-            status=status, user_cd=user_cd, user_nm=user_nm, dept_cd=dept_cd
+            status=status, user_cd=user_cd, user_nm=user_nm, dept_cd=dept_cd, useflg=useflg
         )
         result = [self._fill_dept_nm(u.to_dict()) for u in users]
         return [self._fill_user_groups(d) for d in result]
@@ -112,9 +113,25 @@ class SystemService:
         return False
 
     def list_groups(self) -> list[dict[str, Any]]:
-        """获取用户组列表。"""
+        """获取用户组列表（含组长姓名）。"""
+        from app.models.system import User
+
         groups = self._repo.get_groups()
-        return [grp.to_dict() for grp in groups]
+        leader_cds = [g.leader_cd for g in groups if g.leader_cd]
+        leader_map: dict[str, str] = {}
+        if leader_cds:
+            rows = (
+                db.session.query(User.user_cd, User.user_nm)
+                .filter(User.user_cd.in_(leader_cds))
+                .all()
+            )
+            leader_map = {r.user_cd: r.user_nm for r in rows}
+        result: list[dict[str, Any]] = []
+        for grp in groups:
+            d = grp.to_dict()
+            d["leader_nm"] = leader_map.get(grp.leader_cd, "") if grp.leader_cd else ""
+            result.append(d)
+        return result
 
     def create_group(self, data: dict[str, Any]) -> dict[str, Any]:
         return self._repo.create_group(data).to_dict()
@@ -577,8 +594,8 @@ class SystemService:
         cust["yun_type_nm"] = cache["py"].get(cust.get("yun_type", ""), "")
         # 支付方式 ZF
         cust["zf_type_nm"] = cache["zf"].get(cust.get("zf_type", ""), "")
-        # 通讯方式
-        cust["comm_mode_nm"] = cache["commode"].get(cust.get("comm_mode", ""), "")
+        # 通讯方式（tmm31_syscodes code_typ='CM'）
+        cust["comm_mode_nm"] = cache["cm"].get(cust.get("comm_mode", ""), "")
         # 负责区域：兼容 area_cd（新）和 area_id（旧数据）
         _area_val = str(cust.get("area") or "")
         cust["area_nm"] = cache["area"].get(_area_val, "") or cache["area_by_id"].get(_area_val, "")
@@ -590,6 +607,8 @@ class SystemService:
         cust["s_status_nm"] = cache.get("ss", {}).get(cust.get("s_status", ""), "")
         # POS 数量 = 有效设备数
         cust["pos_count"] = self._repo.get_cust_pos_count(cust["cust_cd"])
+        # 最新机型名称（对齐 PB uf_storeposinfo，取有效设备中最新日期对应 ITEMNM）
+        cust["latest_item_nm"] = self._repo.get_cust_latest_itemnm(cust["cust_cd"])
         # 生命周期状态
         cust["customer_status_nm"] = cache.get("cs", {}).get(cust.get("customer_status", ""), "")
         cust["source_type_nm"] = cache.get("src", {}).get(cust.get("source_type", ""), "")
@@ -616,7 +635,7 @@ class SystemService:
     def _build_ref_cache() -> dict[str, dict[str, str]]:
         """构建码表查找缓存。"""
         repo = SystemRepository()
-        cache: dict[str, dict[str, str]] = {"bt": {}, "yb": {}, "zf": {}, "commode": {}, "area": {}, "area_by_id": {}, "wz": {}, "py": {}}
+        cache: dict[str, dict[str, str]] = {"bt": {}, "yb": {}, "zf": {}, "cm": {}, "area": {}, "area_by_id": {}, "wz": {}, "py": {}}
         for s in repo.get_syscodes("BT"):
             cache["bt"][s.code_cd] = s.code_nm or ""
         for s in repo.get_syscodes("YB"):
@@ -641,7 +660,7 @@ class SystemService:
             cache["custclass"] = cache.get("custclass", {})
             cache["custclass"][cc.class_cd] = cc.class_nm or ""
         for c in repo.get_syscodes("CM"):
-            cache["commode"][c.code_cd] = c.code_nm or ""
+            cache["cm"][c.code_cd] = c.code_nm or ""
         for a in repo.get_areas():
             cache["area"][a.area_cd] = a.name or a.area_nm or ""
             cache["area_by_id"][str(a.area_id)] = a.name or a.area_nm or ""
@@ -687,6 +706,24 @@ class SystemService:
         )
         resolved = [self._resolve_customer_refs(c.to_dict()) for c in items]
         return {"items": resolved, "total": total}
+
+    def list_yx_companies(self) -> list[dict[str, Any]]:
+        """有限公司下拉数据（tmm22.class_cd 关联 tmm21_custclass.class_nm）。
+
+        返回 [{class_cd, class_nm}, ...]，按 class_cd 排序。
+        """
+        from app.extensions import db
+        from app.models.master import Customer, CustClass
+
+        rows = (
+            db.session.query(Customer.class_cd, CustClass.class_nm)
+            .join(CustClass, Customer.class_cd == CustClass.class_cd)
+            .filter(Customer.useflg == "1", Customer.class_cd.isnot(None))
+            .distinct()
+            .order_by(Customer.class_cd)
+            .all()
+        )
+        return [{"class_cd": r[0], "class_nm": r[1]} for r in rows]
 
     def get_customer(self, cust_cd: str) -> dict[str, Any] | None:
         """获取客户详情，含中文解析。"""
@@ -1084,10 +1121,58 @@ class SystemService:
         return False
 
     def get_areas(self) -> list[dict[str, Any]]:
-        return [a.to_dict() for a in self._repo.get_areas()]
+        """区域列表，enrichment 翻译 usercd → usercd_nm。"""
+        items = [a.to_dict() for a in self._repo.get_areas()]
+        return self._enrich_area_user_names(items)
 
-    def get_commodes(self) -> list[dict[str, Any]]:
-        return [c.to_dict() for c in self._repo.get_commodes()]
+    def get_area(self, area_cd: str) -> dict[str, Any] | None:
+        record = self._repo.get_area_by_cd(area_cd)
+        if record is None:
+            return None
+        items = self._enrich_area_user_names([record.to_dict()])
+        return items[0]
+
+    def create_area(self, data: dict[str, Any]) -> dict[str, Any]:
+        if self._repo.get_area_by_cd(data["area_cd"]):
+            raise ValueError(f"区域编码 {data['area_cd']} 已存在")
+        record = self._repo.create_area(data)
+        db.session.commit()
+        return record.to_dict()
+
+    def update_area(self, area_cd: str, data: dict[str, Any]) -> dict[str, Any] | None:
+        record = self._repo.get_area_by_cd(area_cd)
+        if record is None:
+            return None
+        self._repo.update_area(record, data)
+        db.session.commit()
+        return record.to_dict()
+
+    def delete_area(self, area_cd: str) -> bool:
+        record = self._repo.get_area_by_cd(area_cd)
+        if record is None:
+            return False
+        if self._repo.count_userarea_by_area_cd(area_cd) > 0:
+            raise ValueError("该区域下有关联用户，无法删除")
+        self._repo.delete_area(record)
+        return True
+
+    def _enrich_area_user_names(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """批量翻译 usercd → usercd_nm（tmc13_users）。"""
+        if not items:
+            return items
+        codes = {str(r.get("usercd", "")).strip() for r in items if r.get("usercd")}
+        if not codes:
+            return items
+        from app.models.system import User
+        user_map = {
+            u.user_cd: u.user_nm or u.user_cd
+            for u in db.session.query(User).filter(User.user_cd.in_(codes)).all()
+        }
+        for r in items:
+            v = str(r.get("usercd", "")).strip()
+            if v and v in user_map:
+                r["usercd_nm"] = user_map[v]
+        return items
 
     def get_countries(self) -> list[dict[str, Any]]:
         return [c.to_dict() for c in self._repo.get_countries()]
@@ -1156,3 +1241,41 @@ class SystemService:
         if supplier_count > 0:
             raise ValueError(f"分类 {class_cd} 下存在 {supplier_count} 个供应商，无法删除")
         self._repo.delete_supplier_class(obj)
+
+
+class UserAreaService:
+    """区域-用户关联服务（TIT06_USERAREA）。"""
+
+    def __init__(self) -> None:
+        from app.repositories.system_repository import UserAreaRepository
+        self._repo = UserAreaRepository
+
+    def list_users_by_area_cd(self, area_cd: str) -> list[dict[str, Any]]:
+        """返回全量用户列表 + choose 标记（对齐 PB d_mc_areausers）。
+
+        Returns:
+            [{user_cd, user_nm, dept_cd, choose(0/1)}, ...]
+        """
+        from app.models.system import User
+        chosen = self._repo.list_user_cds_by_area_cd(area_cd)
+        users = (
+            db.session.query(User)
+            .filter(db.or_(User.useflg == "1", User.useflg.is_(None)))
+            .order_by(User.user_cd)
+            .all()
+        )
+        return [
+            {
+                "user_cd": u.user_cd,
+                "user_nm": u.user_nm or u.user_cd,
+                "dept_cd": u.dept_cd or "",
+                "choose": 1 if u.user_cd in chosen else 0,
+            }
+            for u in users
+        ]
+
+    def set_users(self, area_cd: str, user_cds: list[str]) -> dict[str, Any]:
+        """批量分配用户到区域。"""
+        self._repo.set_users(area_cd, user_cds)
+        db.session.commit()
+        return {"area_cd": area_cd, "user_cds": user_cds}
