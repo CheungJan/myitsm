@@ -2,5 +2,5 @@
 <script setup lang="ts">import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {useCustomerCards} from '@/composables/useCustomerCards';import {fetchRepairRequests} from '@/api/portal';import type {PortalRecord} from '@/api/portal'
 const{items,loading,page,perPage,total}=useListPage<PortalRecord>(fetchRepairRequests);const{drawer,detail,open}=useDetailDrawer<PortalRecord>();const{custCard}=useCustomerCards()
 function urgencyTag(u:string){const m:Record<string,string>={LOW:'info',NORMAL:'',HIGH:'warning',URGENT:'danger'};return m[u]||'info'}
-function statusTag(s:string){const m:Record<string,string>={SUBMITTED:'info',ACCEPTED:'warning',PROCESSING:'primary',COMPLETED:'success',CANCELLED:'danger'};return m[s]||'info'}</script>
+function statusTag(s:unknown){s=String(s);const m:Record<string,string>={SUBMITTED:'info',ACCEPTED:'warning',PROCESSING:'primary',COMPLETED:'success',CANCELLED:'danger'};return m[s as string]||'info'}</script>
 <style scoped>.page{padding:0}.page-header{display:flex;justify-content:space-between;margin-bottom:16px}.page-header h2{font-size:18px;font-weight:600;margin:0}</style>

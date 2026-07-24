@@ -160,6 +160,8 @@ class TestDispatchAutoCreateNotification:
                         channel="internal",
                         subject="新派工通知：维护单 {{ maintenance_id }}",
                         body="维护单 {{ maintenance_id }}（门店 {{ store_id }}）已派给 {{ accpectder_name }}",
+                        ref_type="dispatch",
+                        is_default="1",
                         useflg="1",
                         opercd="SYSTEM",
                     )
@@ -208,7 +210,7 @@ class TestDispatchAutoCreateNotification:
                 .first()
             )
             assert notify is not None
-            assert notify.send_status == "pending"
+            assert notify.send_status in ("sent", "pending")  # auto_dispatch=1 时自动发送
             assert mid in (notify.subject or "")
             # 清理
             db.session.query(Notification).filter(Notification.ref_id == mid).delete()

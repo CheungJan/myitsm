@@ -4,7 +4,7 @@
 
 - 核心文档 = 全局重要、长期维护的参考文档。阶段性报告、功能调试手册不在此列。
 - 核心文档实体统一存放在 `docs/core/`，后续开发前从此索引定位。
-- 最后更新：2026-06-12（工单取消流程 + 消耗类型字典补充完成）
+- 最后更新：2026-07-23（日常维护单据状态管理优化方案 + 上门服务与配件收费优化方案验收完成）
 
 ---
 
@@ -77,6 +77,13 @@
 25. **后续开发计划：仓库管理与业务主链联动**
     - `docs/core/后续开发计划_仓库与业务主链.md`
 26. ⚠️ ~~MES/QC/仓库联动技术文档 v1~~（已被 #29 v2 取代）
+27. **上门服务与配件收费优化方案**（A→D 阶段完整方案 + 实施路线 + 验收）
+    - `docs/myitsm/上门服务与配件收费优化方案.md`
+    - `docs/myitsm/上门服务与配件收费优化方案_验收手册.md`
+28. **日常维护单据状态管理优化方案**（关单即落地 + 状态机扩展 + 11 项联动清单 + 1a/1b 实施路线）
+    - `docs/myitsm/日常维护单据状态管理优化方案.md`
+29. **故障代码体系优化技术文档**（tit04_archivecode 三级树形字典 + 配件关联映射）
+    - `docs/myitsm/故障代码体系优化技术文档.md`
     - `docs/core/MES_QC_Warehouse_Technical_Document.md`
 27. ⚠️ ~~MES/QC/仓库联动操作手册 v1~~（已被 #30 v2 取代，验收步骤以 v2 为准）
     - `docs/core/MES_QC_Warehouse_Operation_Manual.md`
@@ -134,11 +141,16 @@
 
 42. **区域人员管理与自动派单技术方案**（2026-07-14，PB u_mc_area/d_mc_area_list/d_mc_area_form/d_mc_areausers 功能重构 + UserArea 模型修复 + Area CRUD + 自动派单 store_id→area_cd→usercd 链路 + 派工 Tab maintenance_type 清理）
     - `docs/core/区域人员管理与自动派单技术方案.md`
-    - 状态：📋 方案定稿，待实施
+    - 状态：✅  方案定稿，已实施
 
 43. **派工与通知优化技术方案**（2026-07-15，6个UI/校验问题修复 + 派单规则引擎 tit30_dispatch_rule + tmc12_groups.leader_cd 组长 + 派工创建自动建Notification + 派工Tab编辑通知入口 + 维护单列表"派给我/本区域"Tab + 对齐PB of_newfetion/w_r_itsm_fetion 飞信流程）
     - `docs/core/派工与通知优化技术方案.md`
-    - 状态：📋 方案定稿，待实施
+    - 状态：✅  方案定稿，已实施
+
+44. **上门服务与配件收费优化方案**（2026-07-19，PB 三 Tab 业务逻辑分析 + 重构现状对比 + 优化设计 + 实施路线图 A/B/C/D 四阶段 + 18 项待确认事项全部已确认 + 落地优先级与状态总览）
+    - `docs/myitsm/上门服务与配件收费优化方案.md`
+    - 状态：🟡 阶段 A/C 部分落地（四要素字段+拼句+CLOSURE_REASON 字典+PAY_SVC 字典+工程师虚拟仓治理已生成迁移），A3 前端/B2-B4/C1-C2/C6-C7/D1-D2 待落地
+    - 当前处理事项：按 §8.1 落地顺序推进 A 阶段剩余（A1 gzdm/gzdl/gzxl/device_id/accessories_id 字段 + A3 前端离店弹窗 + A4 测试）
 
 ---
 
@@ -216,6 +228,7 @@ myitsm/
 ├── migrations/                # Alembic 数据库迁移
 ├── docs/
 │   ├── core/                  # 核心文档（本索引）
+│   ├── myitsm/                # ITSM 模块专项文档（优化方案/验收手册）
 │   ├── superpowers/plans/     # 实施计划
 │   ├── superpowers/specs/     # 头脑风暴设计文档
 │   └── archive/               # 归档文档

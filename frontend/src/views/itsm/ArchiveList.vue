@@ -2,7 +2,7 @@
 <script setup lang="ts">import {reactive} from 'vue';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useUserNames} from '@/composables/useUserNames';import request from '@/api/request'
 interface ArchiveRecord{[key:string]:unknown}
 const search=reactive({mid:''})
-const{items,loading,page,perPage,total,onSearch}=useListPage<ArchiveRecord>(async(p)=>{const mid=search.mid;if(mid){return request.get(`/itsm/archives/${mid}`).then((r:any)=>({data:{items:r.data?.archives||[],total:r.data?.archives?.length||0}}))};return{data:{items:[],total:0}}});const{userName}=useUserNames()
-function doSearch(){page.value=1;load()}
+const{items,loading,page,perPage,total,onSearch}=useListPage<ArchiveRecord>(async(_p)=>{const mid=search.mid;if(mid){return request.get(`/itsm/archives/${mid}`).then((r:any)=>({data:{items:r.data?.archives||[],total:r.data?.archives?.length||0}}))};return{data:{items:[],total:0}}});const{userName}=useUserNames()
+function doSearch(){onSearch({mid:search.mid})}
 </script>
 <style scoped>.page{padding:0}.page-header{display:flex;justify-content:space-between;margin-bottom:16px}.page-header h2{font-size:18px;font-weight:600;margin:0}.search-bar{display:flex;gap:12px;align-items:center}.field{display:flex;align-items:center;gap:6px}.field label{font-size:13px;color:#606266}</style>

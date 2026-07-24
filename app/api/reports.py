@@ -13,6 +13,7 @@ from app.api.auth import login_required
 from app.schemas.report import (
     BOMTreeQuery,
     EidLifecycleQuery,
+    FaultAnalysisQuery,
     InventorySnapshotQuery,
     MovementLogQuery,
     SalesReportQuery,
@@ -20,6 +21,7 @@ from app.schemas.report import (
 from app.services.report_service import (
     BOMReportService,
     EidReportService,
+    FaultAnalysisService,
     InventoryReportService,
     SalesReportService,
 )
@@ -136,5 +138,49 @@ def bom_tree():  # type: ignore[no-untyped-def]
         itemcd_val=params.itemcd,
         page=params.page,
         per_page=params.per_page,
+    )
+    return success_response(data=data)
+
+
+# ── D2 故障分析报表（基于 v_fault_analysis 视图） ──
+
+
+@report_bp.get("/fault/model-rate")
+@login_required
+def fault_model_rate():  # type: ignore[no-untyped-def]
+    """型号故障率：按设备物料编码统计故障次数。"""
+    params = FaultAnalysisQuery.model_validate(request.args.to_dict())
+    data = FaultAnalysisService.model_fault_rate(
+        start_date=params.start_date,
+        end_date=params.end_date,
+        bill_type=params.bill_type,
+        fault_type_cd=params.fault_type_cd,
+    )
+    return success_response(data=data)
+
+
+@report_bp.get("/fault/accessory-frequency")
+@login_required
+def fault_accessory_frequency():  # type: ignore[no-untyped-def]
+    """配件更换频次：按 TIT25 itemcd 统计更换次数。"""
+    params = FaultAnalysisQuery.model_validate(request.args.to_dict())
+    data = FaultAnalysisService.accessory_frequency(
+        start_date=params.start_date,
+        end_date=params.end_date,
+        fault_type_cd=params.fault_type_cd,
+    )
+    return success_response(data=data)
+
+
+@report_bp.get("/fault/repair-duration")
+@login_required
+def fault_repair_duration():  # type: ignore[no-untyped-def]
+    """修复时长分析：按单据类型统计平均/中位/最大修复时长。"""
+    params = FaultAnalysisQuery.model_validate(request.args.to_dict())
+    data = FaultAnalysisService.repair_duration(
+        start_date=params.start_date,
+        end_date=params.end_date,
+        bill_type=params.bill_type,
+        fault_type_cd=params.fault_type_cd,
     )
     return success_response(data=data)

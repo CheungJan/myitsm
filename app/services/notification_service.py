@@ -22,13 +22,23 @@ class NotificationTemplateService:
         return record.to_dict()
 
     @staticmethod
-    def list_all() -> list[dict[str, Any]]:
-        records = NotificationTemplateRepository.list_all()
+    def list_all(
+        ref_type: str | None = None,
+        useflg: str | None = None,
+    ) -> list[dict[str, Any]]:
+        records = NotificationTemplateRepository.list_all(
+            useflg=useflg, ref_type=ref_type
+        )
         return [r.to_dict() for r in records]
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
         record = NotificationTemplateRepository.create(data, creator)
+        # 若标记为默认，同 ref_type 其他模板取消默认
+        if data.get("is_default") == "1" and data.get("ref_type"):
+            NotificationTemplateRepository.set_default(
+                record.template_id, data["ref_type"]
+            )
         db.session.commit()
         return record.to_dict()
 
@@ -40,6 +50,19 @@ class NotificationTemplateService:
         if record is None:
             return None
         NotificationTemplateRepository.update(record, data, creator)
+        # 若标记为默认，同 ref_type 其他模板取消默认
+        if data.get("is_default") == "1" and record.ref_type:
+            NotificationTemplateRepository.set_default(template_id, record.ref_type)
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def set_default(template_id: str) -> dict[str, Any] | None:
+        """将指定模板设为其 ref_type 下的默认模板。"""
+        record = NotificationTemplateRepository.get_by_id(template_id)
+        if record is None or not record.ref_type:
+            return None
+        NotificationTemplateRepository.set_default(template_id, record.ref_type)
         db.session.commit()
         return record.to_dict()
 
@@ -61,10 +84,30 @@ class NotificationTemplateService:
             "cust_nm": "示例门店",
             "address": "上海市浦东新区张江路100号",
             "phone_no": "021-12345678",
+            "contactor": "李四",
             "accpectder": "552",
             "accpectder_nm": "张三",
             "accpectd_group": "A1",
             "fault_type": "1",
+            "fault_type_nm": "硬件故障",
+            "short_description": "POS无法开机",
+            "request_time": "2026-07-15 10:00:00",
+            "current_status": "1",
+            "current_status_nm": "新建",
+            "urgency": "一般",
+            "operator": "SYSTEM",
+            "operator_nm": "系统管理员",
+            "dispatch_time": "2026-07-15 10:05:00",
+            "area_cd": "A1",
+            "area_nm": "华东区",
+            "company_id": "C001",
+            "company_nm": "示例有限公司",
+            "d2d_time": "",
+            "d2d_engineer": "",
+            "d2d_engineer_nm": "",
+            "expected_completion": "",
+            "close_time": "",
+            "close_reason": "",
         }
         ctx = {**default_context, **(context or {})}
         try:
@@ -91,11 +134,14 @@ class NotificationService:
         send_status: str | None = None,
         ref_type: str | None = None,
         ref_id: str | None = None,
+        recipient: str | None = None,
+        sender: str | None = None,
         page: int = 1,
         per_page: int = 20,
+        order: str = "desc",
     ) -> dict[str, Any]:
         items, total = NotificationRepository.list_by_filters(
-            channel, send_status, ref_type, ref_id, page, per_page
+            channel, send_status, ref_type, ref_id, recipient, sender, page, per_page, order
         )
         return {
             "items": [r.to_dict() for r in items],

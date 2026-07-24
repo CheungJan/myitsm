@@ -17,6 +17,11 @@
             <el-table :data="warehouses" v-loading="loading" stripe>
                 <el-table-column prop="whcd" label="编码" width="80" />
                 <el-table-column prop="whnm" label="名称" width="140" />
+                <el-table-column label="位置/划区" width="120">
+                    <template #default="{ row }">
+                        <span>{{ areaOptions.find(a => a.area_cd === row.area_id)?.area_nm || row.area_id || '-' }}</span>
+                    </template>
+                </el-table-column>
                 <el-table-column label="分类" width="80"><template #default="{row}">{{ whtypLabel(row.whtyp) }}</template></el-table-column>
                 <el-table-column label="默认" width="55"><template #default="{row}"><el-tag size="small" :type="row.defaultflg==='1'?'success':'info'">{{ row.defaultflg==='1'?'是':'否' }}</el-tag></template></el-table-column>
                 <el-table-column prop="address" label="地址" min-width="140" />
@@ -55,6 +60,11 @@
                     </el-select>
                 </el-form-item>
                 <el-form-item label="默认仓库"><el-switch v-model="form.defaultflg" active-value="1" inactive-value="0" /></el-form-item>
+                <el-form-item label="位置/划区">
+                    <el-select v-model="form.area_id" clearable placeholder="仓库所属划区" style="width:100%">
+                        <el-option v-for="a in areaOptions" :key="a.area_cd" :label="a.area_nm" :value="a.area_cd" />
+                    </el-select>
+                </el-form-item>
                 <el-form-item label="状态">
                     <el-select v-model="form.useflg" style="width:100%">
                         <el-option label="有效" value="1" />
@@ -74,24 +84,30 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from '@/api/warehouse'
+import { fetchAreas } from '@/api/master'
 import { useDict } from '@/composables/useDict'
 
 const { dictMap: whtypMap, dictLabel: whtypLabel } = useDict('WT')
 const whtypOptions = computed(() => Object.entries(whtypMap.value).map(([k, v]) => ({ value: k, label: v })))
+const areaOptions = ref<{ area_cd: string; area_nm: string }[]>([])
 
 const warehouses = ref<Record<string,unknown>[]>([])
 const allData = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const total = ref(0); const filterUseflg = ref('')
 const dialogVisible = ref(false); const editing = ref<Record<string,unknown>|null>(null); const saving = ref(false)
-const form = reactive({ whcd: '', whnm: '', address: '', phoneno: '', leader: '', whtyp: '', defaultflg: '0', useflg: '1' })
+const form = reactive({ whcd: '', whnm: '', address: '', phoneno: '', leader: '', whtyp: '', defaultflg: '0', useflg: '1', area_id: '' })
 
-onMounted(() => loadData())
+onMounted(async () => {
+    const res = await fetchAreas()
+    areaOptions.value = ((res.data || []) as { area_cd: string; area_nm: string }[]).filter(a => a.area_cd)
+    await loadData()
+})
 
 async function loadData() {
     loading.value = true
     try {
         const res = await fetchWarehouses()
-        allData.value = (res.data || []) as Record<string,unknown>[]
+        allData.value = ((res.data || []) as unknown) as Record<string,unknown>[]
         filterData()
     } finally { loading.value = false }
 }
@@ -104,8 +120,8 @@ function filterData() {
 }
 
 function openDialog(row?: Record<string,unknown>) {
-    if (row) { editing.value = row; form.whcd = row.whcd as string; form.whnm = row.whnm as string; form.address = (row.address as string)||''; form.phoneno = (row.phoneno as string)||''; form.leader = (row.leader as string)||''; form.whtyp = (row.whtyp as string)||''; form.defaultflg = (row.defaultflg as string)||'0'; form.useflg = (row.useflg as string)||'1' }
-    else { editing.value = null; Object.assign(form, { whcd:'',whnm:'',address:'',phoneno:'',leader:'',whtyp:'',defaultflg:'0',useflg:'1' }) }
+    if (row) { editing.value = row; form.whcd = row.whcd as string; form.whnm = row.whnm as string; form.address = (row.address as string)||''; form.phoneno = (row.phoneno as string)||''; form.leader = (row.leader as string)||''; form.whtyp = (row.whtyp as string)||''; form.defaultflg = (row.defaultflg as string)||'0'; form.useflg = (row.useflg as string)||'1'; form.area_id = (row.area_id as string)||'' }
+    else { editing.value = null; Object.assign(form, { whcd:'',whnm:'',address:'',phoneno:'',leader:'',whtyp:'',defaultflg:'0',useflg:'1',area_id:'' }) }
     dialogVisible.value = true
 }
 

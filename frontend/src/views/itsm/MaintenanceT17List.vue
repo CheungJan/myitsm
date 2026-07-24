@@ -47,7 +47,7 @@
           <el-tab-pane label="客户信息" name="customer">
             <CustomerInfoTab :store-id="(detail.store_id as string) || ''" business-type="maintenance" :current-record-id="(detail.daily_maintenance_id as string) || ''" />
           </el-tab-pane>
-          <ItsmSubTablePanes :maintenance-id="(detail.daily_maintenance_id as string) || ''" :area-cd="((detail as any).area_cd as string) || ''" :current-status="((detail as any).current_status as string) || ''" />
+          <ItsmSubTablePanes :maintenance-id="(detail.daily_maintenance_id as string) || ''" :area-cd="((detail as any).area_cd as string) || ''" :current-status="((detail as any).current_status as string) || ''" :main-record="detail" />
           <el-tab-pane label="设备资产" name="asset">
             <AssetTab :store-id="(detail.store_id as string) || ''" />
           </el-tab-pane>

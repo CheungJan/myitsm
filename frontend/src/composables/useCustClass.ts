@@ -6,7 +6,7 @@ let loadingPromise: Promise<void> | null = null
 
 export function useCustClass(): {
     classMap: Ref<Record<string, string>>
-    className: (code: string) => string
+    className: (code: unknown) => string
 } {
     if (!loadingPromise) {
         loadingPromise = request.get('/custclasses', { silent: true } as any).then((res: any) => {
@@ -20,9 +20,10 @@ export function useCustClass(): {
         })
     }
 
-    function className(code: string): string {
-        if (!code) return '-'
-        return classMap.value[code.trim()] || code
+    function className(code: unknown): string {
+        const k = code == null ? '' : String(code).trim()
+        if (!k) return '-'
+        return classMap.value[k] || k
     }
 
     return { classMap, className }

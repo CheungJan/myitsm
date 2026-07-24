@@ -30,6 +30,11 @@ class User(BaseModel):
     passwd = db.Column(db.String(128), comment="原始密码（数据迁移用）")
     credamt = db.Column(db.Numeric(12, 2), comment="信用额度")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    default_whcd = db.Column(
+        db.String(2),
+        db.ForeignKey("twh01_warehouse.whcd", name="fk_user_default_warehouse"),
+        comment="默认仓库（FK→twh01_warehouse.whcd，工程师虚拟仓场景使用）",
+    )
 
     groups = db.relationship("UserGroup", back_populates="user", lazy="dynamic")
 

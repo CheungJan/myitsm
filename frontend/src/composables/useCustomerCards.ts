@@ -7,8 +7,8 @@ let loadingPromise: Promise<void> | null = null
 
 export function useCustomerCards(): {
     custMap: Ref<Record<string, CustInfo>>
-    custCard: (code: string) => string
-    custName: (code: string) => string
+    custCard: (code: unknown) => string
+    custName: (code: unknown) => string
 } {
     if (!loadingPromise) {
         loadingPromise = request.get('/customers', {
@@ -31,16 +31,18 @@ export function useCustomerCards(): {
         })
     }
 
-    function custCard(code: string): string {
-        if (!code) return '-'
-        const info = custMap.value[code.trim()]
-        return info ? info.card : code
+    function custCard(code: unknown): string {
+        const k = code == null ? '' : String(code).trim()
+        if (!k) return '-'
+        const info = custMap.value[k]
+        return info ? info.card : k
     }
 
-    function custName(code: string): string {
-        if (!code) return '-'
-        const info = custMap.value[code.trim()]
-        return info ? info.name : code
+    function custName(code: unknown): string {
+        const k = code == null ? '' : String(code).trim()
+        if (!k) return '-'
+        const info = custMap.value[k]
+        return info ? info.name : k
     }
 
     return { custMap, custCard, custName }

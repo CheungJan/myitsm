@@ -114,6 +114,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
 import request from '@/api/request'
 import { fetchInventorySummary, fetchDailySnapshot, fetchInventoryAging, fetchWarehouses } from '@/api/warehouse'

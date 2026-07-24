@@ -684,12 +684,23 @@ class MaintenanceD2D(BaseModel):
     d2d_engineer = db.Column(db.String(6), comment="上门工程师")
     arrive_time = db.Column(db.DateTime, comment="到达时间")
     leave_time = db.Column(db.DateTime, comment="离店时间")
-    jjbz = db.Column(db.String(1), comment="解决标志")
-    d2d_descripiton = db.Column(db.String(200), comment="处理过程描述")
+    jjbz = db.Column(db.String(1), comment="解决标志（已废弃，保留 PB 数据迁移兼容，新数据用 d2d_result）")
+    d2d_descripiton = db.Column(db.String(200), comment="处理过程描述（保留 PB 兼容，离店保存时由后端自动拼句双写）")
     d2d_phone = db.Column(db.String(60), comment="电话")
     old_business_id = db.Column(db.Integer, comment="原操作流水ID")
     d2d_group = db.Column(db.Integer, comment="分组")
     d2d_type = db.Column(db.String(1), comment="类型（1到店/2离店/3催单/4记录）")
+    # 离店解决四要素结构化字段（事项 18）
+    d2d_phenomenon = db.Column(db.String(200), comment="实际现象")
+    d2d_reason = db.Column(db.String(200), comment="原因")
+    d2d_handling = db.Column(db.String(500), comment="处理过程（工程师手输补充）")
+    d2d_result = db.Column(db.String(2), comment="结果（ZT 字典码值：5已解决/4未解决/6转修/7待配件/3关闭）")
+    closure_reason = db.Column(db.String(1), comment="关闭原因（仅 d2d_result=3 时填，CLO_REASON 字典）")
+    d2d_note = db.Column(db.String(200), comment="其他补充")
+    # 故障代码与设备/配件追溯字段（事项 1 方案 B：d2d 只落 gzdm，大类/小类查询时从 gzdm 派生或 join tit04_archivecode）
+    gzdm = db.Column(db.String(8), comment="故障代码（= tit04_archivecode.arch_cd 值，重构改为落库以支持单次上门故障追溯）")
+    device_id = db.Column(db.String(13), comment="本次处理设备（重构新增，支持设备追溯）")
+    accessories_id = db.Column(db.String(13), comment="本次处理配件（重构新增，支持配件追溯）")
     create_time = db.Column(db.DateTime, comment="创建时间")
     creator = db.Column(db.String(6), comment="创建人")
     update_time = db.Column(db.DateTime, comment="更新时间")
@@ -697,6 +708,13 @@ class MaintenanceD2D(BaseModel):
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     posstatus = db.Column(db.String(2), comment="POS状态")
     posstatus1 = db.Column(db.String(2), comment="POS状态1")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "maintenance_id", "business_operation_id",
+            name="uq_maintenance_d2d_op",
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -754,7 +772,16 @@ class AccessoriesUpdate(BaseModel):
     updator = db.Column(db.String(6), comment="更新人")
     auditflg = db.Column(db.String(1), comment="提交标志")
     posflg = db.Column(db.String(1), comment="更换整机标志")
-    c_type = db.Column(db.String(1), comment="操作类型（1维修/2购买）")
+    c_type = db.Column(db.String(1), comment="操作类型（C_TYPE 字典：1维修/2购买/3纯服务费/4整机更换/5耗材线材）")
+    # B3：配件更换关联故障代码（itemcd 前两位用于预过滤 fault_type）
+    itemcd = db.Column(db.String(13), comment="配件物料编码（B3：关联故障代码用）")
+    fault_cd = db.Column(db.String(8), comment="故障代码（B3：配件更换时自动关联）")
+    # 收费维度字段（事项 C1：合并 TIT26 功能）
+    payje = db.Column(db.Numeric(10, 3), comment="收款金额（c_type=3/5 时填，c_type=1/2/4 时与 price 同步）")
+    paytype = db.Column(db.String(20), comment="收费类型（c_type=3 用 PAY_SVC 字典，c_type=5 用 PAY_CONS 字典）")
+    paydate = db.Column(db.DateTime, comment="收款日期")
+    memo = db.Column(db.String(200), comment="备注")
+    version = db.Column(db.Integer, nullable=False, default=1, comment="乐观锁版本号（每次更新+1，并发控制）")
 
 
 # ---------------------------------------------------------------------------
@@ -1011,6 +1038,7 @@ class DispatchRule(BaseModel):
     ultimate_fallback_value = db.Column(db.String(20), comment="最终兜底值")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     auto_dispatch = db.Column(db.String(1), default="1", comment="自动派单开关: 1=启用/0=禁用")
+    notify_channel = db.Column(db.String(10), default="internal", comment="自动派工通知渠道: internal/email/sms/dingtalk/wecom/feishu/ntfy")
     creator = db.Column(db.String(6), comment="创建人")
     create_time = db.Column(db.DateTime, comment="创建时间")
     updator = db.Column(db.String(6), comment="更新人")

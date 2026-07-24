@@ -31,8 +31,10 @@ notification_bp = Blueprint("notification", __name__)
 @notification_bp.get("/notification-templates")
 @login_required
 def list_templates():  # type: ignore[no-untyped-def]
-    """通知模板列表。"""
-    items = NotificationTemplateService.list_all()
+    """通知模板列表，支持 ref_type、useflg 筛选（useflg 不传=全部）。"""
+    ref_type = request.args.get("ref_type")
+    useflg = request.args.get("useflg")
+    items = NotificationTemplateService.list_all(ref_type=ref_type, useflg=useflg)
     return success_response(data={"items": items, "total": len(items)})
 
 
@@ -82,20 +84,47 @@ def preview_template():  # type: ignore[no-untyped-def]
     return success_response(data=data)
 
 
+@notification_bp.post("/notification-templates/<template_id>/set-default")
+@login_required
+def set_default_template(template_id: str):  # type: ignore[no-untyped-def]
+    """将指定模板设为其 ref_type 下的默认模板。"""
+    data = NotificationTemplateService.set_default(template_id)
+    if data is None:
+        return error_response(message="模板不存在或未配置业务类型", code=404)
+    return success_response(data=data, message="已设为默认")
+
+
 # ---- 通知记录 ----
 
 
 @notification_bp.get("/notifications")
 @login_required
 def list_notifications():  # type: ignore[no-untyped-def]
-    """通知记录列表。"""
+    """通知记录列表。
+
+    查询参数:
+        view: inbox(默认)=收件箱(recipient=当前用户), sent=我发送的(sender=当前用户), all=全量
+        recipient: 指定接收方过滤
+        sender: 指定发送方过滤
+    """
     channel = request.args.get("channel")
     send_status = request.args.get("send_status")
     ref_type = request.args.get("ref_type")
     ref_id = request.args.get("ref_id")
+    view = request.args.get("view", "inbox")
+    recipient = request.args.get("recipient")
+    sender = request.args.get("sender")
+    user_cd: str = g.current_user
+    if view == "inbox" and not recipient:
+        recipient = user_cd
+    elif view == "sent" and not sender:
+        sender = user_cd
     page = int(request.args.get("page", "1"))
     per_page = int(request.args.get("per_page", "20"))
-    data = NotificationService.list_all(channel, send_status, ref_type, ref_id, page, per_page)
+    order = request.args.get("order", "desc")
+    data = NotificationService.list_all(
+        channel, send_status, ref_type, ref_id, recipient, sender, page, per_page, order
+    )
     return success_response(data=data)
 
 

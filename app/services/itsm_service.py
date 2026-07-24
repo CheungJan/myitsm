@@ -7,6 +7,17 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from app.extensions import db
+from app.models.itsm import (
+    AccessoriesUpdate,
+    DeviceChange,
+    Maintenance,
+    MaintenanceD2D,
+    MaintenanceDaily,
+    MaintenanceOpen,
+    MaintenanceRenovate,
+    RecycleTask,
+    StoreClose,
+)
 from app.models.master import Area, CustPosRl, Customer, Eid, SysCode
 from app.models.system import User
 from app.repositories.itsm_repository import (
@@ -36,9 +47,11 @@ from app.repositories.itsm_repository import (
     TimepointAreaRepository,
 )
 from app.services.state_machine import StateMachine
+from app.services.business_flow_service import BusinessFlowService
+from app.services.event_bus import EventBus
 
 if TYPE_CHECKING:
-    from app.models.itsm import DeviceChange, MaintenanceRenovate, RecycleTask, StoreClose
+    pass
 
 # ---------------------------------------------------------------------------
 # 业务码值常量（避免硬编码散落各方法）
@@ -248,6 +261,26 @@ def _enrich_sys_codes(
     return items
 
 
+def _get_sys_code_nm(code_typ: str, code_cd: str) -> str | None:
+    """查单个字典码值的名称（tmm31_syscodes）。
+
+    Args:
+        code_typ: 字典类型（如 PAY_SVC, PAY_CONS, C_TYPE）
+        code_cd: 字典码值
+
+    Returns:
+        字典名称，未找到返回 None
+    """
+    if not code_cd:
+        return None
+    row = (
+        db.session.query(SysCode.code_nm)
+        .filter(SysCode.code_typ == code_typ, SysCode.code_cd == code_cd)
+        .first()
+    )
+    return row[0] if row else None
+
+
 def _enrich_notify_status(
     items: list[dict[str, Any]],
     ref_type: str,
@@ -272,30 +305,54 @@ def _enrich_notify_status(
         return items
     from app.models.notification import Notification
 
-    # 按 maintenance_id 批量查询通知记录
-    # 按 dispatch_id 精确匹配（同一工单多次派工各自独立追踪通知状态）
-    dispatch_ids = {r.get("id") for r in items if r.get("id")}
-    if not dispatch_ids:
+    # 收集所有 (ref_id, dispatch_id) 对，用于匹配通知记录
+    # dispatch 类型：ref_id=maintenance_id, dispatch_id=business_operation_id（同单内序号）
+    # 其他类型：ref_id=业务ID, dispatch_id=记录自身ID
+    ref_pairs: set[tuple[str, int]] = set()
+    for r in items:
+        if ref_type == "dispatch":
+            mid = r.get("maintenance_id")
+            opid = r.get("business_operation_id")
+            if mid and opid:
+                ref_pairs.add((str(mid), int(opid)))
+        else:
+            rid = r.get("id")
+            ref = r.get("ref_id") or r.get("maintenance_id")
+            if rid and ref:
+                ref_pairs.add((str(ref), int(rid)))
+
+    if not ref_pairs:
         return items
+
     rows = (
         db.session.query(
-            Notification.dispatch_id, Notification.send_status, Notification.read_status
+            Notification.ref_id, Notification.dispatch_id,
+            Notification.send_status, Notification.read_status,
         )
-        .filter(Notification.ref_type == ref_type, Notification.dispatch_id.in_(dispatch_ids))
+        .filter(Notification.ref_type == ref_type)
         .all()
     )
     status_order = {"sent": 3, "pending": 2, "failed": 1}
-    notify_map: dict[int, dict[str, str]] = {}
-    for did, send_st, read_st in rows:
+    notify_map: dict[tuple[str, int], dict[str, str]] = {}
+    for ref, did, send_st, read_st in rows:
         if did is None:
             continue
-        prev = notify_map.get(did)
-        if prev is None or status_order.get(send_st, 0) > status_order.get(prev.get("send", ""), 0):
-            notify_map[did] = {"send": send_st or "", "read": read_st or "unread"}
+        key = (ref, did)
+        prev = notify_map.get(key)
+        if prev is None or status_order.get(send_st or "", 0) > status_order.get(prev.get("send", ""), 0):
+            notify_map[key] = {"send": send_st or "", "read": read_st or "unread"}
+
     for r in items:
-        did = r.get("id")
-        if did and did in notify_map:
-            info = notify_map[did]
+        if ref_type == "dispatch":
+            mid = r.get("maintenance_id")
+            opid = r.get("business_operation_id")
+            key = (str(mid), int(opid)) if mid and opid else None
+        else:
+            rid = r.get("id")
+            ref = r.get("ref_id") or r.get("maintenance_id")
+            key = (str(ref), int(rid)) if rid and ref else None
+        if key and key in notify_map:
+            info = notify_map[key]
             r["notify_status"] = info["send"]
             r["notify_data"] = "Y"
             r["notify_read"] = "Y" if info.get("read") == "read" else "N"
@@ -349,12 +406,29 @@ def _enrich_daily_refs(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             .all()
         )
 
+    # 更换次数 ghsl（对齐 PB d_whd_report/d_whd_report_ex：COUNT TIT25_ACCESSORIES_UPDATE）
+    # C7 报表适配：TIT25/TIT26 合并后统一查 TIT25，审核标志用 auditflg
+    mid_list = [r.get("maintenance_id") for r in items if r.get("maintenance_id")]
+    ghsl_map: dict[str, int] = {}
+    if mid_list:
+        rows = (
+            db.session.query(
+                AccessoriesUpdate.maintenance_id,
+                db.func.count(AccessoriesUpdate.id),
+            )
+            .filter(AccessoriesUpdate.maintenance_id.in_(mid_list))
+            .group_by(AccessoriesUpdate.maintenance_id)
+            .all()
+        )
+        ghsl_map = {mid: int(cnt) for mid, cnt in rows}
+
     for r in items:
         r["fault_type_nm"] = fault_map.get(r.get("fault_type") or "", "")
         r["current_status_nm"] = status_map.get(r.get("current_status") or "", "")
         r["creator_nm"] = user_map.get(r.get("creator") or "", "")
         r["updator_nm"] = user_map.get(r.get("updator") or "", "")
         r["firstor_nm"] = user_map.get(r.get("firstor") or "", "")
+        r["ghsl"] = ghsl_map.get(r.get("maintenance_id") or "", 0)
     return items
 
 
@@ -1681,8 +1755,47 @@ class D2DService:
         result = [item.to_dict() for item in items]
         result = _enrich_user_names(result, ["d2d_engineer", "creator", "updator"])
         result = _enrich_sys_codes(result, "d2d_type", "D2D")
-        result = _enrich_sys_codes(result, "jjbz", "ZT")
+        # jjbz 字段已废弃（事项 18），保留 PB 数据迁移兼容，不再翻译
+        # result = _enrich_sys_codes(result, "jjbz", "ZT")
+        # d2d_result 直接用 ZT 字典码值，翻译为状态名称
+        result = _enrich_sys_codes(result, "d2d_result", "ZT")
+        # closure_reason 用 CLO_REASON 字典翻译（code_typ VARCHAR(10) 限制用短码）
+        result = _enrich_sys_codes(result, "closure_reason", "CLO_REASON")
         return result
+
+    @staticmethod
+    def get_default_engineer(maintenance_id: str) -> dict[str, Any]:
+        """获取上门工程师默认值：最新派工人 → 区域负责人。
+
+        对齐文档 §5.1.1：
+        1. 优先取 TIT21_MAINTENANCE_DISPATCH 按 dispatch_time 最新一条的 accpectder
+        2. 无派工记录则取工单划区的区域负责人（tmm46_area.usercd）
+        3. 都无则返回空，前端兜底取当前登录用户
+        """
+        from app.models.itsm import MaintenanceDispatch
+        from sqlalchemy import desc as sa_desc
+
+        # 1. 最新派工记录的分派人
+        latest = (
+            db.session.query(MaintenanceDispatch.accpectder)
+            .filter(MaintenanceDispatch.maintenance_id == maintenance_id)
+            .filter(MaintenanceDispatch.accpectder.isnot(None))
+            .order_by(sa_desc(MaintenanceDispatch.dispatch_time))
+            .first()
+        )
+        if latest and latest[0]:
+            return {"engineer": latest[0], "source": "latest_dispatch"}
+
+        # 2. 工单划区的区域负责人
+        md = MaintenanceDailyRepository.get_by_id(maintenance_id)
+        if md and md.store_id:
+            customer = db.session.get(Customer, md.store_id)
+            if customer and customer.area_cd:
+                area = db.session.get(Area, customer.area_cd)
+                if area and area.usercd:
+                    return {"engineer": area.usercd, "source": "area_manager"}
+
+        return {"engineer": "", "source": "none"}
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
@@ -1692,10 +1805,726 @@ class D2DService:
 
     @staticmethod
     def update(record_id: int, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        """更新上门服务记录。
+
+        审核意见 5 采纳：仅当传入结构化字段时才重新拼句 d2d_descripiton，
+        否则保留原值（历史数据保护）。
+        """
         record = D2DRepository.get_by_id(record_id)
         if record is None:
             return None
+
+        # 结构化字段存在时重新拼句（历史数据只改其他字段则保留原 d2d_descripiton）
+        structured_keys = {"d2d_phenomenon", "d2d_reason", "d2d_handling", "d2d_result", "closure_reason", "d2d_note"}
+        if any(k in data for k in structured_keys):
+            # 合并已有字段值与新传入值
+            phenomenon = data.get("d2d_phenomenon", record.d2d_phenomenon)
+            reason = data.get("d2d_reason", record.d2d_reason)
+            handling = data.get("d2d_handling", record.d2d_handling)
+            d2d_result = data.get("d2d_result", record.d2d_result)
+            closure_reason = data.get("closure_reason", record.closure_reason)
+            note = data.get("d2d_note", record.d2d_note)
+
+            handling_sentence = D2DService._compose_handling_sentence(
+                record.maintenance_id, handling
+            )
+            result_nm = StateMachine.D2D_RESULT_NM.get(d2d_result or "", "")
+            closure_reason_nm = StateMachine.CLOSURE_REASON_NM.get(
+                closure_reason or "", ""
+            ) if closure_reason else None
+            data["d2d_descripiton"] = D2DService._compose_description(
+                phenomenon, reason, handling_sentence, result_nm, closure_reason_nm, note
+            )
+
         D2DRepository.update(record, data, updator)
+        db.session.commit()
+        return record.to_dict()
+
+    # ------------------------------------------------------------------
+    # 离店解决四要素结构化（事项 18）
+    # 映射字典统一由 StateMachine 提供（审核意见 11，避免各 Service 重复）
+    # ------------------------------------------------------------------
+    # 保留类属性引用，向后兼容（内部转调 StateMachine）
+    _D2D_RESULT_TO_IS_SUCCESS = StateMachine.D2D_RESULT_TO_IS_SUCCESS
+    _CLOSURE_REASON_TO_IS_SUCCESS = StateMachine.CLOSURE_REASON_TO_IS_SUCCESS
+    _D2D_RESULT_NM = StateMachine.D2D_RESULT_NM
+    _CLOSURE_REASON_NM = StateMachine.CLOSURE_REASON_NM
+
+    @staticmethod
+    def _compose_handling_sentence(maintenance_id: str, d2d_handling: str | None) -> str:
+        """
+        自动拼句处理过程描述。
+
+        来源：
+        - TIT25_ACCESSORIES_UPDATE（换件动作 + 收费金额）
+        - TWH 领用出库（服务领用，暂不查询，由 TIT25 间接体现）
+        - TIT23 到店/催单/记录（次数统计）
+        - 工程师手输 d2d_handling（补充）
+
+        Returns:
+            拼接后的处理过程文本（≤500 字符）
+        """
+        parts: list[str] = []
+
+        # 1. 换件动作 + 收费金额（TIT25）
+        # 注：TIT25_ACCESSORIES_UPDATE 无 useflg 字段
+        accessories = (
+            db.session.query(AccessoriesUpdate)
+            .filter(
+                AccessoriesUpdate.maintenance_id == maintenance_id,
+            )
+            .all()
+        )
+        if accessories:
+            replace_items = [
+                a for a in accessories if a.c_type == "1" and a.old_accessories_id
+            ]
+            buy_items = [a for a in accessories if a.c_type == "2"]
+            service_items = [a for a in accessories if a.c_type == "3"]
+            exchange_items = [a for a in accessories if a.c_type == "4"]
+            consumable_items = [a for a in accessories if a.c_type == "5"]
+            if replace_items:
+                parts.append(
+                    f"更换配件{len(replace_items)}件（"
+                    + "、".join(
+                        (a.accessories_type or "") for a in replace_items[:5]
+                    )
+                    + ("..." if len(replace_items) > 5 else "")
+                    + "）"
+                )
+            if buy_items:
+                parts.append(
+                    f"购买配件{len(buy_items)}件（"
+                    + "、".join(
+                        (a.accessories_type or "") for a in buy_items[:5]
+                    )
+                    + ("..." if len(buy_items) > 5 else "")
+                    + "）"
+                )
+            if exchange_items:
+                parts.append(
+                    f"整机更换{len(exchange_items)}次（"
+                    + "、".join(
+                        (a.accessories_type or "") for a in exchange_items[:5]
+                    )
+                    + ("..." if len(exchange_items) > 5 else "")
+                    + "）"
+                )
+            if service_items:
+                svc_types = "、".join(
+                    (a.paytype or "") for a in service_items[:5] if a.paytype
+                )
+                parts.append(
+                    f"纯服务费{len(service_items)}项"
+                    + (f"（{svc_types}）" if svc_types else "")
+                )
+            if consumable_items:
+                parts.append(
+                    f"耗材线材{len(consumable_items)}项（"
+                    + "、".join(
+                        (a.accessories_type or "") for a in consumable_items[:5]
+                    )
+                    + ("..." if len(consumable_items) > 5 else "")
+                    + "）"
+                )
+            # 收费金额汇总（所有 c_type 的 price + payje）
+            total_charge = sum(
+                float(a.price or 0) + float(a.payje or 0) for a in accessories
+            )
+            if total_charge > 0:
+                parts.append(f"收费{total_charge:.2f}元")
+
+        # 2. 到店/催单/记录次数（TIT23）
+        d2d_records = (
+            db.session.query(MaintenanceD2D)
+            .filter(
+                MaintenanceD2D.maintenance_id == maintenance_id,
+                MaintenanceD2D.useflg == "1",
+            )
+            .all()
+        )
+        arrive_count = sum(1 for r in d2d_records if r.d2d_type == "1")
+        urge_count = sum(1 for r in d2d_records if r.d2d_type == "3")
+        if arrive_count > 0:
+            parts.append(f"上门{arrive_count}次")
+        if urge_count > 0:
+            parts.append(f"催单{urge_count}次")
+
+        # 3. 工程师手输补充
+        if d2d_handling:
+            parts.append(d2d_handling)
+
+        sentence = "；".join(parts)
+        # 截断到 500 字符
+        return sentence[:500] if len(sentence) > 500 else sentence
+
+    @staticmethod
+    def _compose_description(
+        phenomenon: str | None,
+        reason: str | None,
+        handling_sentence: str,
+        result_nm: str,
+        closure_reason_nm: str | None,
+        note: str | None,
+    ) -> str:
+        """
+        拼接 d2d_descripiton 兼容文本（PB 兼容、列表展示）。
+
+        格式：现象：xxx；原因：xxx；处理：xxx；结果：xxx；补充：xxx
+        截断到 200 字符。
+        """
+        parts: list[str] = []
+        if phenomenon:
+            parts.append(f"现象：{phenomenon}")
+        if reason:
+            parts.append(f"原因：{reason}")
+        if handling_sentence:
+            parts.append(f"处理：{handling_sentence}")
+        result_text = result_nm
+        if closure_reason_nm:
+            result_text = f"{result_nm}（{closure_reason_nm}）"
+        parts.append(f"结果：{result_text}")
+        if note:
+            parts.append(f"补充：{note}")
+        sentence = "；".join(parts)
+        return sentence[:200] if len(sentence) > 200 else sentence
+
+    # ------------------------------------------------------------------
+    # 4 模式差异化（A2a）：到店/离店/催单/记录
+    # ------------------------------------------------------------------
+
+    # 主表模型清单（跨单据类型复用 D2D，各自主键字段名不同）
+    _MAIN_MODELS: list[tuple[type, str]] = [
+        (MaintenanceDaily, "maintenance_id"),        # TIT10 日常维护
+        (MaintenanceOpen, "new_opening_id"),          # TIT13 新机开通
+        (MaintenanceRenovate, "renew_id"),            # TIT15 旧机翻新
+        (DeviceChange, "device_change_id"),           # TIT16 设备变更
+        (Maintenance, "daily_maintenance_id"),        # TIT17 日常保养
+    ]
+
+    @staticmethod
+    def _find_main_record(maintenance_id: str) -> tuple[object | None, str | None]:
+        """查询主表记录（兼容多种单据类型）。
+
+        Returns:
+            (main_record, fault_type) 或 (None, None)
+        """
+        for model, pk_field in D2DService._MAIN_MODELS:
+            pk_col = getattr(model, pk_field, None)
+            if pk_col is None:
+                continue
+            record = (
+                db.session.query(model)
+                .filter(pk_col == maintenance_id)
+                .first()
+            )
+            if record is not None:
+                fault_type = getattr(record, "fault_type", None)
+                return record, fault_type
+        return None, None
+
+    @staticmethod
+    def _append_faultcode(main_record: object, gzdm: str | None) -> tuple[str | None, str | None]:
+        """故障代码回写主表 faultcode（对齐 PB 语义）。
+
+        PB 格式（w_r_itsm_d2d_cdjl.srw）：
+            faultcode = archgroup + ',' + gzdm + '/'
+        - archgroup: 故障分组（1=整机/2=配件/3=自由录入），从 tit04_archivecode 查
+        - gzdm: 故障代码（arch_cd 值）
+
+        去重：完整 entry 已存在则不追加。
+
+        Returns:
+            (arch_group, fault_type) 用于责任记录判断
+        """
+        if not gzdm:
+            return None, None
+        # 查 arch_group 和 fault_type
+        from app.models.itsm import ArchiveCode
+
+        arch = (
+            db.session.query(ArchiveCode)
+            .filter(ArchiveCode.arch_cd == gzdm)
+            .first()
+        )
+        arch_group = arch.arch_group if arch else "3"  # 默认自由录入
+        fault_type = arch.fault_type if arch else None
+        entry = f"{arch_group},{gzdm}/"
+
+        current = getattr(main_record, "faultcode", "") or ""
+        if entry in current:
+            return arch_group, fault_type
+        new_faultcode = (current + entry) if current else entry
+        setattr(main_record, "faultcode", new_faultcode[:200])
+        return arch_group, fault_type
+
+    @staticmethod
+    def _get_last_d2d(maintenance_id: str) -> object | None:
+        """获取最后一条有效 d2d 记录（按 business_operation_id 倒序）。"""
+        return (
+            db.session.query(MaintenanceD2D)
+            .filter(
+                MaintenanceD2D.maintenance_id == maintenance_id,
+                MaintenanceD2D.useflg == "1",
+            )
+            .order_by(MaintenanceD2D.business_operation_id.desc())
+            .first()
+        )
+
+    @staticmethod
+    def _next_d2d_group(maintenance_id: str) -> int:
+        """生成下一个 d2d_group（Max+1，对齐 PB of_checkgroup）。"""
+        from sqlalchemy import func
+
+        max_group = (
+            db.session.query(func.coalesce(func.max(MaintenanceD2D.d2d_group), 0))
+            .filter(MaintenanceD2D.maintenance_id == maintenance_id)
+            .scalar()
+        )
+        return int(max_group or 0) + 1
+
+    @staticmethod
+    def _check_group(maintenance_id: str, d2d_type: str) -> int | None:
+        """分组校验（A2c，对齐 PB of_checkgroup）。
+
+        规则：
+        - 到店(1)：上一条不能是到店（否则报错），新分组 = Max(d2d_group)+1
+        - 离店(2)：上一条不能是离店（否则报错），用最后一条的 d2d_group
+        - 催单(3)：用最后一条的 d2d_group（需离店后才能催单）
+        - 记录(4)：用最后一条的 d2d_group（无校验）
+
+        Returns:
+            d2d_group 值（到店返回新分组，其他返回最后分组）
+
+        Raises:
+            ValueError: 分组校验失败
+        """
+        last = D2DService._get_last_d2d(maintenance_id)
+
+        if d2d_type == "1":  # 到店
+            if last and last.d2d_type == "1":
+                raise ValueError("当前分组已记录过到店信息，不能再次添加到店信息")
+            return D2DService._next_d2d_group(maintenance_id)
+
+        if d2d_type == "2":  # 离店
+            if last is None:
+                raise ValueError("当前维护单未记录到店信息，不能添加离店信息")
+            if last.d2d_type == "2":
+                raise ValueError("当前分组已记录过离店信息，不能再次添加离店信息")
+            return last.d2d_group
+
+        if d2d_type == "3":  # 催单
+            # 仅阻断：到店未离店（工程师仍在门店现场，无需催单）
+            # 无记录 / 最后是离店 / 最后是记录 / 最后是催单 → 均允许
+            if last is not None and last.d2d_type == "1":
+                raise ValueError("当前到店未离店（工程师仍在门店），不能催单")
+            return last.d2d_group if last else D2DService._next_d2d_group(maintenance_id)
+
+        # 记录(4)：用最后分组，无校验
+        if last:
+            return last.d2d_group
+        return D2DService._next_d2d_group(maintenance_id)
+
+    @staticmethod
+    def _validate_four_elements(
+        maintenance_id: str,
+        d2d_result: str | None,
+        data: dict[str, Any],
+    ) -> None:
+        """四要素差异化必填校验（A2c，对齐 §5.3.1）。
+
+        规则：
+        - d2d_result='5'(已解决) + 有换件(TIT25 c_type=1/4)：现象/原因/处理/结果全必填
+        - d2d_result='5'(已解决) + 无换件：现象/处理/结果必填，原因可放宽
+        - d2d_result='3'(关闭)/'4'(未解决)/'6'(转修)/'7'(待配件)：处理/结果必填
+        - 到店/催单/记录：不强制（本方法不校验）
+
+        Raises:
+            ValueError: 必填字段缺失
+        """
+        if d2d_result is None:
+            return
+
+        phenomenon = data.get("d2d_phenomenon")
+        reason = data.get("d2d_reason")
+        handling = data.get("d2d_handling")
+        note = data.get("d2d_note")
+
+        # 查是否有换件记录（TIT25 c_type=1/4）
+        # 注：TIT25_ACCESSORIES_UPDATE 无 useflg 字段，所有记录均视为有效
+        has_replace = (
+            db.session.query(AccessoriesUpdate)
+            .filter(
+                AccessoriesUpdate.maintenance_id == maintenance_id,
+                AccessoriesUpdate.c_type.in_(["1", "4"]),
+            )
+            .count()
+        ) > 0
+
+        # 处理/结果对所有离店结果必填
+        if not handling and not note:
+            # handling 或 note 至少填一个（note 作为处理补充）
+            raise ValueError("处理过程(d2d_handling)或补充说明(d2d_note)至少填一个")
+
+        if d2d_result == "5":  # 已解决
+            if not phenomenon:
+                raise ValueError("d2d_result='5' 已解决时实际现象(d2d_phenomenon)必填")
+            if has_replace and not reason:
+                raise ValueError(
+                    "d2d_result='5' 已解决且有换件时原因(d2d_reason)必填"
+                )
+
+    @staticmethod
+    def _auto_generate_liability(
+        maintenance_id: str,
+        d2d_result: str | None,
+        gzdm: str | None,
+        main_fault_type: str | None,
+        operator: str,
+    ) -> None:
+        """责任记录自动生成（A2b，对齐 PB §5.3.3）。
+
+        规则：d2d_result='4'(未解决) 且主表 fault_type='1'(POS 设备类，对齐 PB is_fault_type='1') 时，
+        自动插入 TIT10_MAINTENANCE_LIABILITY 责任记录（type='1' 未成功）。
+
+        PB 语义：保内 POS 设备未解决 → 生成责任记录供考核。
+        main_fault_type 来自主表 fault_type 字段（设备分类 1=POS/2=视频/3=其他），
+        非 ArchiveCode.fault_type（硬件分类前缀如 01=打印机）。
+        """
+        if d2d_result != "4" or main_fault_type != "1":
+            return
+        # 查是否已有 type='1' 的责任记录（避免重复）
+        from app.models.itsm import MaintenanceLiability
+
+        existing = (
+            db.session.query(MaintenanceLiability)
+            .filter(
+                MaintenanceLiability.maintenance_id == maintenance_id,
+                MaintenanceLiability.type == "1",
+                MaintenanceLiability.useflg == "1",
+            )
+            .first()
+        )
+        if existing is not None:
+            return
+        # 插入责任记录（type='1' 未成功，is_finish='0' 未处理）
+        # exceptions_cd 填 gzdm 保留故障溯源
+        liability = MaintenanceLiability(
+            maintenance_id=maintenance_id,
+            exceptions_cd=gzdm,
+            exceptions_nm="保内设备未解决",
+            dept_nm="",
+            assess_flg="Y",
+            exempt_flg="N",
+            type="1",
+            is_finish="0",
+            useflg="1",
+            set_from="AUTO_D2D",
+        )
+        db.session.add(liability)
+
+    @staticmethod
+    def _update_main_on_leave(
+        maintenance_id: str,
+        d2d_result: str | None,
+        closure_reason: str | None,
+        gzdm: str | None,
+        operator: str,
+        leave_time: datetime | None,
+    ) -> None:
+        """离店时联动主表（current_status + is_success + leave_time + firstor/first_time + faultcode）。
+
+        PB 语义（w_r_itsm_d2d.srw oe_preupdate）：
+        - current_status = d2d_result
+        - is_success 按 d2d_result/closure_reason 映射派生
+        - leave_time 若空则填充（第一次离店时间）
+        - firstor/first_time 若空则用本次 d2d 工程师/到店时间填充
+        - faultcode 追加 gzdm
+        """
+        main_record, main_fault_type = D2DService._find_main_record(maintenance_id)
+        if main_record is None:
+            return
+
+        is_success = StateMachine.resolve_is_success(d2d_result, closure_reason)
+        main_record.current_status = d2d_result
+        main_record.is_success = is_success
+
+        # leave_time：第一次离店时间（若空才填）
+        if leave_time and not getattr(main_record, "leave_time", None):
+            main_record.leave_time = leave_time
+
+        # firstor/first_time：若空则查本次上门分组的第一条到店记录填充
+        if not getattr(main_record, "firstor", None) or not getattr(main_record, "first_time", None):
+            first_arrive = (
+                db.session.query(MaintenanceD2D)
+                .filter(
+                    MaintenanceD2D.maintenance_id == maintenance_id,
+                    MaintenanceD2D.d2d_type == "1",  # 到店
+                    MaintenanceD2D.useflg == "1",
+                )
+                .order_by(MaintenanceD2D.arrive_time.asc())
+                .first()
+            )
+            if first_arrive:
+                if not getattr(main_record, "firstor", None):
+                    main_record.firstor = first_arrive.d2d_engineer
+                if not getattr(main_record, "first_time", None):
+                    main_record.first_time = first_arrive.arrive_time
+
+        # 故障代码回写主表 faultcode（arch.fault_type 仅用于 faultcode 拼接，不参与责任判断）
+        D2DService._append_faultcode(main_record, gzdm)
+
+        # 责任记录自动生成（A2b：d2d_result='4' + 主表 fault_type='1' POS 设备类）
+        D2DService._auto_generate_liability(
+            maintenance_id, d2d_result, gzdm, main_fault_type, operator
+        )
+
+        main_record.update_time = datetime.now(UTC)
+        main_record.updator = operator
+
+    @staticmethod
+    def arrive_store(
+        maintenance_id: str,
+        data: dict[str, Any],
+        operator: str,
+    ) -> dict[str, Any]:
+        """到店登记保存（d2d_type='1'）。
+
+        PB 语义（w_r_itsm_d2d.srw）：
+        - 记录到店时间、工程师
+        - 若主表 firstor/first_time 为空，填充本次到店信息
+        - 业务流水（A2b 补）
+
+        Args:
+            maintenance_id: 维护单ID
+            data: {d2d_engineer, arrive_time, d2d_phone, ...}
+            operator: 操作人
+
+        Returns:
+            保存后的 d2d 记录 dict
+        """
+        d2d_data = dict(data)
+        d2d_data["d2d_type"] = "1"  # 到店
+        d2d_data["maintenance_id"] = maintenance_id
+        # 到店时间默认当前
+        if not d2d_data.get("arrive_time"):
+            d2d_data["arrive_time"] = datetime.now(UTC)
+        # 分组校验（A2c）：到店新分组
+        d2d_data["d2d_group"] = D2DService._check_group(maintenance_id, "1")
+        # 业务流水序号（A2b）
+        d2d_data["business_operation_id"] = BusinessFlowService.next_seq(
+            maintenance_id, MaintenanceD2D
+        )
+        record = D2DRepository.create(d2d_data, operator)
+        # 业务流水日志（A2b）
+        BusinessFlowService.log(
+            maintenance_id,
+            record.business_operation_id,
+            "到店登记",
+            operator,
+            f"到店: {d2d_data.get('d2d_engineer', '')}",
+        )
+
+        # 联动主表：firstor/first_time 若空则填充 + current_status 1→2（到店=已分配）
+        main_record, _ = D2DService._find_main_record(maintenance_id)
+        if main_record is not None:
+            # 到店后主表状态流转为 ASSIGNED(2)，对齐 PB §5.1.2
+            if getattr(main_record, "current_status", None) == "1":
+                main_record.current_status = "2"
+            if not getattr(main_record, "firstor", None):
+                main_record.firstor = d2d_data.get("d2d_engineer")
+            if not getattr(main_record, "first_time", None):
+                main_record.first_time = d2d_data.get("arrive_time")
+            main_record.update_time = datetime.now(UTC)
+            main_record.updator = operator
+
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def urge(
+        maintenance_id: str,
+        data: dict[str, Any],
+        operator: str,
+    ) -> dict[str, Any]:
+        """催单保存（d2d_type='3'）。
+
+        PB 语义（w_r_itsm_d2d.srw of_checkgroup）：
+        - 催单只在最后一组 + d2d_type='2' 时同步主表状态
+        - 催单本身不直接改主表 current_status（只有离店才改）
+        - 业务流水（A2b 补）
+        - 分组校验（A2c 补）
+
+        Args:
+            maintenance_id: 维护单ID
+            data: {d2d_engineer, d2d_descripiton, d2d_phone, ...}
+            operator: 操作人
+
+        Returns:
+            保存后的 d2d 记录 dict
+        """
+        d2d_data = dict(data)
+        d2d_data["d2d_type"] = "3"  # 催单
+        d2d_data["maintenance_id"] = maintenance_id
+        # 分组校验（A2c）：催单用最后分组
+        d2d_data["d2d_group"] = D2DService._check_group(maintenance_id, "3")
+        # 业务流水序号（A2b）
+        d2d_data["business_operation_id"] = BusinessFlowService.next_seq(
+            maintenance_id, MaintenanceD2D
+        )
+        record = D2DRepository.create(d2d_data, operator)
+        # 业务流水日志（A2b）
+        BusinessFlowService.log(
+            maintenance_id,
+            record.business_operation_id,
+            "催单",
+            operator,
+            d2d_data.get("d2d_descripiton", ""),
+        )
+        # 催单不直接联动主表状态（A2c 分组校验时再处理）
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def record(
+        maintenance_id: str,
+        data: dict[str, Any],
+        operator: str,
+    ) -> dict[str, Any]:
+        """记录保存（d2d_type='4'，到场说明/客户反馈）。
+
+        PB 语义：仅业务流水，不联动主表。
+
+        Args:
+            maintenance_id: 维护单ID
+            data: {d2d_engineer, d2d_descripiton, d2d_phone, ...}
+            operator: 操作人
+
+        Returns:
+            保存后的 d2d 记录 dict
+        """
+        d2d_data = dict(data)
+        d2d_data["d2d_type"] = "4"  # 记录
+        d2d_data["maintenance_id"] = maintenance_id
+        # 分组校验（A2c）：记录用最后分组
+        d2d_data["d2d_group"] = D2DService._check_group(maintenance_id, "4")
+        # 业务流水序号（A2b）
+        d2d_data["business_operation_id"] = BusinessFlowService.next_seq(
+            maintenance_id, MaintenanceD2D
+        )
+        record = D2DRepository.create(d2d_data, operator)
+        # 业务流水日志（A2b）
+        BusinessFlowService.log(
+            maintenance_id,
+            record.business_operation_id,
+            "记录",
+            operator,
+            d2d_data.get("d2d_descripiton", ""),
+        )
+        db.session.commit()
+        return record.to_dict()
+
+    @staticmethod
+    def leave_store(
+        maintenance_id: str,
+        data: dict[str, Any],
+        operator: str,
+    ) -> dict[str, Any]:
+        """
+        离店登记保存（四要素结构化 + 自动拼句 + 主表联动）。
+
+        Args:
+            maintenance_id: 维护单ID
+            data: 四要素字段 {d2d_phenomenon, d2d_reason, d2d_handling,
+                             d2d_result, closure_reason, d2d_note,
+                             gzdm, device_id, accessories_id, ...}
+            operator: 操作人
+
+        Returns:
+            保存后的 d2d 记录 dict
+
+        联动主表（A2a 补全）：
+            - current_status = d2d_result
+            - is_success 按 d2d_result/closure_reason 映射派生（StateMachine）
+            - leave_time 若空则填充（第一次离店时间）
+            - firstor/first_time 若空则查到店记录填充
+            - faultcode 追加 gzdm
+        """
+        d2d_result = data.get("d2d_result")
+        closure_reason = data.get("closure_reason")
+        gzdm = data.get("gzdm")
+
+        # 校验：d2d_result='3' 时 closure_reason 必填
+        if d2d_result == "3" and not closure_reason:
+            raise ValueError("d2d_result='3' 关闭时 closure_reason 必填")
+
+        # 四要素差异化必填校验（A2c）
+        D2DService._validate_four_elements(maintenance_id, d2d_result, data)
+
+        # 自动拼句：处理过程
+        handling_sentence = D2DService._compose_handling_sentence(
+            maintenance_id, data.get("d2d_handling")
+        )
+
+        # 拼句：d2d_descripiton 兼容文本（用 StateMachine 字典）
+        result_nm = StateMachine.D2D_RESULT_NM.get(d2d_result or "", "")
+        closure_reason_nm = StateMachine.CLOSURE_REASON_NM.get(
+            closure_reason or "", ""
+        ) if closure_reason else None
+        description = D2DService._compose_description(
+            data.get("d2d_phenomenon"),
+            data.get("d2d_reason"),
+            handling_sentence,
+            result_nm,
+            closure_reason_nm,
+            data.get("d2d_note"),
+        )
+
+        # 离店时间默认当前
+        leave_time = data.get("leave_time") or datetime.now(UTC)
+
+        # 写入 d2d 记录
+        d2d_data = dict(data)
+        d2d_data["d2d_descripiton"] = description
+        d2d_data["d2d_type"] = "2"  # 离店
+        d2d_data["leave_time"] = leave_time
+        d2d_data["maintenance_id"] = maintenance_id
+        # 分组校验（A2c）：离店用最后分组
+        d2d_data["d2d_group"] = D2DService._check_group(maintenance_id, "2")
+        # 业务流水序号（A2b）
+        d2d_data["business_operation_id"] = BusinessFlowService.next_seq(
+            maintenance_id, MaintenanceD2D
+        )
+        record = D2DRepository.create(d2d_data, operator)
+        # 业务流水日志（A2b）
+        BusinessFlowService.log(
+            maintenance_id,
+            record.business_operation_id,
+            "离店登记",
+            operator,
+            f"离店: {result_nm}{('（' + closure_reason_nm + '）') if closure_reason_nm else ''}",
+        )
+
+        # 联动主表（A2a 补全：leave_time/firstor/first_time/faultcode）
+        D2DService._update_main_on_leave(
+            maintenance_id, d2d_result, closure_reason, gzdm, operator, leave_time
+        )
+
+        # POS 状态同步（A2c 事件驱动）：发 d2d_leave_store 事件，监听器同步 TMM22_CUSTOMERS
+        main_record, _ = D2DService._find_main_record(maintenance_id)
+        if main_record is not None:
+            custcd = getattr(main_record, "custcd", None)
+            if custcd:
+                EventBus.emit(
+                    "d2d_leave_store",
+                    {
+                        "maintenance_id": maintenance_id,
+                        "custcd": custcd,
+                        "posstatus": data.get("posstatus", "01"),
+                        "posstatus1": data.get("posstatus1", "11"),
+                    },
+                )
+
         db.session.commit()
         return record.to_dict()
 
@@ -1735,19 +2564,146 @@ class AccessoriesUpdateService:
         items = AccessoriesUpdateRepository.list_by_maintenance_id(maintenance_id)
         result = [item.to_dict() for item in items]
         result = _enrich_user_names(result, ["engineer_id", "creator", "updator"])
+        # c_type 用 C_TYPE 字典翻译（1维修/2购买/3纯服务费/4整机更换/5耗材线材）
+        result = _enrich_sys_codes(result, "c_type", "C_TYPE")
+        # paytype 按 c_type 级联翻译：c_type=3 用 PAY_SVC，c_type=5 用 PAY_CONS
+        for r in result:
+            ct = r.get("c_type", "")
+            pt = r.get("paytype", "")
+            if ct == "3" and pt:
+                r["paytype_nm"] = _get_sys_code_nm("PAY_SVC", pt)
+            elif ct == "5" and pt:
+                r["paytype_nm"] = _get_sys_code_nm("PAY_CONS", pt)
         return result
 
     @staticmethod
     def create(data: dict[str, Any], creator: str) -> dict[str, Any]:
+        # c_type=4 整机更换：后端自动设 posflg=1（更换整机标志，对齐 §6.1.2）
+        if data.get("c_type") == "4":
+            data["posflg"] = "1"
         record = AccessoriesUpdateRepository.create(data, creator)
         db.session.commit()
         return record.to_dict()
 
     @staticmethod
+    def get_new_accessories_candidates(
+        engineer_id: str, accessories_type: str | None = None
+    ) -> list[dict[str, Any]]:
+        """查询新配件可选列表（默认仓 + 当前工程师虚拟仓，双来源）。
+
+        对齐 §6.5.3：
+        - 默认仓：defaultflg='Y'，sflg='8'（在库可用），etyp='0'（配件类）
+        - 工程师虚拟仓：按 engineer_id 查用户名 → 匹配 twh01_warehouse.whnm（C5 已去前缀），
+          sflg='1'（工程师持有），etyp='0'
+        - accessories_type 非空时按 itemcd 前两位过滤
+        """
+        from app.models.warehouse import Warehouse
+
+        # 1. 默认仓在库配件
+        default_q = (
+            db.session.query(Eid)
+            .join(Warehouse, Eid.whcd == Warehouse.whcd)
+            .filter(
+                Warehouse.defaultflg == "Y",
+                Warehouse.useflg == "1",
+                Eid.useflg == "1",
+                Eid.sflg == "8",
+                Eid.etyp == "0",
+            )
+        )
+        # 2. 当前工程师虚拟仓持有配件
+        # 优先用 User.default_whcd（C5 FK），名字匹配兜底
+        engineer_whcd: str | None = None
+        if engineer_id:
+            user = db.session.query(User).filter(User.user_cd == engineer_id).first()
+            if user:
+                if getattr(user, "default_whcd", None):
+                    engineer_whcd = user.default_whcd
+                elif user.user_nm:
+                    wh = (
+                        db.session.query(Warehouse)
+                        .filter(Warehouse.whnm == user.user_nm, Warehouse.useflg == "1")
+                        .first()
+                    )
+                    if wh:
+                        engineer_whcd = wh.whcd
+        engineer_q = (
+            db.session.query(Eid)
+            .filter(
+                Eid.useflg == "1",
+                Eid.sflg == "1",
+                Eid.etyp == "0",
+            )
+        )
+        if engineer_whcd:
+            engineer_q = engineer_q.filter(Eid.whcd == engineer_whcd)
+        else:
+            engineer_q = engineer_q.filter(db.false())  # 无工程师仓则空集
+
+        # 合并
+        rows = default_q.union(engineer_q).all()
+        # 按配件类型过滤（itemcd 前两位）
+        if accessories_type:
+            prefix = accessories_type[:2]
+            rows = [r for r in rows if (r.itemcd or "").startswith(prefix)]
+        return [
+            {
+                "eid": r.eid,
+                "itemcd": r.itemcd,
+                "whcd": r.whcd,
+                "sflg": r.sflg,
+                "source": "engineer" if r.sflg == "1" else "default",
+            }
+            for r in rows
+        ]
+
+    @staticmethod
+    def get_old_accessories_candidates(store_id: str) -> list[dict[str, Any]]:
+        """查询门店有效配件资产（旧配件来源，对齐 §6.5.4）。
+
+        从 tmm35_cust_pos_rl 按门店查资产，useflg='1' 且 asset_status='ACTIVE'。
+        """
+        rows = (
+            db.session.query(CustPosRl)
+            .filter(
+                CustPosRl.custcd == store_id,
+                CustPosRl.useflg == "1",
+            )
+            .all()
+        )
+        return [
+            {
+                "eid": r.eid,
+                "itemcd": r.item_cd,
+                "asset_type": getattr(r, "asset_type", None),
+                "useflg": r.useflg,
+            }
+            for r in rows
+        ]
+
+    @staticmethod
     def update(record_id: int, data: dict[str, Any], updator: str) -> dict[str, Any] | None:
+        """更新配件更新记录（乐观锁，审核意见 7）。
+
+        客户端须传入 version 字段（当前版本号），若与数据库不一致则拒绝更新。
+        """
         record = AccessoriesUpdateRepository.get_by_id(record_id)
         if record is None:
             return None
+
+        # 乐观锁校验
+        client_version = data.pop("version", None)
+        if client_version is not None and int(client_version) != record.version:
+            raise ValueError(
+                f"记录已被其他用户修改（当前版本 {record.version}，"
+                f"客户端版本 {client_version}），请刷新后重试"
+            )
+
+        # version +1
+        data["version"] = record.version + 1
+        # c_type=4 整机更换：后端自动设 posflg=1（对齐 §6.1.2）
+        if data.get("c_type") == "4":
+            data["posflg"] = "1"
         AccessoriesUpdateRepository.update(record, data, updator)
         db.session.commit()
         return record.to_dict()
@@ -1920,6 +2876,7 @@ class DispatchRuleService:
                         "target_type": t_type,
                         "target_value": t_value,
                         "auto_dispatch": getattr(matched, "auto_dispatch", "1") or "1",
+                        "notify_channel": getattr(matched, "notify_channel", None) or "internal",
                     }
             elif t_type == "group_leader":
                 res = _resolve_group_leader(t_value)
@@ -1931,6 +2888,7 @@ class DispatchRuleService:
                         "target_type": t_type,
                         "target_value": t_value,
                         "auto_dispatch": getattr(matched, "auto_dispatch", "1") or "1",
+                        "notify_channel": getattr(matched, "notify_channel", None) or "internal",
                     }
             elif t_type == "load_balance":
                 res = _resolve_group_load_balance(t_value)
@@ -1942,6 +2900,7 @@ class DispatchRuleService:
                         "target_type": t_type,
                         "target_value": t_value,
                         "auto_dispatch": getattr(matched, "auto_dispatch", "1") or "1",
+                        "notify_channel": getattr(matched, "notify_channel", None) or "internal",
                     }
         return None
 
@@ -2061,6 +3020,80 @@ class DispatchService:
         return record.to_dict()
 
     @staticmethod
+    def send_notification(
+        record_id: int,
+        channel: str = "internal",
+        subject: str | None = None,
+        body: str | None = None,
+        operator: str = "system",
+        template_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        """按派工记录发送通知：渲染模板，创建 Notification 并发送。
+
+        Args:
+            record_id: 派工记录ID
+            channel: 通知渠道（internal/email/sms/dingtalk/wecom/feishu/ntfy）
+            subject: 自定义标题（空=用模板渲染）
+            body: 自定义正文（空=用模板渲染）
+            operator: 操作人
+            template_id: 指定模板ID（空=用 dispatch 业务类型默认模板）
+        """
+        record = DispatchRepository.get_by_id(record_id)
+        if record is None:
+            return None
+        from jinja2 import Template
+        from app.models.itsm import MaintenanceDaily
+        from app.models.notification import NotificationTemplate
+        from app.repositories.notification_repository import (
+            NotificationRepository,
+            NotificationTemplateRepository,
+        )
+        from app.services.notification_service import NotificationService
+
+        # 选择模板：指定 > dispatch 默认 > DISPATCH 兼容
+        tpl = None
+        if template_id:
+            tpl = db.session.get(NotificationTemplate, template_id)
+        if tpl is None:
+            tpl = NotificationTemplateRepository.find_default("dispatch")
+        if tpl is None:
+            tpl = db.session.get(NotificationTemplate, "DISPATCH")
+        if tpl is None:
+            return None
+        # 模板已停用则报错（避免静默用无效模板）
+        if tpl.useflg != "1":
+            raise ValueError(f"通知模板 {tpl.template_id} 已停用，无法发送")
+        # 取维护单+客户上下文
+        mnt = db.session.query(MaintenanceDaily).filter(
+            MaintenanceDaily.maintenance_id == record.maintenance_id
+        ).first()
+        store_id = mnt.store_id if mnt else None
+        fault_type = mnt.fault_type if mnt else None
+        context = DispatchService._build_notify_context(record, store_id, fault_type)
+        final_subject = subject or Template(tpl.subject or "").render(**context)
+        final_body = body or Template(tpl.body or "").render(**context)
+        # 创建通知并发送
+        # dispatch_id 直接使用派工的 business_operation_id（跨表共享流水号）
+        seq_no = record.business_operation_id
+        notif = NotificationRepository.create(
+            {
+                "template_id": tpl.template_id,
+                "channel": channel,
+                "recipient": context["accpectder"],
+                "subject": final_subject,
+                "body": final_body,
+                "ref_type": "dispatch",
+                "ref_id": str(record.maintenance_id),
+                "dispatch_id": seq_no,
+                "send_status": "pending",
+            },
+            operator,
+        )
+        db.session.commit()
+        result = NotificationService.send(notif.id)
+        return result
+
+    @staticmethod
     def auto_create(
         maintenance_id: str,
         store_id: str,
@@ -2114,12 +3147,23 @@ class DispatchService:
                     _MD2.maintenance_id == record.maintenance_id
                 ).scalar()
                 record.business_operation_id = (max_op or 0) + 1
-            # 创建通知快照（与派工同事务，一次性渲染模板）
-            DispatchService._create_notification(record, store_id, fault_type, creator)
+            # 创建通知快照（与派工同事务，按规则渠道渲染模板）
+            notify_channel = target.get("notify_channel") or "internal"
+            DispatchService._create_notification(record, store_id, fault_type, creator, channel=notify_channel)
             db.session.commit()
+            # 自动派工自动发送通知（按规则配置渠道）
+            try:
+                from app.repositories.notification_repository import NotificationRepository as _NR
+                notif = _NR.find_latest_by_dispatch(getattr(record, "id", None))
+                if notif is not None:
+                    from app.services.notification_service import NotificationService
+                    NotificationService.send(notif.id)
+            except Exception as ne:
+                logger.warning(f"自动派工通知发送失败 maintenance_id={maintenance_id}: {ne}")
             logger.info(
                 f"自动派单成功：maintenance_id={maintenance_id}, "
-                f"accpectder={target['accpectder']}, rule_id={target.get('rule_id')}"
+                f"accpectder={target['accpectder']}, rule_id={target.get('rule_id')}, "
+                f"channel={notify_channel}"
             )
             return record.to_dict()
         except Exception as e:
@@ -2128,49 +3172,142 @@ class DispatchService:
             return None
 
     @staticmethod
+    def _build_notify_context(record: Any, store_id: str | None, fault_type: str | None) -> dict[str, Any]:
+        """构建派工通知模板渲染上下文（对齐维护单+客户+派工字段）。"""
+        from app.models.master import Customer, Area
+        from app.models.itsm import MaintenanceDaily
+
+        mnt = db.session.query(MaintenanceDaily).filter(
+            MaintenanceDaily.maintenance_id == record.maintenance_id
+        ).first()
+        # 客户/门店信息
+        cust_card = ""
+        cust_nm = ""
+        address = ""
+        phone_no = ""
+        contactor = ""
+        area_cd = ""
+        area_nm = ""
+        company_id = ""
+        if store_id:
+            cust = db.session.query(Customer).filter(Customer.cust_cd == store_id).first()
+            if cust:
+                cust_card = cust.cust_card or ""
+                cust_nm = cust.cust_nm or ""
+                address = cust.address or ""
+                phone_no = cust.phone_no or ""
+                contactor = cust.contactor or ""
+                area_cd = cust.area_cd or ""
+                company_id = getattr(cust, "company_id", "") or ""
+                if area_cd:
+                    area = db.session.query(Area).filter(Area.area_cd == area_cd).first()
+                    area_nm = area.area_nm if area else ""
+        # 分派人姓名
+        accpectder = record.accpectder or ""
+        accpectder_name = accpectder
+        if accpectder:
+            user = db.session.query(User).filter(User.user_cd == accpectder).first()
+            if user and user.user_nm:
+                accpectder_name = user.user_nm
+        # 故障类型名称
+        fault_type_nm = ""
+        if fault_type:
+            from app.models.master import SysCode
+            sc = db.session.query(SysCode).filter(
+                SysCode.code_typ == "GZ", SysCode.code_cd == fault_type
+            ).first()
+            if sc:
+                fault_type_nm = sc.code_nm or ""
+        # 状态名称
+        current_status = getattr(mnt, "current_status", "") or ""
+        current_status_nm = ""
+        if current_status:
+            from app.models.master import SysCode as _SC
+            st = db.session.query(_SC).filter(
+                _SC.code_typ == "ZT", _SC.code_cd == current_status
+            ).first()
+            if st:
+                current_status_nm = st.code_nm or ""
+        return {
+            "maintenance_id": record.maintenance_id,
+            "store_id": store_id or "",
+            "cust_card": cust_card,
+            "cust_nm": cust_nm,
+            "address": address,
+            "phone_no": phone_no,
+            "contactor": contactor,
+            "comm_mode": getattr(cust, "comm_mode", "") if cust else "",
+            "class_cd": getattr(cust, "class_cd", "") if cust else "",
+            "accpectder": accpectder,
+            "accpectder_name": accpectder_name,
+            "accpectder_nm": accpectder_name,
+            "accpectd_group": record.accpectd_group or "",
+            "fault_type": fault_type or "",
+            "fault_type_nm": fault_type_nm,
+            "short_description": getattr(mnt, "short_description", "") or "",
+            "detail_description": getattr(mnt, "detail_description", "") or "",
+            "device_id": getattr(mnt, "device_id", "") or "",
+            "request_time": str(getattr(mnt, "request_time", "") or ""),
+            "current_status": current_status,
+            "current_status_nm": current_status_nm,
+            "emergency_level": getattr(mnt, "emergency_level", "") or "",
+            "requester": getattr(mnt, "requester", "") or "",
+            "expected_completion_time": str(getattr(mnt, "expected_completion_time", "") or ""),
+            "operator": getattr(record, "operator", "") or "",
+            "operator_nm": user.user_nm if (user := db.session.query(User).filter(User.user_cd == getattr(record, "operator", "")).first()) else "",
+            "dispatch_time": str(getattr(record, "dispatch_time", "") or ""),
+            "business_operation_id": str(getattr(record, "business_operation_id", "") or ""),
+            "area_cd": area_cd,
+            "area_nm": area_nm,
+        }
+
+    @staticmethod
     def _create_notification(
         record: Any,
         store_id: str | None,
         fault_type: str | None,
         creator: str,
+        channel: str = "internal",
+        template_id: str | None = None,
     ) -> None:
-        """派工创建时一次性渲染 DISPATCH 模板写入通知快照。
+        """派工创建时一次性渲染通知模板写入通知快照。
 
         模板渲染采用 Jinja2，占位符一次性替换后落库，后续不再重渲染。
+        若指定 template_id 则用该模板，否则用 dispatch 业务类型默认模板。
         """
         import logging
         from jinja2 import Template
 
         from app.models.notification import NotificationTemplate
-        from app.repositories.notification_repository import NotificationRepository
+        from app.repositories.notification_repository import (
+            NotificationRepository,
+            NotificationTemplateRepository,
+        )
 
         logger = logging.getLogger(__name__)
         try:
-            tpl = db.session.get(NotificationTemplate, "DISPATCH")
+            # 选择模板：指定 > dispatch 默认 > DISPATCH 兼容
+            tpl = None
+            if template_id:
+                tpl = db.session.get(NotificationTemplate, template_id)
             if tpl is None:
-                logger.warning("DISPATCH 通知模板未配置，跳过通知创建")
+                tpl = NotificationTemplateRepository.find_default("dispatch")
+            if tpl is None:
+                tpl = db.session.get(NotificationTemplate, "DISPATCH")
+            if tpl is None:
+                logger.warning("派工通知模板未配置，跳过通知创建")
                 return
-            # 解析分派人姓名
-            accpectder = record.accpectder or ""
-            accpectder_name = accpectder
-            if accpectder:
-                user = db.session.query(User).filter(User.user_cd == accpectder).first()
-                if user and user.user_nm:
-                    accpectder_name = user.user_nm
-            context = {
-                "maintenance_id": record.maintenance_id,
-                "store_id": store_id or "",
-                "accpectder_name": accpectder_name,
-                "accpectd_group": record.accpectd_group or "",
-                "fault_type": fault_type or "",
-            }
+            if tpl.useflg != "1":
+                logger.warning(f"通知模板 {tpl.template_id} 已停用，跳过通知创建")
+                return
+            context = DispatchService._build_notify_context(record, store_id, fault_type)
             subject = Template(tpl.subject or "").render(**context)
             body = Template(tpl.body or "").render(**context)
             NotificationRepository.create(
                 {
-                    "template_id": "DISPATCH",
-                    "channel": "internal",
-                    "recipient": accpectder,
+                    "template_id": tpl.template_id,
+                    "channel": channel,
+                    "recipient": context["accpectder"],
                     "subject": subject,
                     "body": body,
                     "ref_type": "dispatch",
@@ -2616,6 +3753,50 @@ class MaintenanceLiabilityService:
         MaintenanceLiabilityRepository.update(record, data)
         db.session.commit()
         return record.to_dict()
+
+
+class ArchiveCodeService:
+    """故障代码字典服务（TIT04_ARCHIVECODE，A3 故障代码选择器用）。
+
+    支持：
+    - 按 arch_group（故障分组 1=整机/2=配件/3=自由录入）过滤
+    - 按 fault_type（设备分类前缀如 01=打印机）过滤
+    - 按 parent 查子级（级联用）
+    """
+
+    @staticmethod
+    def list(
+        arch_group: str | None = None,
+        fault_type: str | None = None,
+        parent: str | None = None,
+        keyword: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """查询故障代码字典（支持过滤+关键字搜索）。
+
+        Args:
+            arch_group: 故障分组过滤（1/2/3）
+            fault_type: 故障类型前缀过滤（如 "01"）
+            parent: 父级编码过滤（级联用，默认查顶层 parent='%' 或 useflg='1'）
+            keyword: arch_cd/arch_nm 模糊搜索
+            limit: 返回条数上限
+        """
+        from app.models.itsm import ArchiveCode
+
+        q = db.session.query(ArchiveCode).filter(ArchiveCode.useflg == "1")
+        if arch_group:
+            q = q.filter(ArchiveCode.arch_group == arch_group)
+        if fault_type:
+            q = q.filter(ArchiveCode.fault_type.like(f"{fault_type}%"))
+        if parent:
+            q = q.filter(ArchiveCode.parent == parent)
+        if keyword:
+            kw = f"%{keyword}%"
+            q = q.filter(
+                db.or_(ArchiveCode.arch_cd.like(kw), ArchiveCode.arch_nm.like(kw))
+            )
+        q = q.order_by(ArchiveCode.arch_cd).limit(limit)
+        return [r.to_dict() for r in q.all()]
 
 
 class LiabilityRegService:

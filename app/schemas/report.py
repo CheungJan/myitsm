@@ -50,3 +50,12 @@ class BOMTreeQuery(BaseModel):
     itemcd: str | None = Field(default=None, description="主物料编码")
     page: int = Field(default=1, ge=1, description="页码")
     per_page: int = Field(default=20, ge=1, le=100, description="每页数量")
+
+
+class FaultAnalysisQuery(BaseModel):
+    """D2 故障分析报表查询参数（基于 v_fault_analysis 视图）。"""
+
+    start_date: str | None = Field(default=None, description="开始日期（YYYY-MM-DD）")
+    end_date: str | None = Field(default=None, description="结束日期（YYYY-MM-DD）")
+    bill_type: str | None = Field(default=None, description="单据类型（MD/MO/MR/BG/BY）")
+    fault_type_cd: str | None = Field(default=None, description="故障类型编码")

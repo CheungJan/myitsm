@@ -4,6 +4,7 @@ export interface MntRecord { maintenance_id?: string; opening_id?: string; renew
 export interface MntPage { items: MntRecord[]; total: number }
 
 export function fetchMaintenanceDaily(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/maintenance-daily',{params:p})}
+export function fetchMaintenanceDailyDetail(maintenance_id:string){return request.get<never,{data:MntRecord}>(`/itsm/maintenance-daily/${maintenance_id}`)}
 export function fetchMaintenanceOpen(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/maintenance-open',{params:p})}
 export function fetchMaintenanceOpenDetail(opening_id:string){return request.get<never,{data:MntRecord}>(`/itsm/maintenance-open/${opening_id}`)}
 export function updateMaintenanceOpen(opening_id:string, data:Record<string,unknown>){return request.put<never,{data:MntRecord}>(`/itsm/maintenance-open/${opening_id}`,data)}
@@ -55,20 +56,32 @@ export function fetchHistoryByStore(type: string, storeId: string) {
 // ---- 公用附表 API ----
 export interface SubRecord { id?:number; maintenance_id?:string; [key:string]: unknown }
 export function fetchD2D(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/d2d/${maintenance_id}`)}
+export function fetchD2DDefaultEngineer(maintenance_id:string){return request.get<never,{data:{engineer:string;source:string}}>(`/itsm/d2d/${maintenance_id}/default-engineer`)}
 export function createD2D(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/d2d',data)}
 export function updateD2D(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/d2d/${record_id}`,data)}
+// 4 模式差异化 API（A2a）
+export function arriveStoreD2D(maintenance_id:string, data:Record<string,unknown>){return request.post<never,{data:SubRecord}>(`/itsm/d2d/arrive-store/${maintenance_id}`,data)}
+export function leaveStoreD2D(maintenance_id:string, data:Record<string,unknown>){return request.post<never,{data:SubRecord}>(`/itsm/d2d/leave-store/${maintenance_id}`,data)}
+export function urgeD2D(maintenance_id:string, data:Record<string,unknown>){return request.post<never,{data:SubRecord}>(`/itsm/d2d/urge/${maintenance_id}`,data)}
+export function recordD2D(maintenance_id:string, data:Record<string,unknown>){return request.post<never,{data:SubRecord}>(`/itsm/d2d/record/${maintenance_id}`,data)}
+// 故障代码字典 API（A3 故障代码选择器）
+export function fetchArchiveCodes(params:Record<string,string>){return request.get<never,{data:SubRecord[]}>('/itsm/archive-codes',{params})}
 export function fetchRV(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/rv/${maintenance_id}`)}
 export function createRV(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/rv',data)}
 export function updateRV(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/rv/${record_id}`,data)}
 export function fetchAccessories(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/accessories/${maintenance_id}`)}
 export function createAccessories(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/accessories',data)}
 export function updateAccessories(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/accessories/${record_id}`,data)}
+// C4：新旧配件候选（双来源+资产过滤）
+export function fetchNewAccessoriesCandidates(params:{engineer_id:string; accessories_type?:string}){return request.get<never,{data:SubRecord[]}>('/itsm/accessories/new-candidates',{params})}
+export function fetchOldAccessoriesCandidates(params:{store_id:string}){return request.get<never,{data:SubRecord[]}>('/itsm/accessories/old-candidates',{params})}
 export function fetchPayList(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/paylist/${maintenance_id}`)}
 export function createPayList(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/paylist',data)}
 export function updatePayList(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/paylist/${record_id}`,data)}
 export function fetchDispatch(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/dispatch/${maintenance_id}`)}
 export function createDispatch(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/dispatch',data)}
 export function updateDispatch(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/dispatch/${record_id}`,data)}
+export function sendDispatchNotification(record_id:number, data:Record<string,unknown>){return request.post<never,{data:SubRecord}>(`/itsm/dispatch/${record_id}/send`,data)}
 export function fetchCloseBills(maintenance_id:string){return request.get<never,{data:SubRecord[]}>(`/itsm/close-bill/${maintenance_id}`)}
 export function createCloseBill(data:Record<string,unknown>){return request.post<never,{data:SubRecord}>('/itsm/close-bill',data)}
 export function updateCloseBill(record_id:number, data:Record<string,unknown>){return request.put<never,{data:SubRecord}>(`/itsm/close-bill/${record_id}`,data)}
@@ -96,6 +109,7 @@ export interface DispatchRule {
     fallback_value?: string | null
     ultimate_fallback_type?: string | null
     ultimate_fallback_value?: string | null
+    auto_dispatch?: string
     useflg?: string
 }
 export function fetchDispatchRules(){return request.get<never,{data:DispatchRule[]}>('/itsm/dispatch-rules')}

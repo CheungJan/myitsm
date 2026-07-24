@@ -519,7 +519,7 @@ async function handleUpdate() {
                         }
                     }
                     // 检查多余物料
-                    for (const [itemcd, actual] of actualMap) {
+                    for (const [itemcd] of actualMap) {
                         if (!bomMap.has(itemcd)) {
                             ElMessage.warning(`物料 ${itemcd} 不在 BOM 中，不能领用`); return
                         }

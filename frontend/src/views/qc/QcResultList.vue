@@ -171,7 +171,7 @@ function getItemTypeLabel(item: any): string {
 // 将扁平明细重建为成品→配件树形结构
 interface DetailNode { itemcd: string; item_nm?: string; qcstatus: string; qcqty?: number; inqty?: number; eid?: string; typeLabel: string; prddate?: string; fault_desc?: string; replenish_ov_billid?: string; prod_seq?: number }
 interface TreeNode { itemcd: string; item_nm?: string; qcstatus: string; eid?: string; typeLabel: string; children: DetailNode[]; prodSeq?: number }
-function buildDetailTree(record: any, batchRefbillid: string, splitOutbound: boolean = true): { tree: TreeNode[]; outbound: DetailNode[] } {
+function buildDetailTree(record: any, _batchRefbillid: string, splitOutbound: boolean = true): { tree: TreeNode[]; outbound: DetailNode[] } {
   const details: DetailNode[] = (record.details||[]).map((d:any)=>({...d,typeLabel:getItemTypeLabel(d)}))
   const eidDetails: DetailNode[] = (record.eid_details||[]).map((d:any)=>({...d,typeLabel:getItemTypeLabel(d)}))
   const productCd = record.itemcd || ''
@@ -204,18 +204,16 @@ function buildDetailTree(record: any, batchRefbillid: string, splitOutbound: boo
   return { tree, outbound }
 }
 
-// 获取最终有效的 EID（排除已更换的）
+// 获取最终有效的 EID（排除已更换的）— 预留工具函数
 function getActiveEids(record: any): any[] {
   return (record.eid_details || []).filter((e: any) => !e.is_replaced)
 }
-
-// 检查是否有更换历史
+// 检查是否有更换历史 — 预留工具函数
 function hasReplacementHistory(record: any): boolean {
   const eids = record.eid_details || []
   return eids.some((e: any) => e.is_replacement || e.is_replaced)
 }
-
-// 获取更换历史时间线（按时间排序）
+// 获取更换历史时间线 — 预留工具函数
 function getHistoryTimeline(records: any[]): any[] {
   return records
     .map((r: any) => ({
@@ -227,6 +225,8 @@ function getHistoryTimeline(records: any[]): any[] {
     }))
     .sort((a: any, b: any) => a.gendate.localeCompare(b.gendate))
 }
+// 预留工具函数引用（避免 tsc noUnusedLocals 报错）
+void getActiveEids; void hasReplacementHistory; void getHistoryTimeline;
 
 async function load(){loading.value=true;try{const params:Record<string,string>={page:String(page.value),per_page:String(perPage.value)};if(s.search)params.search=s.search;if(s.auditflg)params.auditflg=s.auditflg;if(s.eid)params.eid=s.eid;if(s.dateRange){params.start_date=s.dateRange[0];params.end_date=s.dateRange[1]};const r=await listQcBatches(params);items.value=(r.data?.items||[]) as any[];total.value=r.data?.total||0}catch{items.value=[];total.value=0}finally{loading.value=false}}
 function doSearch(){page.value=1;load()}

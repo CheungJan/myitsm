@@ -16,7 +16,11 @@ from app.schemas.itsm import (
     ArchiveCreate,
     ArchiveUpdate,
     CloseBillCreate,
+    D2DArriveCreate,
     D2DCreate,
+    D2DLeaveCreate,
+    D2DRecordCreate,
+    D2DUrgeCreate,
     DeviceChangeCreate,
     DeviceChangeUpdate,
     DispatchCreate,
@@ -520,6 +524,17 @@ def list_d2d(maintenance_id: str):  # type: ignore[no-untyped-def]
     return success_response(data=data)
 
 
+@itsm_bp.get("/d2d/<maintenance_id>/default-engineer")
+@login_required
+def get_default_engineer(maintenance_id: str):  # type: ignore[no-untyped-def]
+    """获取上门工程师默认值：最新派工人 → 区域负责人。
+
+    对齐文档 §5.1.1：前端离店/到店弹窗工程师字段默认值。
+    """
+    data = D2DService.get_default_engineer(maintenance_id)
+    return success_response(data=data)
+
+
 @itsm_bp.post("/d2d")
 @login_required
 def create_d2d():  # type: ignore[no-untyped-def]
@@ -527,6 +542,81 @@ def create_d2d():  # type: ignore[no-untyped-def]
     body = D2DCreate(**request.get_json(force=True))
     user_cd: str = request.headers.get("X-User-Cd", "system")
     data = D2DService.create(body.model_dump(exclude_none=True), creator=user_cd)
+    return success_response(data=data, code=201)
+
+
+@itsm_bp.post("/d2d/arrive-store/<maintenance_id>")
+@login_required
+def arrive_store(maintenance_id: str):  # type: ignore[no-untyped-def]
+    """到店登记（d2d_type='1'）。
+
+    Body: {d2d_engineer, arrive_time?, d2d_phone?, d2d_descripiton?}
+    联动主表：firstor/first_time 若空则填充 + current_status 1→2。
+    """
+    body = D2DArriveCreate(**(request.get_json(force=True) or {}))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    try:
+        data = D2DService.arrive_store(
+            maintenance_id, body.model_dump(exclude_none=True), operator=user_cd
+        )
+    except ValueError as e:
+        return error_response(message=str(e), code=400)
+    return success_response(data=data, code=201)
+
+
+@itsm_bp.post("/d2d/leave-store/<maintenance_id>")
+@login_required
+def leave_store(maintenance_id: str):  # type: ignore[no-untyped-def]
+    """离店登记（d2d_type='2'，四要素结构化 + 自动拼句 + 主表联动）。
+
+    Body: {d2d_engineer, d2d_result, d2d_phenomenon?, d2d_reason?,
+           d2d_handling?, closure_reason?, d2d_note?, gzdm?,
+           device_id?, accessories_id?, leave_time?, d2d_phone?}
+    联动主表：current_status + is_success + leave_time + firstor/first_time + faultcode。
+    """
+    body = D2DLeaveCreate(**(request.get_json(force=True) or {}))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    try:
+        data = D2DService.leave_store(
+            maintenance_id, body.model_dump(exclude_none=True), operator=user_cd
+        )
+    except ValueError as e:
+        return error_response(message=str(e), code=400)
+    return success_response(data=data, code=201)
+
+
+@itsm_bp.post("/d2d/urge/<maintenance_id>")
+@login_required
+def urge_d2d(maintenance_id: str):  # type: ignore[no-untyped-def]
+    """催单（d2d_type='3'）。
+
+    Body: {d2d_engineer, d2d_descripiton?, d2d_phone?}
+    不直接联动主表状态（分组校验在 A2c 补）。
+    """
+    body = D2DUrgeCreate(**(request.get_json(force=True) or {}))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    try:
+        data = D2DService.urge(
+            maintenance_id, body.model_dump(exclude_none=True), operator=user_cd
+        )
+    except ValueError as e:
+        return error_response(message=str(e), code=400)
+    return success_response(data=data, code=201)
+
+
+@itsm_bp.post("/d2d/record/<maintenance_id>")
+@login_required
+def record_d2d(maintenance_id: str):  # type: ignore[no-untyped-def]
+    """记录（d2d_type='4'，到场说明/客户反馈）。
+
+    Body: {d2d_engineer, d2d_descripiton?, d2d_phone?}
+    仅业务流水，不联动主表。
+    """
+    body = D2DRecordCreate(**(request.get_json(force=True) or {}))
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    data = D2DService.record(
+        maintenance_id, body.model_dump(exclude_none=True), operator=user_cd
+    )
     return success_response(data=data, code=201)
 
 
@@ -553,6 +643,38 @@ def create_rv():  # type: ignore[no-untyped-def]
 def list_accessories(maintenance_id: str):  # type: ignore[no-untyped-def]
     """查询配件更新记录。"""
     data = AccessoriesUpdateService.list_by_maintenance_id(maintenance_id)
+    return success_response(data=data)
+
+
+@itsm_bp.get("/accessories/new-candidates")
+@login_required
+def new_accessories_candidates():  # type: ignore[no-untyped-def]
+    """查询新配件可选列表（默认仓 + 当前工程师虚拟仓，双来源，对齐 §6.5.3）。
+
+    查询参数：
+    - engineer_id: 工程师用户编码
+    - accessories_type: 可选，按 itemcd 前两位过滤
+    """
+    engineer_id = request.args.get("engineer_id", "")
+    accessories_type = request.args.get("accessories_type") or None
+    data = AccessoriesUpdateService.get_new_accessories_candidates(
+        engineer_id, accessories_type
+    )
+    return success_response(data=data)
+
+
+@itsm_bp.get("/accessories/old-candidates")
+@login_required
+def old_accessories_candidates():  # type: ignore[no-untyped-def]
+    """查询门店有效配件资产（旧配件来源，对齐 §6.5.4）。
+
+    查询参数：
+    - store_id: 门店编码
+    """
+    store_id = request.args.get("store_id", "")
+    if not store_id:
+        return error_response(message="store_id 必填", code=400)
+    data = AccessoriesUpdateService.get_old_accessories_candidates(store_id)
     return success_response(data=data)
 
 
@@ -648,6 +770,31 @@ def update_dispatch(record_id: int):  # type: ignore[no-untyped-def]
     if data is None:
         return error_response(message="记录不存在", code=404)
     return success_response(data=data)
+
+
+@itsm_bp.post("/dispatch/<int:record_id>/send")
+@login_required
+def send_dispatch_notification(record_id: int):  # type: ignore[no-untyped-def]
+    """按派工记录发送通知：渲染模板，创建 Notification 并发送。
+
+    Body 可选: { channel, subject, body, template_id }
+    """
+    body = request.get_json(silent=True) or {}
+    channel = body.get("channel") or "internal"
+    subject = body.get("subject")
+    body_text = body.get("body")
+    template_id = body.get("template_id")
+    user_cd: str = request.headers.get("X-User-Cd", "system")
+    try:
+        data = DispatchService.send_notification(
+            record_id, channel=channel, subject=subject, body=body_text,
+            operator=user_cd, template_id=template_id,
+        )
+    except ValueError as e:
+        return error_response(message=str(e), code=400)
+    if data is None:
+        return error_response(message="派工记录或模板不存在", code=404)
+    return success_response(data=data, message="发送成功")
 
 
 @itsm_bp.put("/close-bill/<int:record_id>")
@@ -1042,6 +1189,38 @@ def delete_archive(archive_id: int):  # type: ignore[no-untyped-def]
     if not ArchiveService.delete_archive(archive_id):
         return error_response(message="归档记录不存在", code=404)
     return success_response(message="已删除")
+
+
+# ---- 故障代码字典 (TIT04_ARCHIVECODE，A3 故障代码选择器) ----
+
+
+@itsm_bp.get("/archive-codes")
+@login_required
+def list_archive_codes():  # type: ignore[no-untyped-def]
+    """故障代码字典查询（支持 arch_group/fault_type/parent/keyword 过滤）。
+
+    Query params:
+        arch_group: 故障分组（1=整机/2=配件/3=自由录入）
+        fault_type: 故障类型前缀（如 "01"）
+        parent: 父级编码（级联用）
+        keyword: arch_cd/arch_nm 模糊搜索
+        limit: 返回条数上限（默认 100）
+    """
+    from app.services.itsm_service import ArchiveCodeService
+
+    arch_group = request.args.get("arch_group") or None
+    fault_type = request.args.get("fault_type") or None
+    parent = request.args.get("parent") or None
+    keyword = request.args.get("keyword") or None
+    limit = int(request.args.get("limit", "100"))
+    data = ArchiveCodeService.list(
+        arch_group=arch_group,
+        fault_type=fault_type,
+        parent=parent,
+        keyword=keyword,
+        limit=limit,
+    )
+    return success_response(data=data)
 
 
 # ---- POS 状态字典 (TMM52) ----

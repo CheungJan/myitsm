@@ -10,6 +10,7 @@ from typing import Any
 from app.repositories.report_repository import (
     BOMReportRepository,
     EidReportRepository,
+    FaultAnalysisRepository,
     InventoryReportRepository,
     SalesReportRepository,
 )
@@ -102,3 +103,52 @@ class BOMReportService:
             itemcd_val=itemcd_val, page=page, per_page=per_page
         )
         return {"items": items, "total": total, "page": page, "per_page": per_page}
+
+
+class FaultAnalysisService:
+    """D2 故障分析报表服务（基于 v_fault_analysis 视图）。"""
+
+    @staticmethod
+    def model_fault_rate(
+        start_date: str | None = None,
+        end_date: str | None = None,
+        bill_type: str | None = None,
+        fault_type_cd: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """型号故障率：按设备物料编码统计故障次数。"""
+        return FaultAnalysisRepository.model_fault_rate(
+            {
+                "start_date": start_date,
+                "end_date": end_date,
+                "bill_type": bill_type,
+                "fault_type_cd": fault_type_cd,
+            }
+        )
+
+    @staticmethod
+    def accessory_frequency(
+        start_date: str | None = None,
+        end_date: str | None = None,
+        fault_type_cd: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """配件更换频次：按 TIT25 itemcd 统计更换次数。"""
+        return FaultAnalysisRepository.accessory_frequency(
+            {"start_date": start_date, "end_date": end_date, "fault_type_cd": fault_type_cd}
+        )
+
+    @staticmethod
+    def repair_duration(
+        start_date: str | None = None,
+        end_date: str | None = None,
+        bill_type: str | None = None,
+        fault_type_cd: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """修复时长分析：按单据类型统计平均/中位/最大修复时长。"""
+        return FaultAnalysisRepository.repair_duration(
+            {
+                "start_date": start_date,
+                "end_date": end_date,
+                "bill_type": bill_type,
+                "fault_type_cd": fault_type_cd,
+            }
+        )

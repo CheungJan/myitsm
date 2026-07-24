@@ -8,7 +8,7 @@ const dictLoaded = new Set<string>()
 export function useDict(codeTyp: string): {
     dictMap: Ref<Record<string, string>>
     dictOptions: Ref<{ value: string; label: string }[]>
-    dictLabel: (code: string) => string
+    dictLabel: (code: unknown) => string
 } {
     let map = dictCache.get(codeTyp)
     let opts = dictListCache.get(codeTyp)
@@ -39,10 +39,11 @@ export function useDict(codeTyp: string): {
         }).catch(() => {})
     }
 
-    function dictLabel(code: string): string {
-        if (!code) return '-'
-        const nm = map!.value[code]
-        return nm || code
+    function dictLabel(code: unknown): string {
+        const k = code == null ? '' : String(code)
+        if (!k) return '-'
+        const nm = map!.value[k]
+        return nm || k
     }
 
     return { dictMap: map, dictOptions: opts, dictLabel }

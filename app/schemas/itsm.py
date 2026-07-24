@@ -74,8 +74,68 @@ class D2DCreate(BaseModel):
     d2d_type: str = Field(..., max_length=1, description="类型（1到店/2离店/3催单/4记录）")
     arrive_time: datetime | None = Field(None, description="到达时间")
     leave_time: datetime | None = Field(None, description="离店时间")
-    jjbz: str | None = Field(None, max_length=1, description="解决标志（1已解决/0未解决）")
-    d2d_descripiton: str | None = Field(None, max_length=200, description="处理过程描述")
+    # jjbz 字段已废弃（事项 18），保留 PB 数据迁移兼容，新数据用 d2d_result
+    # jjbz: str | None = Field(None, max_length=1, description="解决标志（1已解决/0未解决）")
+    d2d_descripiton: str | None = Field(None, max_length=200, description="处理过程描述（保留 PB 兼容，离店保存时后端自动拼句双写）")
+    d2d_phone: str | None = Field(None, max_length=60, description="电话")
+    # 离店解决四要素结构化字段（事项 18）
+    d2d_phenomenon: str | None = Field(None, max_length=200, description="实际现象")
+    d2d_reason: str | None = Field(None, max_length=200, description="原因")
+    d2d_handling: str | None = Field(None, max_length=500, description="处理过程（工程师手输补充）")
+    d2d_result: str | None = Field(None, max_length=2, description="结果（ZT 字典码值：5已解决/4未解决/6转修/7待配件/3关闭）")
+    closure_reason: str | None = Field(None, max_length=1, description="关闭原因（仅 d2d_result=3 时填，CLO_REASON 字典）")
+    d2d_note: str | None = Field(None, max_length=200, description="其他补充")
+    # 故障代码与设备/配件追溯字段（事项 1 方案 B：只落 gzdm，大类/小类从 gzdm 派生或 join tit04）
+    gzdm: str | None = Field(None, max_length=8, description="故障代码（= tit04_archivecode.arch_cd 值）")
+    device_id: str | None = Field(None, max_length=13, description="本次处理设备")
+    accessories_id: str | None = Field(None, max_length=13, description="本次处理配件")
+
+
+class D2DArriveCreate(BaseModel):
+    """到店登记（d2d_type='1'）。"""
+
+    d2d_engineer: str = Field(..., max_length=6, description="上门工程师")
+    arrive_time: datetime | None = Field(None, description="到达时间（默认当前）")
+    d2d_phone: str | None = Field(None, max_length=60, description="电话")
+    d2d_descripiton: str | None = Field(None, max_length=200, description="到场说明")
+
+
+class D2DLeaveCreate(BaseModel):
+    """离店登记（d2d_type='2'，四要素结构化）。
+
+    必填：d2d_result（离店结果）
+    d2d_result='3' 时 closure_reason 必填（Service 层校验）
+    """
+
+    d2d_engineer: str = Field(..., max_length=6, description="上门工程师")
+    d2d_result: str = Field(..., max_length=2, description="结果（ZT 字典码值：5已解决/4未解决/6转修/7待配件/3关闭）")
+    d2d_phenomenon: str | None = Field(None, max_length=200, description="实际现象")
+    d2d_reason: str | None = Field(None, max_length=200, description="原因")
+    d2d_handling: str | None = Field(None, max_length=500, description="处理过程（工程师手输补充）")
+    closure_reason: str | None = Field(None, max_length=1, description="关闭原因（仅 d2d_result=3 时填）")
+    d2d_note: str | None = Field(None, max_length=200, description="其他补充")
+    gzdm: str | None = Field(None, max_length=8, description="故障代码")
+    device_id: str | None = Field(None, max_length=13, description="本次处理设备")
+    accessories_id: str | None = Field(None, max_length=13, description="本次处理配件")
+    leave_time: datetime | None = Field(None, description="离店时间（默认当前）")
+    d2d_phone: str | None = Field(None, max_length=60, description="电话")
+    posstatus: str | None = Field(None, max_length=2, description="POS主状态（默认01=正常）")
+    posstatus1: str | None = Field(None, max_length=2, description="POS子状态（默认11=正常使用）")
+
+
+class D2DUrgeCreate(BaseModel):
+    """催单（d2d_type='3'）。"""
+
+    d2d_engineer: str = Field(..., max_length=6, description="上门工程师")
+    d2d_descripiton: str | None = Field(None, max_length=200, description="催单说明")
+    d2d_phone: str | None = Field(None, max_length=60, description="电话")
+
+
+class D2DRecordCreate(BaseModel):
+    """记录（d2d_type='4'，到场说明/客户反馈）。"""
+
+    d2d_engineer: str | None = Field(None, max_length=6, description="上门工程师（记录类型可留空）")
+    d2d_descripiton: str | None = Field(None, max_length=200, description="记录内容")
     d2d_phone: str | None = Field(None, max_length=60, description="电话")
 
 
@@ -111,7 +171,15 @@ class AccessoriesUpdateCreate(BaseModel):
     description: str | None = Field(None, max_length=200, description="过程描述")
     price: float | None = Field(None, description="价格")
     engineer_id: str | None = Field(None, max_length=6, description="工程师ID")
-    c_type: str | None = Field(None, max_length=1, description="操作类型（1维修/2购买）")
+    c_type: str | None = Field(None, max_length=1, description="操作类型（C_TYPE 字典：1维修/2购买/3纯服务费/4整机更换/5耗材线材）")
+    # B3：配件更换关联故障代码
+    itemcd: str | None = Field(None, max_length=13, description="配件物料编码（B3：关联故障代码用）")
+    fault_cd: str | None = Field(None, max_length=8, description="故障代码（B3：配件更换时自动关联）")
+    # 收费维度字段（事项 C1：合并 TIT26 功能）
+    payje: float | None = Field(None, description="收款金额（c_type=3/5 时填，c_type=1/2/4 时与 price 同步）")
+    paytype: str | None = Field(None, max_length=20, description="收费类型（c_type=3 用 PAY_SVC 字典，c_type=5 用 PAY_CONS 字典）")
+    paydate: datetime | None = Field(None, description="收款日期")
+    memo: str | None = Field(None, max_length=200, description="备注")
 
 
 # ---------------------------------------------------------------------------

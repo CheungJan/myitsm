@@ -24,6 +24,9 @@ export function createNotifTemplate(data: Record<string, unknown>) {
 export function updateNotifTemplate(id: string, data: Record<string, unknown>) {
     return request.put<never, { data: NotifTemplate }>(`/notification/notification-templates/${id}`, data)
 }
+export function setDefaultNotifTemplate(id: string) {
+    return request.post<never, { data: NotifTemplate }>(`/notification/notification-templates/${id}/set-default`)
+}
 export function previewNotifTemplate(data: { subject: string; body: string; context?: Record<string, string> }) {
     return request.post<never, { data: { subject: string; body: string; error?: string } }>('/notification/notification-templates/preview', data)
 }

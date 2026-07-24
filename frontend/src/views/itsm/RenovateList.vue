@@ -58,7 +58,7 @@
               <el-table-column label="操作" width="50"><template #default="{row}"><el-button size="small" type="danger" @click="delRenEq(row)">删</el-button></template></el-table-column>
             </el-table>
           </el-tab-pane>
-          <ItsmSubTablePanes :maintenance-id="(detail.renew_id as string) || ''" :area-cd="((detail as any).area_cd as string) || ''" :current-status="((detail as any).current_status as string) || ''" />
+          <ItsmSubTablePanes :maintenance-id="(detail.renew_id as string) || ''" :area-cd="((detail as any).area_cd as string) || ''" :current-status="((detail as any).current_status as string) || ''" :main-record="detail" />
           <el-tab-pane label="设备资产" name="asset">
             <AssetTab :store-id="(detail.store_id as string) || ''" />
           </el-tab-pane>

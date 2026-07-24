@@ -1,6 +1,6 @@
 # 完整数据库字典（myitsm）
 
-> 生成时间：2026-05-13 | 更新：2026-06-22 | 数据库：myitsm | PostgreSQL | v1.4 +plan_serve表 +plan_cust.imple_billid
+> 生成时间：2026-05-13 | 更新：2026-07-22 | 数据库：myitsm | PostgreSQL | v1.7 +D2/D3视图优化(工单级聚合+回溯faultcode+优化列)
 > 🟢=自动生成（information_schema）| 🟡=手动维护 | 🔗=引用ER文档
 > 配套：`数据库ER关系文档.md`（ER关联）| `数据库变更追踪_迁移后.md`（变更历史）
 
@@ -139,6 +139,7 @@
 | 10 | passwd | VARCHAR(128) |  | 原始密码（数据迁移用） |
 | 11 | credamt | NUMERIC(12,2) |  | 信用额度 |
 | 12 | useflg | VARCHAR(1) |  | 有效标志 |
+| 13 | default_whcd | VARCHAR(2) |  | 默认仓库编码（2026-07-20新增，FK→twh01_warehouse.whcd） |
 
 #### 7. tmc21_usergroup
 
@@ -1346,6 +1347,15 @@
 | 19 | posstatus1 | VARCHAR(2) |  | POS状态1 |
 | 20 | created_at | TIMESTAMP | NOT NULL |  |
 | 21 | updated_at | TIMESTAMP | NOT NULL |  |
+| 22 | gzdm | VARCHAR(8) |  | 故障代码 8 位（2026-07-20新增） |
+| 23 | device_id | VARCHAR(13) |  | 本次处理设备（2026-07-20新增） |
+| 24 | accessories_id | VARCHAR(13) |  | 本次处理配件（2026-07-20新增） |
+| 25 | d2d_phenomenon | VARCHAR(200) |  | 实际现象（2026-07-20新增） |
+| 26 | d2d_reason | VARCHAR(200) |  | 原因（2026-07-20新增） |
+| 27 | d2d_handling | VARCHAR(500) |  | 处理过程（2026-07-20新增） |
+| 28 | d2d_result | VARCHAR(2) |  | 结果（ZT字典码值，2026-07-20新增）：5已解决/4未解决/6转修/7待配件/3关闭 |
+| 29 | closure_reason | VARCHAR(1) |  | 关闭原因（仅 d2d_result=3 时填，CLO_REASON 字典，2026-07-20新增） |
+| 30 | d2d_note | VARCHAR(200) |  | 其他补充（2026-07-20新增） |
 
 #### 27. tit24_maintenance_rv
 
@@ -1391,11 +1401,20 @@
 | 20 | updator | VARCHAR(6) |  | 更新人 |
 | 21 | auditflg | VARCHAR(1) |  | 提交标志 |
 | 22 | posflg | VARCHAR(1) |  | 更换整机标志 |
-| 23 | c_type | VARCHAR(1) |  | 操作类型（1维修/2购买） |
+| 23 | c_type | VARCHAR(1) |  | 操作类型（1维修/2购买/3非更换服务/4整机更换/5耗材线材）2026-07-20扩展 |
 | 24 | created_at | TIMESTAMP | NOT NULL |  |
 | 25 | updated_at | TIMESTAMP | NOT NULL |  |
+| 26 | paytype | VARCHAR(30) |  | 收费类型（2026-07-20新增，吸收 TIT26） |
+| 27 | payje | NUMERIC(10,3) |  | 收款金额（2026-07-20新增，吸收 TIT26） |
+| 28 | paydate | TIMESTAMP |  | 收款日期（2026-07-20新增，吸收 TIT26） |
+| 29 | memo | VARCHAR(250) |  | 备注（2026-07-20新增，吸收 TIT26） |
+| 30 | itemcd | VARCHAR(13) |  | 配件物料编码（2026-07-22新增，B3：关联故障代码用） |
+| 31 | fault_cd | VARCHAR(8) |  | 故障代码（2026-07-22新增，B3：配件更换时自动关联） |
+| 32 | version | INTEGER |  | 乐观锁版本号（2026-07-22新增） |
 
-#### 29. tit26_paylist
+#### 29. tit26_paylist ⚠️ 已废弃（2026-07-20）
+
+> 新业务只写 TIT25，此表仅保留历史数据查询。
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
@@ -1560,6 +1579,7 @@
 | 14 | whtransflg | VARCHAR(1) |  | 仓储流转标志 |
 | 15 | created_at | TIMESTAMP | NOT NULL |  |
 | 16 | updated_at | TIMESTAMP | NOT NULL |  |
+| 17 | area_id | INTEGER |  | 仓库所属划区（2026-07-20新增，FK→tmm46_area.id） |
 
 #### 2. twh11_detail--全仓库库存余量表
 
@@ -2587,6 +2607,9 @@
 | 3 | channel | VARCHAR(10) | NOT NULL | 渠道: sms/email/internal |
 | 4 | subject | VARCHAR(200) |  | 标题模板 |
 | 5 | body | text |  | 正文模板 |
+| 5a | ref_type | VARCHAR(20) |  | 业务类型 dispatch/maintenance/renovate/open/change/recycle（2026-07-17新增） |
+| 5b | is_default | VARCHAR(1) |  | 该ref_type下默认模板 1=是/0=否（2026-07-17新增） |
+| 5c | sort_no | INTEGER |  | 排序号小优先（2026-07-17新增） |
 | 6 | opercd | VARCHAR(6) |  | 操作员 |
 | 7 | gendate | TIMESTAMP |  | 创建日期 |
 | 8 | upddate | TIMESTAMP |  | 更新日期 |
@@ -3420,4 +3443,50 @@
 | `tip%` | 价格 (tip) | 价格规则 |
 | `plan%` | 预计划 (plan) | 预计划客户 |
 | `tmp%` | 采购验收 (tmp) | 采购验收明细 |
+
+---
+
+## E. 视图
+
+> 🟡 手动维护 | 更新：2026-07-22
+
+### E.1 v_fault_analysis（故障分析视图）
+
+工单维度聚合视图，数据源覆盖 PB 迁移数据与新重构数据。通过 COALESCE 三层 fallback 自动适配数据来源。
+
+| 列名 | 类型 | 来源 | 说明 |
+|------|------|------|------|
+| `maintenance_id` | VARCHAR(8) | 主表 UNION | 维护单ID |
+| `bill_type` | VARCHAR(2) | 主表 UNION | 单据类型（MD/MO/MR/BG/BY） |
+| `current_status` | VARCHAR(1) | 主表 | 当前状态（ZT字典） |
+| `request_time` | TIMESTAMP | 主表 | 请求时间 |
+| `close_time` | TIMESTAMP | 主表 | 关单时间 |
+| `arrive_time` | TIMESTAMP | TIT23 聚合 | 最早到店时间（d2d_type=1） |
+| `leave_time` | TIMESTAMP | TIT23 聚合 | 最晚离店时间（d2d_type=2） |
+| `device_id` | VARCHAR(13) | COALESCE(TIT25, TIT23_d2d, 主表) | 整机EID |
+| `gzdm` | VARCHAR(8) | COALESCE(TIT23_gzdm, faultcode解析) | 故障代码 |
+| `device_itemcd` | VARCHAR(6) | tmm43_eid JOIN | 整机物料编码 |
+| `device_item_nm` | VARCHAR(100) | tmm12_items JOIN | 物料名称 |
+| `fault_nm` | VARCHAR(100) | tit04_archivecode JOIN | 故障名称 |
+| `fault_type_cd` | VARCHAR(2) | itemcd 前2位派生 | 故障类型编码 |
+| `fault_group` | VARCHAR(1) | tit04_archivecode | 故障分组 |
+| `repair_minutes` | NUMERIC | leave_time - arrive_time | 修复时长（分钟） |
+| `d2d_device_id` | VARCHAR(13) | TIT23 D2D 新增字段 | B3优化列：D2D处理设备 |
+| `d2d_accessories_id` | VARCHAR(13) | TIT23 D2D 新增字段 | B3优化列：D2D处理配件 |
+| `accessory_itemcd` | VARCHAR(13) | TIT25 B3字段 | B3优化列：配件物料编码 |
+| `accessory_fault_cd` | VARCHAR(8) | TIT25 B3字段 | B3优化列：配件关联故障代码 |
+
+**数据兼容策略**：
+- PB 历史：`gzdm` 从主表 `faultcode` 解析（格式 `级别,代码/`），`device_id` 从主表或 TIT25 反查
+- 新重构数据：直接取 TIT23.gzdm、TIT25.itemcd 等新字段
+- 优化列（d2d_*/accessory_*）在 PB 历史中为 NULL
+
+**依赖表**：tit10/tit13/tit15/tit16/tit17（主表）、tit23（D2D）、tit25（配件更新）、tmm43_eid、tmm12_items、tit04_archivecode
+
+**迁移历史**：
+| 版本 | 变更 |
+|------|------|
+| D1 (`d1e2f3a4b5c7`) | 初始视图，D2D 行级 |
+| D2 (`e2f3a4b5c6d8`) | 改工单级聚合 + faultcode 解析回填（63,708 工单恢复 gzdm） |
+| D3 (`f3a4b5c6d7e9`) | 增加优化列 d2d_device_id/d2d_accessories_id/accessory_itemcd/accessory_fault_cd |
 

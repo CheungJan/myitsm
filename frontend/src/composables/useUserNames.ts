@@ -4,7 +4,7 @@ import request from '@/api/request'
 const userMap = ref<Record<string, string>>({})
 let loadingPromise: Promise<void> | null = null
 
-export function useUserNames(): { userMap: Ref<Record<string, string>>; userName: (code: string) => string } {
+export function useUserNames(): { userMap: Ref<Record<string, string>>; userName: (code: unknown) => string } {
     if (!loadingPromise) {
         loadingPromise = request.get('/users', {
             params: { per_page: '9999' },
@@ -21,9 +21,10 @@ export function useUserNames(): { userMap: Ref<Record<string, string>>; userName
         })
     }
 
-    function userName(code: string): string {
-        if (!code) return '-'
-        return userMap.value[code.trim()] || code
+    function userName(code: unknown): string {
+        const k = code == null ? '' : String(code).trim()
+        if (!k) return '-'
+        return userMap.value[k] || k
     }
 
     return { userMap, userName }

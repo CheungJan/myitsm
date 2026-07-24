@@ -195,7 +195,8 @@ export const FRONTEND_MENUS: MenuConfig[] = [
     {
         menu_cd: 'reports', menu_nm: '报表中心',
         children: [
-            { menu_cd: 'reports-center', menu_nm: '报表中心', path: '/reports/center' }
+            { menu_cd: 'reports-center', menu_nm: '报表中心', path: '/reports/center' },
+            { menu_cd: 'reports-fault', menu_nm: '故障分析报表', path: '/reports/fault-analysis' }
         ]
     }
     // F3+ 模块将在后续阶段追加

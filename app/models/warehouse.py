@@ -42,6 +42,11 @@ class Warehouse(BaseModel):
     upddate = db.Column(db.DateTime, comment="更新日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     whtransflg = db.Column(db.String(1), comment="仓储流转标志")
+    area_id = db.Column(
+        db.String(20),
+        db.ForeignKey("tmm46_area.area_cd", name="fk_warehouse_area"),
+        comment="所属划区（FK→tmm46_area.area_cd，仓库位置属性）",
+    )
 
 
 # ---------------------------------------------------------------------------

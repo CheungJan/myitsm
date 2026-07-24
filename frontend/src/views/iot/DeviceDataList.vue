@@ -2,7 +2,7 @@
 <script setup lang="ts">import {ref} from 'vue';import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import {useDetailDrawer} from '@/composables/useDetailDrawer';import {fetchDeviceData} from '@/api/iot';import type {IotRecord} from '@/api/iot'
 const searchEid=ref('')
 const{items,loading,page,perPage,total,onSearch}=useListPage<IotRecord>((p?:Record<string,string>)=>{if(!p?.eid&&!searchEid.value)return Promise.resolve({data:{items:[],total:0}});return fetchDeviceData(p?.eid||searchEid.value,p)})
-const{drawer,detail,open}=useDetailDrawer<IotRecord>()
+const{open}=useDetailDrawer<IotRecord>()
 function doSearch(){if(searchEid.value){onSearch({eid:searchEid.value})}}
 function qualityTag(s:string){const m:Record<string,string>={GOOD:'success',BAD:'danger',UNCERTAIN:'warning'};return m[s]||'info'}</script>
 <style scoped>.page{padding:0}.page-header{display:flex;justify-content:space-between;margin-bottom:16px}.page-header h2{font-size:18px;font-weight:600;margin:0}.search-bar{display:flex;gap:12px;align-items:center}.field{display:flex;align-items:center;gap:6px}.field label{font-size:13px;color:#606266}</style>

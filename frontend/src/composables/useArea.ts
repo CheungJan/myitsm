@@ -6,7 +6,7 @@ let loadingPromise: Promise<void> | null = null
 
 export function useArea(): {
     areaMap: Ref<Record<string, string>>
-    areaName: (code: string | number) => string
+    areaName: (code: unknown) => string
 } {
     if (!loadingPromise) {
         loadingPromise = request.get('/areas', { silent: true } as any).then((res: any) => {
@@ -22,7 +22,7 @@ export function useArea(): {
         })
     }
 
-    function areaName(code: string | number): string {
+    function areaName(code: unknown): string {
         if (code === undefined || code === null) return '-'
         const c = String(code).trim()
         return areaMap.value[c] || c

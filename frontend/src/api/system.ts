@@ -126,3 +126,9 @@ export interface PermTreeNode {
 export function fetchPermTree() {
     return request.get<never, { data: PermTreeNode[] }>('/menus/perm-tree')
 }
+
+// EID 设备信息（B4：离店登记按 device_id 反查 itemcd 用于故障代码预过滤）
+export interface EidInfo { eid: string; itemcd: string; whcd?: string }
+export function fetchEidInfo(eid: string) {
+    return request.get<never, { data: EidInfo }>(`/eid/${eid}`)
+}

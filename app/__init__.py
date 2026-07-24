@@ -54,6 +54,16 @@ def _init_extensions(app: Flask) -> None:
 
     register_audit_listeners()
 
+    # 注册 POS 状态同步事件监听器（审核意见 13，d2d 离店/关单/新建 → 同步 TMM22.posstatus）
+    from app.services.pos_sync_listener import _on_d2d_leave_sync_pos  # noqa: F401
+    from app.services.pos_sync_listener import _on_maintenance_close_sync_pos  # noqa: F401
+    from app.services.pos_sync_listener import _on_maintenance_create_sync_pos  # noqa: F401
+
+    # 注册 seed CLI
+    from app.seed import init_app as seed_init
+
+    seed_init(app)
+
 
 def _register_blueprints(app: Flask) -> None:
     """注册蓝图。"""
