@@ -82,6 +82,7 @@
     - `docs/myitsm/上门服务与配件收费优化方案_验收手册.md`
 28. **日常维护单据状态管理优化方案**（关单即落地 + 状态机扩展 + 11 项联动清单 + 1a/1b 实施路线）
     - `docs/myitsm/日常维护单据状态管理优化方案.md`
+    - `docs/core/1a阶段实施计划.md`（2026-07-26，设备资产联动+业务规则，15 任务 DDL/代码/测试详细设计，对齐 EAM/FSM 六层模型 BM_S 8 档+Entitlement 6 级优先级）
 29. **故障代码体系优化技术文档**（tit04_archivecode 三级树形字典 + 配件关联映射）
     - `docs/myitsm/故障代码体系优化技术文档.md`
     - `docs/core/MES_QC_Warehouse_Technical_Document.md`

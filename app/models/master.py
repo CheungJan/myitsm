@@ -418,7 +418,7 @@ class Eid(BaseModel):
     )
     recyclable = db.Column(db.Boolean, default=False, comment="可回收标志")
     recycle_status = db.Column(db.String(10), comment="回收状态（RS码表）")
-    asset_owner = db.Column(db.String(20), default="CUSTOMER", comment="资产所属方（AO码表）")
+    asset_owner = db.Column(db.String(20), default="01", comment="资产所属方（OW码表：01商用电子/02通方信息/03门店资产/04海晟）")
     install_date = db.Column(db.DateTime, comment="安装日期")
     # 方案 A 预占：预计划选 posid 时锁定 EID，其他计划不可选
     reserve_planno = db.Column(db.String(20), comment="预占预计划号（方案A专属）")

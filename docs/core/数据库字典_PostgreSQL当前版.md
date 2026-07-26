@@ -651,11 +651,11 @@
 | 17 | isunit | VARCHAR(1) |  | 是否整机 |
 | 18 | created_at | TIMESTAMP | NOT NULL |  |
 | 19 | updated_at | TIMESTAMP | NOT NULL |  |
-| 20 | asset_type | VARCHAR(10) |  |  |
-| 21 | recyclable | BOOLEAN |  |  |
-| 22 | recycle_status | VARCHAR(10) |  |  |
-| 23 | asset_owner | VARCHAR(20) |  |  |
-| 24 | install_date | TIMESTAMP |  |  |
+| 20 | asset_type | VARCHAR(10) |  | 资产类型（AT码表：01新机/02旧机/03翻新机/04报废） |
+| 21 | recyclable | BOOLEAN |  | 可回收标志 |
+| 22 | recycle_status | VARCHAR(10) |  | 回收状态（RS码表） |
+| 23 | asset_owner | VARCHAR(20) |  | 资产所属方（OW码表：01商用电子/02通方信息/03门店资产/04海晟） |
+| 24 | install_date | TIMESTAMP |  | 安装日期 |
 | 25 | ref_eid | VARCHAR(13) |  | 来源EID（翻新溯源链，OV=10翻新出库→IV=6翻新入库后写入，可递归追溯） |
 | 26 | reserve_planno | VARCHAR(20) |  | 预占预计划号（方案A：创建预计划选posid时锁定；出库审核/作废后释放为NULL） |
 
@@ -698,18 +698,18 @@
 | 31 | n_old_degree | numeric |  | 新旧化程度 |
 | 32 | created_at | TIMESTAMP | NOT NULL |  |
 | 33 | updated_at | TIMESTAMP | NOT NULL |  |
-| 34 | install_date | TIMESTAMP |  |  |
-| 35 | n_install_date | TIMESTAMP |  |  |
-| 36 | cust_cd | VARCHAR(20) |  |  |
-| 37 | n_cust_cd | VARCHAR(20) |  |  |
-| 38 | asset_type | VARCHAR(10) |  |  |
-| 39 | n_asset_type | VARCHAR(10) |  |  |
-| 40 | recyclable | VARCHAR(1) |  |  |
-| 41 | n_recyclable | VARCHAR(1) |  |  |
-| 42 | recycle_status | VARCHAR(10) |  |  |
-| 43 | n_recycle_status | VARCHAR(10) |  |  |
-| 44 | asset_owner | VARCHAR(20) |  |  |
-| 45 | n_asset_owner | VARCHAR(20) |  |  |
+| 34 | install_date | TIMESTAMP |  | 安装日期 |
+| 35 | n_install_date | TIMESTAMP |  | 新安装日期 |
+| 36 | cust_cd | VARCHAR(20) |  | 变更前客户 |
+| 37 | n_cust_cd | VARCHAR(20) |  | 变更后客户 |
+| 38 | asset_type | VARCHAR(10) |  | 资产类型 |
+| 39 | n_asset_type | VARCHAR(10) |  | 新资产类型 |
+| 40 | recyclable | VARCHAR(1) |  | 可回收标志 |
+| 41 | n_recyclable | VARCHAR(1) |  | 新可回收标志 |
+| 42 | recycle_status | VARCHAR(10) |  | 回收状态 |
+| 43 | n_recycle_status | VARCHAR(10) |  | 新回收状态 |
+| 44 | asset_owner | VARCHAR(20) |  | 资产所属方 |
+| 45 | n_asset_owner | VARCHAR(20) |  | 新资产所属方 |
 
 #### 22. tmm44_pos_r_eid
 
@@ -3163,7 +3163,7 @@
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | itemcd | VARCHAR(6) | PK NOT NULL | 物料编码 |
-| 2 | busityp | VARCHAR(6) | PK NOT NULL | 业务类型（10=销售价/20=采购价/40=押金） |
+| 2 | busityp | VARCHAR(6) | PK NOT NULL | 业务类型（10=销售价/20=采购价/30=维护品价格/40=押金） |
 | 3 | unitcd | VARCHAR(6) |  | 单位 |
 | 4 | itemprice | NUMERIC(16,8) |  | 物料单价 |
 | 5 | opercd | VARCHAR(6) |  | 操作员 |

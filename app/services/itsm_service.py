@@ -76,8 +76,8 @@ TRACK_TYPE_TRANSFER = "T"  # 客户转移
 TRACK_TYPE_ATTRIBUTE = "A"  # 属性变更
 
 # tmm43_eid.asset_owner：资产归属
-ASSET_OWNER_CUSTOMER = "01"  # 客户资产
-# asset_owner 不等于 "01" 即为自有资产（02=公司等）
+ASSET_OWNER_CUSTOMER = "03"  # 门店资产（OW字典：客户购买的设备）
+# asset_owner != "03" 即为公司侧资产（01商用电子/02通方信息/04海晟）
 
 # ITSM 单据关单状态
 CLOSE_STATUS = "5"
