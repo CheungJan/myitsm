@@ -43,6 +43,13 @@ class TestWarehouse:
 
     def test_get_warehouse(self, app: Flask, client: FlaskClient) -> None:
         headers = _auth_header(app)
+        # 自建仓库，消除测试间依赖
+        _post(
+            client,
+            "/api/v1/warehouse/warehouses",
+            {"whcd": "01", "whnm": "主仓库", "whtyp": "01"},
+            headers,
+        )
         resp = client.get("/api/v1/warehouse/warehouses/01", headers=headers)
         assert resp.status_code == 200
 
