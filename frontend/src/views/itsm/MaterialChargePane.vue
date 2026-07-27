@@ -168,6 +168,7 @@
             <el-input
               v-model="form.itemcd"
               placeholder="配件编码（前两位过滤故障现象）"
+              @change="() => onItemcdChange(form)"
             />
           </el-form-item>
           <el-form-item label="故障代码">
@@ -228,6 +229,7 @@
             <el-input
               v-model="form.itemcd"
               placeholder="配件编码（前两位过滤故障现象）"
+              @change="() => onItemcdChange(form)"
             />
           </el-form-item>
           <el-form-item label="故障代码">
@@ -336,6 +338,7 @@
             <el-input
               v-model="form.itemcd"
               placeholder="配件编码（前两位过滤故障现象）"
+              @change="() => onItemcdChange(form)"
             />
           </el-form-item>
           <el-form-item label="故障代码">
@@ -434,7 +437,7 @@
 import { ref, computed } from 'vue'
 import ItsmSubTablePane from './ItsmSubTablePane.vue'
 import FaultCodeCascader from './FaultCodeCascader.vue'
-import { fetchAccessories, createAccessories, updateAccessories, fetchNewAccessoriesCandidates, fetchOldAccessoriesCandidates, resolveEntitlement } from '@/api/itsm'
+import { fetchAccessories, createAccessories, updateAccessories, fetchNewAccessoriesCandidates, fetchOldAccessoriesCandidates, resolveEntitlement, fetchItemPrice } from '@/api/itsm'
 import type { SubRecord } from '@/api/itsm'
 import { useDict } from '@/composables/useDict'
 
@@ -496,12 +499,40 @@ async function loadNewCandidates(query: string) {
     newLoading.value = false
   }
 }
-/** 新配件选中后联动 itemcd */
+/** 新配件选中后联动 itemcd + 带出价格 */
 function onNewAccSelect(form: Record<string, unknown>, eid: string) {
   const opt = newCandidates.value.find(o => (o.eid as string) === eid)
   if (opt) {
     form.itemcd = opt.itemcd
     form.accessories_type = opt.itemcd // 兼容显示
+    // C9：带出价格
+    fetchItemPriceForForm(form, opt.itemcd as string)
+  }
+}
+
+/** C9：按 itemcd 带出价格（销售价），同步 payje（c_type=1/2/4） */
+async function fetchItemPriceForForm(form: Record<string, unknown>, itemcd: string) {
+  if (!itemcd || !props.storeId) return
+  try {
+    const r = await fetchItemPrice(props.storeId, itemcd)
+    const price = r?.data?.price
+    if (price != null) {
+      form.price = price
+      const ct = (form.c_type as string) || ''
+      if (['1', '2', '4'].includes(ct)) {
+        form.payje = price
+      }
+    }
+  } catch {
+    // 静默失败
+  }
+}
+
+/** 手动输入/修改 itemcd 时带出价格 */
+function onItemcdChange(form: Record<string, unknown>) {
+  const itemcd = (form.itemcd as string) || ''
+  if (itemcd) {
+    fetchItemPriceForForm(form, itemcd)
   }
 }
 

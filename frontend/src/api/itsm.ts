@@ -45,6 +45,11 @@ export function resolveEntitlement(eid: string, custCd?: string) {
     return request.get<never, { data: EntitlementResult }>('/itsm/entitlement/resolve', { params: { eid, cust_cd: custCd } })
 }
 
+// ---- 1a C9：价格带出（按 cust_cd + itemcd 取销售价） ----
+export function fetchItemPrice(custCd: string, itemcd: string) {
+    return request.get<never, { data: { price: number | null; busityp: string } }>('/itsm/entitlement/price', { params: { cust_cd: custCd, itemcd } })
+}
+
 // ---- 历史同业务单据查询（客户信息 Tab 使用） ----
 export function fetchHistoryByStore(type: string, storeId: string) {
     const params: Record<string, string> = {}

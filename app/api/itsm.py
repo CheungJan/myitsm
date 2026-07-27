@@ -1614,3 +1614,25 @@ def resolve_entitlement_api():  # type: ignore[no-untyped-def]
         "warranty_expire": eid_rec.warranty_expire.isoformat() if eid_rec.warranty_expire else None,
     })
 
+
+@itsm_bp.get("/entitlement/price")
+@login_required
+def resolve_price_api():  # type: ignore[no-untyped-def]
+    """按 cust_cd + itemcd 查询价格（供前端配件更换时自动带出价格）。
+
+    返回：
+      { "price": float|null, "busityp": "10"|"20"|"30"|"40" }
+    """
+    cust_cd = request.args.get("cust_cd", "")
+    itemcd = request.args.get("itemcd", "")
+    if not cust_cd or not itemcd:
+        return error_response(message="缺少 cust_cd 或 itemcd", code=400)
+
+    from app.services.entitlement_service import resolve_price, BUSITYP_SALE
+
+    price = resolve_price(cust_cd, itemcd)
+    return success_response(data={
+        "price": price,
+        "busityp": BUSITYP_SALE,
+    })
+
