@@ -583,6 +583,11 @@ class MaintenanceDailyService(_BaseMaintenanceService):
             # 关单完成（to_status=5）：自动创建服务返还入库草稿（IV=3）
             if to_status == CLOSE_STATUS:
                 self._create_service_return_inbound(record, operator)
+                # 1a 阶段关单联动 L1/L2/L3/L11
+                self._write_eid_track_on_daily_close(record, operator)
+                self._update_eid_warranty_on_daily_close(record, operator)
+                self._update_pos_r_eid_on_daily_close(record, operator)
+                self._write_pos_detail_on_daily_close(record, operator)
             db.session.commit()
         return result
 
@@ -656,6 +661,199 @@ class MaintenanceDailyService(_BaseMaintenanceService):
             eid_items=eid_items,
             creator=operator,
         )
+
+    @staticmethod
+    def _write_eid_track_on_daily_close(record: Any, operator: str) -> None:
+        """L1：日常维护单关单时写 tmm43_eid_track type='A'（配件更换属性变更）。
+
+        对每条配件更新记录（TIT25_ACCESSORIES_UPDATE），写一条 EidTrack 轨迹。
+        """
+        from app.models.itsm import AccessoriesUpdate
+        from app.models.master import Eid as EidModel, EidTrack
+
+        rows = (
+            db.session.query(AccessoriesUpdate)
+            .filter(
+                AccessoriesUpdate.maintenance_id == record.maintenance_id,
+                AccessoriesUpdate.old_accessories_id.isnot(None),
+                AccessoriesUpdate.old_accessories_id != "",
+            )
+            .all()
+        )
+        if not rows:
+            return
+
+        change_date = datetime.now()
+        for r in rows:
+            old_eid = (
+                db.session.query(EidModel)
+                .filter(EidModel.eid == r.old_accessories_id)
+                .first()
+            )
+            if not old_eid:
+                continue
+            new_eid = (
+                db.session.query(EidModel)
+                .filter(EidModel.eid == r.new_accessories_id)
+                .first()
+                if r.new_accessories_id
+                else None
+            )
+            track = EidTrack(
+                type=TRACK_TYPE_ATTRIBUTE,  # 'A' 属性变更
+                change_date=change_date,
+                itemcd=old_eid.itemcd,
+                eid=old_eid.eid,
+                opercd=operator,
+                gendate=change_date,
+                useflg="1",
+                sflg=old_eid.sflg,
+                n_sflg=new_eid.sflg if new_eid else old_eid.sflg,
+                whcd=old_eid.whcd,
+                n_whcd=old_eid.whcd,
+                refid=record.maintenance_id,
+                n_refid=record.maintenance_id,
+                install_date=old_eid.install_date,
+                n_install_date=new_eid.install_date if new_eid else old_eid.install_date,
+                asset_owner=old_eid.asset_owner,
+                n_asset_owner=new_eid.asset_owner if new_eid else old_eid.asset_owner,
+                remark=f"日常维护单 {record.maintenance_id} 关单，配件更换",
+            )
+            db.session.add(track)
+
+    @staticmethod
+    def _update_eid_warranty_on_daily_close(record: Any, operator: str) -> None:
+        """L2：日常维护单关单时更新 tmm43_eid.warranty_expire（新配件保修期）。
+
+        对每条配件更新记录，新配件的 warranty_expire = install_date + newperiod/oldperiod。
+        """
+        from app.models.itsm import AccessoriesUpdate
+        from app.models.master import Eid as EidModel, Item
+
+        rows = (
+            db.session.query(AccessoriesUpdate)
+            .filter(
+                AccessoriesUpdate.maintenance_id == record.maintenance_id,
+                AccessoriesUpdate.new_accessories_id.isnot(None),
+                AccessoriesUpdate.new_accessories_id != "",
+            )
+            .all()
+        )
+        if not rows:
+            return
+
+        change_date = datetime.now()
+        for r in rows:
+            new_eid = (
+                db.session.query(EidModel)
+                .filter(EidModel.eid == r.new_accessories_id)
+                .first()
+            )
+            if not new_eid:
+                continue
+            # 新配件安装日期 = 关单日期
+            new_eid.install_date = change_date
+            # 派生保修到期日
+            item = db.session.get(Item, new_eid.itemcd)
+            if item:
+                period = item.newperiod if new_eid.old_degree == 12 else item.oldperiod
+                if period:
+                    from datetime import timedelta
+
+                    new_eid.warranty_expire = change_date + timedelta(days=int(period))
+
+    @staticmethod
+    def _update_pos_r_eid_on_daily_close(record: Any, operator: str) -> None:
+        """L3：日常维护单关单时更新 tmm44_pos_r_eid（整机更换时旧eid失效+新eid关联）。
+
+        仅对 c_type='4'（整机更换）的记录执行。
+        """
+        from app.models.itsm import AccessoriesUpdate
+        from app.models.master import PosREid
+
+        rows = (
+            db.session.query(AccessoriesUpdate)
+            .filter(
+                AccessoriesUpdate.maintenance_id == record.maintenance_id,
+                AccessoriesUpdate.c_type == "4",  # 整机更换
+            )
+            .all()
+        )
+        if not rows:
+            return
+
+        change_date = datetime.now()
+        for r in rows:
+            # 旧整机 eid 失效
+            if r.old_accessories_id:
+                old_rows = (
+                    db.session.query(PosREid)
+                    .filter(PosREid.eid == r.old_accessories_id, PosREid.useflg == "1")
+                    .all()
+                )
+                for old_row in old_rows:
+                    old_row.useflg = "0"
+                    old_row.upddate = change_date
+            # 新整机 eid 关联
+            if r.new_accessories_id:
+                new_row = PosREid(
+                    posid=r.device_id or "",
+                    eid=r.new_accessories_id,
+                    itemcd=r.itemcd or "",
+                    opercd=operator,
+                    gendate=change_date,
+                    upddate=change_date,
+                    useflg="1",
+                )
+                db.session.add(new_row)
+
+    @staticmethod
+    def _write_pos_detail_on_daily_close(record: Any, operator: str) -> None:
+        """L11：日常维护单关单时写 TIT10_POS_DETAIL（c_type=4 整机更换记录）。
+
+        对每条 c_type='4' 的配件更新记录，写一条 PosDetail 整机更换明细。
+        """
+        from app.models.itsm import AccessoriesUpdate, PosDetail
+
+        rows = (
+            db.session.query(AccessoriesUpdate)
+            .filter(
+                AccessoriesUpdate.maintenance_id == record.maintenance_id,
+                AccessoriesUpdate.c_type == "4",  # 整机更换
+            )
+            .all()
+        )
+        if not rows:
+            return
+
+        change_date = datetime.now()
+        for r in rows:
+            # 旧整机记录（noflg='0' 旧设备）
+            if r.old_accessories_id:
+                old_detail = PosDetail(
+                    bill_id=record.maintenance_id,
+                    noflg="0",  # 旧设备
+                    device_id=r.device_id or "",
+                    item_cd=r.itemcd or "",
+                    accessories_id=r.old_accessories_id,
+                    status="5",  # 已关单
+                    create_time=change_date,
+                    creator=operator,
+                )
+                db.session.add(old_detail)
+            # 新整机记录（noflg='1' 新设备）
+            if r.new_accessories_id:
+                new_detail = PosDetail(
+                    bill_id=record.maintenance_id,
+                    noflg="1",  # 新设备
+                    device_id=r.device_id or "",
+                    item_cd=r.itemcd or "",
+                    accessories_id=r.new_accessories_id,
+                    status="5",  # 已关单
+                    create_time=change_date,
+                    creator=operator,
+                )
+                db.session.add(new_detail)
 
 
 class MaintenanceOpenService(_BaseMaintenanceService):
@@ -887,6 +1085,7 @@ class MaintenanceOpenService(_BaseMaintenanceService):
         对齐 PB"实施完成即计划完成"优化，消除人工配置确认环节。
         仅当预计划当前 plan_status='04'（实施中）时回写。
         """
+        from app.models.master import Eid as EidModel
         from app.models.sales import PlanCust
 
         plan = (
@@ -901,6 +1100,20 @@ class MaintenanceOpenService(_BaseMaintenanceService):
         plan.plan_status = PLAN_STATUS_COMPLETED
         plan.update_time = datetime.now(UTC)
         plan.updator = operator
+
+        # 1a C7：PF→OW 映射（预计划设备来源 → 资产所属）
+        # 3 新设：00商用仓库→01商用电子 / 03IT公司→02通方信息 / 04海晟公司→04海晟
+        # 2 继承：01门店移机 / 02烟草直调 → asset_owner 不变
+        pos_from = plan.pos_from
+        eid_val = plan.posid
+        if eid_val and pos_from in ("00", "03", "04"):
+            pf_ow_map = {"00": "01", "03": "02", "04": "04"}
+            new_owner = pf_ow_map[pos_from]
+            eid_rec = (
+                db.session.query(EidModel).filter(EidModel.eid == eid_val).first()
+            )
+            if eid_rec and eid_rec.asset_owner != new_owner:
+                eid_rec.asset_owner = new_owner
 
 
 class MaintenanceRenovateService(_BaseMaintenanceService):

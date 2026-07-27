@@ -425,12 +425,12 @@ class TestMaintenanceRenovate11c:
             assert stock_in is None, "未配置仓库不应创建入库草稿"
 
     def test_renovate_close_customer_asset_no_inbound(self, app: Flask) -> None:
-        """翻新单关单：旧机为客户资产（asset_owner='01'）时不创建入库草稿。"""
+        """翻新单关单：旧机为客户资产（asset_owner='03' 门店资产）时不创建入库草稿。"""
         with app.app_context():
             _seed_customer("CUST001", "CARD001")
             _seed_eid("EIDOLD0000070")
             old_eid = db.session.query(Eid).filter(Eid.eid == "EIDOLD0000070").first()
-            old_eid.asset_owner = "01"  # 客户资产
+            old_eid.asset_owner = "03"  # 门店资产（客户资产，OW 字典）
             _seed_eid("EIDNEW0000070")
             _seed_rl("CUST001", "EIDOLD0000070")
             renovate = _seed_renovate(
