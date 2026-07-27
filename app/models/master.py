@@ -249,6 +249,7 @@ class CustPosRl(BaseModel):
     created_from = db.Column(db.String(20), comment="来源追溯")
     source_id = db.Column(db.String(20), comment="来源单号")
     warranty_expire = db.Column(db.DateTime, comment="保修到期日")
+    business_mode = db.Column(db.String(2), comment="业务模式（BM_S字典：01销售/02租赁/03借用/04代维/05寄售/06试用/07免费投放/08合作运营）")
 
     __table_args__ = (db.Index("idx_cust_pos_rl_eid_useflg", "eid", "useflg"),)
 
@@ -420,6 +421,7 @@ class Eid(BaseModel):
     recycle_status = db.Column(db.String(10), comment="回收状态（RS码表）")
     asset_owner = db.Column(db.String(20), default="01", comment="资产所属方（OW码表：01商用电子/02通方信息/03门店资产/04海晟）")
     install_date = db.Column(db.DateTime, comment="安装日期")
+    warranty_expire = db.Column(db.DateTime, comment="保修到期日（install_date + 按 old_degree 取 newperiod/oldperiod，关单 L2 写入）")
     # 方案 A 预占：预计划选 posid 时锁定 EID，其他计划不可选
     reserve_planno = db.Column(db.String(20), comment="预占预计划号（方案A专属）")
 

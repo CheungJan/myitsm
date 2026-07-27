@@ -654,6 +654,7 @@ class MaintenanceDispatch(BaseModel):
     maintenance_id = db.Column(db.String(8), nullable=False, comment="维护单ID")
     business_operation_id = db.Column(db.Integer, comment="业务操作流水表ID")
     maintenance_type = db.Column(db.String(2), comment="维护类型（PB未使用，重构已废弃，保留历史兼容）")
+    service_responsibility = db.Column(db.String(2), comment="服务责任方（SR字典：01内部/02厂商/03代维）")
     operator = db.Column(db.String(6), comment="操作人")
     accpectd_group = db.Column(db.String(2), comment="分派组")
     accpectder = db.Column(db.String(6), comment="分派人")

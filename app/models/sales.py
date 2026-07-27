@@ -75,6 +75,7 @@ class PlanCust(BaseModel):
     serve_ercd = db.Column(db.String(6), comment="分配呼出人/服务工程师（对齐 PB d_serve_list）")
     deposit = db.Column(db.Numeric(12, 2), comment="押金金额")
     is_rent = db.Column(db.String(1), comment="是否租赁（Y租赁/N购买）")
+    business_mode = db.Column(db.String(2), comment="业务模式（BM_S字典：01销售/02租赁/03借用/04代维/05寄售/06试用/07免费投放/08合作运营）")
     yun_type = db.Column(db.String(2), comment="运营类型")
     upload_type = db.Column(db.String(2), comment="上传类型")
 
