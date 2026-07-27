@@ -71,6 +71,33 @@ class Price(BaseModel):
     gendate = db.Column(db.DateTime, comment="创建日期")
     upddate = db.Column(db.DateTime, comment="更新日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    effective_date = db.Column(db.Date, comment="生效日期")
+    expire_date = db.Column(db.Date, comment="失效日期")
+    is_current = db.Column(db.Boolean, default=True, comment="是否当前有效")
+
+
+class SupplierPrice(BaseModel):
+    """供应商价格表（TIP02_SUPPLIER_PRICE，P0 新增）。"""
+
+    __tablename__ = "tip02_supplier_price"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    itemcd = db.Column(
+        db.String(6),
+        db.ForeignKey("tmm12_items.item_cd", name="fk_supplier_price_item", onupdate="CASCADE"),
+        nullable=False,
+        comment="物料编码",
+    )
+    supp_cd = db.Column(db.String(8), nullable=False, comment="供应商编码")
+    min_qty = db.Column(db.Numeric, default=0, comment="起订量")
+    itemprice = db.Column(db.Numeric(12, 2), nullable=False, comment="供应商报价")
+    effective_date = db.Column(db.Date, comment="生效日期")
+    expire_date = db.Column(db.Date, comment="失效日期")
+    is_current = db.Column(db.Boolean, default=True, comment="是否当前有效")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
 
 class AdjustPrice(BaseModel):
@@ -136,3 +163,27 @@ class InventoryDetailDt(BaseModel):
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
     inventory_detail = db.relationship("InventoryDetail", back_populates="detail_logs")
+
+
+# ---------------------------------------------------------------------------
+# 标签管理 (TMM40_LABEL) — 迁移自 ortopbitsmdb
+# ---------------------------------------------------------------------------
+
+
+class Label(BaseModel):
+    """标签库存池（TMM40_LABEL）。
+
+    预录入的设备标签号（LABELID），激活后在 TMM43_EID 建立 EID 记录。
+    useflg: '1'=未激活可用, '0'=已激活
+    classcd: 物料中类编码（TMM11_ITEMCLASS），限定该标签适用的设备类型
+    """
+
+    __tablename__ = "tmm40_label"
+    __table_args__ = (db.PrimaryKeyConstraint("labelid", "classcd"),)
+
+    labelid = db.Column(db.String(20), nullable=False, comment="标签号（即激活后的EID）")
+    classcd = db.Column(db.String(10), nullable=True, comment="物料中类编码")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志：1=未激活，0=已激活")

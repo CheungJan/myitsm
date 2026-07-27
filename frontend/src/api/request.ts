@@ -30,7 +30,7 @@ request.interceptors.response.use(
                 localStorage.removeItem('token')
                 window.location.href = '/login'
             }
-        } else {
+        } else if (!err.config?.silent) {
             const msg = err.response?.data?.message || '网络错误'
             ElMessage.error(msg)
         }

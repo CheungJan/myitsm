@@ -1,0 +1,32 @@
+select custcd,
+custcard 磁卡号,
+custnm 店名,
+custanm 简称,
+classcd,
+(select custanm from tmm22_customers m where m.busityp ='YX' and m.classcd = t.classcd) 上级机构,
+busityp,
+address 地址,
+phoneno 电话,
+faxno 传真,
+useflg 有效标记,
+location,
+decode(location,1,'内环',2,'中环',3,'外环',location) 位置,
+area,
+(select a.name from TMM46_AREA a where a.id = area) 划区,
+pos_n 台数,
+opersystem 操作系统,
+data_base 数据库,
+soft_edition 软件版本,
+s_status ,
+decode(s_status,'1','开通',2,'临时关闭',3,'永久关闭','4','未开通',s_status) 状态,
+commmode,
+(select cmmnm from tmm47_commode c where c.cmmcd = commmode) 通讯方式,
+card3g 卡号3G,
+adr3g 归属地3G,
+systemcode 内核版本,
+opendate 开通日期,
+replacedate 最近更换日期
+ from tmm22_customers t
+where t.classcd<> '08' and  t.busityp<>'YX'
+AND T.USEFLG ='1'
+

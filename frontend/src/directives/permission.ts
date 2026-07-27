@@ -7,7 +7,7 @@ export const vPermission: Directive = {
         if (!value) return
 
         const authStore = useAuthStore()
-        const hasPermission = authStore.permissions.includes(value as string)
+        const hasPermission = authStore.permList.includes(value as string)
 
         if (!hasPermission) {
             el.parentNode?.removeChild(el)

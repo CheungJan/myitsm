@@ -19,6 +19,11 @@
                 <el-table-column prop="user_cd" label="编码" width="100" />
                 <el-table-column prop="user_nm" label="姓名" width="120" />
                 <el-table-column prop="dept_nm" label="部门" width="120" />
+                <el-table-column label="默认仓库" width="140">
+                    <template #default="{ row }">
+                        <span>{{ warehouseOptions.find(w => w.whcd === row.default_whcd)?.whnm || row.default_whcd || '-' }}</span>
+                    </template>
+                </el-table-column>
                 <el-table-column prop="phone" label="电话" width="130" />
                 <el-table-column prop="email" label="邮箱" min-width="160" />
                 <el-table-column label="状态" width="80">
@@ -72,6 +77,11 @@
                         <el-option label="无效" value="0" />
                     </el-select>
                 </el-form-item>
+                <el-form-item label="默认仓库">
+                    <el-select v-model="form.default_whcd" clearable placeholder="工程师虚拟仓场景使用" style="width:100%">
+                        <el-option v-for="w in warehouseOptions" :key="w.whcd" :label="w.whnm" :value="w.whcd" />
+                    </el-select>
+                </el-form-item>
             </el-form>
             <template #footer>
                 <el-button @click="dialogVisible = false">取消</el-button>
@@ -88,6 +98,7 @@ import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { fetchUsers, createUser, updateUser, deleteUser, fetchDepartments } from '@/api/system'
+import { fetchWarehouses } from '@/api/master'
 
 const authStore = useAuthStore()
 
@@ -95,18 +106,21 @@ const users = ref<Record<string,unknown>[]>([])
 const loading = ref(false); const page = ref(1); const perPage = ref(20); const total = ref(0)
 const filters = reactive({ user_cd: '', user_nm: '', dept_cd: '' })
 const deptOptions = ref<{ dept_cd: string; dept_nm: string }[]>([])
+const warehouseOptions = ref<{ whcd: string; whnm: string }[]>([])
 
 const dialogVisible = ref(false)
 const editing = ref<Record<string,string>|null>(null)
 const saving = ref(false)
-const form = reactive({ user_cd: '', user_nm: '', password: '', dept_cd: '', phone: '', email: '', status: '1' })
+const form = reactive({ user_cd: '', user_nm: '', password: '', dept_cd: '', phone: '', email: '', status: '1', default_whcd: '' })
 
 watch(page, () => loadData())
 watch(perPage, () => { page.value = 1; loadData() })
 onMounted(async () => {
-    const res = await fetchDepartments()
-    deptOptions.value = ((res.data || []) as { dept_cd: string; dept_nm: string }[])
+    const [deptRes, whRes] = await Promise.all([fetchDepartments(), fetchWarehouses('1')])
+    deptOptions.value = ((deptRes.data || []) as { dept_cd: string; dept_nm: string }[])
         .filter(d => d.dept_cd)
+    warehouseOptions.value = ((whRes.data || []) as { whcd: string; whnm: string }[])
+        .filter(w => w.whcd)
     await loadData()
 })
 
@@ -142,6 +156,7 @@ function openDialog(row?: Record<string,string>) {
         form.phone = row.phone || ''
         form.email = row.email || ''
         form.status = row.status || '1'
+        form.default_whcd = row.default_whcd || ''
     } else {
         editing.value = null
         form.user_cd = ''
@@ -151,6 +166,7 @@ function openDialog(row?: Record<string,string>) {
         form.phone = ''
         form.email = ''
         form.status = '1'
+        form.default_whcd = ''
     }
     dialogVisible.value = true
 }
@@ -171,6 +187,7 @@ async function handleSave() {
         if (form.dept_cd) payload.dept_cd = form.dept_cd
         if (form.phone) payload.phone = form.phone
         if (form.email) payload.email = form.email
+        if (form.default_whcd) payload.default_whcd = form.default_whcd
         payload.status = form.status || '1'
         payload.useflg = '1'
         if (form.password) payload.password = form.password

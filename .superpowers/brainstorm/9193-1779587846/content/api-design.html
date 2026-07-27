@@ -1,0 +1,59 @@
+<h2>API 设计：双端点 vs 统一端点</h2>
+<p class="subtitle">文档设计了两个独立端点，但底层操作本质相同——都是"从需求行创建订单+写TPC20关联"</p>
+
+<div class="section">
+  <h3>文档方案：两个专用端点</h3>
+  <div style="background:#f5f5f5;padding:16px;border-radius:8px;font-size:13px;line-height:1.8;">
+    <strong>POST /orders/batch</strong> — 拆单专用<br>
+    └─ 输入：多个订单，每个有各自的 suppliercd + details<br>
+    └─ 循环调用 create()，写 TPC20<br>
+    <br>
+    <strong>POST /orders/merge-create</strong> — 并单专用<br>
+    └─ 输入：按 itemcd 分组的 merge_groups<br>
+    └─ 每组生成一个订单，写多条 TPC20<br>
+    <br>
+    <span style="color:#e65100;">⚠️ 两套入参格式，两套校验逻辑，两套前端调用</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>替代方案：统一端点</h3>
+  <div style="background:#e8f5e9;padding:16px;border-radius:8px;font-size:13px;line-height:1.8;">
+    <strong>POST /orders/batch</strong> — 同时支持拆单和并单<br>
+    <br>
+    输入格式完全不变（文档已有）：<br>
+    <code style="background:#fff;padding:2px 6px;border-radius:3px;">
+    { "orders": [{ "suppliercd": "...", "details": [...] }] }
+    </code><br><br>
+    └─ 拆单：同一个 ref_pcplanid/ref_pclineno 出现在不同 order 里 → 自动拆<br>
+    └─ 并单：不同 ref_pcplanid 出现在同一个 order 里 → 自动并<br>
+    └─ 校验逻辑统一：汇总所有 ref 的 qty vs available_qty<br>
+    <br>
+    <span style="color:#2e7d32;">✅ 合并预览接口保留，但最终执行都走同一个 batch 端点</span>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>保持文档方案：双端点</h3>
+      <p>拆单和并单各有独立端点，语义明确，入参针对各自场景优化</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>每个端点职责单一</li><li>前端调用意图清晰</li><li>独立演进不互相影响</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>后端重复代码多</li><li>两套参数校验</li><li>并单预览→执行的参数要转换</li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>统一端点 + 保留预览</h3>
+      <p>只保留 /orders/batch，拆单/并单走同一个执行路径。保留 /requisitions/merge-preview 做智能分组</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>一套校验逻辑，减少 bug</li><li>自动支持组合场景</li><li>代码量减少约40%</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>入参结构较通用</li><li>前端需自行组织 orders 数组</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

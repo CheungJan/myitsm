@@ -1,0 +1,660 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]: myitsm
+    - menubar [ref=e105]:
+      - menuitem "首页" [ref=e106] [cursor=pointer]:
+        - img [ref=e108]
+        - generic [ref=e110]: 首页
+      - menuitem "系统管理" [ref=e111]:
+        - generic [ref=e112] [cursor=pointer]:
+          - img [ref=e114]
+          - generic [ref=e116]: 系统管理
+          - img [ref=e118]
+      - menuitem "基础数据" [ref=e120]:
+        - generic [ref=e121] [cursor=pointer]:
+          - img [ref=e123]
+          - generic [ref=e125]: 基础数据
+          - img [ref=e127]
+      - menuitem "仓储管理" [ref=e129]:
+        - generic [ref=e130] [cursor=pointer]:
+          - img [ref=e132]
+          - generic [ref=e134]: 仓储管理
+          - img [ref=e136]
+      - menuitem "采购管理" [expanded] [ref=e138]:
+        - generic [ref=e139] [cursor=pointer]:
+          - img [ref=e141]
+          - generic [ref=e143]: 采购管理
+          - img [ref=e145]
+        - menu [ref=e147]:
+          - menuitem "执行看板" [ref=e148] [cursor=pointer]
+          - menuitem "采购需求" [ref=e149] [cursor=pointer]
+          - menuitem "采购订单" [ref=e150] [cursor=pointer]
+          - menuitem "采购结算单" [ref=e151] [cursor=pointer]
+          - menuitem "采购退货" [ref=e152] [cursor=pointer]
+          - menuitem "供应商管理" [ref=e153] [cursor=pointer]
+          - menuitem "供应商评价" [ref=e154] [cursor=pointer]
+      - menuitem "ITSM工单" [ref=e155]:
+        - generic [ref=e156] [cursor=pointer]:
+          - img [ref=e158]
+          - generic [ref=e160]: ITSM工单
+          - img [ref=e162]
+      - menuitem "销售管理" [ref=e164]:
+        - generic [ref=e165] [cursor=pointer]:
+          - img [ref=e167]
+          - generic [ref=e169]: 销售管理
+          - img [ref=e171]
+      - menuitem "质检管理" [ref=e173]:
+        - generic [ref=e174] [cursor=pointer]:
+          - img [ref=e176]
+          - generic [ref=e178]: 质检管理
+          - img [ref=e180]
+      - menuitem "事务查询" [ref=e182]:
+        - generic [ref=e183] [cursor=pointer]:
+          - img [ref=e185]
+          - generic [ref=e187]: 事务查询
+          - img [ref=e189]
+      - menuitem "客户门户" [ref=e191]:
+        - generic [ref=e192] [cursor=pointer]:
+          - img [ref=e194]
+          - generic [ref=e196]: 客户门户
+          - img [ref=e198]
+      - menuitem "SLA管理" [ref=e200]:
+        - generic [ref=e201] [cursor=pointer]:
+          - img [ref=e203]
+          - generic [ref=e205]: SLA管理
+          - img [ref=e207]
+      - menuitem "通知管理" [ref=e209]:
+        - generic [ref=e210] [cursor=pointer]:
+          - img [ref=e212]
+          - generic [ref=e214]: 通知管理
+          - img [ref=e216]
+      - menuitem "合同管理" [ref=e218]:
+        - generic [ref=e219] [cursor=pointer]:
+          - img [ref=e221]
+          - generic [ref=e223]: 合同管理
+          - img [ref=e225]
+      - menuitem "结算管理" [ref=e227]:
+        - generic [ref=e228] [cursor=pointer]:
+          - img [ref=e230]
+          - generic [ref=e232]: 结算管理
+          - img [ref=e234]
+      - menuitem "财务管理" [ref=e236]:
+        - generic [ref=e237] [cursor=pointer]:
+          - img [ref=e239]
+          - generic [ref=e241]: 财务管理
+          - img [ref=e243]
+      - menuitem "押金管理" [ref=e245]:
+        - generic [ref=e246] [cursor=pointer]:
+          - img [ref=e248]
+          - generic [ref=e250]: 押金管理
+          - img [ref=e252]
+      - menuitem "考勤管理" [ref=e254]:
+        - generic [ref=e255] [cursor=pointer]:
+          - img [ref=e257]
+          - generic [ref=e259]: 考勤管理
+          - img [ref=e261]
+      - menuitem "库存管理" [ref=e263]:
+        - generic [ref=e264] [cursor=pointer]:
+          - img [ref=e266]
+          - generic [ref=e268]: 库存管理
+          - img [ref=e270]
+      - menuitem "生产管理" [ref=e272]:
+        - generic [ref=e273] [cursor=pointer]:
+          - img [ref=e275]
+          - generic [ref=e277]: 生产管理
+          - img [ref=e279]
+      - menuitem "IoT物联" [ref=e281]:
+        - generic [ref=e282] [cursor=pointer]:
+          - img [ref=e284]
+          - generic [ref=e286]: IoT物联
+          - img [ref=e288]
+      - menuitem "报表中心" [ref=e290]:
+        - generic [ref=e291] [cursor=pointer]:
+          - img [ref=e293]
+          - generic [ref=e295]: 报表中心
+          - img [ref=e297]
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - img [ref=e10] [cursor=pointer]
+        - navigation "面包屑" [ref=e12]:
+          - generic [ref=e13]:
+            - link "首页" [ref=e14]
+            - text: /
+          - link "供应商管理" [ref=e16]
+      - generic [ref=e17]:
+        - generic [ref=e18]: 系统管理员
+        - button "退出" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]: 退出
+    - generic [ref=e300] [cursor=pointer]: 首页
+    - main [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - heading "供应商管理" [level=2] [ref=e25]
+          - generic [ref=e26]:
+            - textbox "搜索编码/名称" [ref=e29]
+            - button "新增供应商" [ref=e30] [cursor=pointer]:
+              - generic [ref=e31]: 新增供应商
+        - generic [ref=e32]:
+          - generic [ref=e34]:
+            - generic [ref=e36]:
+              - generic [ref=e37]: 供应商分类
+              - button "新增" [ref=e38] [cursor=pointer]:
+                - generic [ref=e39]: 新增
+            - generic [ref=e40]:
+              - textbox "输入关键字过滤" [ref=e43]
+              - generic [ref=e44]:
+                - button "全部" [ref=e45] [cursor=pointer]:
+                  - generic [ref=e46]: 全部
+                - button "全部展开" [ref=e47] [cursor=pointer]:
+                  - generic [ref=e48]: 全部展开
+                - button "全部收缩" [ref=e49] [cursor=pointer]:
+                  - generic [ref=e50]: 全部收缩
+              - tree [ref=e51]:
+                - treeitem "商用电子 (00) 2" [ref=e301]:
+                  - generic [ref=e303] [cursor=pointer]:
+                    - generic [ref=e304]: 商用电子
+                    - generic [ref=e305]: (00)
+                    - generic [ref=e306]: "2"
+                - treeitem "市内 (02) 22" [ref=e307]:
+                  - generic [ref=e309] [cursor=pointer]:
+                    - generic [ref=e310]: 市内
+                    - generic [ref=e311]: (02)
+                    - generic [ref=e312]: "22"
+                - treeitem "市外 (03) 9" [ref=e313]:
+                  - generic [ref=e315] [cursor=pointer]:
+                    - generic [ref=e316]: 市外
+                    - generic [ref=e317]: (03)
+                    - generic [ref=e318]: "9"
+                - treeitem "耗材类采购 (04)" [ref=e319]:
+                  - generic [ref=e320] [cursor=pointer]:
+                    - img [ref=e322]
+                    - generic [ref=e324]:
+                      - generic [ref=e325]: 耗材类采购
+                      - generic [ref=e326]: (04)
+          - generic [ref=e56]:
+            - generic [ref=e58]:
+              - table [ref=e60]:
+                - rowgroup [ref=e70]:
+                  - row "编码 名称 简称 分类 联系人 电话 状态 操作" [ref=e71]:
+                    - columnheader "编码" [ref=e72]:
+                      - generic [ref=e73]: 编码
+                    - columnheader "名称" [ref=e74]:
+                      - generic [ref=e75]: 名称
+                    - columnheader "简称" [ref=e76]:
+                      - generic [ref=e77]: 简称
+                    - columnheader "分类" [ref=e78]:
+                      - generic [ref=e79]: 分类
+                    - columnheader "联系人" [ref=e80]:
+                      - generic [ref=e81]: 联系人
+                    - columnheader "电话" [ref=e82]:
+                      - generic [ref=e83]: 电话
+                    - columnheader "状态" [ref=e84]:
+                      - generic [ref=e85]: 状态
+                    - columnheader "操作" [ref=e86]:
+                      - generic [ref=e87]: 操作
+              - table [ref=e327]:
+                - rowgroup [ref=e337]:
+                  - row "00000000 00000000 启用 详情 编辑 删除" [ref=e338]:
+                    - cell "00000000" [ref=e339]:
+                      - generic [ref=e340]: "00000000"
+                    - cell "00000000" [ref=e341]:
+                      - generic [ref=e342]: "00000000"
+                    - cell [ref=e343]
+                    - cell [ref=e344]
+                    - cell [ref=e345]
+                    - cell [ref=e346]
+                    - cell "启用" [ref=e347]:
+                      - generic [ref=e350]: 启用
+                    - cell "详情 编辑 删除" [ref=e351]:
+                      - generic [ref=e352]:
+                        - button "详情" [ref=e353] [cursor=pointer]:
+                          - generic [ref=e354]: 详情
+                        - button "编辑" [ref=e355] [cursor=pointer]:
+                          - generic [ref=e356]: 编辑
+                        - button "删除" [ref=e357] [cursor=pointer]:
+                          - generic [ref=e358]: 删除
+                  - row "00000001 商用电子 商用电子 启用 详情 编辑 删除" [ref=e359]:
+                    - cell "00000001" [ref=e360]:
+                      - generic [ref=e361]: "00000001"
+                    - cell "商用电子" [ref=e362]:
+                      - generic [ref=e363]: 商用电子
+                    - cell [ref=e364]
+                    - cell "商用电子" [ref=e365]:
+                      - generic [ref=e366]: 商用电子
+                    - cell [ref=e367]
+                    - cell [ref=e368]
+                    - cell "启用" [ref=e369]:
+                      - generic [ref=e372]: 启用
+                    - cell "详情 编辑 删除" [ref=e373]:
+                      - generic [ref=e374]:
+                        - button "详情" [ref=e375] [cursor=pointer]:
+                          - generic [ref=e376]: 详情
+                        - button "编辑" [ref=e377] [cursor=pointer]:
+                          - generic [ref=e378]: 编辑
+                        - button "删除" [ref=e379] [cursor=pointer]:
+                          - generic [ref=e380]: 删除
+                  - row "00000003 广州市中崎电脑设备有限公司 广州中崎 市外 雷强 020-32290168-861 启用 详情 编辑 删除" [ref=e381]:
+                    - cell "00000003" [ref=e382]:
+                      - generic [ref=e383]: "00000003"
+                    - cell "广州市中崎电脑设备有限公司" [ref=e384]:
+                      - generic [ref=e385]: 广州市中崎电脑设备有限公司
+                    - cell "广州中崎" [ref=e386]:
+                      - generic [ref=e387]: 广州中崎
+                    - cell "市外" [ref=e388]:
+                      - generic [ref=e389]: 市外
+                    - cell "雷强" [ref=e390]:
+                      - generic [ref=e391]: 雷强
+                    - cell "020-32290168-861" [ref=e392]:
+                      - generic [ref=e393]: 020-32290168-861
+                    - cell "启用" [ref=e394]:
+                      - generic [ref=e397]: 启用
+                    - cell "详情 编辑 删除" [ref=e398]:
+                      - generic [ref=e399]:
+                        - button "详情" [ref=e400] [cursor=pointer]:
+                          - generic [ref=e401]: 详情
+                        - button "编辑" [ref=e402] [cursor=pointer]:
+                          - generic [ref=e403]: 编辑
+                        - button "删除" [ref=e404] [cursor=pointer]:
+                          - generic [ref=e405]: 删除
+                  - row "00000004 上海卓扬电子有限公司 上海卓扬 市内 周文炜 021-54971557 启用 详情 编辑 删除" [ref=e406]:
+                    - cell "00000004" [ref=e407]:
+                      - generic [ref=e408]: "00000004"
+                    - cell "上海卓扬电子有限公司" [ref=e409]:
+                      - generic [ref=e410]: 上海卓扬电子有限公司
+                    - cell "上海卓扬" [ref=e411]:
+                      - generic [ref=e412]: 上海卓扬
+                    - cell "市内" [ref=e413]:
+                      - generic [ref=e414]: 市内
+                    - cell "周文炜" [ref=e415]:
+                      - generic [ref=e416]: 周文炜
+                    - cell "021-54971557" [ref=e417]:
+                      - generic [ref=e418]: 021-54971557
+                    - cell "启用" [ref=e419]:
+                      - generic [ref=e422]: 启用
+                    - cell "详情 编辑 删除" [ref=e423]:
+                      - generic [ref=e424]:
+                        - button "详情" [ref=e425] [cursor=pointer]:
+                          - generic [ref=e426]: 详情
+                        - button "编辑" [ref=e427] [cursor=pointer]:
+                          - generic [ref=e428]: 编辑
+                        - button "删除" [ref=e429] [cursor=pointer]:
+                          - generic [ref=e430]: 删除
+                  - row "00000005 上海赞达电子科技有限公司 上海赞达 市内 张上元 021-64866887 启用 详情 编辑 删除" [ref=e431]:
+                    - cell "00000005" [ref=e432]:
+                      - generic [ref=e433]: "00000005"
+                    - cell "上海赞达电子科技有限公司" [ref=e434]:
+                      - generic [ref=e435]: 上海赞达电子科技有限公司
+                    - cell "上海赞达" [ref=e436]:
+                      - generic [ref=e437]: 上海赞达
+                    - cell "市内" [ref=e438]:
+                      - generic [ref=e439]: 市内
+                    - cell "张上元" [ref=e440]:
+                      - generic [ref=e441]: 张上元
+                    - cell "021-64866887" [ref=e442]:
+                      - generic [ref=e443]: 021-64866887
+                    - cell "启用" [ref=e444]:
+                      - generic [ref=e447]: 启用
+                    - cell "详情 编辑 删除" [ref=e448]:
+                      - generic [ref=e449]:
+                        - button "详情" [ref=e450] [cursor=pointer]:
+                          - generic [ref=e451]: 详情
+                        - button "编辑" [ref=e452] [cursor=pointer]:
+                          - generic [ref=e453]: 编辑
+                        - button "删除" [ref=e454] [cursor=pointer]:
+                          - generic [ref=e455]: 删除
+                  - row "00000006 常州华辉电子设备有限公司 常州华辉 市外 黄洪维 0519-81685222 启用 详情 编辑 删除" [ref=e456]:
+                    - cell "00000006" [ref=e457]:
+                      - generic [ref=e458]: "00000006"
+                    - cell "常州华辉电子设备有限公司" [ref=e459]:
+                      - generic [ref=e460]: 常州华辉电子设备有限公司
+                    - cell "常州华辉" [ref=e461]:
+                      - generic [ref=e462]: 常州华辉
+                    - cell "市外" [ref=e463]:
+                      - generic [ref=e464]: 市外
+                    - cell "黄洪维" [ref=e465]:
+                      - generic [ref=e466]: 黄洪维
+                    - cell "0519-81685222" [ref=e467]:
+                      - generic [ref=e468]: 0519-81685222
+                    - cell "启用" [ref=e469]:
+                      - generic [ref=e472]: 启用
+                    - cell "详情 编辑 删除" [ref=e473]:
+                      - generic [ref=e474]:
+                        - button "详情" [ref=e475] [cursor=pointer]:
+                          - generic [ref=e476]: 详情
+                        - button "编辑" [ref=e477] [cursor=pointer]:
+                          - generic [ref=e478]: 编辑
+                        - button "删除" [ref=e479] [cursor=pointer]:
+                          - generic [ref=e480]: 删除
+                  - row "00000007 珠海恒宇科技有限公司 珠海恒宇 市外 朱统文 0756-7769768*852 启用 详情 编辑 删除" [ref=e481]:
+                    - cell "00000007" [ref=e482]:
+                      - generic [ref=e483]: "00000007"
+                    - cell "珠海恒宇科技有限公司" [ref=e484]:
+                      - generic [ref=e485]: 珠海恒宇科技有限公司
+                    - cell "珠海恒宇" [ref=e486]:
+                      - generic [ref=e487]: 珠海恒宇
+                    - cell "市外" [ref=e488]:
+                      - generic [ref=e489]: 市外
+                    - cell "朱统文" [ref=e490]:
+                      - generic [ref=e491]: 朱统文
+                    - cell "0756-7769768*852" [ref=e492]:
+                      - generic [ref=e493]: 0756-7769768*852
+                    - cell "启用" [ref=e494]:
+                      - generic [ref=e497]: 启用
+                    - cell "详情 编辑 删除" [ref=e498]:
+                      - generic [ref=e499]:
+                        - button "详情" [ref=e500] [cursor=pointer]:
+                          - generic [ref=e501]: 详情
+                        - button "编辑" [ref=e502] [cursor=pointer]:
+                          - generic [ref=e503]: 编辑
+                        - button "删除" [ref=e504] [cursor=pointer]:
+                          - generic [ref=e505]: 删除
+                  - row "00000008 上海星之捷电子科技有限公司 上海星之捷 市内 姚波 021-32096852 启用 详情 编辑 删除" [ref=e506]:
+                    - cell "00000008" [ref=e507]:
+                      - generic [ref=e508]: "00000008"
+                    - cell "上海星之捷电子科技有限公司" [ref=e509]:
+                      - generic [ref=e510]: 上海星之捷电子科技有限公司
+                    - cell "上海星之捷" [ref=e511]:
+                      - generic [ref=e512]: 上海星之捷
+                    - cell "市内" [ref=e513]:
+                      - generic [ref=e514]: 市内
+                    - cell "姚波" [ref=e515]:
+                      - generic [ref=e516]: 姚波
+                    - cell "021-32096852" [ref=e517]:
+                      - generic [ref=e518]: 021-32096852
+                    - cell "启用" [ref=e519]:
+                      - generic [ref=e522]: 启用
+                    - cell "详情 编辑 删除" [ref=e523]:
+                      - generic [ref=e524]:
+                        - button "详情" [ref=e525] [cursor=pointer]:
+                          - generic [ref=e526]: 详情
+                        - button "编辑" [ref=e527] [cursor=pointer]:
+                          - generic [ref=e528]: 编辑
+                        - button "删除" [ref=e529] [cursor=pointer]:
+                          - generic [ref=e530]: 删除
+                  - row "00000009 张家港和乔电子有限公司 张家港和乔 市外 徐琼 0512-58422167*208 启用 详情 编辑 删除" [ref=e531]:
+                    - cell "00000009" [ref=e532]:
+                      - generic [ref=e533]: "00000009"
+                    - cell "张家港和乔电子有限公司" [ref=e534]:
+                      - generic [ref=e535]: 张家港和乔电子有限公司
+                    - cell "张家港和乔" [ref=e536]:
+                      - generic [ref=e537]: 张家港和乔
+                    - cell "市外" [ref=e538]:
+                      - generic [ref=e539]: 市外
+                    - cell "徐琼" [ref=e540]:
+                      - generic [ref=e541]: 徐琼
+                    - cell "0512-58422167*208" [ref=e542]:
+                      - generic [ref=e543]: 0512-58422167*208
+                    - cell "启用" [ref=e544]:
+                      - generic [ref=e547]: 启用
+                    - cell "详情 编辑 删除" [ref=e548]:
+                      - generic [ref=e549]:
+                        - button "详情" [ref=e550] [cursor=pointer]:
+                          - generic [ref=e551]: 详情
+                        - button "编辑" [ref=e552] [cursor=pointer]:
+                          - generic [ref=e553]: 编辑
+                        - button "删除" [ref=e554] [cursor=pointer]:
+                          - generic [ref=e555]: 删除
+                  - row "00000010 上海锦逊电子有限公司 上海锦逊 市内 邹飞华 021-51877708*201 启用 详情 编辑 删除" [ref=e556]:
+                    - cell "00000010" [ref=e557]:
+                      - generic [ref=e558]: "00000010"
+                    - cell "上海锦逊电子有限公司" [ref=e559]:
+                      - generic [ref=e560]: 上海锦逊电子有限公司
+                    - cell "上海锦逊" [ref=e561]:
+                      - generic [ref=e562]: 上海锦逊
+                    - cell "市内" [ref=e563]:
+                      - generic [ref=e564]: 市内
+                    - cell "邹飞华" [ref=e565]:
+                      - generic [ref=e566]: 邹飞华
+                    - cell "021-51877708*201" [ref=e567]:
+                      - generic [ref=e568]: 021-51877708*201
+                    - cell "启用" [ref=e569]:
+                      - generic [ref=e572]: 启用
+                    - cell "详情 编辑 删除" [ref=e573]:
+                      - generic [ref=e574]:
+                        - button "详情" [ref=e575] [cursor=pointer]:
+                          - generic [ref=e576]: 详情
+                        - button "编辑" [ref=e577] [cursor=pointer]:
+                          - generic [ref=e578]: 编辑
+                        - button "删除" [ref=e579] [cursor=pointer]:
+                          - generic [ref=e580]: 删除
+                  - row "00000011 上海众恒电脑电源系统有限公司 上海众恒 市内 王春君 021-62600277*219 启用 详情 编辑 删除" [ref=e581]:
+                    - cell "00000011" [ref=e582]:
+                      - generic [ref=e583]: "00000011"
+                    - cell "上海众恒电脑电源系统有限公司" [ref=e584]:
+                      - generic [ref=e585]: 上海众恒电脑电源系统有限公司
+                    - cell "上海众恒" [ref=e586]:
+                      - generic [ref=e587]: 上海众恒
+                    - cell "市内" [ref=e588]:
+                      - generic [ref=e589]: 市内
+                    - cell "王春君" [ref=e590]:
+                      - generic [ref=e591]: 王春君
+                    - cell "021-62600277*219" [ref=e592]:
+                      - generic [ref=e593]: 021-62600277*219
+                    - cell "启用" [ref=e594]:
+                      - generic [ref=e597]: 启用
+                    - cell "详情 编辑 删除" [ref=e598]:
+                      - generic [ref=e599]:
+                        - button "详情" [ref=e600] [cursor=pointer]:
+                          - generic [ref=e601]: 详情
+                        - button "编辑" [ref=e602] [cursor=pointer]:
+                          - generic [ref=e603]: 编辑
+                        - button "删除" [ref=e604] [cursor=pointer]:
+                          - generic [ref=e605]: 删除
+                  - row "00000012 上海博施电子技术有限公司 上海博施 市内 黄润红 021-51098912*1009 启用 详情 编辑 删除" [ref=e606]:
+                    - cell "00000012" [ref=e607]:
+                      - generic [ref=e608]: "00000012"
+                    - cell "上海博施电子技术有限公司" [ref=e609]:
+                      - generic [ref=e610]: 上海博施电子技术有限公司
+                    - cell "上海博施" [ref=e611]:
+                      - generic [ref=e612]: 上海博施
+                    - cell "市内" [ref=e613]:
+                      - generic [ref=e614]: 市内
+                    - cell "黄润红" [ref=e615]:
+                      - generic [ref=e616]: 黄润红
+                    - cell "021-51098912*1009" [ref=e617]:
+                      - generic [ref=e618]: 021-51098912*1009
+                    - cell "启用" [ref=e619]:
+                      - generic [ref=e622]: 启用
+                    - cell "详情 编辑 删除" [ref=e623]:
+                      - generic [ref=e624]:
+                        - button "详情" [ref=e625] [cursor=pointer]:
+                          - generic [ref=e626]: 详情
+                        - button "编辑" [ref=e627] [cursor=pointer]:
+                          - generic [ref=e628]: 编辑
+                        - button "删除" [ref=e629] [cursor=pointer]:
+                          - generic [ref=e630]: 删除
+                  - row "00000013 深圳亿利达商业设备有限公司 深圳亿利达 市外 何亦云 0755-86011888*201 启用 详情 编辑 删除" [ref=e631]:
+                    - cell "00000013" [ref=e632]:
+                      - generic [ref=e633]: "00000013"
+                    - cell "深圳亿利达商业设备有限公司" [ref=e634]:
+                      - generic [ref=e635]: 深圳亿利达商业设备有限公司
+                    - cell "深圳亿利达" [ref=e636]:
+                      - generic [ref=e637]: 深圳亿利达
+                    - cell "市外" [ref=e638]:
+                      - generic [ref=e639]: 市外
+                    - cell "何亦云" [ref=e640]:
+                      - generic [ref=e641]: 何亦云
+                    - cell "0755-86011888*201" [ref=e642]:
+                      - generic [ref=e643]: 0755-86011888*201
+                    - cell "启用" [ref=e644]:
+                      - generic [ref=e647]: 启用
+                    - cell "详情 编辑 删除" [ref=e648]:
+                      - generic [ref=e649]:
+                        - button "详情" [ref=e650] [cursor=pointer]:
+                          - generic [ref=e651]: 详情
+                        - button "编辑" [ref=e652] [cursor=pointer]:
+                          - generic [ref=e653]: 编辑
+                        - button "删除" [ref=e654] [cursor=pointer]:
+                          - generic [ref=e655]: 删除
+                  - row "00000014 上海界普贸易有限公司 上海界普 市内 茆俊伟 021-34222782 启用 详情 编辑 删除" [ref=e656]:
+                    - cell "00000014" [ref=e657]:
+                      - generic [ref=e658]: "00000014"
+                    - cell "上海界普贸易有限公司" [ref=e659]:
+                      - generic [ref=e660]: 上海界普贸易有限公司
+                    - cell "上海界普" [ref=e661]:
+                      - generic [ref=e662]: 上海界普
+                    - cell "市内" [ref=e663]:
+                      - generic [ref=e664]: 市内
+                    - cell "茆俊伟" [ref=e665]:
+                      - generic [ref=e666]: 茆俊伟
+                    - cell "021-34222782" [ref=e667]:
+                      - generic [ref=e668]: 021-34222782
+                    - cell "启用" [ref=e669]:
+                      - generic [ref=e672]: 启用
+                    - cell "详情 编辑 删除" [ref=e673]:
+                      - generic [ref=e674]:
+                        - button "详情" [ref=e675] [cursor=pointer]:
+                          - generic [ref=e676]: 详情
+                        - button "编辑" [ref=e677] [cursor=pointer]:
+                          - generic [ref=e678]: 编辑
+                        - button "删除" [ref=e679] [cursor=pointer]:
+                          - generic [ref=e680]: 删除
+                  - row "00000015 上海颂祥信息技术有限公司 上海颂祥 市内 季卫平 021-64705045 启用 详情 编辑 删除" [ref=e681]:
+                    - cell "00000015" [ref=e682]:
+                      - generic [ref=e683]: "00000015"
+                    - cell "上海颂祥信息技术有限公司" [ref=e684]:
+                      - generic [ref=e685]: 上海颂祥信息技术有限公司
+                    - cell "上海颂祥" [ref=e686]:
+                      - generic [ref=e687]: 上海颂祥
+                    - cell "市内" [ref=e688]:
+                      - generic [ref=e689]: 市内
+                    - cell "季卫平" [ref=e690]:
+                      - generic [ref=e691]: 季卫平
+                    - cell "021-64705045" [ref=e692]:
+                      - generic [ref=e693]: 021-64705045
+                    - cell "启用" [ref=e694]:
+                      - generic [ref=e697]: 启用
+                    - cell "详情 编辑 删除" [ref=e698]:
+                      - generic [ref=e699]:
+                        - button "详情" [ref=e700] [cursor=pointer]:
+                          - generic [ref=e701]: 详情
+                        - button "编辑" [ref=e702] [cursor=pointer]:
+                          - generic [ref=e703]: 编辑
+                        - button "删除" [ref=e704] [cursor=pointer]:
+                          - generic [ref=e705]: 删除
+                  - row "00000016 上海先达条码技术有限公司 上海先达 市内 颜小姐 021-62463399*683 启用 详情 编辑 删除" [ref=e706]:
+                    - cell "00000016" [ref=e707]:
+                      - generic [ref=e708]: "00000016"
+                    - cell "上海先达条码技术有限公司" [ref=e709]:
+                      - generic [ref=e710]: 上海先达条码技术有限公司
+                    - cell "上海先达" [ref=e711]:
+                      - generic [ref=e712]: 上海先达
+                    - cell "市内" [ref=e713]:
+                      - generic [ref=e714]: 市内
+                    - cell "颜小姐" [ref=e715]:
+                      - generic [ref=e716]: 颜小姐
+                    - cell "021-62463399*683" [ref=e717]:
+                      - generic [ref=e718]: 021-62463399*683
+                    - cell "启用" [ref=e719]:
+                      - generic [ref=e722]: 启用
+                    - cell "详情 编辑 删除" [ref=e723]:
+                      - generic [ref=e724]:
+                        - button "详情" [ref=e725] [cursor=pointer]:
+                          - generic [ref=e726]: 详情
+                        - button "编辑" [ref=e727] [cursor=pointer]:
+                          - generic [ref=e728]: 编辑
+                        - button "删除" [ref=e729] [cursor=pointer]:
+                          - generic [ref=e730]: 删除
+                  - row "00000017 上海云库电子有限公司 上海云库 市内 冯荣 021-64510343 启用 详情 编辑 删除" [ref=e731]:
+                    - cell "00000017" [ref=e732]:
+                      - generic [ref=e733]: "00000017"
+                    - cell "上海云库电子有限公司" [ref=e734]:
+                      - generic [ref=e735]: 上海云库电子有限公司
+                    - cell "上海云库" [ref=e736]:
+                      - generic [ref=e737]: 上海云库
+                    - cell "市内" [ref=e738]:
+                      - generic [ref=e739]: 市内
+                    - cell "冯荣" [ref=e740]:
+                      - generic [ref=e741]: 冯荣
+                    - cell "021-64510343" [ref=e742]:
+                      - generic [ref=e743]: 021-64510343
+                    - cell "启用" [ref=e744]:
+                      - generic [ref=e747]: 启用
+                    - cell "详情 编辑 删除" [ref=e748]:
+                      - generic [ref=e749]:
+                        - button "详情" [ref=e750] [cursor=pointer]:
+                          - generic [ref=e751]: 详情
+                        - button "编辑" [ref=e752] [cursor=pointer]:
+                          - generic [ref=e753]: 编辑
+                        - button "删除" [ref=e754] [cursor=pointer]:
+                          - generic [ref=e755]: 删除
+                  - row "00000018 上海帮帮立信电脑软硬件维护服务社 帮帮立信 市内 陈凡霞 启用 详情 编辑 删除" [ref=e756]:
+                    - cell "00000018" [ref=e757]:
+                      - generic [ref=e758]: "00000018"
+                    - cell "上海帮帮立信电脑软硬件维护服务社" [ref=e759]:
+                      - generic [ref=e760]: 上海帮帮立信电脑软硬件维护服务社
+                    - cell "帮帮立信" [ref=e761]:
+                      - generic [ref=e762]: 帮帮立信
+                    - cell "市内" [ref=e763]:
+                      - generic [ref=e764]: 市内
+                    - cell "陈凡霞" [ref=e765]:
+                      - generic [ref=e766]: 陈凡霞
+                    - cell [ref=e767]
+                    - cell "启用" [ref=e768]:
+                      - generic [ref=e771]: 启用
+                    - cell "详情 编辑 删除" [ref=e772]:
+                      - generic [ref=e773]:
+                        - button "详情" [ref=e774] [cursor=pointer]:
+                          - generic [ref=e775]: 详情
+                        - button "编辑" [ref=e776] [cursor=pointer]:
+                          - generic [ref=e777]: 编辑
+                        - button "删除" [ref=e778] [cursor=pointer]:
+                          - generic [ref=e779]: 删除
+                  - row "00000019 迅泓计算机科技有限公司 上海迅泓 市内 陈小元 021-64547292/3*802 启用 详情 编辑 删除" [ref=e780]:
+                    - cell "00000019" [ref=e781]:
+                      - generic [ref=e782]: "00000019"
+                    - cell "迅泓计算机科技有限公司" [ref=e783]:
+                      - generic [ref=e784]: 迅泓计算机科技有限公司
+                    - cell "上海迅泓" [ref=e785]:
+                      - generic [ref=e786]: 上海迅泓
+                    - cell "市内" [ref=e787]:
+                      - generic [ref=e788]: 市内
+                    - cell "陈小元" [ref=e789]:
+                      - generic [ref=e790]: 陈小元
+                    - cell "021-64547292/3*802" [ref=e791]:
+                      - generic [ref=e792]: 021-64547292/3*802
+                    - cell "启用" [ref=e793]:
+                      - generic [ref=e796]: 启用
+                    - cell "详情 编辑 删除" [ref=e797]:
+                      - generic [ref=e798]:
+                        - button "详情" [ref=e799] [cursor=pointer]:
+                          - generic [ref=e800]: 详情
+                        - button "编辑" [ref=e801] [cursor=pointer]:
+                          - generic [ref=e802]: 编辑
+                        - button "删除" [ref=e803] [cursor=pointer]:
+                          - generic [ref=e804]: 删除
+                  - row "00000020 上海敬科（上海索浦） 上海索浦 市内 薛中华 启用 详情 编辑 删除" [ref=e805]:
+                    - cell "00000020" [ref=e806]:
+                      - generic [ref=e807]: "00000020"
+                    - cell "上海敬科（上海索浦）" [ref=e808]:
+                      - generic [ref=e809]: 上海敬科（上海索浦）
+                    - cell "上海索浦" [ref=e810]:
+                      - generic [ref=e811]: 上海索浦
+                    - cell "市内" [ref=e812]:
+                      - generic [ref=e813]: 市内
+                    - cell "薛中华" [ref=e814]:
+                      - generic [ref=e815]: 薛中华
+                    - cell [ref=e816]
+                    - cell "启用" [ref=e817]:
+                      - generic [ref=e820]: 启用
+                    - cell "详情 编辑 删除" [ref=e821]:
+                      - generic [ref=e822]:
+                        - button "详情" [ref=e823] [cursor=pointer]:
+                          - generic [ref=e824]: 详情
+                        - button "编辑" [ref=e825] [cursor=pointer]:
+                          - generic [ref=e826]: 编辑
+                        - button "删除" [ref=e827] [cursor=pointer]:
+                          - generic [ref=e828]: 删除
+            - generic [ref=e98]:
+              - generic [ref=e99]: 共 34 条
+              - generic [ref=e100]:
+                - button "上一页" [disabled] [ref=e101]:
+                  - generic:
+                    - img
+                - list [ref=e102]:
+                  - listitem "第 1 页" [ref=e103]: "1"
+                  - listitem "第 2 页" [ref=e829] [cursor=pointer]: "2"
+                - button "下一页" [ref=e104] [cursor=pointer]:
+                  - generic:
+                    - img

@@ -84,7 +84,7 @@ async function loadData() {
     loading.value = true
     try {
         const res = await fetchDepartments()
-        const list = (res.data || []) as Record<string,string>[]
+        const list = ((res.data || []) as unknown) as { dept_cd: string; dept_nm: string }[]
         deptOptions.value = list.filter(d => d.dept_cd)
         total.value = list.length
         depts.value = list.slice((page.value - 1) * perPage.value, page.value * perPage.value)

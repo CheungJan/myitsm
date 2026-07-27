@@ -1,6 +1,6 @@
 # 完整数据库字典（myitsm）
 
-> 生成时间：2026-05-13 | 数据库：myitsm | PostgreSQL 18.3 (Homebrew) | 存储：715 MB
+> 生成时间：2026-05-13 | 更新：2026-07-22 | 数据库：myitsm | PostgreSQL | v1.7 +D2/D3视图优化(工单级聚合+回溯faultcode+优化列)
 > 🟢=自动生成（information_schema）| 🟡=手动维护 | 🔗=引用ER文档
 > 配套：`数据库ER关系文档.md`（ER关联）| `数据库变更追踪_迁移后.md`（变更历史）
 
@@ -10,7 +10,7 @@
 
 | 指标 | 值 |
 |------|----|
-| 业务表总数 | 142 |
+| 业务表总数 | 146 |
 | 非主键索引 | 16 |
 | 数据库大小 | 715 MB |
 
@@ -22,9 +22,11 @@
 | 主数据 (tmm) | 25 | 客户/物料/设备/供应商/区域（不含押金） |
 | ITSM 核心 (tit) | 33 | 维护/翻新/开通/归档/变更 |
 | 仓储 (twh) | 15 | 入库/出库/库存/调拨 |
-| 采购 (tpc/tmp) | 11 | 采购计划/订单/验收 |
+| 采购 (tpc) | 11 | 采购计划/订单 |
 | 销售 (tsl) | 3 | 销售/延期 |
-| 财务 (tfn/tac/tht) | 7 | 账务/支付/合同/发票 |
+| 财务 (tfn) | 5 | 账务/支付 |
+| 财务 (tac/tht) | 1 | 合同/发票 |
+| 财务 (tht) | 1 | 合同管理 |
 | 考勤 (tkq) | 2 | 考勤 |
 | 库存预警 (tiv) | 4 | 预警规则/库存明细 |
 | 结算 (tbl) | 4 | 结算规则/账单 |
@@ -32,13 +34,14 @@
 | SLA (sla) | 2 | 服务级别 |
 | 门户 (tpt) | 3 | 自助报修/评价 |
 | IoT (tio) | 4 | 设备接入/监控 |
-| MES (tms) | 4 | 生产工单/工序 |
+| MES (tms) | 5 | 生产工单/工序 |
 | 押金 (tmm61) | 5 | 押金管理 |
 | 质检 (tqc) | 3 | 质检结果 |
 | 调拨 (ttx) | 1 | 调拨科目 |
-| 价格 (tip) | 2 | 价格规则 |
+| 价格 (tip) | 3 | 价格规则 |
 | 预计划 (plan) | 1 | 预计划客户 |
-| **合计** | **142** | |
+| 采购验收 (tmp) | 1 | 采购验收明细 |
+| **合计** | **144** | |
 
 ---
 
@@ -118,6 +121,7 @@
 | 4 | created_at | TIMESTAMP | NOT NULL |  |
 | 5 | updated_at | TIMESTAMP | NOT NULL |  |
 | 6 | useflg | VARCHAR(1) |  | 有效标志 |
+| 7 | leader_cd | VARCHAR(6) |  | 组长用户编码（2026-07-15新增，FK→tmc13_users.user_cd） |
 
 #### 6. tmc13_users
 
@@ -135,6 +139,7 @@
 | 10 | passwd | VARCHAR(128) |  | 原始密码（数据迁移用） |
 | 11 | credamt | NUMERIC(12,2) |  | 信用额度 |
 | 12 | useflg | VARCHAR(1) |  | 有效标志 |
+| 13 | default_whcd | VARCHAR(2) |  | 默认仓库编码（2026-07-20新增，FK→twh01_warehouse.whcd） |
 
 #### 7. tmc21_usergroup
 
@@ -236,9 +241,12 @@
 
 #### 2. tmm02_country
 
+> ⚠️ **老系统地理码表（保留不动，新业务使用 geo_* 系列表）**  
+> 编码体系为 Oracle 原系统自定义短码，非国标行政区划码。
+
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | country_cd | VARCHAR(3) | PK NOT NULL | 国家代码 |
+| 1 | country_cd | VARCHAR(3) | PK NOT NULL | 国家代码（老系统自定义，如191=中国） |
 | 2 | country_nm | VARCHAR(50) | NOT NULL | 国家名称 |
 | 3 | useflg | VARCHAR(1) |  | 有效标志 |
 | 4 | created_at | TIMESTAMP | NOT NULL |  |
@@ -246,33 +254,43 @@
 
 #### 3. tmm03_province
 
+> ⚠️ **老系统地理码表（保留不动，新业务使用 geo_province）**  
+> 编码为自定义2位短码（如09=上海），含港澳台（32/33/34），共34条。
+
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | prvn_cd | VARCHAR(2) | PK NOT NULL | 省份代码 |
+| 1 | prvn_cd | VARCHAR(2) | PK NOT NULL | 省份代码（老系统自定义，如09=上海、01=北京） |
 | 2 | prvn_nm | VARCHAR(50) | NOT NULL | 省份名称 |
-| 3 | country_cd | VARCHAR(3) |  | 国家代码 |
+| 3 | country_cd | VARCHAR(3) |  | 国家代码（关联tmm02_country） |
 | 4 | useflg | VARCHAR(1) |  | 有效标志 |
 | 5 | created_at | TIMESTAMP | NOT NULL |  |
 | 6 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 4. tmm04_city
 
+> ⚠️ **老系统地理码表（保留不动，新业务使用 geo_area）**  
+> 注意：本表实为**区级**数据（省直辖市的区直挂省下），并非国标地级市层级。  
+> 含已撤销区划（卢湾区/南汇区/闸北区/崇明县等），共436条。
+
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | city_cd | VARCHAR(4) | PK NOT NULL | 城市代码 |
-| 2 | city_nm | VARCHAR(50) | NOT NULL | 城市名称 |
-| 3 | prvn_cd | VARCHAR(2) |  | 省份代码 |
+| 1 | city_cd | VARCHAR(4) | PK NOT NULL | 区级代码（老系统自定义4位短码，如0121=浦东新区） |
+| 2 | city_nm | VARCHAR(50) | NOT NULL | 区名称（含已撤销区划） |
+| 3 | prvn_cd | VARCHAR(2) |  | 省份代码（关联tmm03_province） |
 | 4 | useflg | VARCHAR(1) |  | 有效标志 |
 | 5 | created_at | TIMESTAMP | NOT NULL |  |
 | 6 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 5. tmm05_town
 
+> ⚠️ **老系统地理码表（保留不动，新业务使用 geo_street）**  
+> 本表在迁移后 `town_cd` 数据全为空（tmm22_customers.town_cd 全NULL），实际未使用。共2778条。
+
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | town_cd | VARCHAR(4) | PK NOT NULL | 区县代码 |
+| 1 | town_cd | VARCHAR(4) | PK NOT NULL | 区县代码（老系统自定义，迁移后客户表town_cd全为空） |
 | 2 | town_nm | VARCHAR(50) | NOT NULL | 区县名称 |
-| 3 | city_cd | VARCHAR(4) |  | 城市代码 |
+| 3 | city_cd | VARCHAR(4) |  | 城市代码（关联tmm04_city） |
 | 4 | useflg | VARCHAR(1) |  | 有效标志 |
 | 5 | created_at | TIMESTAMP | NOT NULL |  |
 | 6 | updated_at | TIMESTAMP | NOT NULL |  |
@@ -289,6 +307,9 @@
 | 6 | classtyp | VARCHAR(1) |  | 分类类型 |
 | 7 | childflg | VARCHAR(1) |  | 子节点标志 |
 | 8 | useflg | VARCHAR(1) |  | 有效标志 |
+| 9 | opercd | VARCHAR(6) |  |  |
+| 10 | gendate | TIMESTAMP |  |  |
+| 11 | upddate | TIMESTAMP |  |  |
 
 #### 7. tmm12_items
 
@@ -385,7 +406,7 @@
 | 2 | cust_nm | VARCHAR(100) | NOT NULL | 客户名称 |
 | 3 | cust_card | VARCHAR(30) |  | 磁卡号 |
 | 4 | class_cd | VARCHAR(20) |  | 客户分类 |
-| 5 | area_cd | VARCHAR(20) |  | 区域编码 |
+| 5 | area_cd | VARCHAR(20) |  | 区域编码（关联tmm46_area.area_cd，原Oracle TMM22.AREA整数已回填至此） |
 | 6 | address | VARCHAR(200) |  | 地址 |
 | 7 | phone_no | VARCHAR(30) |  | 电话 |
 | 8 | contactor | VARCHAR(50) |  | 联系人 |
@@ -395,7 +416,7 @@
 | 12 | ppt_code | VARCHAR(20) |  | 品牌编码 |
 | 13 | zf_type | VARCHAR(10) |  | 支付方式 |
 | 14 | comm_mode | VARCHAR(20) |  | 通讯方式 |
-| 15 | store_cd | VARCHAR(30) |  | 门店编码 |
+| 15 | store_cd | VARCHAR(30) |  | ⚠️**废弃**：Oracle原表无此字段，数据全为空，与cust_cd功能重复，待删除 |
 | 16 | created_at | TIMESTAMP | NOT NULL |  |
 | 17 | updated_at | TIMESTAMP | NOT NULL |  |
 | 18 | cust_anm | VARCHAR(40) |  | 客户别名 |
@@ -408,7 +429,7 @@
 | 25 | parentcd | VARCHAR(8) |  | 上级客户编码 |
 | 26 | backup | VARCHAR(200) |  | 备注 |
 | 27 | location | VARCHAR(1) |  | 位置标志 |
-| 28 | area | INTEGER |  | 区域编号 |
+| 28 | area | INTEGER |  | ⚠️**废弃**：Oracle原表AREA整数（关联TMM46_AREA.ID），迁移后由area_cd替代，数据已回填至area_cd，不再写入，待删除 |
 | 29 | pos_n | INTEGER |  | POS数量 |
 | 30 | opersystem | VARCHAR(128) |  | POS操作系统 |
 | 31 | data_base | VARCHAR(128) |  | POS数据库版本 |
@@ -433,10 +454,14 @@
 | 50 | verified_at | TIMESTAMP |  | 转正时间 |
 | 51 | preplan_id | VARCHAR(50) |  | 关联预计划号 |
 | 52 | valid_until | TIMESTAMP |  | 临时客户有效期 |
-| 53 | country_cd | VARCHAR(3) |  | 国家代码 |
-| 54 | prvn_cd | VARCHAR(2) |  | 省份代码 |
-| 55 | city_cd | VARCHAR(4) |  | 城市代码 |
-| 56 | town_cd | VARCHAR(4) |  | 区县代码 |
+| 53 | country_cd | VARCHAR(3) |  | ⚠️**废弃**：老系统自定义国家码（191=中国），由geo_prvn_cd等替代，待删除 |
+| 54 | prvn_cd | VARCHAR(2) |  | ⚠️**废弃**：老系统自定义省份码（09=上海），由geo_prvn_cd替代，待删除 |
+| 55 | city_cd | VARCHAR(4) |  | ⚠️**废弃**：老系统自定义区级码（如0121=浦东新区），已回填至geo_area_cd，待删除 |
+| 56 | town_cd | VARCHAR(4) |  | ⚠️**废弃**：老系统区县码，迁移后全为空，由geo_area_cd替代，待删除 |
+| 57 | geo_prvn_cd | VARCHAR(6) |  | 国标省级代码（关联geo_province.code，如31=上海市，已回填11020条） |
+| 58 | geo_city_cd | VARCHAR(6) |  | 国标地级市代码（关联geo_city.code，如3101=上海市辖区，已回填11020条） |
+| 59 | geo_area_cd | VARCHAR(6) |  | 国标区县代码（关联geo_area.code，如310101=黄浦区，已回填11020条） |
+| 60 | geo_street_cd | VARCHAR(12) |  | 国标街道代码（关联geo_street.code，如310101002=南京东路街道，新录入时通过前端四级联动填入） |
 
 #### 12. tmm22_customers_history
 
@@ -559,24 +584,41 @@
 | 18 | created_at | TIMESTAMP | NOT NULL |  |
 | 19 | updated_at | TIMESTAMP | NOT NULL |  |
 
-#### 18. tmm41_bom
+#### 17b. tmm40_label ⚠️ 新增迁移 (2026-05-16)
+
+> 来源：ortopbitsmdb | 行数：164,690 | 模型：`app/models/inventory.py:Label`
+> API：`GET /api/v1/inventory/labels` | 前端：`库存管理 → 标签管理`
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | bomcd | VARCHAR(6) | PK NOT NULL | BOM编码 |
-| 2 | bomnm | VARCHAR(50) |  | BOM名称 |
+| 1 | labelid | VARCHAR(20) | PK NOT NULL | 标签ID |
+| 2 | classcd | VARCHAR(10) |  | 分类编码 |
 | 3 | opercd | VARCHAR(6) |  | 操作员 |
 | 4 | gendate | TIMESTAMP |  | 创建日期 |
 | 5 | upddate | TIMESTAMP |  | 更新日期 |
 | 6 | useflg | VARCHAR(1) |  | 有效标志 |
-| 7 | created_at | TIMESTAMP | NOT NULL |  |
-| 8 | updated_at | TIMESTAMP | NOT NULL |  |
+| 7 | created_at | TIMESTAMP |  |  |
+| 8 | updated_at | TIMESTAMP |  |  |
+
+#### 18. tmm41_bom
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | bomcd | VARCHAR(20) | PK NOT NULL | BOM编码 |
+| 2 | bomnm | VARCHAR(50) |  | BOM名称 |
+| 3 | opercd | VARCHAR(6) |  | 操作员 |
+| 4 | gendate | TIMESTAMP |  | 创建日期 |
+| 5 | upddate | TIMESTAMP |  | 更新日期 |
+| 6 | useflg | VARCHAR(1) |  | 有效/在产标志（1=在产可选/0=停产，对齐PB Bom.useflg语义，预计划机型下拉用此过滤） |
+| 7 | redundancy_ratio | NUMERIC(5,4) |  | 补料冗余比例 |
+| 8 | created_at | TIMESTAMP | NOT NULL |  |
+| 9 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 19. tmm42_bomdt
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | bomcd | VARCHAR(6) | PK NOT NULL | BOM编码 |
+| 1 | bomcd | VARCHAR(20) | PK NOT NULL | BOM编码 |
 | 2 | itemcd | VARCHAR(6) | PK NOT NULL | 物料编码 |
 | 3 | bomqty | NUMERIC(12,0) |  | BOM数量 |
 | 4 | opercd | VARCHAR(6) |  | 操作员 |
@@ -609,11 +651,13 @@
 | 17 | isunit | VARCHAR(1) |  | 是否整机 |
 | 18 | created_at | TIMESTAMP | NOT NULL |  |
 | 19 | updated_at | TIMESTAMP | NOT NULL |  |
-| 20 | asset_type | VARCHAR(10) |  |  |
-| 21 | recyclable | BOOLEAN |  |  |
-| 22 | recycle_status | VARCHAR(10) |  |  |
-| 23 | asset_owner | VARCHAR(20) |  |  |
-| 24 | install_date | TIMESTAMP |  |  |
+| 20 | asset_type | VARCHAR(10) |  | 资产类型（AT码表：01新机/02旧机/03翻新机/04报废） |
+| 21 | recyclable | BOOLEAN |  | 可回收标志 |
+| 22 | recycle_status | VARCHAR(10) |  | 回收状态（RS码表） |
+| 23 | asset_owner | VARCHAR(20) |  | 资产所属方（OW码表：01商用电子/02通方信息/03门店资产/04海晟） |
+| 24 | install_date | TIMESTAMP |  | 安装日期 |
+| 25 | ref_eid | VARCHAR(13) |  | 来源EID（翻新溯源链，OV=10翻新出库→IV=6翻新入库后写入，可递归追溯） |
+| 26 | reserve_planno | VARCHAR(20) |  | 预占预计划号（方案A：创建预计划选posid时锁定；出库审核/作废后释放为NULL） |
 
 #### 21. tmm43_eid_track
 
@@ -631,14 +675,14 @@
 | 8 | useflg | VARCHAR(1) |  | 有效标志 |
 | 9 | etyp | VARCHAR(1) |  | 设备类型 |
 | 10 | sflg | VARCHAR(1) |  | 状态标志 |
-| 11 | refid | VARCHAR(8) |  | 关联单号 |
+| 11 | refid | VARCHAR(20) |  | 关联单号（预计划号/出库单号/维护单号） |
 | 12 | qcflg | VARCHAR(2) |  | 质检标志 |
 | 13 | whcd | VARCHAR(2) |  | 仓库编码 |
 | 14 | prddate | TIMESTAMP |  | 生产日期 |
 | 15 | itemtyp | VARCHAR(2) |  | 物料类型 |
 | 16 | new_old | VARCHAR(1) |  | 新旧标志 |
 | 17 | n_sflg | VARCHAR(1) |  | 新状态标志 |
-| 18 | n_refid | VARCHAR(8) |  | 新关联单号 |
+| 18 | n_refid | VARCHAR(20) |  | 新关联单号（变更后关联单号） |
 | 19 | n_qcflg | VARCHAR(2) |  | 新质检标志 |
 | 20 | n_whcd | VARCHAR(2) |  | 新仓库编码 |
 | 21 | n_prddate | TIMESTAMP |  | 新生产日期 |
@@ -654,18 +698,18 @@
 | 31 | n_old_degree | numeric |  | 新旧化程度 |
 | 32 | created_at | TIMESTAMP | NOT NULL |  |
 | 33 | updated_at | TIMESTAMP | NOT NULL |  |
-| 34 | install_date | TIMESTAMP |  |  |
-| 35 | n_install_date | TIMESTAMP |  |  |
-| 36 | cust_cd | VARCHAR(20) |  |  |
-| 37 | n_cust_cd | VARCHAR(20) |  |  |
-| 38 | asset_type | VARCHAR(10) |  |  |
-| 39 | n_asset_type | VARCHAR(10) |  |  |
-| 40 | recyclable | VARCHAR(1) |  |  |
-| 41 | n_recyclable | VARCHAR(1) |  |  |
-| 42 | recycle_status | VARCHAR(10) |  |  |
-| 43 | n_recycle_status | VARCHAR(10) |  |  |
-| 44 | asset_owner | VARCHAR(20) |  |  |
-| 45 | n_asset_owner | VARCHAR(20) |  |  |
+| 34 | install_date | TIMESTAMP |  | 安装日期 |
+| 35 | n_install_date | TIMESTAMP |  | 新安装日期 |
+| 36 | cust_cd | VARCHAR(20) |  | 变更前客户 |
+| 37 | n_cust_cd | VARCHAR(20) |  | 变更后客户 |
+| 38 | asset_type | VARCHAR(10) |  | 资产类型 |
+| 39 | n_asset_type | VARCHAR(10) |  | 新资产类型 |
+| 40 | recyclable | VARCHAR(1) |  | 可回收标志 |
+| 41 | n_recyclable | VARCHAR(1) |  | 新可回收标志 |
+| 42 | recycle_status | VARCHAR(10) |  | 回收状态 |
+| 43 | n_recycle_status | VARCHAR(10) |  | 新回收状态 |
+| 44 | asset_owner | VARCHAR(20) |  | 资产所属方 |
+| 45 | n_asset_owner | VARCHAR(20) |  | 新资产所属方 |
 
 #### 22. tmm44_pos_r_eid
 
@@ -688,28 +732,19 @@
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | area_cd | VARCHAR(20) | PK NOT NULL | 区域编码 |
+| 1 | area_cd | VARCHAR(20) | PK NOT NULL | 区域编码（原Oracle TMM46_AREA.ID，迁移后字符串化为主键，值为纯数字字符串） |
 | 2 | area_nm | VARCHAR(50) | NOT NULL | 区域名称 |
-| 3 | parent_cd | VARCHAR(20) |  | 上级区域 |
+| 3 | parent_cd | VARCHAR(20) |  | 上级区域【扩展字段，Oracle原表无此字段，当前全为空，待后续启用】 |
 | 4 | useflg | VARCHAR(1) |  | 有效标志 |
 | 5 | created_at | TIMESTAMP | NOT NULL |  |
 | 6 | updated_at | TIMESTAMP | NOT NULL |  |
-| 7 | area_id | INTEGER |  | 区域ID |
-| 8 | name | VARCHAR(50) |  | 区域全称 |
+| 7 | area_id | INTEGER |  | ⚠️**废弃**：Oracle原表ID的整数备份，已回填为area_cd::int，业务代码不再使用，待删除 |
+| 8 | name | VARCHAR(50) |  | ⚠️**废弃**：Oracle原表NAME的备份，已迁移至area_nm，业务代码不再使用，待删除 |
 | 9 | usercd | VARCHAR(6) |  | 负责人编码 |
 
-#### 24. tmm47_commode
+#### 24. tmm47_commode（已废弃，2026-07-13 drop）
 
-| # | 列名 | 类型 | 约束 | 说明 |
-|---|------|------|------|------|
-| 1 | cmm_cd | VARCHAR(20) | PK NOT NULL | 通讯方式编码 |
-| 2 | cmm_nm | VARCHAR(50) | NOT NULL | 通讯方式名称 |
-| 3 | cmm_type | VARCHAR(10) |  | 类型 |
-| 4 | useflg | VARCHAR(1) |  | 有效标志 |
-| 5 | created_at | TIMESTAMP | NOT NULL |  |
-| 6 | updated_at | TIMESTAMP | NOT NULL |  |
-| 7 | parent | VARCHAR(20) |  | 上级编码 |
-| 8 | childflg | VARCHAR(1) |  | 子节点标志 |
+> 数据已迁移至 `tmm31_syscodes`（`code_typ='CM'`），旧表已删除。前端通过 `useDict('CM')` 读取，后端 `system_service.py` 补充 `comm_mode_nm`。
 
 #### 25. tmm62_asset_attrib_list
 
@@ -725,6 +760,25 @@
 | 8 | created_at | TIMESTAMP | NOT NULL |  |
 | 9 | updated_at | TIMESTAMP | NOT NULL |  |
 
+
+#### 26. tmm52_posstatus ⚠️ 新增迁移/标记废弃 (2026-05-16)
+
+> 来源：ortopbitsmdb | 行数：9 | 模型：`app/models/itsm.py:PosStatus`
+> ⚠️ 与 TMM31_SYSCODES (code_typ='ST'/'ZZ') 完全重合，建议使用系统字典替代
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | id | BIGINT | PK AUTO | 主键 |
+| 2 | codecd | VARCHAR(50) |  | 主状态编码（→tmm31_syscodes ST） |
+| 3 | codecd1 | VARCHAR(50) |  | 子状态编码（→tmm31_syscodes ZZ） |
+| 4 | memo | VARCHAR(200) |  | 备注 |
+| 5 | sysflg | VARCHAR(1) |  | 系统标志 |
+| 6 | opercd | VARCHAR(6) |  | 操作员 |
+| 7 | gendate | TIMESTAMP |  | 创建日期 |
+| 8 | upddate | TIMESTAMP |  | 更新日期 |
+| 9 | useflg | VARCHAR(1) |  | 有效标志 |
+| 10 | created_at | TIMESTAMP |  |  |
+| 11 | updated_at | TIMESTAMP |  |  |
 
 ### ITSM 核心 (tit) — 33 张表
 > 维护/翻新/开通/归档/变更
@@ -803,12 +857,12 @@
 
 #### 6. tit06_userarea
 
-**索引**: `uq_userarea` (area_id, user_cd)
+**索引**: `uq_userarea` (area_cd, user_cd)
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | id | INTEGER | PK NOT NULL |  |
-| 2 | area_id | INTEGER | NOT NULL | 区域ID |
+| 2 | area_cd | VARCHAR(20) | NOT NULL | 区域编码（FK→tmm46_area.area_cd） |
 | 3 | user_cd | VARCHAR(6) | NOT NULL | 人员编号 |
 | 4 | created_at | TIMESTAMP | NOT NULL |  |
 | 5 | updated_at | TIMESTAMP | NOT NULL |  |
@@ -1293,6 +1347,15 @@
 | 19 | posstatus1 | VARCHAR(2) |  | POS状态1 |
 | 20 | created_at | TIMESTAMP | NOT NULL |  |
 | 21 | updated_at | TIMESTAMP | NOT NULL |  |
+| 22 | gzdm | VARCHAR(8) |  | 故障代码 8 位（2026-07-20新增） |
+| 23 | device_id | VARCHAR(13) |  | 本次处理设备（2026-07-20新增） |
+| 24 | accessories_id | VARCHAR(13) |  | 本次处理配件（2026-07-20新增） |
+| 25 | d2d_phenomenon | VARCHAR(200) |  | 实际现象（2026-07-20新增） |
+| 26 | d2d_reason | VARCHAR(200) |  | 原因（2026-07-20新增） |
+| 27 | d2d_handling | VARCHAR(500) |  | 处理过程（2026-07-20新增） |
+| 28 | d2d_result | VARCHAR(2) |  | 结果（ZT字典码值，2026-07-20新增）：5已解决/4未解决/6转修/7待配件/3关闭 |
+| 29 | closure_reason | VARCHAR(1) |  | 关闭原因（仅 d2d_result=3 时填，CLO_REASON 字典，2026-07-20新增） |
+| 30 | d2d_note | VARCHAR(200) |  | 其他补充（2026-07-20新增） |
 
 #### 27. tit24_maintenance_rv
 
@@ -1338,11 +1401,20 @@
 | 20 | updator | VARCHAR(6) |  | 更新人 |
 | 21 | auditflg | VARCHAR(1) |  | 提交标志 |
 | 22 | posflg | VARCHAR(1) |  | 更换整机标志 |
-| 23 | c_type | VARCHAR(1) |  | 操作类型（1维修/2购买） |
+| 23 | c_type | VARCHAR(1) |  | 操作类型（1维修/2购买/3非更换服务/4整机更换/5耗材线材）2026-07-20扩展 |
 | 24 | created_at | TIMESTAMP | NOT NULL |  |
 | 25 | updated_at | TIMESTAMP | NOT NULL |  |
+| 26 | paytype | VARCHAR(30) |  | 收费类型（2026-07-20新增，吸收 TIT26） |
+| 27 | payje | NUMERIC(10,3) |  | 收款金额（2026-07-20新增，吸收 TIT26） |
+| 28 | paydate | TIMESTAMP |  | 收款日期（2026-07-20新增，吸收 TIT26） |
+| 29 | memo | VARCHAR(250) |  | 备注（2026-07-20新增，吸收 TIT26） |
+| 30 | itemcd | VARCHAR(13) |  | 配件物料编码（2026-07-22新增，B3：关联故障代码用） |
+| 31 | fault_cd | VARCHAR(8) |  | 故障代码（2026-07-22新增，B3：配件更换时自动关联） |
+| 32 | version | INTEGER |  | 乐观锁版本号（2026-07-22新增） |
 
-#### 29. tit26_paylist
+#### 29. tit26_paylist ⚠️ 已废弃（2026-07-20）
+
+> 新业务只写 TIT25，此表仅保留历史数据查询。
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
@@ -1456,6 +1528,34 @@
 | 16 | cause_mian | VARCHAR(20) |  | 原因大类（Oracle原字段名） |
 
 
+#### 34. tit30_dispatch_rule
+
+> 2026-07-15 新增。派单规则引擎：故障类型→目标→两级兜底链。
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | rule_id | INTEGER | PK | 规则ID |
+| 2 | rule_name | VARCHAR(50) | NOT NULL | 规则名称 |
+| 3 | priority | INTEGER | | 优先级（小优先） |
+| 4 | fault_type | VARCHAR(2) | | 故障类型（空=全匹配） |
+| 5 | store_id | VARCHAR(8) | | 门店编码（预留） |
+| 6 | target_type | VARCHAR(20) | | area_manager/group_leader/manual |
+| 7 | target_value | VARCHAR(20) | | 目标值 |
+| 8 | fallback_type | VARCHAR(20) | | 一级兜底 |
+| 9 | fallback_value | VARCHAR(20) | | 一级兜底值 |
+| 10 | ultimate_fallback_type | VARCHAR(20) | | 最终兜底 |
+| 11 | ultimate_fallback_value | VARCHAR(20) | | 最终兜底值 |
+| 12 | useflg | VARCHAR(1) | | 有效标志 |
+| 13 | creator | VARCHAR(6) | | 创建人 |
+| 14 | create_time | TIMESTAMP | | 创建时间 |
+| 15 | updator | VARCHAR(6) | | 更新人 |
+| 12a | auto_dispatch | VARCHAR(1) | | 自动派单开关 1=启用/0=禁用（2026-07-16新增） |
+| 16 | update_time | TIMESTAMP | | 更新时间 |
+| 17 | created_at | TIMESTAMP | | 创建时间（TimestampMixin，2026-07-15补） |
+| 18 | updated_at | TIMESTAMP | | 更新时间（TimestampMixin，2026-07-15补） |
+
+**预置规则**：P10 POS→区域负责人 / P20 视频→A1组长 / P30 取机→区域负责人 / P99 兜底→A1组长
+
 ### 仓储 (twh) — 15 张表
 > 入库/出库/库存/调拨
 
@@ -1479,8 +1579,9 @@
 | 14 | whtransflg | VARCHAR(1) |  | 仓储流转标志 |
 | 15 | created_at | TIMESTAMP | NOT NULL |  |
 | 16 | updated_at | TIMESTAMP | NOT NULL |  |
+| 17 | area_id | INTEGER |  | 仓库所属划区（2026-07-20新增，FK→tmm46_area.id） |
 
-#### 2. twh11_detail
+#### 2. twh11_detail--全仓库库存余量表
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
@@ -1508,7 +1609,7 @@
 | 5 | prddate | TIMESTAMP |  | 生产日期 |
 | 6 | billid | VARCHAR(8) |  | 单据号 |
 | 7 | invdate | TIMESTAMP |  | 库存日期 |
-| 8 | invtyp | VARCHAR(1) |  | 出入库类型 |
+| 8 | invtyp | VARCHAR(2) |  | 出入库类型 |
 | 9 | itemqty | INTEGER |  | 变动数量 |
 | 10 | storeqty | INTEGER |  | 库存余量 |
 | 11 | opercd | VARCHAR(6) |  | 操作员 |
@@ -1525,8 +1626,8 @@
 | 1 | inbillid | VARCHAR(8) | PK NOT NULL | 入库单号 |
 | 2 | whcd | VARCHAR(2) | NOT NULL | 仓库编码 |
 | 3 | indate | TIMESTAMP |  | 入库日期 |
-| 4 | invtyp | VARCHAR(1) | NOT NULL | 入库类型 |
-| 5 | refbillid | VARCHAR(8) |  | 关联单据号 |
+| 4 | invtyp | VARCHAR(2) | NOT NULL | 入库类型 |
+| 5 | refbillid | VARCHAR(30) |  | 关联单据号 |
 | 6 | ptimes | INTEGER |  | 打印次数 |
 | 7 | memo | VARCHAR(255) |  | 备注 |
 | 8 | opercd | VARCHAR(6) |  | 操作员 |
@@ -1555,8 +1656,12 @@
 | 9 | inqty | INTEGER |  | 入库数量 |
 | 10 | reflineno | INTEGER |  | 关联行号 |
 | 11 | s_money | NUMERIC(10,2) |  | 金额 |
-| 12 | created_at | TIMESTAMP | NOT NULL |  |
-| 13 | updated_at | TIMESTAMP | NOT NULL |  |
+| 12 | ref_rgstbillid | VARCHAR(8) |  | 采购订单号（冗余，非采购入库为空） |
+| 13 | ref_rgstlineno | INTEGER |  | 采购订单行号（冗余，非采购入库为空） |
+| 14 | eid | VARCHAR(13) |  | 设备EID（非空=EID模式入库） |
+| 15 | seid | VARCHAR(30) |  | 序列号 |
+| 16 | created_at | TIMESTAMP | NOT NULL |  |
+| 17 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 6. twh15_out
 
@@ -1565,7 +1670,7 @@
 | 1 | outbillid | VARCHAR(8) | PK NOT NULL | 出库单号 |
 | 2 | whcd | VARCHAR(2) | NOT NULL | 仓库编码 |
 | 3 | outdate | TIMESTAMP |  | 出库日期 |
-| 4 | invtyp | VARCHAR(1) | NOT NULL | 出库类型 |
+| 4 | invtyp | VARCHAR(2) | NOT NULL | 出库类型 |
 | 5 | ptimes | INTEGER |  | 打印次数 |
 | 6 | memo | VARCHAR(255) |  | 备注 |
 | 7 | opercd | VARCHAR(6) |  | 操作员 |
@@ -1577,8 +1682,9 @@
 | 13 | useflg | VARCHAR(1) |  | 有效标志 |
 | 14 | targetwhcd | VARCHAR(2) |  | 目标仓库（调拨） |
 | 15 | suppcd | VARCHAR(8) |  | 供应商编码（退货） |
-| 16 | created_at | TIMESTAMP | NOT NULL |  |
-| 17 | updated_at | TIMESTAMP | NOT NULL |  |
+| 16 | refbillid | VARCHAR(30) |  | 关联单据号 |
+| 17 | created_at | TIMESTAMP | NOT NULL |  |
+| 18 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 7. twh16_outdteid
 
@@ -1596,8 +1702,14 @@
 | 10 | qcqty | INTEGER |  | 质检数量 |
 | 11 | reflineno | INTEGER |  | 关联行号 |
 | 12 | s_money | NUMERIC(10,2) |  | 金额 |
-| 13 | created_at | TIMESTAMP | NOT NULL |  |
-| 14 | updated_at | TIMESTAMP | NOT NULL |  |
+| 13 | closed_flg | VARCHAR(1) |  | 结案标志 0=未结案 1=已结案 |
+| 14 | closed_reason | VARCHAR(100) |  | 结案原因 |
+| 15 | closed_by | VARCHAR(6) |  | 结案操作人 |
+| 16 | closed_at | TIMESTAMP |  | 结案时间 |
+| 17 | ref_inbillid | VARCHAR(8) |  | 来源入库单号（质检出库追溯） |
+| 18 | ref_planno | VARCHAR(12) |  | 来源预计划号（批量出库方案B：明细行记来源预计划） |
+| 19 | created_at | TIMESTAMP | NOT NULL |  |
+| 20 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 8. twh16_outdtprd
 
@@ -1614,8 +1726,14 @@
 | 9 | qcqty | INTEGER |  | 质检数量 |
 | 10 | reflineno | INTEGER |  | 关联行号 |
 | 11 | s_money | NUMERIC(10,2) |  | 金额 |
-| 12 | created_at | TIMESTAMP | NOT NULL |  |
-| 13 | updated_at | TIMESTAMP | NOT NULL |  |
+| 12 | closed_flg | VARCHAR(1) |  | 结案标志 0=未结案 1=已结案 |
+| 13 | closed_reason | VARCHAR(100) |  | 结案原因 |
+| 14 | closed_by | VARCHAR(6) |  | 结案操作人 |
+| 15 | closed_at | TIMESTAMP |  | 结案时间 |
+| 16 | ref_inbillid | VARCHAR(8) |  | 来源入库单号（质检出库追溯） |
+| 17 | ref_planno | VARCHAR(12) |  | 来源预计划号（批量出库方案B：明细行记来源预计划） |
+| 18 | created_at | TIMESTAMP | NOT NULL |  |
+| 19 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 9. twh17_overlost
 
@@ -1752,7 +1870,7 @@
 | 12 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-### 采购 (tpc/tmp) — 11 张表
+### 采购 (tpc) — 11 张表
 > 采购计划/订单
 
 #### 1. tpc01_pcplan
@@ -1761,7 +1879,7 @@
 |---|------|------|------|------|
 | 1 | pcplanid | VARCHAR(8) | PK NOT NULL | 采购计划号 |
 | 2 | slbillid | VARCHAR(8) |  | 关联销售单号 |
-| 3 | pctyp | VARCHAR(1) |  | 采购类型 |
+| 3 | pctyp | VARCHAR(2 |  | 采购类型 |
 | 4 | ptimes | INTEGER |  | 打印次数 |
 | 5 | opercd | VARCHAR(6) |  | 操作员 |
 | 6 | memo | VARCHAR(255) |  | 备注 |
@@ -1806,7 +1924,7 @@
 | 7 | gendate | TIMESTAMP |  | 创建日期 |
 | 8 | useflg | VARCHAR(1) |  | 有效标志 |
 | 9 | upddate | TIMESTAMP |  | 更新日期 |
-| 10 | refbillid | VARCHAR(8) |  | 关联单号 |
+| 10 | refbillid | VARCHAR(30) |  | 关联单号 |
 | 11 | created_at | TIMESTAMP | NOT NULL |  |
 | 12 | updated_at | TIMESTAMP | NOT NULL |  |
 
@@ -1849,60 +1967,108 @@
 | 12 | created_at | TIMESTAMP | NOT NULL |  |
 | 13 | updated_at | TIMESTAMP | NOT NULL |  |
 
-#### 6. tpc14_pcbill
+#### 6. tpc14_pcbill — 采购结算单主表
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | pcbillid | VARCHAR(8) | PK NOT NULL | 采购单号 |
+| 1 | pcbillid | VARCHAR(8) | PK NOT NULL | 结算单号（SB前缀，IdMaster取号） |
 | 2 | pctyp | VARCHAR(2) |  | 采购类型 |
-| 3 | custcd | VARCHAR(8) |  | 客户编码 |
-| 4 | refbillid | VARCHAR(8) |  | 关联单号 |
-| 5 | pcdate | TIMESTAMP |  | 采购日期 |
-| 6 | pcamt | NUMERIC(16,4) |  | 采购金额 |
-| 7 | whcd | VARCHAR(2) |  | 入库仓库 |
-| 8 | invoiceflg | VARCHAR(1) |  | 发票标志 |
-| 9 | ptimes | INTEGER |  | 打印次数 |
-| 10 | opercd | VARCHAR(6) |  | 操作员 |
-| 11 | memo | VARCHAR(255) |  | 备注 |
-| 12 | gendate | TIMESTAMP |  | 创建日期 |
-| 13 | useflg | VARCHAR(1) |  | 有效标志 |
-| 14 | created_at | TIMESTAMP | NOT NULL |  |
-| 15 | updated_at | TIMESTAMP | NOT NULL |  |
+| 3 | suppliercd | VARCHAR(8) |  | 供应商编码（由custcd重命名） |
+| 4 | pcdate | TIMESTAMP |  | 结算日期 |
+| 5 | whcd | VARCHAR(2) |  | 入库仓库 |
+| 6 | invoiceflg | VARCHAR(1) |  | 发票标志（0=未开票, 1=已开票） |
+| 7 | ptimes | INTEGER |  | 打印次数 |
+| 8 | opercd | VARCHAR(6) |  | 操作员 |
+| 9 | memo | VARCHAR(255) |  | 备注 |
+| 10 | gendate | TIMESTAMP |  | 创建日期 |
+| 11 | useflg | VARCHAR(1) |  | 有效标志（1=有效, 9=作废） |
+| 12 | ref_rgstbillid | VARCHAR(8) |  | 来源采购订单号（月结置空） |
+| 13 | pay_type | VARCHAR(3) | DEFAULT 'COD' | 付款方式（COD/PIA/DEP/MON/INS） |
+| 14 | invoice_no | VARCHAR(50) |  | 发票号码 |
+| 15 | invoice_date | DATE |  | 发票日期 |
+| 16 | total_settle_amt | NUMERIC(16,4) | DEFAULT 0 | 结算总额 |
+| 17 | auditflg | VARCHAR(1) | DEFAULT '0' | 审核标志（0=未审,1=待审,2=已审,9=作废） |
+| 18 | auditman | VARCHAR(6) |  | 审核人 |
+| 19 | auditdate | TIMESTAMP |  | 审核日期 |
+| 20 | created_at | TIMESTAMP | NOT NULL | 创建时间 |
+| 21 | updated_at | TIMESTAMP | NOT NULL | 更新时间<br /> |
+| 22 | pay_type_override | varchar(1) |  | 是否强制覆盖付款方式一致性(Y/N) |
 
-#### 7. tpc16_rpcbill
+> **变更记录**（2026-05-26）：custcd→suppliercd 重命名；新增 ref_rgstbillid/pay_type/invoice_no/invoice_date/total_settle_amt/auditflg/auditman/auditdate；删除旧字段 refbillid/pcamt。
+>
+> 是否强制覆盖付款方式一致性(Y/N)，说明追加至memo，操作人/时间复用opercd/gendate'
+
+#### 7. tpc14_pcbilldt — 采购结算明细表（新增 2026-05-26）
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | pcbillid | VARCHAR(8) | PK NOT NULL | 退货单号 |
-| 2 | custcd | VARCHAR(8) |  | 客户编码 |
+| 1 | id | INTEGER | PK NOT NULL | 自增主键 |
+| 2 | pcbillid | VARCHAR(8) | FK NOT NULL | 结算单号 → tpc14_pcbill.pcbillid CASCADE |
+| 3 | lineno | INTEGER | NOT NULL | 行号 |
+| 4 | ref_rgstbillid | VARCHAR(8) | FK NOT NULL | 来源采购订单号 |
+| 5 | ref_rgstlineno | INTEGER | FK NOT NULL | 来源订单行号 |
+| 6 | itemcd | VARCHAR(6) | NOT NULL | 物料编码 |
+| 7 | order_qty | NUMERIC(12,2) | DEFAULT 0 | 订购数量（快照） |
+| 8 | received_qty | NUMERIC(12,2) | DEFAULT 0 | 已入库数量（快照） |
+| 9 | already_settled | NUMERIC(12,2) | DEFAULT 0 | 该行已结算累计（不含本次） |
+| 10 | settle_qty | NUMERIC(12,2) | NOT NULL | 本次结算数量 |
+| 11 | settle_price | NUMERIC(16,4) | NOT NULL | 结算单价 |
+| 12 | settle_amt | NUMERIC(16,4) | NOT NULL | 结算金额 = qty × price |
+| 13 | created_at | TIMESTAMP | DEFAULT NOW() | 创建时间 |
+| 14 | updated_at | TIMESTAMP | DEFAULT NOW() | 更新时间 |
+
+外键：
+- `(pcbillid) → tpc14_pcbill(pcbillid) ON DELETE CASCADE`
+- `(ref_rgstbillid, ref_rgstlineno) → tpc13_registerdt(rgstbillid, lineno) ON DELETE RESTRICT`
+- UNIQUE(pcbillid, lineno)
+
+#### 8. tpc16_rpcbill — 采购退货单主表
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | pcbillid | VARCHAR(8) | PK NOT NULL | 退货单号（RT前缀，IdMaster取号） |
+| 2 | suppliercd | VARCHAR(8) |  | 供应商编码（由custcd重命名） |
 | 3 | pcdate | TIMESTAMP |  | 退货日期 |
-| 4 | pcamt | INTEGER |  | 退货金额 |
+| 4 | pcamt | INTEGER |  | 退货金额（自动计算） |
 | 5 | whcd | VARCHAR(2) |  | 仓库编码 |
 | 6 | invoiceflg | VARCHAR(2) |  | 发票标志 |
 | 7 | ptimes | INTEGER |  | 打印次数 |
 | 8 | opercd | VARCHAR(6) |  | 操作员 |
 | 9 | memo | VARCHAR(255) |  | 备注 |
-| 10 | useflg | VARCHAR(1) |  | 有效标志 |
+| 10 | useflg | VARCHAR(1) |  | 有效标志（1=有效, 9=作废） |
 | 11 | gendate | TIMESTAMP |  | 创建日期 |
-| 12 | created_at | TIMESTAMP | NOT NULL |  |
-| 13 | updated_at | TIMESTAMP | NOT NULL |  |
+| 12 | ref_rgstbillid | VARCHAR(8) |  | 来源采购订单号 |
+| 13 | return_reason | VARCHAR(20) |  | 退货原因（quality/quantity/spec/other） |
+| 14 | auditflg | VARCHAR(1) | DEFAULT '0' | 审核标志 |
+| 15 | auditman | VARCHAR(6) |  | 审核人 |
+| 16 | auditdate | TIMESTAMP |  | 审核日期 |
+| 17 | created_at | TIMESTAMP | NOT NULL | 创建时间 |
+| 18 | updated_at | TIMESTAMP | NOT NULL | 更新时间 |
 
-#### 8. tpc17_rpcbilldt
+> **变更记录**（2026-05-26）：custcd→suppliercd 重命名；新增 return_reason。
+
+#### 9. tpc17_rpcbilldt — 采购退货明细表
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | id | INTEGER | PK NOT NULL |  |
-| 2 | pcbillid | VARCHAR(8) | NOT NULL | 退货单号 |
+| 1 | id | INTEGER | PK NOT NULL | 自增主键 |
+| 2 | pcbillid | VARCHAR(8) | FK NOT NULL | 退货单号 → tpc16_rpcbill.pcbillid |
 | 3 | lineno | INTEGER | NOT NULL | 行号 |
 | 4 | itemtyp | VARCHAR(2) |  | 物料类型 |
 | 5 | itemcd | VARCHAR(6) | NOT NULL | 物料编码 |
 | 6 | eid | VARCHAR(13) |  | 设备EID |
 | 7 | seid | VARCHAR(30) |  | 序列号 |
 | 8 | rpcqty | INTEGER |  | 退货数量 |
-| 9 | invoiceqty | INTEGER |  | 发票数量 |
-| 10 | units | VARCHAR(4) |  | 单位 |
-| 11 | created_at | TIMESTAMP | NOT NULL |  |
-| 12 | updated_at | TIMESTAMP | NOT NULL |  |
+| 9 | return_price | NUMERIC(16,4) |  | 退货单价 |
+| 10 | return_amt | NUMERIC(16,4) |  | 退货金额 = rpcqty × return_price |
+| 11 | invoiceqty | INTEGER |  | 发票数量 |
+| 12 | units | VARCHAR(4) |  | 单位 |
+| 13 | ref_rgstlineno | INTEGER |  | 来源订单行号 |
+| 14 | line_reason | VARCHAR(100) |  | 行级退货原因说明 |
+| 15 | created_at | TIMESTAMP | NOT NULL | 创建时间 |
+| 16 | updated_at | TIMESTAMP | NOT NULL | 更新时间 |
+
+> **变更记录**（2026-05-26）：新增 return_price/return_amt/line_reason。
 
 #### 9. tpc20_suppappraisal
 
@@ -1935,13 +2101,28 @@
 | 8 | created_at | TIMESTAMP | NOT NULL |  |
 | 9 | updated_at | TIMESTAMP | NOT NULL |  |
 
+**11:tpc20_requisition_order_link**
 
-**采购验收**
+| 字段         | 类型                 | 说明                                          |
+| :----------- | :------------------- | :-------------------------------------------- |
+| `id`         | integer (自增 PK)    | 主键                                          |
+| `pcplanid`   | varchar(20) NOT NULL | 来源需求单号（关联 `tpc10_pcplan`）           |
+| `pclineno`   | integer NOT NULL     | 来源需求单行号                                |
+| `rgstbillid` | varchar(20) NOT NULL | 采购订单号（FK → `tpc12_register`，级联删除） |
+| `rgstlineno` | integer NOT NULL     | 采购订单行号                                  |
+| `linkqty`    | numeric(12,2)        | 关联数量（该需求行分配到该订单的数量）        |
+| `linkstatus` | varchar(20)          | 关联状态（预留，目前未强制使用）              |
+| `gendate`    | timestamp            | 创建时间                                      |
+| `upddate`    | timestamp            | 更新时间                                      |
+| `opercd`     | varchar(20)          | 操作员                                        |
+| `created_at` | timestamp NOT NULL   | 系统创建时间                                  |
+| `updated_at` | timestamp NOT NULL   | 系统更新时间                                  |
 
-#### 11. tmp14_checkindt
-
+**唯一约束**：`(pcplanid, pclineno, rgstbillid, rgstlineno)` — 同一需求行不能重复关联同一订单行。
+**级联删除**：订单（`tpc12_register`）删除时，关联记录自动清除。
 
 ### 销售 (tsl) — 3 张表
+
 > 销售/延期
 
 #### 1. tsl01_extend
@@ -2028,7 +2209,7 @@
 | 25 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-### 财务 (tfn/tac/tht) — 7 张表
+### 财务 (tfn) — 5 张表
 > 账务/支付
 
 #### 1. tfn01_account
@@ -2131,8 +2312,8 @@
 | 16 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-**合同/发票**
-
+### 财务 (tac/tht) — 1 张表
+> 合同/发票
 
 #### 1. tac01_fpsk
 
@@ -2162,8 +2343,8 @@
 | 22 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-**合同管理**
-
+### 财务 (tht) — 1 张表
+> 合同管理
 
 #### 1. tht01_htgl
 
@@ -2325,7 +2506,7 @@
 | 4 | itemtyp | VARCHAR(2) |  | 物料类型 |
 | 5 | billid | VARCHAR(8) |  | 单号 |
 | 6 | invdate | TIMESTAMP |  | 库存日期 |
-| 7 | invtyp | VARCHAR(1) |  | 出入库类型 |
+| 7 | invtyp | VARCHAR(2) |  | 出入库类型 |
 | 8 | itemqty | NUMERIC(12,0) |  | 本次数量 |
 | 9 | storeqty | NUMERIC(12,0) |  | 库存数量 |
 | 10 | opercd | VARCHAR(6) |  | 操作员 |
@@ -2426,6 +2607,9 @@
 | 3 | channel | VARCHAR(10) | NOT NULL | 渠道: sms/email/internal |
 | 4 | subject | VARCHAR(200) |  | 标题模板 |
 | 5 | body | text |  | 正文模板 |
+| 5a | ref_type | VARCHAR(20) |  | 业务类型 dispatch/maintenance/renovate/open/change/recycle（2026-07-17新增） |
+| 5b | is_default | VARCHAR(1) |  | 该ref_type下默认模板 1=是/0=否（2026-07-17新增） |
+| 5c | sort_no | INTEGER |  | 排序号小优先（2026-07-17新增） |
 | 6 | opercd | VARCHAR(6) |  | 操作员 |
 | 7 | gendate | TIMESTAMP |  | 创建日期 |
 | 8 | upddate | TIMESTAMP |  | 更新日期 |
@@ -2448,6 +2632,10 @@
 | 9 | send_status | VARCHAR(10) |  | 发送状态: pending/sent/failed |
 | 10 | send_time | TIMESTAMP |  | 发送时间 |
 | 11 | error_msg | VARCHAR(500) |  | 错误信息 |
+| 8a | dispatch_id | INTEGER |  | FK→tit21_maintenance_dispatch.id，区分同一工单多次派工通知（2026-07-15新增） |
+| 11a | retry_count | INTEGER |  | 重试次数（2026-07-15新增） |
+| 11b | read_status | VARCHAR(10) |  | 已读状态 unread/read（2026-07-15新增） |
+| 11c | read_time | TIMESTAMP |  | 已读时间（2026-07-15新增） |
 | 12 | opercd | VARCHAR(6) |  | 操作员 |
 | 13 | gendate | TIMESTAMP |  | 创建日期 |
 | 14 | useflg | VARCHAR(1) |  | 有效标志 |
@@ -2651,7 +2839,7 @@
 | 16 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-### MES (tms) — 4 张表
+### MES (tms) — 5 张表
 > 生产工单/工序
 
 #### 1. tms01_work_order
@@ -2666,7 +2854,7 @@
 | 6 | plan_end | date |  | 计划完成日期 |
 | 7 | actual_start | date |  | 实际开始日期 |
 | 8 | actual_end | date |  | 实际完成日期 |
-| 9 | status | VARCHAR(10) |  | 状态（DRAFT/RELEASED/IN_PROGRESS/COMPLETED/CANCELLED） |
+| 9 | status | VARCHAR(20) |  | 状态（DRAFT/RELEASED/IN_PROGRESS/COMPLETED/CANCELLED） |
 | 10 | priority | VARCHAR(10) |  | 优先级 |
 | 11 | warehouse_cd | VARCHAR(20) |  | 目标仓库 |
 | 12 | remark | VARCHAR(200) |  | 备注 |
@@ -2702,7 +2890,7 @@
 | 5 | plan_qty | INTEGER |  | 计划数量 |
 | 6 | actual_qty | INTEGER |  | 完成数量 |
 | 7 | defect_qty | INTEGER |  | 不良品数量 |
-| 8 | status | VARCHAR(10) |  | 状态（PENDING/IN_PROGRESS/COMPLETED/SKIPPED） |
+| 8 | status | VARCHAR(20) |  | 状态（PENDING/IN_PROGRESS/COMPLETED/SKIPPED） |
 | 9 | start_time | TIMESTAMP |  | 开始时间 |
 | 10 | end_time | TIMESTAMP |  | 结束时间 |
 | 11 | worker_cd | VARCHAR(20) |  | 操作工 |
@@ -2730,6 +2918,29 @@
 | 12 | upddate | TIMESTAMP |  | 更新日期 |
 | 13 | created_at | TIMESTAMP | NOT NULL |  |
 | 14 | updated_at | TIMESTAMP | NOT NULL |  |
+| 15 | consume_type | VARCHAR(2) | DEFAULT '1' | 消耗类型：1定额 2补料 3报废 4返修 5退换 |
+| 16 | ref_bill_type | VARCHAR(2) |  | 来源单据类型：OV出库/IV入库 |
+| 17 | ref_bill_id | VARCHAR(20) |  | 来源单据号 |
+| 18 | ref_qc_id | VARCHAR(12) |  | 关联质检单号 |
+| 19 | unit_cost | NUMERIC(12,4) |  | 单价（采购价/标准成本） |
+| 20 | total_cost | NUMERIC(14,2) |  | 总成本（actual_qty * unit_cost） |
+
+#### 5. tms05_replace_record
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | id | INTEGER | PK NOT NULL | 主键 |
+| 2 | wo_id | VARCHAR(20) | NOT NULL | 工单号 |
+| 3 | old_eid | VARCHAR(20) |  | 旧物料序列号 |
+| 4 | new_eid | VARCHAR(20) |  | 新物料序列号 |
+| 5 | itemcd | VARCHAR(12) |  | 物料编码 |
+| 6 | old_batch_no | VARCHAR(20) |  | 旧批次号（批次物料使用） |
+| 7 | new_batch_no | VARCHAR(20) |  | 新批次号（批次物料使用） |
+| 8 | replace_date | TIMESTAMP |  | 更换时间 |
+| 9 | opercd | VARCHAR(10) |  | 操作人 |
+| 10 | memo | VARCHAR(200) |  | 备注 |
+| 11 | created_at | TIMESTAMP | NOT NULL |  |
+| 12 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
 ### 押金 (tmm61) — 5 张表
@@ -2745,8 +2956,11 @@
 | 4 | r_billid | VARCHAR(20) |  | 关联单号 |
 | 5 | modelcd | VARCHAR(20) |  | 型号编码 |
 | 6 | modelnm | VARCHAR(20) |  | 型号名称 |
-| 7 | created_at | TIMESTAMP | NOT NULL |  |
-| 8 | updated_at | TIMESTAMP | NOT NULL |  |
+| 7 | auditflg | VARCHAR(1) |  | 审核标志(0未审/1已审) ✨新增 |
+| 8 | auditman | VARCHAR(6) |  | 审核人 ✨新增 |
+| 9 | auditdate | TIMESTAMP |  | 审核日期 ✨新增 |
+| 10 | created_at | TIMESTAMP | NOT NULL |  |
+| 11 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 2. tmm61_deposit_dtl
 
@@ -2821,15 +3035,18 @@
 | 34 | created_at | TIMESTAMP | NOT NULL |  |
 | 35 | updated_at | TIMESTAMP | NOT NULL |  |
 
-#### 5. tmm61_deposit_posmodel
+#### 5. tmm61_deposit_posmodel（⚠️ 已废弃）
+
+> **已废弃**。机型押金/售价改由 `tip01_price` (busityp=40 押金/10 销售价) 管理；
+> 在产/停产改由 `tmm41_bom.useflg` 控制。此表保留仅供历史数据查看。
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | model_cd | VARCHAR(8) | PK NOT NULL | 型号编码 |
 | 2 | model_nm | VARCHAR(20) |  | 型号名称 |
-| 3 | rent_money | NUMERIC(10,2) |  | 租金 |
-| 4 | sale_money | NUMERIC(10,2) |  | 售价 |
-| 5 | useflg | VARCHAR(1) |  | 有效标志 |
+| 3 | rent_money | NUMERIC(10,2) |  | 租金(已废弃→tip01_price busityp=40) |
+| 4 | sale_money | NUMERIC(10,2) |  | 售价(已废弃→tip01_price busityp=10) |
+| 5 | useflg | VARCHAR(1) |  | 有效标志(已废弃→tmm41_bom.useflg) |
 | 6 | created_at | TIMESTAMP | NOT NULL |  |
 | 7 | updated_at | TIMESTAMP | NOT NULL |  |
 
@@ -2841,9 +3058,10 @@
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
-| 1 | qcbillid | VARCHAR(8) | PK NOT NULL | 质检单号 |
-| 2 | optyp | VARCHAR(2) |  | 操作类型 |
-| 3 | refbillid | VARCHAR(8) |  | 关联单号 |
+| 1 | qcbillid | VARCHAR(12) | PK NOT NULL | 质检单号 |
+| 2 | batch_id | VARCHAR(12) |  | 批次号 |
+| 3 | optyp | VARCHAR(2) |  | 操作类型 |
+| 3 | refbillid | VARCHAR(30) |  | 关联单号 |
 | 4 | itemcd | VARCHAR(6) |  | 物料编码 |
 | 5 | eid | VARCHAR(13) |  | 设备序列号 |
 | 6 | opercd | VARCHAR(6) |  | 操作员 |
@@ -2854,15 +3072,17 @@
 | 11 | auditflg | VARCHAR(1) |  | 审核标志 |
 | 12 | auditdate | TIMESTAMP |  | 审核日期 |
 | 13 | qcstatus | VARCHAR(2) |  | 质检状态 |
-| 14 | created_at | TIMESTAMP | NOT NULL |  |
-| 15 | updated_at | TIMESTAMP | NOT NULL |  |
+| 14 | draft_type | VARCHAR(1) |  | 草稿类型：S=暂存 C=提交 |
+| 15 | memo | VARCHAR(200) |  | 备注 |
+| 16 | created_at | TIMESTAMP | NOT NULL |  |
+| 17 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 2. tqc11_resultdt
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | id | INTEGER | PK NOT NULL | 主键 |
-| 2 | qcbillid | VARCHAR(8) | NOT NULL | 质检单号 |
+| 2 | qcbillid | VARCHAR(12) | NOT NULL | 质检单号 |
 | 3 | itemcd | VARCHAR(6) | NOT NULL | 物料编码 |
 | 4 | itemtyp | VARCHAR(2) |  | 物料类型 |
 | 5 | prddate | TIMESTAMP |  | 生产日期 |
@@ -2878,15 +3098,19 @@
 | 15 | inspector | VARCHAR(8) |  | 检验员 |
 | 16 | qc_source | VARCHAR(1) |  | 质检来源 |
 | 17 | remark | VARCHAR(100) |  | 备注 |
-| 18 | created_at | TIMESTAMP | NOT NULL |  |
-| 19 | updated_at | TIMESTAMP | NOT NULL |  |
+| 18 | ref_rgstbillid | VARCHAR(30) |  | 来源入库单号 |
+| 19 | replenish_status | VARCHAR(10) |  | 补料状态 |
+| 20 | replenish_ov_billid | VARCHAR(12) |  | 补料出库单号 |
+| 21 | prod_seq | INTEGER |  | 产品序号（FQC树形对应） |
+| 22 | created_at | TIMESTAMP | NOT NULL |  |
+| 23 | updated_at | TIMESTAMP | NOT NULL |  |
 
 #### 3. tqc11_resulteid
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | id | INTEGER | PK NOT NULL | 主键 |
-| 2 | qcbillid | VARCHAR(8) | NOT NULL | 质检单号 |
+| 2 | qcbillid | VARCHAR(12) | NOT NULL | 质检单号 |
 | 3 | itemcd | VARCHAR(6) |  | 物料编码 |
 | 4 | itemtyp | VARCHAR(2) |  | 物料类型 |
 | 5 | prddate | TIMESTAMP |  | 生产日期 |
@@ -2904,8 +3128,12 @@
 | 17 | qc_source | VARCHAR(1) |  | 质检来源 |
 | 18 | remark | VARCHAR(100) |  | 备注 |
 | 19 | manuf_seq | VARCHAR(100) |  | 制造序列号 |
-| 20 | created_at | TIMESTAMP | NOT NULL |  |
-| 21 | updated_at | TIMESTAMP | NOT NULL |  |
+| 20 | ref_rgstbillid | VARCHAR(30) |  | 来源入库单号 |
+| 21 | replenish_status | VARCHAR(10) |  | 补料状态 |
+| 22 | replenish_ov_billid | VARCHAR(12) |  | 补料出库单号 |
+| 23 | prod_seq | INTEGER |  | 产品序号（FQC树形对应） |
+| 24 | created_at | TIMESTAMP | NOT NULL |  |
+| 25 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
 ### 调拨 (ttx) — 1 张表
@@ -2927,7 +3155,7 @@
 | 10 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-### 价格 (tip) — 2 张表
+### 价格 (tip) — 3 张表
 > 价格规则
 
 #### 1. tip01_price
@@ -2935,7 +3163,7 @@
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | itemcd | VARCHAR(6) | PK NOT NULL | 物料编码 |
-| 2 | busityp | VARCHAR(6) | PK NOT NULL | 业务类型 |
+| 2 | busityp | VARCHAR(6) | PK NOT NULL | 业务类型（10=销售价/20=采购价/30=维护品价格/40=押金） |
 | 3 | unitcd | VARCHAR(6) |  | 单位 |
 | 4 | itemprice | NUMERIC(16,8) |  | 物料单价 |
 | 5 | opercd | VARCHAR(6) |  | 操作员 |
@@ -2944,8 +3172,30 @@
 | 8 | useflg | VARCHAR(1) |  | 有效标志 |
 | 9 | created_at | TIMESTAMP | NOT NULL |  |
 | 10 | updated_at | TIMESTAMP | NOT NULL |  |
+| 11 | effective_date | date |  |  |
+| 12 | expire_date | date |  |  |
+| 13 | is_current | BOOLEAN |  |  |
 
-#### 2. tip03_adjprice
+#### 2. tip02_supplier_price
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | id | INTEGER | PK NOT NULL |  |
+| 2 | itemcd | VARCHAR(6) | NOT NULL |  |
+| 3 | supp_cd | VARCHAR(8) | NOT NULL |  |
+| 4 | min_qty | numeric |  |  |
+| 5 | itemprice | NUMERIC(12,2) | NOT NULL |  |
+| 6 | effective_date | date |  |  |
+| 7 | expire_date | date |  |  |
+| 8 | is_current | BOOLEAN |  |  |
+| 9 | opercd | VARCHAR(6) |  |  |
+| 10 | gendate | TIMESTAMP |  |  |
+| 11 | upddate | TIMESTAMP |  |  |
+| 12 | useflg | VARCHAR(1) |  |  |
+| 13 | created_at | TIMESTAMP |  |  |
+| 14 | updated_at | TIMESTAMP |  |  |
+
+#### 3. tip03_adjprice
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
@@ -2962,71 +3212,101 @@
 | 11 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
-### 预计划 (plan) — 1 张表
-> 预计划客户
+### 预计划 (plan) — 2 张表
+> 预计划客户 + 呼出单
 
 #### 1. plan_cust
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
 | 1 | planno | VARCHAR(10) | PK NOT NULL | 计划编号 |
-| 2 | plantyp | VARCHAR(2) |  | 计划类型 |
-| 3 | custnew | VARCHAR(2) |  | 新旧客户标志 |
+| 2 | plantyp | VARCHAR(2) |  | 计划类型（00新机开通/10磁卡号变更/20旧机翻新/30取机回收/40门店关闭） |
+| 3 | custnew | VARCHAR(2) |  | 新旧客户标志（Y=新客户/N=已有客户） |
 | 4 | custcard | VARCHAR(20) |  | 客户磁卡号 |
 | 5 | custcd | VARCHAR(8) |  | 客户编码 |
 | 6 | custnm | VARCHAR(80) |  | 客户名称 |
 | 7 | classcd | VARCHAR(6) |  | 分类编码 |
 | 8 | busityp | VARCHAR(2) |  | 业务类型 |
-| 9 | pptcode | VARCHAR(10) |  | 属性代码 |
+| 9 | pptcode | VARCHAR(10) |  | 品牌编码 |
 | 10 | is_contract | VARCHAR(2) |  | 是否合同 |
 | 11 | address | VARCHAR(80) |  | 地址 |
 | 12 | contactor | VARCHAR(10) |  | 联系人 |
 | 13 | phoneno | VARCHAR(60) |  | 电话 |
 | 14 | custrnm | VARCHAR(80) |  | 客户真实名称 |
-| 15 | jl_contactor | VARCHAR(10) |  | 经理联系人 |
-| 16 | jl_phoneno | VARCHAR(60) |  | 经理电话 |
-| 17 | pos_from | VARCHAR(6) |  | POS来源 |
-| 18 | pos_item | VARCHAR(6) |  | POS物料 |
-| 19 | posid | VARCHAR(13) |  | POS设备ID |
-| 20 | new_custcard | VARCHAR(20) |  | 新磁卡号 |
-| 21 | new_custcd | VARCHAR(8) |  | 新客户编码 |
-| 22 | new_phoneno | VARCHAR(60) |  | 新电话 |
-| 23 | new_address | VARCHAR(80) |  | 新地址 |
-| 24 | new_custnm | VARCHAR(80) |  | 新客户名称 |
-| 25 | new_positem | VARCHAR(6) |  | 新POS物料 |
-| 26 | new_posid | VARCHAR(13) |  | 新POS设备ID |
-| 27 | solve_type | VARCHAR(2) |  | 处理方式 |
+| 15 | jl_contactor | VARCHAR(10) |  | 客户经理 |
+| 16 | jl_phoneno | VARCHAR(60) |  | 经理联系方式 |
+| 17 | pos_from | VARCHAR(6) |  | 设备来源（PF字典：00商用仓库/01门店移机/02烟草直调/03IT公司/04海晟公司） |
+| 18 | pos_item | VARCHAR(6) |  | 机型编码(关联 tmm12_items.item_cd / tmm41_bom.bomcd，选机型时从在产BOM中获取) |
+| 19 | posid | VARCHAR(13) |  | 目标设备EID |
+| 20 | new_custcard | VARCHAR(20) |  | 源磁卡号（移机/变更场景的源门店磁卡号） |
+| 21 | new_custcd | VARCHAR(8) |  | 目标客户编码（移机场景目标门店编码） |
+| 22 | new_phoneno | VARCHAR(60) |  | 源电话（移机场景源门店电话） |
+| 23 | new_address | VARCHAR(80) |  | 源地址（移机场景源门店地址） |
+| 24 | new_custnm | VARCHAR(80) |  | 源门店名称（移机场景源门店名称） |
+| 25 | new_positem | VARCHAR(6) |  | 源机型（移机场景源设备机型） |
+| 26 | new_posid | VARCHAR(13) |  | 源设备ID（移机场景源设备EID） |
+| 27 | solve_type | VARCHAR(2) |  | 旧机处理方式（翻新场景） |
 | 28 | back_status | VARCHAR(2) |  | 回退状态 |
-| 29 | cust_useflg | VARCHAR(2) |  | 客户有效标志 |
-| 30 | plan_status | VARCHAR(2) |  | 计划状态 |
-| 31 | servetyp | VARCHAR(2) |  | 服务类型 |
-| 32 | pl_serve_task | VARCHAR(200) |  | 服务任务 |
+| 29 | cust_useflg | VARCHAR(2) |  | 源门店无效化（移机/取机时勾选使源门店useflg=0） |
+| 30 | plan_status | VARCHAR(2) |  | 计划状态（TS字典：00计划中/01计划完成/02分派中/03实施完成/04实施中/08计划退回/09计划作废） |
+| 31 | servetyp | VARCHAR(2) |  | 服务类型（0客户确认/1预计划呼出/2实施任务） |
+| 32 | pl_serve_task | VARCHAR(200) |  | 服务任务描述 |
 | 33 | imple_status | VARCHAR(2) |  | 实施状态 |
+| 33.1 | imple_billid | VARCHAR(20) |  | **新增** 下游单据ID（实施确认时写入，如 new_opening_id） |
 | 34 | commmode | VARCHAR(4) |  | 通讯方式 |
 | 35 | serve_status | VARCHAR(2) |  | 服务状态 |
-| 36 | plan_require | VARCHAR(200) |  | 计划需求 |
-| 37 | imple_date | TIMESTAMP |  | 实施日期 |
-| 38 | send_date | TIMESTAMP |  | 发送日期 |
-| 39 | train_date | TIMESTAMP |  | 培训日期 |
-| 40 | imple_mark | VARCHAR(200) |  | 实施备注 |
+| 36 | plan_require | VARCHAR(200) |  | 计划要求/需求描述 |
+| 37 | imple_date | TIMESTAMP |  | 实施日期（安排上门安装日期） |
+| 38 | send_date | TIMESTAMP |  | 配送日期（设备配送到店日期） |
+| 39 | train_date | TIMESTAMP |  | 培训日期（客户培训日期） |
+| 40 | imple_mark | VARCHAR(200) |  | 实施备注（配送/安装要求等） |
 | 41 | imple_result | VARCHAR(10) |  | 实施结果 |
 | 42 | fail_reason | VARCHAR(200) |  | 失败原因 |
-| 43 | is_outflag | VARCHAR(2) |  | 出库标志 |
-| 44 | status | VARCHAR(2) |  | 状态 |
+| 43 | is_outflag | VARCHAR(4) |  | 出库标志三态（N/A=非商用仓库不适用/0=待出库/1=OV=1出库单已审核） |
+| 44 | status | VARCHAR(2) |  | PB旧状态字段（已废弃，使用plan_status） |
 | 45 | gendate | TIMESTAMP |  | 创建日期 |
 | 46 | opercd | VARCHAR(6) |  | 操作员 |
-| 47 | propo_item | VARCHAR(20) |  | 推荐物料 |
+| 47 | propo_item | VARCHAR(20) |  | 推荐物料（建议机型编码） |
 | 48 | serve_ercd | VARCHAR(6) |  | 服务工程师 |
 | 49 | deposit | NUMERIC(12,2) |  | 押金金额 |
-| 50 | is_rent | VARCHAR(1) |  | 是否租赁 |
+| 50 | is_rent | VARCHAR(1) |  | 是否租赁（Y租赁/N购买） |
 | 51 | yun_type | VARCHAR(2) |  | 运营类型 |
 | 52 | upload_type | VARCHAR(2) |  | 上传类型 |
 | 53 | created_at | TIMESTAMP | NOT NULL |  |
 | 54 | updated_at | TIMESTAMP | NOT NULL |  |
 
 
+#### 2. plan_serve（**新增** — 呼出单/服务计划）
+
+> 话务台呼出客户确认安装意向并收集反馈。对应 PB PLAN_SERVE 表。
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | dtlid | INTEGER | PK NOT NULL AUTO | 明细ID |
+| 2 | planno | VARCHAR(10) |  | 关联预计划单号（兼容历史NULL） |
+| 3 | plantyp | VARCHAR(2) |  | 计划类型 |
+| 4 | servetyp | VARCHAR(2) |  | 服务类型（0客户确认/1预计划呼出/2实施任务） |
+| 5 | serve_task | VARCHAR(200) |  | 服务任务 |
+| 6 | serve_back | VARCHAR(200) |  | 客户反馈/呼出结果 |
+| 7 | serve_mark | VARCHAR(200) |  | 服务备注 |
+| 8 | commmode | VARCHAR(4) |  | 通讯方式 |
+| 9 | status | VARCHAR(2) |  | 状态（00待呼出/01已呼出/09作废） |
+| 10 | gendate | TIMESTAMP |  | 创建日期 |
+| 11 | genercd | VARCHAR(6) |  | 创建操作员 |
+| 12 | opdate | TIMESTAMP |  | **新增** 最后操作日期 |
+| 13 | opercd | VARCHAR(6) |  | **新增** 最后操作员 |
+| 14 | created_at | TIMESTAMP | NOT NULL DEFAULT NOW() | 系统创建时间 |
+| 15 | updated_at | TIMESTAMP | NOT NULL DEFAULT NOW() | 系统更新时间 |
+
+**状态流转**：00 待呼出 → 01 已呼出 → 09 作废。呼出完成后需更新对应 plan_cust.plan_status 为 01。
+
+**关联关系**：`plan_serve.planno → plan_cust.planno`
 
 
+### 采购验收 (tmp) — 1 张表
+> 采购验收明细
+
+#### 1. tmp14_checkindt
 
 | # | 列名 | 类型 | 约束 | 说明 |
 |---|------|------|------|------|
@@ -3064,7 +3344,7 @@
 | tio01_device_conn | tio01_device_conn_eid_key | eid |
 | tit02_liabilityregdt | uq_liabilityregdt | lbdt_cd, liab_cd |
 | tit05_repairinfo | uq_repairinfo | rep_type, obj_cd |
-| tit06_userarea | uq_userarea | area_id, user_cd |
+| tit06_userarea | uq_userarea | area_cd, user_cd |
 | tit17_maintenance_plan | uq_maintenance_plan | plan_y, plan_yymm, area_id |
 | tmc21_usergroup | uq_usergroup | user_cd, group_cd |
 | tmm22_customers | tmm22_customers_cust_card_key | cust_card |
@@ -3075,6 +3355,64 @@
 | tmm44_pos_r_eid | idx_pos_r_eid_eid | eid |
 | tmm44_pos_r_eid | idx_pos_r_eid_useflg | useflg, eid |
 | tpt01_portal_user | tpt01_portal_user_login_name_key | login_name |
+
+---
+
+### 国标地理表（geo_* 系列）
+
+> 数据来源：[province-city-china](https://github.com/uiwjs/province-city-china)（民政部国标行政区划码）  
+> 导入脚本：`app/migration/import_geo_data.py --sqlite /path/to/data.sqlite`（幂等，支持重复执行更新）  
+> 与老系统 tmm02-05 表**并存**，老表保持不变，新业务使用此组表。
+
+#### geo_province（国标省级，31条）
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | code | VARCHAR(6) | PK NOT NULL | 国标省级代码（2位，如11=北京、31=上海、44=广东） |
+| 2 | name | VARCHAR(50) | NOT NULL | 省级名称 |
+| 3 | created_at | TIMESTAMP | NOT NULL |  |
+| 4 | updated_at | TIMESTAMP | NOT NULL |  |
+
+> 注：不含港澳台（国标行政区划码未收录）。
+
+#### geo_city（国标地级市，342条）
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | code | VARCHAR(6) | PK NOT NULL | 国标地级市代码（4位，如3101=上海市辖区、4401=广州市） |
+| 2 | name | VARCHAR(50) | NOT NULL | 地级市名称 |
+| 3 | province_code | VARCHAR(6) |  | 所属省级代码（关联geo_province.code） |
+| 4 | created_at | TIMESTAMP | NOT NULL |  |
+| 5 | updated_at | TIMESTAMP | NOT NULL |  |
+
+#### geo_area（国标区县，2978条）
+
+**索引**：`idx_geo_area_city_code` (city_code)、`idx_geo_area_province_code` (province_code)
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | code | VARCHAR(6) | PK NOT NULL | 国标区县代码（6位，如310101=黄浦区、310115=浦东新区） |
+| 2 | name | VARCHAR(50) | NOT NULL | 区县名称 |
+| 3 | city_code | VARCHAR(6) |  | 所属地级市代码（关联geo_city.code） |
+| 4 | province_code | VARCHAR(6) |  | 所属省级代码（冗余字段，便于按省直接查询） |
+| 5 | created_at | TIMESTAMP | NOT NULL |  |
+| 6 | updated_at | TIMESTAMP | NOT NULL |  |
+
+#### geo_street（国标街道/乡镇，41352条）
+
+**索引**：`idx_geo_street_area_code` (area_code)、`idx_geo_street_city_code` (city_code)
+
+| # | 列名 | 类型 | 约束 | 说明 |
+|---|------|------|------|------|
+| 1 | code | VARCHAR(12) | PK NOT NULL | 国标街道代码（9位，如310101002=南京东路街道）末3位：001-099=街道，100-199=镇，200-399=乡 |
+| 2 | name | VARCHAR(100) | NOT NULL | 街道/乡镇名称 |
+| 3 | area_code | VARCHAR(6) |  | 所属区县代码（关联geo_area.code，**前端联动必传此参数**） |
+| 4 | province_code | VARCHAR(6) |  | 所属省级代码（冗余） |
+| 5 | city_code | VARCHAR(6) |  | 所属地级市代码（冗余） |
+| 6 | created_at | TIMESTAMP | NOT NULL |  |
+| 7 | updated_at | TIMESTAMP | NOT NULL |  |
+
+---
 
 ### D.2 业务模块前缀速查
 
@@ -3105,4 +3443,50 @@
 | `tip%` | 价格 (tip) | 价格规则 |
 | `plan%` | 预计划 (plan) | 预计划客户 |
 | `tmp%` | 采购验收 (tmp) | 采购验收明细 |
+
+---
+
+## E. 视图
+
+> 🟡 手动维护 | 更新：2026-07-22
+
+### E.1 v_fault_analysis（故障分析视图）
+
+工单维度聚合视图，数据源覆盖 PB 迁移数据与新重构数据。通过 COALESCE 三层 fallback 自动适配数据来源。
+
+| 列名 | 类型 | 来源 | 说明 |
+|------|------|------|------|
+| `maintenance_id` | VARCHAR(8) | 主表 UNION | 维护单ID |
+| `bill_type` | VARCHAR(2) | 主表 UNION | 单据类型（MD/MO/MR/BG/BY） |
+| `current_status` | VARCHAR(1) | 主表 | 当前状态（ZT字典） |
+| `request_time` | TIMESTAMP | 主表 | 请求时间 |
+| `close_time` | TIMESTAMP | 主表 | 关单时间 |
+| `arrive_time` | TIMESTAMP | TIT23 聚合 | 最早到店时间（d2d_type=1） |
+| `leave_time` | TIMESTAMP | TIT23 聚合 | 最晚离店时间（d2d_type=2） |
+| `device_id` | VARCHAR(13) | COALESCE(TIT25, TIT23_d2d, 主表) | 整机EID |
+| `gzdm` | VARCHAR(8) | COALESCE(TIT23_gzdm, faultcode解析) | 故障代码 |
+| `device_itemcd` | VARCHAR(6) | tmm43_eid JOIN | 整机物料编码 |
+| `device_item_nm` | VARCHAR(100) | tmm12_items JOIN | 物料名称 |
+| `fault_nm` | VARCHAR(100) | tit04_archivecode JOIN | 故障名称 |
+| `fault_type_cd` | VARCHAR(2) | itemcd 前2位派生 | 故障类型编码 |
+| `fault_group` | VARCHAR(1) | tit04_archivecode | 故障分组 |
+| `repair_minutes` | NUMERIC | leave_time - arrive_time | 修复时长（分钟） |
+| `d2d_device_id` | VARCHAR(13) | TIT23 D2D 新增字段 | B3优化列：D2D处理设备 |
+| `d2d_accessories_id` | VARCHAR(13) | TIT23 D2D 新增字段 | B3优化列：D2D处理配件 |
+| `accessory_itemcd` | VARCHAR(13) | TIT25 B3字段 | B3优化列：配件物料编码 |
+| `accessory_fault_cd` | VARCHAR(8) | TIT25 B3字段 | B3优化列：配件关联故障代码 |
+
+**数据兼容策略**：
+- PB 历史：`gzdm` 从主表 `faultcode` 解析（格式 `级别,代码/`），`device_id` 从主表或 TIT25 反查
+- 新重构数据：直接取 TIT23.gzdm、TIT25.itemcd 等新字段
+- 优化列（d2d_*/accessory_*）在 PB 历史中为 NULL
+
+**依赖表**：tit10/tit13/tit15/tit16/tit17（主表）、tit23（D2D）、tit25（配件更新）、tmm43_eid、tmm12_items、tit04_archivecode
+
+**迁移历史**：
+| 版本 | 变更 |
+|------|------|
+| D1 (`d1e2f3a4b5c7`) | 初始视图，D2D 行级 |
+| D2 (`e2f3a4b5c6d8`) | 改工单级聚合 + faultcode 解析回填（63,708 工单恢复 gzdm） |
+| D3 (`f3a4b5c6d7e9`) | 增加优化列 d2d_device_id/d2d_accessories_id/accessory_itemcd/accessory_fault_cd |
 

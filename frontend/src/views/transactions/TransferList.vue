@@ -1,0 +1,5 @@
+<template><div class="page"><div class="page-header"><h2>调拨流转</h2></div><el-card shadow="never"><el-table :data="items" v-loading="loading" stripe size="small" highlight-current-row><el-table-column prop="txkno" label="科目编号" width="140"/><el-table-column prop="commmode" label="通讯方式" width="120"/><el-table-column prop="remark" label="备注" min-width="200" show-overflow-tooltip/><el-table-column prop="gendate" label="日期" width="100"/></el-table><AppPagination v-model:current-page="page" v-model:page-size="perPage" :total="total" style="margin-top:12px;justify-content:flex-end"/></el-card></div></template>
+<script setup lang="ts">import AppPagination from '@/components/common/AppPagination.vue';import {useListPage} from '@/composables/useListPage';import request from '@/api/request'
+interface TxRecord{[key:string]:unknown}
+const{items,loading,page,perPage,total}=useListPage<TxRecord>(()=>request.get<never,{data:{items:TxRecord[];total:number}}>('/transactions/bills',{params:{}}))</script>
+<style scoped>.page{padding:0}.page-header{display:flex;justify-content:space-between;margin-bottom:16px}.page-header h2{font-size:18px;font-weight:600;margin:0}</style>

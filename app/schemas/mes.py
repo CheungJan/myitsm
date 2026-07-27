@@ -15,11 +15,12 @@ from pydantic import BaseModel, Field
 class WorkOrderCreate(BaseModel):
     """创建生产工单。"""
 
-    wo_id: str = Field(..., max_length=20, description="工单编号")
+    wo_id: str | None = Field(None, max_length=20, description="工单编号，留空自动生成")
     item_cd: str = Field(..., max_length=20, description="产品编码")
     plan_qty: int = Field(..., description="计划数量")
     plan_start: date | None = Field(None, description="计划开始日期")
     plan_end: date | None = Field(None, description="计划完成日期")
+    wo_type: str | None = Field("PRODUCTION", max_length=10, description="工单类型: PRODUCTION=生产 RENOVATION=翻新")
     priority: str | None = Field("NORMAL", max_length=10, description="优先级")
     warehouse_cd: str | None = Field(None, max_length=20, description="目标仓库")
     remark: str | None = Field(None, max_length=200, description="备注")

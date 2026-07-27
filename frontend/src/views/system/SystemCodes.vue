@@ -8,7 +8,7 @@
                         <el-button type="primary" size="small" @click="openTypeDialog()">新增类型</el-button>
                     </div>
                 </template>
-                <el-input v-model="treeFilter" placeholder="过滤类型" clearable size="small" style="margin-bottom:4px" />
+                <el-input v-model="treeFilter" placeholder="过滤类型或明细名称（反查包含该名称的类型）" clearable size="small" style="margin-bottom:4px" />
                 <el-tree
                     ref="treeRef"
                     :data="treeData"
@@ -123,6 +123,8 @@ const treeFilter = ref('')
 const treeRef = ref()
 const selectedTyp = ref('')
 const selectedLabel = ref('')
+// 类型 → 明细名称列表（用于按明细名称反查类型）
+const typeDetailsMap = ref<Record<string, string[]>>({})
 
 const codes = ref<Record<string,unknown>[]>([])
 const loading = ref(false)
@@ -143,25 +145,35 @@ async function loadTree() {
     try {
         const allRes = await fetchAllSyscodes()
         const all = (allRes.data || []) as Record<string,unknown>[]
-        // 动态提取所有类型
+        // 动态提取所有类型 + 构建类型→明细名称映射
         const typeSet = new Map<string, string>()
+        const detailsMap: Record<string, string[]> = {}
         for (const r of all) {
             const typ = r.code_typ as string
-            if (typ && typ !== 'SY' && !typeSet.has(typ)) typeSet.set(typ, r.code_nm as string || '')
+            const nm = (r.code_nm as string) || ''
+            if (typ && typ !== 'SY') {
+                if (!typeSet.has(typ)) typeSet.set(typ, nm)
+                if (!detailsMap[typ]) detailsMap[typ] = []
+                if (nm) detailsMap[typ].push(nm)
+            }
         }
-        // 补充 SY 中的中文名
+        // 补充 SY 中的中文名 + 提取 _id 用于删除
         const syList = all.filter(r => r.code_typ === 'SY')
+        const syIdMap = new Map<string, number>()
         for (const sy of syList) {
             const cd = sy.code_cd as string
+            syIdMap.set(cd, sy.id as number)
             if (typeSet.has(cd)) typeSet.set(cd, (sy.code_nm as string) || typeSet.get(cd) || '')
             else typeSet.set(cd, sy.code_nm as string || '')
         }
+        typeDetailsMap.value = detailsMap
         treeData.value = Array.from(typeSet.entries())
             .sort((a, b) => a[0].localeCompare(b[0]))
             .map(([cd, nm]) => ({
                 code_cd: cd,
                 label: nm ? `${nm}（${cd}）` : cd,
                 sort_no: 0,
+                _id: syIdMap.get(cd),
             }))
     } catch { /* */ }
 }
@@ -169,7 +181,10 @@ async function loadTree() {
 function filterTree(value: string, data: TreeNode): boolean {
     if (!value) return true
     const kw = value.toLowerCase()
-    return data.label.toLowerCase().includes(kw)
+    // 匹配类型标签或该类型下任一明细名称（支持反查）
+    if (data.label.toLowerCase().includes(kw)) return true
+    const details = typeDetailsMap.value[data.code_cd] || []
+    return details.some(nm => nm.toLowerCase().includes(kw))
 }
 
 async function onTreeClick(node: TreeNode) {

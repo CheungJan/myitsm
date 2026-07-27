@@ -67,8 +67,8 @@ export function updateGroup(groupCd: string, data: Record<string, string>) {
 export function deleteGroup(groupCd: string) {
     return request.delete<never, unknown>(`/groups/${groupCd}`)
 }
-export function fetchGroupMembers(groupCd: string) {
-    return request.get<never, { data: { user_cd: string; user_nm: string }[] }>(`/groups/${groupCd}/members`)
+export function fetchGroupMembers(groupCd: string, params?: Record<string, string>) {
+    return request.get<never, { data: { user_cd: string; user_nm: string; status?: string }[] }>(`/groups/${groupCd}/members`, { params })
 }
 export function addGroupMember(groupCd: string, userCd: string) {
     return request.post<never, unknown>(`/groups/${groupCd}/members`, { user_cd: userCd })
@@ -78,6 +78,9 @@ export function removeGroupMember(groupCd: string, userCd: string) {
 }
 export function fetchSysparms() {
     return request.get<never, { data: Record<string,unknown>[] }>('/sysparms')
+}
+export function fetchSysparmByCd(parmCd: string) {
+    return request.get<never, { data: Record<string,unknown> | null }>(`/sysparms/${parmCd}`)
 }
 export function updateSysparm(parmCd: string, data: Record<string, unknown>) {
     return request.put<never, { data: Record<string, unknown> }>(`/sysparms/${parmCd}`, data)
@@ -122,4 +125,10 @@ export interface PermTreeNode {
 }
 export function fetchPermTree() {
     return request.get<never, { data: PermTreeNode[] }>('/menus/perm-tree')
+}
+
+// EID 设备信息（B4：离店登记按 device_id 反查 itemcd 用于故障代码预过滤）
+export interface EidInfo { eid: string; itemcd: string; whcd?: string }
+export function fetchEidInfo(eid: string) {
+    return request.get<never, { data: EidInfo }>(`/eid/${eid}`)
 }

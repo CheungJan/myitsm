@@ -1,0 +1,238 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e3]:
+    - heading "呼出管理" [level=2] [ref=f1e4]
+    - paragraph [ref=f1e5]: 主行 = 计划公有信息（不重复），展开 = 呼出记录明细（类型标签区分）
+  - generic [ref=f1e6]:
+    - generic [ref=f1e7]: ✅
+    - generic [ref=f1e8]:
+      - strong [ref=f1e9]: 解决臃肿：
+      - text: 客户信息每计划只显一次。同计划有预计划+实施两条呼出时，展开即可看到两条明细，类型标签区分。
+  - generic [ref=f1e11]:
+    - generic [ref=f1e12]:
+      - generic [ref=f1e13]: 呼出类型
+      - combobox [ref=f1e14] [cursor=pointer]:
+        - option "全部" [selected]
+        - option "预计划呼出"
+        - option "实施任务呼出"
+    - generic [ref=f1e15]:
+      - generic [ref=f1e16]: 计划单号
+      - textbox "输入单号" [ref=f1e17]
+    - generic [ref=f1e18]:
+      - generic [ref=f1e19]: 客户名称
+      - textbox "输入客户" [ref=f1e20]
+    - generic [ref=f1e21]:
+      - generic [ref=f1e22]: 磁卡号
+      - textbox "输入磁卡号" [ref=f1e23]
+    - generic [ref=f1e24]:
+      - generic [ref=f1e25]: 呼出状态
+      - combobox [ref=f1e26] [cursor=pointer]:
+        - option "全部" [selected]
+        - option "待呼出"
+        - option "已呼出"
+    - button "查询" [ref=f1e27] [cursor=pointer]
+    - button "重置" [ref=f1e28] [cursor=pointer]
+  - generic [ref=f1e29]:
+    - table [ref=f1e31]:
+      - rowgroup [ref=f1e32]:
+        - row "次数 分配呼出人 计划单号 计划类型 磁卡号 客户代码 客户名称 有限公司 是否合同 客户属性 计划机型 计划状态" [ref=f1e33]:
+          - columnheader [ref=f1e34]
+          - columnheader "次数" [ref=f1e35]
+          - columnheader "分配呼出人" [ref=f1e36]
+          - columnheader "计划单号" [ref=f1e37]
+          - columnheader "计划类型" [ref=f1e38]
+          - columnheader "磁卡号" [ref=f1e39]
+          - columnheader "客户代码" [ref=f1e40]
+          - columnheader "客户名称" [ref=f1e41]
+          - columnheader "有限公司" [ref=f1e42]
+          - columnheader "是否合同" [ref=f1e43]
+          - columnheader "客户属性" [ref=f1e44]
+          - columnheader "计划机型" [ref=f1e45]
+          - columnheader "计划状态" [ref=f1e46]
+      - rowgroup [ref=f1e47]:
+        - row "▶ 2 王小明 P2026-001 新机开通 8800123456 C00123 天河区中山大道便利店 广州天河贸易有限公司 是 合同客户 POS-A200 计划中" [ref=f1e48]:
+          - cell "▶" [ref=f1e49]:
+            - generic [ref=f1e51] [cursor=pointer]: ▶
+          - cell "2" [ref=f1e52]:
+            - generic [ref=f1e53]: "2"
+          - cell "王小明" [ref=f1e54]
+          - cell "P2026-001" [ref=f1e55]
+          - cell "新机开通" [ref=f1e56]
+          - cell "8800123456" [ref=f1e57]
+          - cell "C00123" [ref=f1e58]
+          - cell "天河区中山大道便利店" [ref=f1e59]
+          - cell "广州天河贸易有限公司" [ref=f1e60]
+          - cell "是" [ref=f1e61]:
+            - generic [ref=f1e62]: 是
+          - cell "合同客户" [ref=f1e63]
+          - cell "POS-A200" [ref=f1e64]
+          - cell "计划中" [ref=f1e65]:
+            - generic [ref=f1e66]: 计划中
+        - row "📋 呼出记录明细（计划 P2026-001） 类型 计划要求 (serve_task) 呼出状态 反馈 通讯方式 创建日期 操作 预计划呼出 确认门店营业情况、安装时间 已呼出 同意 电话 2026-07-01 编辑反馈 实施任务呼出 确认配送地址、培训时间安排 待呼出 - 微信 2026-07-03 录入反馈 作废" [ref=f1e67]:
+          - cell "📋 呼出记录明细（计划 P2026-001） 类型 计划要求 (serve_task) 呼出状态 反馈 通讯方式 创建日期 操作 预计划呼出 确认门店营业情况、安装时间 已呼出 同意 电话 2026-07-01 编辑反馈 实施任务呼出 确认配送地址、培训时间安排 待呼出 - 微信 2026-07-03 录入反馈 作废" [ref=f1e68]:
+            - generic [ref=f1e69]:
+              - generic [ref=f1e70]: 📋 呼出记录明细（计划 P2026-001）
+              - table [ref=f1e71]:
+                - rowgroup [ref=f1e72]:
+                  - row "类型 计划要求 (serve_task) 呼出状态 反馈 通讯方式 创建日期 操作" [ref=f1e73]:
+                    - columnheader "类型" [ref=f1e74]
+                    - columnheader "计划要求 (serve_task)" [ref=f1e75]
+                    - columnheader "呼出状态" [ref=f1e76]
+                    - columnheader "反馈" [ref=f1e77]
+                    - columnheader "通讯方式" [ref=f1e78]
+                    - columnheader "创建日期" [ref=f1e79]
+                    - columnheader "操作" [ref=f1e80]
+                - rowgroup [ref=f1e81]:
+                  - row "预计划呼出 确认门店营业情况、安装时间 已呼出 同意 电话 2026-07-01 编辑反馈" [ref=f1e82]:
+                    - cell "预计划呼出" [ref=f1e83]:
+                      - generic [ref=f1e84]: 预计划呼出
+                    - cell "确认门店营业情况、安装时间" [ref=f1e85]
+                    - cell "已呼出" [ref=f1e86]:
+                      - generic [ref=f1e87]: 已呼出
+                    - cell "同意" [ref=f1e88]:
+                      - generic [ref=f1e89]: 同意
+                    - cell "电话" [ref=f1e90]
+                    - cell "2026-07-01" [ref=f1e91]
+                    - cell "编辑反馈" [ref=f1e92]:
+                      - button "编辑反馈" [ref=f1e93] [cursor=pointer]
+                  - row "实施任务呼出 确认配送地址、培训时间安排 待呼出 - 微信 2026-07-03 录入反馈 作废" [ref=f1e94]:
+                    - cell "实施任务呼出" [ref=f1e95]:
+                      - generic [ref=f1e96]: 实施任务呼出
+                    - cell "确认配送地址、培训时间安排" [ref=f1e97]
+                    - cell "待呼出" [ref=f1e98]:
+                      - generic [ref=f1e99]: 待呼出
+                    - cell "-" [ref=f1e100]
+                    - cell "微信" [ref=f1e101]
+                    - cell "2026-07-03" [ref=f1e102]
+                    - cell "录入反馈 作废" [ref=f1e103]:
+                      - button "录入反馈" [ref=f1e104] [cursor=pointer]
+                      - button "作废" [ref=f1e105] [cursor=pointer]
+        - row "▶ 1 张三 P2026-002 设备变更 8800789012 C00567 白云区远景路烟酒行 广州白云烟酒贸易有限公司 否 散户 POS-B500 分派中" [ref=f1e106]:
+          - cell "▶" [ref=f1e107]:
+            - generic [ref=f1e109] [cursor=pointer]: ▶
+          - cell "1" [ref=f1e110]:
+            - generic [ref=f1e111]: "1"
+          - cell "张三" [ref=f1e112]
+          - cell "P2026-002" [ref=f1e113]
+          - cell "设备变更" [ref=f1e114]
+          - cell "8800789012" [ref=f1e115]
+          - cell "C00567" [ref=f1e116]
+          - cell "白云区远景路烟酒行" [ref=f1e117]
+          - cell "广州白云烟酒贸易有限公司" [ref=f1e118]
+          - cell "否" [ref=f1e119]:
+            - generic [ref=f1e120]: 否
+          - cell "散户" [ref=f1e121]
+          - cell "POS-B500" [ref=f1e122]
+          - cell "分派中" [ref=f1e123]:
+            - generic [ref=f1e124]: 分派中
+        - row "▶ 2 赵六 P2026-003 设备取回 8800345678 C00901 海珠区江南西路专卖店 广州海珠商贸有限公司 是 合同客户 POS-C100 计划中" [ref=f1e125]:
+          - cell "▶" [ref=f1e126]:
+            - generic [ref=f1e128] [cursor=pointer]: ▶
+          - cell "2" [ref=f1e129]:
+            - generic [ref=f1e130]: "2"
+          - cell "赵六" [ref=f1e131]
+          - cell "P2026-003" [ref=f1e132]
+          - cell "设备取回" [ref=f1e133]
+          - cell "8800345678" [ref=f1e134]
+          - cell "C00901" [ref=f1e135]
+          - cell "海珠区江南西路专卖店" [ref=f1e136]
+          - cell "广州海珠商贸有限公司" [ref=f1e137]
+          - cell "是" [ref=f1e138]:
+            - generic [ref=f1e139]: 是
+          - cell "合同客户" [ref=f1e140]
+          - cell "POS-C100" [ref=f1e141]
+          - cell "计划中" [ref=f1e142]:
+            - generic [ref=f1e143]: 计划中
+        - row "📋 呼出记录明细（计划 P2026-003） 类型 计划要求 呼出状态 反馈 通讯方式 创建日期 操作 预计划呼出 确认门店关闭、设备回收时间 已呼出 不同意 电话 2026-06-28 编辑反馈 实施任务呼出 确认设备取回物流安排 已呼出 未接通 电话 2026-07-02 编辑反馈" [ref=f1e144]:
+          - cell "📋 呼出记录明细（计划 P2026-003） 类型 计划要求 呼出状态 反馈 通讯方式 创建日期 操作 预计划呼出 确认门店关闭、设备回收时间 已呼出 不同意 电话 2026-06-28 编辑反馈 实施任务呼出 确认设备取回物流安排 已呼出 未接通 电话 2026-07-02 编辑反馈" [ref=f1e145]:
+            - generic [ref=f1e146]:
+              - generic [ref=f1e147]: 📋 呼出记录明细（计划 P2026-003）
+              - table [ref=f1e148]:
+                - rowgroup [ref=f1e149]:
+                  - row "类型 计划要求 呼出状态 反馈 通讯方式 创建日期 操作" [ref=f1e150]:
+                    - columnheader "类型" [ref=f1e151]
+                    - columnheader "计划要求" [ref=f1e152]
+                    - columnheader "呼出状态" [ref=f1e153]
+                    - columnheader "反馈" [ref=f1e154]
+                    - columnheader "通讯方式" [ref=f1e155]
+                    - columnheader "创建日期" [ref=f1e156]
+                    - columnheader "操作" [ref=f1e157]
+                - rowgroup [ref=f1e158]:
+                  - row "预计划呼出 确认门店关闭、设备回收时间 已呼出 不同意 电话 2026-06-28 编辑反馈" [ref=f1e159]:
+                    - cell "预计划呼出" [ref=f1e160]:
+                      - generic [ref=f1e161]: 预计划呼出
+                    - cell "确认门店关闭、设备回收时间" [ref=f1e162]
+                    - cell "已呼出" [ref=f1e163]:
+                      - generic [ref=f1e164]: 已呼出
+                    - cell "不同意" [ref=f1e165]:
+                      - generic [ref=f1e166]: 不同意
+                    - cell "电话" [ref=f1e167]
+                    - cell "2026-06-28" [ref=f1e168]
+                    - cell "编辑反馈" [ref=f1e169]:
+                      - button "编辑反馈" [ref=f1e170] [cursor=pointer]
+                  - row "实施任务呼出 确认设备取回物流安排 已呼出 未接通 电话 2026-07-02 编辑反馈" [ref=f1e171]:
+                    - cell "实施任务呼出" [ref=f1e172]:
+                      - generic [ref=f1e173]: 实施任务呼出
+                    - cell "确认设备取回物流安排" [ref=f1e174]
+                    - cell "已呼出" [ref=f1e175]:
+                      - generic [ref=f1e176]: 已呼出
+                    - cell "未接通" [ref=f1e177]:
+                      - generic [ref=f1e178]: 未接通
+                    - cell "电话" [ref=f1e179]
+                    - cell "2026-07-02" [ref=f1e180]
+                    - cell "编辑反馈" [ref=f1e181]:
+                      - button "编辑反馈" [ref=f1e182] [cursor=pointer]
+        - row "▶ 1 - P2026-004 旧机翻新 8800901234 C01234 番禺区市桥街道便利店 广州番禺便利商贸有限公司 是 合同客户 POS-D300 已作废" [ref=f1e183]:
+          - cell "▶" [ref=f1e184]:
+            - generic [ref=f1e186] [cursor=pointer]: ▶
+          - cell "1" [ref=f1e187]:
+            - generic [ref=f1e188]: "1"
+          - cell "-" [ref=f1e189]
+          - cell "P2026-004" [ref=f1e190]
+          - cell "旧机翻新" [ref=f1e191]
+          - cell "8800901234" [ref=f1e192]
+          - cell "C01234" [ref=f1e193]
+          - cell "番禺区市桥街道便利店" [ref=f1e194]
+          - cell "广州番禺便利商贸有限公司" [ref=f1e195]
+          - cell "是" [ref=f1e196]:
+            - generic [ref=f1e197]: 是
+          - cell "合同客户" [ref=f1e198]
+          - cell "POS-D300" [ref=f1e199]
+          - cell "已作废" [ref=f1e200]:
+            - generic [ref=f1e201]: 已作废
+    - generic [ref=f1e202]:
+      - generic [ref=f1e203]: 共 4 条计划
+      - generic [ref=f1e204] [cursor=pointer]: "1"
+  - generic [ref=f1e205]:
+    - heading "📋 方案对比" [level=3] [ref=f1e206]
+    - table [ref=f1e207]:
+      - rowgroup [ref=f1e208]:
+        - row "❌ 扁平列表 ✅ 主从结构" [ref=f1e209]:
+          - columnheader [ref=f1e210]
+          - columnheader "❌ 扁平列表" [ref=f1e211]
+          - columnheader "✅ 主从结构" [ref=f1e212]
+      - rowgroup [ref=f1e213]:
+        - row "客户信息 每条 PlanServe 都重复显示，臃肿 主行显示一次，不重复" [ref=f1e214]:
+          - cell "客户信息" [ref=f1e215]:
+            - strong [ref=f1e216]: 客户信息
+          - cell "每条 PlanServe 都重复显示，臃肿" [ref=f1e217]
+          - cell "主行显示一次，不重复" [ref=f1e218]
+        - row "同计划多类型 两行独立，客户列重复 展开即见两条明细，Tag 区分" [ref=f1e219]:
+          - cell "同计划多类型" [ref=f1e220]:
+            - strong [ref=f1e221]: 同计划多类型
+          - cell "两行独立，客户列重复" [ref=f1e222]
+          - cell "展开即见两条明细，Tag 区分" [ref=f1e223]
+        - row "计划要求归属 当前行独立，无歧义 展开子行独立，Tag 标注类型，无歧义" [ref=f1e224]:
+          - cell "计划要求归属" [ref=f1e225]:
+            - strong [ref=f1e226]: 计划要求归属
+          - cell "当前行独立，无歧义" [ref=f1e227]
+          - cell "展开子行独立，Tag 标注类型，无歧义" [ref=f1e228]
+        - row "呼出状态 每行一个状态 子行各自状态，主行\"次数\"列概览" [ref=f1e229]:
+          - cell "呼出状态" [ref=f1e230]:
+            - strong [ref=f1e231]: 呼出状态
+          - cell "每行一个状态" [ref=f1e232]
+          - cell "子行各自状态，主行\"次数\"列概览" [ref=f1e233]
+        - row "信息密度 列表冗长，大量冗余 紧凑，按需展开" [ref=f1e234]:
+          - cell "信息密度" [ref=f1e235]:
+            - strong [ref=f1e236]: 信息密度
+          - cell "列表冗长，大量冗余" [ref=f1e237]
+          - cell "紧凑，按需展开" [ref=f1e238]

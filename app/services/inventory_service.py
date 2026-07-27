@@ -84,6 +84,11 @@ class AdjustPriceService:
     """调价服务。"""
 
     @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        items, total = AdjustPriceRepository.list_all(page=page, per_page=per_page)
+        return {"items": [item.to_dict() for item in items], "total": total, "page": page, "per_page": per_page}
+
+    @staticmethod
     def list_by_bill(pabillid: str) -> list[dict[str, Any]]:
         records = AdjustPriceRepository.list_by_bill(pabillid)
         return [r.to_dict() for r in records]

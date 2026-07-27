@@ -55,10 +55,10 @@ def test_update_sysparm_success(app: Flask, client: FlaskClient):
 
 
 def test_update_sysparm_not_found(app: Flask, client: FlaskClient):
-    """PUT /sysparms/NOEXIST 应返回 404。"""
+    """PUT /sysparms/NOEXIST 应 upsert 创建并返回 200（PUT 幂等语义）。"""
     headers = _auth_header(app)
     resp = _put(client, "/api/v1/sysparms/NOEXIST", {"costtype": "2"}, headers)
-    assert resp.status_code == 404
+    assert resp.status_code == 200
 
 
 def test_sysparm_requires_auth(client: FlaskClient):

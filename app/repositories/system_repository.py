@@ -5,8 +5,40 @@ from __future__ import annotations
 from typing import Any
 
 from app.extensions import db
-from app.models.master import Area, City, ComMode, Country, CustClass, CustPosRl, Customer, Eid, EidTrack, Item, ItemClass, PosREid, Province, SysCode, Town
-from app.models.system import Department, Group, GroupRight, Menu, MenuDetail, SysParm, User, UserGroup
+from app.models.itsm import UserArea
+from app.models.master import (
+    Area,
+    City,
+    Country,
+    CustClass,
+    Customer,
+    CustItems,
+    CustPosRl,
+    Eid,
+    EidTrack,
+    GeoArea,
+    GeoCity,
+    GeoProvince,
+    GeoStreet,
+    Item,
+    ItemClass,
+    PosREid,
+    Province,
+    Supplier,
+    SupplierClass,
+    SysCode,
+    Town,
+)
+from app.models.system import (
+    Department,
+    Group,
+    GroupRight,
+    Menu,
+    MenuDetail,
+    SysParm,
+    User,
+    UserGroup,
+)
 
 
 class SystemRepository:
@@ -18,11 +50,19 @@ class SystemRepository:
         user_cd: str | None = None,
         user_nm: str | None = None,
         dept_cd: str | None = None,
+        useflg: str | None = None,
     ) -> list[User]:
-        """获取用户列表，支持多条件筛选。"""
+        """获取用户列表，支持多条件筛选。
+
+        Args:
+            status: 登录启用标志（1=可登录/0=禁用登录）
+            useflg: 在职有效标志（1=在职/0=离职停用）
+        """
         query = db.session.query(User)
         if status:
             query = query.filter(User.status == status)
+        if useflg:
+            query = query.filter(User.useflg == useflg)
         if user_cd:
             query = query.filter(User.user_cd.ilike(f"%{user_cd}%"))
         if user_nm:
@@ -130,16 +170,23 @@ class SystemRepository:
         db.session.commit()
 
     @staticmethod
-    def get_group_members(group_cd: str) -> list[dict[str, Any]]:
-        """获取用户组成员列表（含用户名称）。"""
-        rows = (
-            db.session.query(UserGroup, User.user_nm)
+    def get_group_members(group_cd: str, active_only: bool = False) -> list[dict[str, Any]]:
+        """获取用户组成员列表（含用户名称）。
+
+        Args:
+            group_cd: 用户组编码
+            active_only: 仅返回 status='1' 的有效成员
+        """
+        query = (
+            db.session.query(UserGroup, User.user_nm, User.status)
             .join(User, UserGroup.user_cd == User.user_cd)
             .filter(UserGroup.group_cd == group_cd)
-            .all()
         )
-        return [{"user_cd": ug.user_cd, "group_cd": ug.group_cd, "user_nm": nm}
-                for ug, nm in rows]
+        if active_only:
+            query = query.filter(User.useflg == "1")
+        rows = query.all()
+        return [{"user_cd": ug.user_cd, "group_cd": ug.group_cd, "user_nm": nm, "status": st}
+                for ug, nm, st in rows]
 
     @staticmethod
     def add_group_member(user_cd: str, group_cd: str) -> None:
@@ -186,7 +233,16 @@ class SystemRepository:
 
     @staticmethod
     def get_user_permissions(user_cd: str) -> list[dict[str, str]]:
-        """获取用户的有效权限（通过其所属于的用户组，并集去重）。"""
+        """获取用户的有效权限（管理员组99自动拥有全部权限）。"""
+        # 管理员组(99)直接返回全部菜单权限
+        is_admin = db.session.query(UserGroup).filter(
+            UserGroup.user_cd == user_cd, UserGroup.group_cd == "99"
+        ).first()
+        if is_admin:
+            rows = db.session.query(MenuDetail.menu_cd, MenuDetail.func_cd).filter(
+                MenuDetail.useflg == "1"
+            ).all()
+            return [{"menu_cd": r.menu_cd, "func_cd": r.func_cd or "view"} for r in rows]
         rows = (
             db.session.query(GroupRight.menu_cd, GroupRight.func_cd)
             .join(UserGroup, GroupRight.group_cd == UserGroup.group_cd)
@@ -246,13 +302,16 @@ class SystemRepository:
         return db.session.get(SysParm, parm_cd)
 
     @staticmethod
-    def update_sysparm(parm_cd: str, data: dict[str, Any]) -> SysParm | None:
-        """更新系统参数（单例表）。"""
+    def update_sysparm(parm_cd: str, data: dict[str, Any]) -> SysParm:
+        """更新或创建系统参数。"""
         r = db.session.get(SysParm, parm_cd)
-        if r:
+        if r is None:
+            r = SysParm(parm_cd=parm_cd, **data)
+            db.session.add(r)
+        else:
             for k, v in data.items():
                 setattr(r, k, v)
-            db.session.commit()
+        db.session.commit()
         return r
 
     # ——— 物料分类 ———
@@ -306,6 +365,76 @@ class SystemRepository:
         return roots
 
     @staticmethod
+    def get_bom_class_tree(typflg: str = "1") -> list[dict[str, Any]]:
+        """分类树（按 typflg 过滤：1=只含成品，0=只含配件）。"""
+        item_classes = set(r[0] for r in db.session.query(Item.class_cd)
+                          .filter(Item.typflg == typflg).distinct().all())
+        finished_items = list(db.session.query(Item.item_cd, Item.item_nm, Item.class_cd)
+                              .filter(Item.typflg == typflg).order_by(Item.item_cd).all())
+        # 递归收集所有父分类（保证层级完整）
+        all_relevant: set[str] = set(item_classes)
+        while True:
+            parents = set(r[0] for r in db.session.query(ItemClass.parent_cd)
+                         .filter(ItemClass.class_cd.in_(list(all_relevant)),
+                                 ItemClass.parent_cd.isnot(None),
+                                 ItemClass.parent_cd != "").all())
+            new_parents = parents - all_relevant
+            if not new_parents:
+                break
+            all_relevant.update(new_parents)
+            # 防止死循环
+            if len(all_relevant) > 500:
+                break
+
+        # CTE 生成完整树（含所有分类）
+        sql = db.text("""
+            WITH RECURSIVE tree AS (
+                SELECT ic.class_cd, ic.class_nm, ic.childflg, ic.parent_cd,
+                       ic.opercd, COALESCE(u.user_nm, ic.opercd) AS oper_nm,
+                       COALESCE(ic.gendate, ic.created_at) AS gendate, 0 AS depth
+                FROM tmm11_itemclass ic
+                LEFT JOIN tmc13_users u ON u.user_cd = TRIM(ic.opercd)
+                WHERE ic.parent_cd IS NULL
+                UNION ALL
+                SELECT c.class_cd, c.class_nm, c.childflg, c.parent_cd,
+                       c.opercd, COALESCE(u2.user_nm, c.opercd) AS oper_nm,
+                       COALESCE(c.gendate, c.created_at), t.depth + 1
+                FROM tmm11_itemclass c
+                JOIN tree t ON c.parent_cd = t.class_cd
+                LEFT JOIN tmc13_users u2 ON u2.user_cd = TRIM(c.opercd)
+            )
+            SELECT class_cd, class_nm, childflg, parent_cd, opercd, oper_nm, gendate, depth
+            FROM tree ORDER BY depth, class_cd
+        """)
+        rows = db.session.execute(sql).fetchall()
+
+        node_map: dict[str, dict[str, Any]] = {}
+        roots: list[dict[str, Any]] = []
+        for r in rows:
+            if r.class_cd not in all_relevant:
+                continue  # 没有成品的分类不显示
+            node = {"class_cd": r.class_cd, "class_nm": r.class_nm,
+                    "childflg": r.childflg, "parent_cd": r.parent_cd.strip() if r.parent_cd else "",
+                    "opercd": (r.oper_nm or r.opercd or ""),
+                    "gendate": str(r.gendate)[:10] if r.gendate else "",
+                    "children": [], "type": "class"}
+            node_map[r.class_cd] = node
+            parent = r.parent_cd.strip() if r.parent_cd else None
+            if parent and parent in node_map:
+                node_map[parent]["children"].append(node)
+            else:
+                roots.append(node)
+
+        for item_cd, item_nm, class_cd in finished_items:
+            label = f"{item_cd} {item_nm}" if item_nm and item_nm != item_cd else item_cd
+            leaf = {"class_cd": item_cd, "class_nm": label,
+                    "childflg": "0", "parent_cd": class_cd,
+                    "children": [], "type": "item"}
+            if class_cd and class_cd in node_map:
+                node_map[class_cd]["children"].append(leaf)
+        return roots
+
+    @staticmethod
     def _get_descendant_class_cds(class_cd: str) -> list[str]:
         """CTE 递归查询指定分类的所有子分类编码。"""
         sql = db.text("""
@@ -322,6 +451,302 @@ class SystemRepository:
     @staticmethod
     def get_item_class_by_cd(class_cd: str) -> ItemClass | None:
         return db.session.get(ItemClass, class_cd)
+
+    @staticmethod
+    def get_item_suppliers(item_cd: str) -> list[dict[str, Any]]:
+        """查询物料关联的供应商列表（含供应商名称）。"""
+        from app.models.master import CustItems
+        rows = db.session.query(CustItems).filter(CustItems.itemcd == item_cd).all()
+        result = []
+        for r in rows:
+            d = r.to_dict()
+            from app.models.master import Supplier
+            s = db.session.get(Supplier, r.custcd)
+            d["supp_nm"] = s.supp_nm if s else ""
+            result.append(d)
+        return result
+
+    @staticmethod
+    def get_related_boms(item_cd: str) -> list[dict[str, Any]]:
+        """反查：该物料作为配件出现在哪些 BOM 中。"""
+        from app.models.master import Bom, BomDt
+        bomcds = [r[0] for r in db.session.query(BomDt.bomcd).filter(BomDt.itemcd == item_cd).distinct().all()]
+        if not bomcds:
+            return []
+        boms = db.session.query(Bom).filter(Bom.bomcd.in_(bomcds)).all()
+        result = []
+        for b in boms:
+            d = b.to_dict()
+            d["details"] = [dt.to_dict() for dt in db.session.query(BomDt).filter(BomDt.bomcd == b.bomcd).all()]
+            result.append(d)
+        return result
+
+    @staticmethod
+    def get_item_prices(item_cd: str) -> list[dict[str, Any]]:
+        from app.models.inventory import Price
+        rows = db.session.query(Price).filter(Price.itemcd == item_cd).all()
+        return [r.to_dict() for r in rows]
+
+    @staticmethod
+    def get_item_price(item_cd: str, busityp: str):
+        from app.models.inventory import Price
+        return db.session.get(Price, (item_cd, busityp))
+
+    @staticmethod
+    def get_item_standard_price(item_cd: str, busityp: str = "20"):
+        """获取物料标准采购价（TIP01，当前有效）。"""
+        from datetime import date
+
+        from app.models.inventory import Price
+
+        today = date.today()
+        return (
+            db.session.query(Price)
+            .filter(
+                Price.itemcd == item_cd,
+                Price.busityp == busityp,
+                Price.is_current == True,
+            )
+            .first()
+        )
+
+    @staticmethod
+    def add_item_price(data: dict[str, Any]):
+        from app.models.inventory import Price
+        r = Price(**data)
+        db.session.add(r)
+        db.session.commit()
+        return r
+
+    @staticmethod
+    def update_item_price(r: Any, data: dict[str, Any]) -> Any:
+        for k, v in data.items():
+            setattr(r, k, v)
+        db.session.commit()
+        return r
+
+    @staticmethod
+    def delete_item_price(r: Any) -> bool:
+        db.session.delete(r)
+        db.session.commit()
+        return True
+
+    @staticmethod
+    def get_item_supplier(item_cd: str, cust_cd: str):
+        from app.models.master import CustItems
+        return db.session.get(CustItems, (item_cd, cust_cd))
+
+    @staticmethod
+    def add_item_supplier(data: dict[str, Any]):
+        from app.models.master import CustItems
+        r = CustItems(**data)
+        db.session.add(r)
+        db.session.commit()
+        return r
+
+    @staticmethod
+    def update_item_supplier(r: Any, data: dict[str, Any]) -> Any:
+        for k, v in data.items():
+            setattr(r, k, v)
+        db.session.commit()
+        return r
+
+    @staticmethod
+    def delete_item_supplier(r: Any) -> bool:
+        db.session.delete(r)
+        db.session.commit()
+        return True
+
+    @staticmethod
+    def list_all_suppliers():
+        from app.models.master import Supplier
+        rows = db.session.query(Supplier.supp_cd, Supplier.supp_nm).order_by(Supplier.supp_cd).all()
+        return [{"supp_cd": r[0], "supp_nm": r[1]} for r in rows]
+
+    # ========== Supplier CRUD ==========
+
+    @staticmethod
+    def get_supplier(supp_cd: str):
+        """获取单个供应商。"""
+        return db.session.get(Supplier, supp_cd)
+
+    @staticmethod
+    def list_suppliers_all() -> list:
+        """全量查询供应商简表（用于下拉选择）。"""
+        rows = (
+            db.session.query(Supplier)
+            .filter(Supplier.useflg != "9")
+            .order_by(Supplier.supp_nm)
+            .all()
+        )
+        return [{"supp_cd": r.supp_cd, "supp_nm": r.supp_nm} for r in rows]
+
+    @staticmethod
+    def list_suppliers_paginated(keyword: str = "", class_cd: str = "", page: int = 1, per_page: int = 20):
+        """分页查询供应商列表，支持搜索和分类筛选。"""
+        q = db.session.query(Supplier)
+        if keyword:
+            like = f"%{keyword}%"
+            q = q.filter(db.or_(Supplier.supp_nm.ilike(like), Supplier.supp_cd.ilike(like)))
+        if class_cd:
+            q = q.filter(Supplier.class_cd == class_cd)
+        q = q.order_by(Supplier.supp_cd)
+        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+        return {
+            "items": [r.to_dict() for r in pagination.items],
+            "total": pagination.total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    @staticmethod
+    def get_max_supp_cd() -> str | None:
+        """获取当前最大供应商编码（用于自动编号）。"""
+        row = db.session.query(db.func.max(Supplier.supp_cd)).filter(
+            Supplier.supp_cd.op("~")(r"^\d{8}$")
+        ).scalar()
+        return row
+
+    @staticmethod
+    def create_supplier(data: dict[str, Any]) -> Supplier:
+        """新增供应商。"""
+        obj = Supplier(**data)
+        db.session.add(obj)
+        db.session.flush()
+        return obj
+
+    @staticmethod
+    def update_supplier(obj: Supplier, data: dict[str, Any]) -> Supplier:
+        """更新供应商。"""
+        readonly = {"supp_cd", "custcd", "custnm", "opercd", "gendate", "upddate"}
+        for k, v in data.items():
+            if hasattr(obj, k) and k not in readonly:
+                setattr(obj, k, v)
+        db.session.flush()
+        return obj
+
+    @staticmethod
+    def delete_supplier(obj: Supplier) -> None:
+        """逻辑删除供应商（useflg='0'）。"""
+        obj.useflg = "0"
+        db.session.flush()
+
+    @staticmethod
+    def count_orders_by_supplier(supp_cd: str) -> int:
+        from app.models.procurement import PurchaseRegister
+        return db.session.query(PurchaseRegister).filter(PurchaseRegister.suppliercd == supp_cd).count()
+
+    @staticmethod
+    def count_prices_by_supplier(supp_cd: str) -> int:
+        from app.models.inventory import SupplierPrice
+        return db.session.query(SupplierPrice).filter(SupplierPrice.supp_cd == supp_cd).count()
+
+    @staticmethod
+    def count_custitems_by_supplier(supp_cd: str) -> int:
+        return db.session.query(CustItems).filter(CustItems.custcd == supp_cd).count()
+
+    @staticmethod
+    def count_appraisals_by_supplier(supp_cd: str) -> int:
+        from app.models.procurement import SupplierAppraisalDt
+        return db.session.query(SupplierAppraisalDt).filter(SupplierAppraisalDt.supplierid == supp_cd).count()
+
+    # ========== SupplierClass CRUD ==========
+
+    @staticmethod
+    def get_supplier_classes() -> list[dict[str, Any]]:
+        """获取所有供应商分类（扁平列表）。"""
+        classes = db.session.query(SupplierClass).order_by(SupplierClass.class_cd).all()
+        return [c.to_dict() for c in classes]
+
+    @staticmethod
+    def get_supplier_class_tree() -> list[dict[str, Any]]:
+        """获取供应商分类树（递归构建，parent 字段为上级编码）。"""
+        sql = db.text("""
+            WITH RECURSIVE tree AS (
+                SELECT class_cd, class_nm, parent, childflg, useflg, 0 AS depth
+                FROM tmm18_supplierclass
+                WHERE parent IS NULL OR parent = '' OR parent = '%'
+                UNION ALL
+                SELECT c.class_cd, c.class_nm, c.parent, c.childflg, c.useflg, t.depth + 1
+                FROM tmm18_supplierclass c
+                JOIN tree t ON c.parent = t.class_cd
+            )
+            SELECT t.class_cd, t.class_nm, t.parent, t.childflg, t.useflg, t.depth,
+                   COUNT(s.supp_cd) AS supp_count
+            FROM tree t
+            LEFT JOIN tmm19_suppliers s ON s.class_cd = t.class_cd
+            GROUP BY t.class_cd, t.class_nm, t.parent, t.childflg, t.useflg, t.depth
+            ORDER BY t.depth, t.class_cd
+        """)
+        rows = db.session.execute(sql).fetchall()
+        node_map: dict[str, dict[str, Any]] = {}
+        roots: list[dict[str, Any]] = []
+        for r in rows:
+            parent_cd = (r.parent or "").strip()
+            node = {
+                "class_cd": r.class_cd,
+                "class_nm": r.class_nm,
+                "parent": parent_cd,
+                "childflg": r.childflg,
+                "useflg": r.useflg,
+                "supp_count": int(r.supp_count),
+                "children": [],
+            }
+            node_map[r.class_cd] = node
+            if parent_cd and parent_cd != "%" and parent_cd in node_map:
+                node_map[parent_cd]["children"].append(node)
+            else:
+                roots.append(node)
+        return roots
+
+    @staticmethod
+    def get_supplier_class(class_cd: str) -> SupplierClass | None:
+        """按编码获取供应商分类。"""
+        return db.session.get(SupplierClass, class_cd)
+
+    @staticmethod
+    def create_supplier_class(data: dict[str, Any]) -> SupplierClass:
+        """新增供应商分类。"""
+        obj = SupplierClass(**data)
+        db.session.add(obj)
+        db.session.commit()
+        return obj
+
+    @staticmethod
+    def update_supplier_class(record: SupplierClass, data: dict[str, Any]) -> SupplierClass:
+        """更新供应商分类。"""
+        for k, v in data.items():
+            if hasattr(record, k):
+                setattr(record, k, v)
+        db.session.commit()
+        return record
+
+    @staticmethod
+    def delete_supplier_class(record: SupplierClass) -> None:
+        """删除供应商分类。"""
+        db.session.delete(record)
+        db.session.commit()
+
+    @staticmethod
+    def count_child_classes(class_cd: str) -> int:
+        """统计指定分类下的子分类数量。"""
+        return db.session.query(SupplierClass).filter(SupplierClass.parent == class_cd).count()
+
+    @staticmethod
+    def count_suppliers_by_class(class_cd: str) -> int:
+        """统计使用该分类的供应商数量。"""
+        return db.session.query(Supplier).filter(Supplier.class_cd == class_cd).count()
+
+    @staticmethod
+    def get_max_supplier_class_cd() -> str | None:
+        """获取最大的两位供应商分类编码（用于自动生成）。"""
+        result = (
+            db.session.query(SupplierClass.class_cd)
+            .filter(SupplierClass.class_cd.op("~")("^[0-9]{1,2}$"))
+            .order_by(SupplierClass.class_cd.desc())
+            .first()
+        )
+        return result[0] if result else None
 
     @staticmethod
     def create_item_class(data: dict[str, Any]) -> ItemClass:
@@ -346,8 +771,9 @@ class SystemRepository:
 
     @staticmethod
     def get_items(page: int = 1, per_page: int = 20, search: str | None = None,
-                  class_cd: str | None = None, recursive: bool = True) -> tuple[list[Item], int]:
-        """获取物料列表，支持分类筛选、递归子分类、搜索。"""
+                  class_cd: str | None = None, recursive: bool = True,
+                  typflg: str | None = None) -> tuple[list[Item], int]:
+        """获取物料列表，支持分类筛选、递归子分类、搜索、成品/配件过滤。"""
         q = db.session.query(Item)
         if class_cd:
             if recursive:
@@ -360,9 +786,112 @@ class SystemRepository:
                 Item.item_cd.ilike(f"%{search}%"),
                 Item.item_nm.ilike(f"%{search}%"),
             ))
+        if typflg:
+            q = q.filter(Item.typflg == typflg)
         q = q.order_by(Item.item_cd)
         total = q.count()
         return q.offset((page - 1) * per_page).limit(per_page).all(), total
+
+    @staticmethod
+    def get_pos_models() -> list[dict[str, Any]]:
+        """获取在产机型列表(整机成品 JOIN Bom useflg=1,带押金/售价/库存/品级)。
+
+        包含属性: item_cd, item_nm, rent_money, sale_money,
+          stock_qty(成品库03总量), stock_by_wh[{whcd,whnm,qty,itemtyp}],
+          grade_* 各品级台数。
+        排序: 在产优先 -> 有库存优先 -> 成品库数量降序。
+        品级标签从 tmm31_syscodes(code_typ='QC') 动态读取，避免硬编码。
+        """
+        from sqlalchemy import func, case
+        from app.models.inventory import Price
+        from app.models.master import Bom
+        from app.models.warehouse import StockDetail as _WHD, Warehouse as _WH
+
+        PriceRent = db.aliased(Price)
+        PriceSale = db.aliased(Price)
+
+        # 在产机型基础信息
+        rows = (
+            db.session.query(
+                Item.item_cd,
+                Item.item_nm,
+                PriceRent.itemprice,
+                PriceSale.itemprice,
+            )
+            .join(Bom, Bom.bomcd == Item.item_cd)
+            .outerjoin(PriceRent, (PriceRent.itemcd == Item.item_cd) & (PriceRent.busityp == "40"))
+            .outerjoin(PriceSale, (PriceSale.itemcd == Item.item_cd) & (PriceSale.busityp == "10"))
+            .filter(Item.typflg == "1", Item.useflg == "1", Bom.useflg == "1")
+            .all()
+        )
+
+        item_cds = [r[0] for r in rows]
+
+        # QC 字典(code_typ='QC'),用于 itemtyp -> 品级名称
+        qc_codes = {
+            sc.code_cd: sc.code_nm
+            for sc in db.session.query(SysCode.code_cd, SysCode.code_nm)
+            .filter(SysCode.code_typ == "QC", SysCode.useflg == "1")
+            .all()
+        }
+
+        # 库存: 按 itemcd + whcd 汇总(仅 itemqty>0)
+        stock_rows = (
+            db.session.query(
+                _WHD.itemcd, _WHD.whcd, _WH.whnm, _WHD.itemtyp,
+                func.sum(_WHD.itemqty),
+            )
+            .outerjoin(_WH, _WHD.whcd == _WH.whcd)
+            .filter(_WHD.itemcd.in_(item_cds), _WHD.itemqty > 0, _WHD.useflg == "1")
+            .group_by(_WHD.itemcd, _WHD.whcd, _WH.whnm, _WHD.itemtyp)
+            .all()
+        )
+
+        # 组织库存数据
+        stock_map: dict[str, list[dict]] = {}
+        grade_map: dict[str, dict[str, int]] = {}
+        for sr in stock_rows:
+            cd = sr[0]
+            it = sr[3] or "__"
+            wh = {"whcd": sr[1], "whnm": sr[2] or "", "itemtyp": it, "qty": int(sr[4] or 0)}
+            stock_map.setdefault(cd, []).append(wh)
+            grade_map.setdefault(cd, {})
+            grade_map[cd][it] = grade_map[cd].get(it, 0) + int(sr[4] or 0)
+
+        result = []
+        for r in rows:
+            cd = r[0]
+            wh_list = stock_map.get(cd, [])
+            total_03 = sum(x["qty"] for x in wh_list if x["whcd"] == "03")
+            g = grade_map.get(cd, {})
+            parts = []
+            # 按 QC 字典顺序输出各品级库存
+            for qc_cd, qc_nm in qc_codes.items():
+                if g.get(qc_cd):
+                    parts.append(f"{qc_nm}:{g[qc_cd]}")
+            if g.get("__"):
+                parts.append(f"未分级:{g['__']}")
+            label = " ".join(parts) if parts else "无库存"
+            result.append({
+                "item_cd": cd,
+                "item_nm": r[1] or "",
+                "rent_money": float(r[2]) if r[2] is not None else 0,
+                "sale_money": float(r[3]) if r[3] is not None else 0,
+                "stock_qty": total_03,
+                "stock_by_wh": wh_list,
+                "grade_label": label,
+                "grade_detail": g,
+            })
+
+        # 排序: 在产优先 -> 有库存优先 -> 成品库数量降序
+        result.sort(
+            key=lambda x: (
+                1 if x["stock_qty"] > 0 else 0,
+                x["stock_qty"],
+            ),
+            reverse=True,
+        )
+        return result
 
     @staticmethod
     def get_item(item_cd: str) -> Item | None:
@@ -452,11 +981,17 @@ class SystemRepository:
 
     @staticmethod
     def get_customers(page: int = 1, per_page: int = 20, search: str | None = None,
-                      class_cd: str | None = None) -> tuple[list[Customer], int]:
-        """获取客户列表，支持分类筛选和搜索。"""
+                      class_cd: str | None = None,
+                      customer_status: str | None = None,
+                      useflg: str | None = None) -> tuple[list[Customer], int]:
+        """获取客户列表，支持分类筛选、状态筛选和搜索。"""
         q = db.session.query(Customer)
         if class_cd:
             q = q.filter(Customer.class_cd == class_cd)
+        if customer_status:
+            q = q.filter(Customer.customer_status == customer_status)
+        if useflg is not None:
+            q = q.filter(Customer.useflg == useflg)
         if search:
             q = q.filter(db.or_(
                 Customer.cust_card.ilike(f"%{search}%"),
@@ -528,14 +1063,15 @@ class SystemRepository:
 
     @staticmethod
     def get_eid_list(page: int = 1, per_page: int = 20, search: str | None = None,
-                     class_cd: str | None = None) -> tuple[list[Eid], int]:
+                     class_cd: str | None = None, whcd: str | None = None) -> tuple[list[Eid], int]:
         q = db.session.query(Eid)
         if class_cd:
-            # 递归获取该分类下的所有物料编码
             cds = SystemRepository._get_descendant_class_cds(class_cd)
             if cds:
                 item_cds = db.session.query(Item.item_cd).filter(Item.class_cd.in_(cds)).all()
                 q = q.filter(Eid.itemcd.in_([r[0] for r in item_cds]))
+        if whcd:
+            q = q.filter(Eid.whcd == whcd)
         if search:
             q = q.filter(db.or_(Eid.eid.ilike(f"%{search}%"), Eid.itemcd.ilike(f"%{search}%")))
         q = q.order_by(Eid.eid.desc())
@@ -573,8 +1109,8 @@ class SystemRepository:
 
     @staticmethod
     def get_warehouses() -> list[Any]:
-        from app.models.warehouse import Warehouse
         from app.models.system import User
+        from app.models.warehouse import Warehouse
         whs = list(db.session.query(Warehouse).order_by(Warehouse.whcd).all())
         user_map: dict[str, str] = {}
         result = []
@@ -620,6 +1156,65 @@ class SystemRepository:
         ).order_by(EidTrack.change_date.asc(), EidTrack.seqno.asc()).all())
 
     @staticmethod
+    def create_eid_track(
+        eid: str,
+        itemcd: str,
+        track_type: str,
+        operator: str,
+        refid: str = "",
+        change_date: Any | None = None,
+        cust_cd: str | None = None,
+        n_cust_cd: str | None = None,
+        sflg: str | None = None,
+        n_sflg: str | None = None,
+        whcd: str | None = None,
+        n_whcd: str | None = None,
+        install_date: Any | None = None,
+        n_install_date: Any | None = None,
+        remark: str = "",
+    ) -> EidTrack:
+        """写入设备变更轨迹记录。
+
+        参数：
+            track_type: 变更类型。
+                'C'=客户分配（设备绑定到门店）
+                'u'=状态变更（配置确认/计划完成）
+                'R'=设备回收
+            refid: 关联单号（预计划号/出库单号/维护单号）
+            cust_cd/n_cust_cd: 变更前后客户
+            sflg/n_sflg: 变更前后状态标志
+            whcd/n_whcd: 变更前后仓库
+            install_date/n_install_date: 变更前后安装日期
+        """
+        from datetime import UTC, datetime as _dt
+
+        if change_date is None:
+            change_date = _dt.now(UTC)
+
+        track = EidTrack(
+            type=track_type,
+            change_date=change_date,
+            itemcd=itemcd,
+            eid=eid,
+            opercd=operator,
+            gendate=_dt.now(UTC),
+            useflg="1",
+            refid=refid,
+            cust_cd=cust_cd,
+            n_cust_cd=n_cust_cd,
+            sflg=sflg,
+            n_sflg=n_sflg,
+            whcd=whcd,
+            n_whcd=n_whcd,
+            install_date=install_date,
+            n_install_date=n_install_date,
+            remark=remark,
+        )
+        db.session.add(track)
+        db.session.flush()
+        return track
+
+    @staticmethod
     def get_cust_pos_rl(page: int = 1, per_page: int = 20, search: str | None = None,
                          class_cd: str | None = None, asset_type: str | None = None,
                          asset_owner: str | None = None, useflg: str | None = None,
@@ -627,7 +1222,8 @@ class SystemRepository:
                          sflg: str | None = None, cust_cd: str | None = None,
                          item_class: str | None = None) -> tuple[list[dict], int]:
         """资产台账列表（以 Eid 为主表，BOM 归属按页批量后解析）。"""
-        from app.models.master import Customer as CustModel, Item, CustClass
+        from app.models.master import CustClass, Item
+        from app.models.master import Customer as CustModel
 
         # BOM 配件归属子查询：找出所有"父设备有客户"的 BOM 配件 EID
         bom_cust_subq = (
@@ -733,6 +1329,7 @@ class SystemRepository:
         result = []
         for e, r, bom_eid, cust_nm, parentcd, _cd, cust_card, item_nm, cust_class_nm in rows:
             d = e.to_dict()
+            d["item_nm"] = item_nm or ""
             if r:
                 d["id"] = r.id
                 d["cust_nm"] = cust_nm or "库存"
@@ -740,6 +1337,8 @@ class SystemRepository:
                 d["cust_class_nm"] = cust_class_nm or ""
                 d["useflg"] = r.useflg or (e.useflg or "1")
                 d["asset_status"] = getattr(r, 'asset_status', None) or ""
+                d["posupddate"] = r.posupddate.isoformat() if r.posupddate else ""
+                d["maintenanceno"] = r.maintenanceno or ""
                 d["parentcd"] = (parentcd or "").strip()
             elif e.eid in bom_map:
                 bm = bom_map[e.eid]
@@ -787,6 +1386,25 @@ class SystemRepository:
             CustPosRl.cust_cd == cust_cd, CustPosRl.useflg == "1"
         ).count()
 
+    @staticmethod
+    def get_cust_latest_itemnm(cust_cd: str) -> str:
+        """取客户有效设备中最新日期对应的机型名称（对齐 PB uf_storeposinfo）。
+
+        优先按 posupddate 倒序，回退 created_at，取首条有效设备的 item_nm。
+        """
+        from sqlalchemy import func
+        row = (
+            db.session.query(Item.item_nm)
+            .join(CustPosRl, CustPosRl.item_cd == Item.item_cd)
+            .filter(CustPosRl.cust_cd == cust_cd, CustPosRl.useflg == "1")
+            .order_by(
+                CustPosRl.posupddate.desc().nullslast(),
+                CustPosRl.created_at.desc().nullslast(),
+            )
+            .first()
+        )
+        return row[0] if row else ""
+
     # ——— 码表查询 ———
 
     @staticmethod
@@ -831,8 +1449,33 @@ class SystemRepository:
         ).order_by(Area.area_cd).all())
 
     @staticmethod
-    def get_commodes() -> list[ComMode]:
-        return list(db.session.query(ComMode).filter(ComMode.useflg == "1").order_by(ComMode.cmm_cd).all())
+    def get_area_by_cd(area_cd: str) -> Area | None:
+        return db.session.query(Area).filter(Area.area_cd == area_cd).first()
+
+    @staticmethod
+    def create_area(data: dict[str, Any]) -> Area:
+        record = Area(**data)
+        db.session.add(record)
+        db.session.flush()
+        return record
+
+    @staticmethod
+    def update_area(record: Area, data: dict[str, Any]) -> None:
+        for k, v in data.items():
+            if hasattr(record, k):
+                setattr(record, k, v)
+        db.session.flush()
+
+    @staticmethod
+    def delete_area(record: Area) -> None:
+        db.session.delete(record)
+        db.session.commit()
+
+    @staticmethod
+    def count_userarea_by_area_cd(area_cd: str) -> int:
+        """统计区域下的用户关联数（删除区域前校验）。"""
+        from app.models.itsm import UserArea
+        return db.session.query(UserArea).filter(UserArea.area_cd == area_cd).count()
 
     @staticmethod
     def get_countries() -> list[Country]:
@@ -863,3 +1506,278 @@ class SystemRepository:
         if city_cd:
             q = q.filter(Town.city_cd == city_cd)
         return list(q.order_by(Town.town_cd).all())
+
+    # ========== 国标地理表（geo_*）==========
+
+    @staticmethod
+    def get_geo_provinces() -> list[GeoProvince]:
+        """国标省级列表。"""
+        return list(db.session.query(GeoProvince).order_by(GeoProvince.code).all())
+
+    @staticmethod
+    def get_geo_cities(province_code: str | None = None) -> list[GeoCity]:
+        """国标地级市列表，可按省级代码筛选。"""
+        q = db.session.query(GeoCity)
+        if province_code:
+            q = q.filter(GeoCity.province_code == province_code)
+        return list(q.order_by(GeoCity.code).all())
+
+    @staticmethod
+    def get_geo_areas(city_code: str | None = None, province_code: str | None = None) -> list[GeoArea]:
+        """国标区县列表，可按地级市或省级代码筛选。"""
+        q = db.session.query(GeoArea)
+        if city_code:
+            q = q.filter(GeoArea.city_code == city_code)
+        elif province_code:
+            q = q.filter(GeoArea.province_code == province_code)
+        return list(q.order_by(GeoArea.code).all())
+
+    @staticmethod
+    def get_geo_streets(area_code: str | None = None, city_code: str | None = None) -> list[GeoStreet]:
+        """国标街道列表，可按区县或地级市代码筛选。"""
+        q = db.session.query(GeoStreet)
+        if area_code:
+            q = q.filter(GeoStreet.area_code == area_code)
+        elif city_code:
+            q = q.filter(GeoStreet.city_code == city_code)
+        return list(q.order_by(GeoStreet.code).all())
+
+    # ========== SupplierClass CRUD ==========
+
+    @staticmethod
+    def get_supplier_classes() -> list[dict[str, Any]]:
+        """获取供应商分类列表（用于树形结构）。"""
+        rows = db.session.query(SupplierClass).order_by(SupplierClass.class_cd).all()
+        return [r.to_dict() for r in rows]
+
+    @staticmethod
+    def get_supplier_class(class_cd: str):
+        """获取单个供应商分类。"""
+        return db.session.get(SupplierClass, class_cd)
+
+    @staticmethod
+    def create_supplier_class(data: dict[str, Any]) -> SupplierClass:
+        """新增供应商分类。"""
+        obj = SupplierClass(**data)
+        db.session.add(obj)
+        db.session.flush()
+        return obj
+
+    @staticmethod
+    def update_supplier_class(obj: SupplierClass, data: dict[str, Any]) -> SupplierClass:
+        """更新供应商分类。"""
+        for k, v in data.items():
+            if hasattr(obj, k):
+                setattr(obj, k, v)
+        db.session.flush()
+        return obj
+
+    @staticmethod
+    def delete_supplier_class(obj: SupplierClass) -> None:
+        """删除供应商分类。"""
+        db.session.delete(obj)
+        db.session.flush()
+
+    @staticmethod
+    def count_suppliers_by_class(class_cd: str) -> int:
+        """统计某分类下的供应商数量。"""
+        return db.session.query(Supplier).filter(Supplier.class_cd == class_cd, Supplier.useflg == "1").count()
+
+    @staticmethod
+    def count_child_classes(class_cd: str) -> int:
+        """统计某分类下的子分类数量。"""
+        return db.session.query(SupplierClass).filter(SupplierClass.parent == class_cd).count()
+
+    # ========== Supplier Items (tmm24) ==========
+
+    @staticmethod
+    def get_supplier_items(supp_cd: str) -> list[dict[str, Any]]:
+        """查询供应商关联的商品列表，含物料名称、单位、分类。"""
+        rows = (
+            db.session.query(CustItems, Item.item_nm, Item.unit, Item.class_cd)
+            .outerjoin(Item, CustItems.itemcd == Item.item_cd)
+            .filter(CustItems.custcd == supp_cd)
+            .all()
+        )
+        result = []
+        for ci, item_nm, unit, class_cd in rows:
+            d = ci.to_dict()
+            d["item_nm"] = item_nm
+            d["item_unit"] = unit
+            d["class_cd"] = class_cd
+            result.append(d)
+        return result
+
+    @staticmethod
+    def get_supplier_item(supp_cd: str, item_cd: str):
+        """获取单个供应商-商品关联。"""
+        return db.session.query(CustItems).filter(
+            CustItems.custcd == supp_cd,
+            CustItems.itemcd == item_cd,
+        ).first()
+
+    @staticmethod
+    def add_supplier_item(supp_cd: str, data: dict[str, Any]) -> CustItems:
+        """新增供应商-商品关联。"""
+        obj = CustItems(
+            custcd=supp_cd,
+            itemcd=data["itemcd"],
+            **{k: v for k, v in data.items() if k != "itemcd"},
+        )
+        db.session.add(obj)
+        db.session.commit()
+        return obj
+
+    @staticmethod
+    def set_item_default_supplier(item_cd: str, cust_cd: str) -> None:
+        """将该物料其他供应商的默认标志清除。"""
+        db.session.query(CustItems).filter(
+            CustItems.itemcd == item_cd,
+            CustItems.custcd != cust_cd,
+            CustItems.dfltflg == "Y",
+        ).update({"dfltflg": "N"})
+        db.session.flush()
+
+    @staticmethod
+    def delete_supplier_item(obj: CustItems) -> None:
+        """删除供应商-商品关联。"""
+        db.session.delete(obj)
+        db.session.commit()
+
+    @staticmethod
+    def check_supplier_item_has_orders(supp_cd: str, item_cd: str) -> bool:
+        """检查供应商-商品关联是否有对应的采购订单。"""
+        from app.models.procurement import PurchaseRegister, RequisitionOrderLink
+
+        count = (
+            db.session.query(RequisitionOrderLink)
+            .join(PurchaseRegister, RequisitionOrderLink.rgstbillid == PurchaseRegister.rgstbillid)
+            .filter(
+                PurchaseRegister.suppliercd == supp_cd,
+                RequisitionOrderLink.pcplanid.isnot(None),
+            )
+            .count()
+        )
+        return count > 0
+
+    # ========== Supplier Prices (tip02) ==========
+
+    @staticmethod
+    def check_custitems_exists(supp_cd: str, item_cd: str) -> bool:
+        """检查供应商-商品关联是否存在。"""
+        return db.session.query(CustItems).filter(
+            CustItems.custcd == supp_cd,
+            CustItems.itemcd == item_cd,
+        ).first() is not None
+
+    @staticmethod
+    def get_supplier_price_current(item_cd: str, supp_cd: str, qty: float = 1):
+        """获取供应商当前有效阶梯报价。
+
+        阶梯定价规则：取满足 min_qty <= qty 的记录中 min_qty 最大的一条
+        （最匹配的采购阶梯）。若无满足起订量的记录，退而取 min_qty 最小
+        的有效报价，并由调用方决定是否提示用户未达起订量。
+        """
+        from datetime import date
+
+        from app.models.inventory import SupplierPrice
+
+        today = date.today()
+        base_filters = [
+            SupplierPrice.itemcd == item_cd,
+            SupplierPrice.supp_cd == supp_cd,
+            SupplierPrice.effective_date <= today,
+        ]
+        # expire_date 可为空（永久有效）
+        import sqlalchemy as sa
+        expire_filter = sa.or_(
+            SupplierPrice.expire_date.is_(None),
+            SupplierPrice.expire_date >= today,
+        )
+        # 阶梯匹配：满足起订量，取 min_qty 最大的（最接近采购量的阶梯）
+        result = (
+            db.session.query(SupplierPrice)
+            .filter(*base_filters, expire_filter, SupplierPrice.min_qty <= qty)
+            .order_by(SupplierPrice.min_qty.desc())
+            .first()
+        )
+        if result:
+            return result
+        # 退而：数量未达任何起订量，取 min_qty 最小的有效报价供参考
+        return (
+            db.session.query(SupplierPrice)
+            .filter(*base_filters, expire_filter)
+            .order_by(SupplierPrice.min_qty.asc())
+            .first()
+        )
+
+    @staticmethod
+    def get_supplier_prices(supp_cd: str, item_cd: str = "", current_only: bool = False) -> list[dict[str, Any]]:
+        """查询供应商报价，支持物料筛选和当前有效筛选。"""
+        from app.models.inventory import SupplierPrice
+        q = (
+            db.session.query(SupplierPrice, Item.item_nm)
+            .join(Item, SupplierPrice.itemcd == Item.item_cd)
+            .filter(SupplierPrice.supp_cd == supp_cd)
+        )
+        if item_cd:
+            q = q.filter(SupplierPrice.itemcd == item_cd)
+        if current_only:
+            from datetime import date
+            today = date.today()
+            q = q.filter(SupplierPrice.effective_date <= today, SupplierPrice.expire_date >= today)
+        rows = q.order_by(SupplierPrice.itemcd, SupplierPrice.effective_date).all()
+        result = []
+        for sp, item_nm in rows:
+            d = sp.to_dict()
+            d["item_nm"] = item_nm
+            result.append(d)
+        return result
+
+    @staticmethod
+    def get_supplier_price(price_id: int):
+        from app.models.inventory import SupplierPrice
+        return db.session.get(SupplierPrice, price_id)
+
+    @staticmethod
+    def create_supplier_price(data: dict[str, Any]):
+        from app.models.inventory import SupplierPrice
+        obj = SupplierPrice(**data)
+        db.session.add(obj)
+        db.session.commit()
+        return obj
+
+    @staticmethod
+    def update_supplier_price(obj: Any, data: dict[str, Any]) -> Any:
+        skip = {"id", "opercd", "gendate", "upddate"}
+        for k, v in data.items():
+            if hasattr(obj, k) and k not in skip:
+                setattr(obj, k, v)
+        db.session.commit()
+        return obj
+
+    @staticmethod
+    def delete_supplier_price(obj: Any) -> None:
+        db.session.delete(obj)
+        db.session.commit()
+
+
+class UserAreaRepository:
+    """区域-用户关联数据访问（TIT06_USERAREA）。"""
+
+    @staticmethod
+    def list_by_area_cd(area_cd: str) -> list[UserArea]:
+        return list(db.session.query(UserArea).filter(UserArea.area_cd == area_cd).all())
+
+    @staticmethod
+    def list_user_cds_by_area_cd(area_cd: str) -> set[str]:
+        rows = db.session.query(UserArea.user_cd).filter(UserArea.area_cd == area_cd).all()
+        return {r[0] for r in rows}
+
+    @staticmethod
+    def set_users(area_cd: str, user_cds: list[str]) -> None:
+        """批量替换区域用户关联（删除旧关联 + 插入新关联）。"""
+        db.session.query(UserArea).filter(UserArea.area_cd == area_cd).delete()
+        for cd in user_cds:
+            db.session.add(UserArea(area_cd=area_cd, user_cd=cd))
+        db.session.flush()

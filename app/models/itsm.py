@@ -8,7 +8,7 @@ ITSM 业务模型。
   日常维护：TIT10 系列（主表 + LIABILITY + TRACK + POS_DETAIL + ATTC + ARCHIVE）
   新机开通：TIT13 + TIT14
   旧机翻新：TIT15（主表 + EQUIPMENT）
-  设备变更：TIT16
+  磁卡号变更：TIT16
   日常保养：TIT17（主表 + CUST_POS_DAILY + PLAN）
   门店关闭：TIT18
   配件选取：TIT19
@@ -125,10 +125,10 @@ class UserArea(BaseModel):
     __tablename__ = "tit06_userarea"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    area_id = db.Column(db.Integer, nullable=False, comment="区域ID")
+    area_cd = db.Column(db.String(20), nullable=False, comment="区域编码（FK→tmm46_area.area_cd）")
     user_cd = db.Column(db.String(6), nullable=False, comment="人员编号")
 
-    __table_args__ = (db.UniqueConstraint("area_id", "user_cd", name="uq_userarea"),)
+    __table_args__ = (db.UniqueConstraint("area_cd", "user_cd", name="uq_userarea"),)
 
 
 # ---------------------------------------------------------------------------
@@ -140,8 +140,8 @@ class MaintenanceDaily(BaseModel):
     """
     日常维护单主表（TIT10_MAINTENANCEDAY）。
 
-    CURRENT_STATUS 状态码：
-        00=草稿, 01=已计划, 04=已派工, 02=实施中, 05=已完成, 09=已取消
+    CURRENT_STATUS 状态码（对齐 PB ZT 字典）：
+        1=新建, 2=分配, 3=关闭, 4=未解决, 5=已解决, 9=作废
     """
 
     __tablename__ = "tit10_maintenanceday"
@@ -161,7 +161,7 @@ class MaintenanceDaily(BaseModel):
     short_description = db.Column(db.String(80), comment="故障简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
     device_id = db.Column(db.String(13), comment="故障设备编号")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     faultcode = db.Column(db.String(80), comment="故障编码")
@@ -333,7 +333,7 @@ class MaintenanceOpen(BaseModel):
     deliver_no = db.Column(db.String(8), comment="送货单号")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     create_time = db.Column(db.DateTime, comment="创建时间")
@@ -403,7 +403,7 @@ class MaintenanceRenovate(BaseModel):
     deliver_no = db.Column(db.String(8), comment="送货单号")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     create_time = db.Column(db.DateTime, comment="创建时间")
@@ -449,15 +449,15 @@ class EquipmentRenovate(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# TIT16 设备变更单
+# TIT16 磁卡号变更单
 # ---------------------------------------------------------------------------
 
 
 class DeviceChange(BaseModel):
     """
-    设备变更单（TIT16_DEVICE_CHANGE）。
+    磁卡号变更单（TIT16_DEVICE_CHANGE）。
 
-    CHANGE_TYPE: CK=改磁卡号, BQ=信息变更, BG=设备变更
+    CHANGE_TYPE: CK=仅磁卡号变更, BQ=信息变更, BG=磁卡号+设备变更
     """
 
     __tablename__ = "tit16_device_change"
@@ -465,7 +465,7 @@ class DeviceChange(BaseModel):
     device_change_id = db.Column(db.String(8), primary_key=True, comment="变更单ID")
     store_id = db.Column(db.String(8), comment="门店ID")
     requset_paper_id = db.Column(db.String(8), comment="变更请求单ID")
-    change_type = db.Column(db.String(8), comment="变更类型（CK/BQ/BG）")
+    change_type = db.Column(db.String(8), comment="变更类型（CK=仅磁卡号/BQ=信息变更/BG=磁卡号+设备）")
     device_id = db.Column(db.String(13), comment="整机ID")
     new_contactor = db.Column(db.String(10), comment="变更后联系人")
     new_tel = db.Column(db.String(60), comment="变更后电话")
@@ -477,7 +477,7 @@ class DeviceChange(BaseModel):
     expected_completion_time = db.Column(db.DateTime, comment="合同要求完成时间")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     create_time = db.Column(db.DateTime, comment="创建时间")
@@ -510,7 +510,7 @@ class Maintenance(BaseModel):
     request_time = db.Column(db.DateTime, comment="请求时间")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     create_time = db.Column(db.DateTime, comment="创建时间")
@@ -603,7 +603,7 @@ class StoreClose(BaseModel):
     expected_completion_time = db.Column(db.DateTime, comment="要求完成时间")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     create_time = db.Column(db.DateTime, comment="创建时间")
@@ -653,7 +653,8 @@ class MaintenanceDispatch(BaseModel):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     maintenance_id = db.Column(db.String(8), nullable=False, comment="维护单ID")
     business_operation_id = db.Column(db.Integer, comment="业务操作流水表ID")
-    maintenance_type = db.Column(db.String(2), comment="维护类型")
+    maintenance_type = db.Column(db.String(2), comment="维护类型（PB未使用，重构已废弃，保留历史兼容）")
+    service_responsibility = db.Column(db.String(2), comment="服务责任方（SR字典：01内部/02厂商/03代维）")
     operator = db.Column(db.String(6), comment="操作人")
     accpectd_group = db.Column(db.String(2), comment="分派组")
     accpectder = db.Column(db.String(6), comment="分派人")
@@ -673,7 +674,7 @@ class MaintenanceD2D(BaseModel):
     """
     维护单上门服务表（TIT23_MAINTENANCE_D2D）。
 
-    跨单据复用：日常维护(MD)/新机开通(MO)/旧机翻新(MR)/保养(BY)/设备变更(BG) 均使用。
+    跨单据复用：日常维护(MD)/新机开通(MO)/旧机翻新(MR)/保养(BY)/磁卡号变更(BG) 均使用。
     """
 
     __tablename__ = "tit23_maintenance_d2d"
@@ -684,12 +685,23 @@ class MaintenanceD2D(BaseModel):
     d2d_engineer = db.Column(db.String(6), comment="上门工程师")
     arrive_time = db.Column(db.DateTime, comment="到达时间")
     leave_time = db.Column(db.DateTime, comment="离店时间")
-    jjbz = db.Column(db.String(1), comment="解决标志")
-    d2d_descripiton = db.Column(db.String(200), comment="处理过程描述")
+    jjbz = db.Column(db.String(1), comment="解决标志（已废弃，保留 PB 数据迁移兼容，新数据用 d2d_result）")
+    d2d_descripiton = db.Column(db.String(200), comment="处理过程描述（保留 PB 兼容，离店保存时由后端自动拼句双写）")
     d2d_phone = db.Column(db.String(60), comment="电话")
     old_business_id = db.Column(db.Integer, comment="原操作流水ID")
     d2d_group = db.Column(db.Integer, comment="分组")
     d2d_type = db.Column(db.String(1), comment="类型（1到店/2离店/3催单/4记录）")
+    # 离店解决四要素结构化字段（事项 18）
+    d2d_phenomenon = db.Column(db.String(200), comment="实际现象")
+    d2d_reason = db.Column(db.String(200), comment="原因")
+    d2d_handling = db.Column(db.String(500), comment="处理过程（工程师手输补充）")
+    d2d_result = db.Column(db.String(2), comment="结果（ZT 字典码值：5已解决/4未解决/6转修/7待配件/3关闭）")
+    closure_reason = db.Column(db.String(1), comment="关闭原因（仅 d2d_result=3 时填，CLO_REASON 字典）")
+    d2d_note = db.Column(db.String(200), comment="其他补充")
+    # 故障代码与设备/配件追溯字段（事项 1 方案 B：d2d 只落 gzdm，大类/小类查询时从 gzdm 派生或 join tit04_archivecode）
+    gzdm = db.Column(db.String(8), comment="故障代码（= tit04_archivecode.arch_cd 值，重构改为落库以支持单次上门故障追溯）")
+    device_id = db.Column(db.String(13), comment="本次处理设备（重构新增，支持设备追溯）")
+    accessories_id = db.Column(db.String(13), comment="本次处理配件（重构新增，支持配件追溯）")
     create_time = db.Column(db.DateTime, comment="创建时间")
     creator = db.Column(db.String(6), comment="创建人")
     update_time = db.Column(db.DateTime, comment="更新时间")
@@ -697,6 +709,13 @@ class MaintenanceD2D(BaseModel):
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     posstatus = db.Column(db.String(2), comment="POS状态")
     posstatus1 = db.Column(db.String(2), comment="POS状态1")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "maintenance_id", "business_operation_id",
+            name="uq_maintenance_d2d_op",
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -754,7 +773,16 @@ class AccessoriesUpdate(BaseModel):
     updator = db.Column(db.String(6), comment="更新人")
     auditflg = db.Column(db.String(1), comment="提交标志")
     posflg = db.Column(db.String(1), comment="更换整机标志")
-    c_type = db.Column(db.String(1), comment="操作类型（1维修/2购买）")
+    c_type = db.Column(db.String(1), comment="操作类型（C_TYPE 字典：1维修/2购买/3纯服务费/4整机更换/5耗材线材）")
+    # B3：配件更换关联故障代码（itemcd 前两位用于预过滤 fault_type）
+    itemcd = db.Column(db.String(13), comment="配件物料编码（B3：关联故障代码用）")
+    fault_cd = db.Column(db.String(8), comment="故障代码（B3：配件更换时自动关联）")
+    # 收费维度字段（事项 C1：合并 TIT26 功能）
+    payje = db.Column(db.Numeric(10, 3), comment="收款金额（c_type=3/5 时填，c_type=1/2/4 时与 price 同步）")
+    paytype = db.Column(db.String(20), comment="收费类型（c_type=3 用 PAY_SVC 字典，c_type=5 用 PAY_CONS 字典）")
+    paydate = db.Column(db.DateTime, comment="收款日期")
+    memo = db.Column(db.String(200), comment="备注")
+    version = db.Column(db.Integer, nullable=False, default=1, comment="乐观锁版本号（每次更新+1，并发控制）")
 
 
 # ---------------------------------------------------------------------------
@@ -814,8 +842,10 @@ class CloseBills(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# TODO(cleanup): 免费更换（TIT28）已废弃，FreeReplace / FreeReplaceDt 模型仅保留
+# 供历史数据查询。当前业务不再创建新免费更换单，后续版本统一清理。
 class FreeReplace(BaseModel):
-    """免费更换维护单（TIT28_FREE_REPLACE）。"""
+    """免费更换维护单（TIT28_FREE_REPLACE）—— 已废弃，仅保留历史数据查询。"""
 
     __tablename__ = "tit28_free_replace"
 
@@ -831,7 +861,7 @@ class FreeReplace(BaseModel):
     expected_completion_time = db.Column(db.DateTime, comment="合同要求完成时间")
     short_description = db.Column(db.String(80), comment="简述")
     detail_description = db.Column(db.String(200), comment="详细描述")
-    current_status = db.Column(db.String(2), default="00", comment="当前状态")
+    current_status = db.Column(db.String(2), default="1", comment="当前状态")
     is_success = db.Column(db.String(1), comment="成功标志")
     is_old = db.Column(db.String(1), comment="是否补单")
     is_back = db.Column(db.String(1), comment="设备是否返回（Y/N）")
@@ -894,7 +924,7 @@ class RecycleTask(BaseModel):
     plan_no = db.Column(db.String(10), comment="来源预计划单号")
     maintenance_id = db.Column(db.String(8), comment="关联维护单号")
     cust_cd = db.Column(db.String(8), nullable=False, comment="门店代码")
-    task_status = db.Column(db.String(2), default="00", comment="任务状态")
+    task_status = db.Column(db.String(2), default="1", comment="任务状态")
     asset_count = db.Column(db.Integer, default=0, comment="应回收资产数量")
     asset_list = db.Column(db.String(500), comment="资产清单JSON")
     assigned_to = db.Column(db.String(6), comment="分配人员")
@@ -959,3 +989,58 @@ class NoCloseTrack(BaseModel):
     creator = db.Column(db.String(6), comment="创建人")
     update_time = db.Column(db.DateTime, comment="更新时间")
     updator = db.Column(db.String(6), comment="更新人")
+
+
+# ---------------------------------------------------------------------------
+# POS 状态字典 (TMM52_POSSTATUS)
+# ---------------------------------------------------------------------------
+
+
+class PosStatus(BaseModel):
+    """POS 状态字典（TMM52_POSSTATUS）。"""
+
+    __tablename__ = "tmm52_posstatus"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    codecd = db.Column(db.String(50), comment="状态编码")
+    codecd1 = db.Column(db.String(50), comment="状态编码1")
+    memo = db.Column(db.String(200), comment="备注")
+    sysflg = db.Column(db.String(1), comment="系统标志")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+
+# ---------------------------------------------------------------------------
+# 派单规则 (TIT30_DISPATCH_RULE)
+# ---------------------------------------------------------------------------
+
+
+class DispatchRule(BaseModel):
+    """派单规则（TIT30_DISPATCH_RULE，新增）。
+
+    按故障类型配置派单目标与兜底链路，替代 PB 硬编码默认组 'A1'。
+    target_type: area_manager / group_leader / load_balance / manual
+    """
+
+    __tablename__ = "tit30_dispatch_rule"
+
+    rule_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    rule_name = db.Column(db.String(50), nullable=False, comment="规则名称")
+    priority = db.Column(db.Integer, default=99, comment="优先级（小优先）")
+    fault_type = db.Column(db.String(2), comment="故障类型（GZ字典，空=全匹配）")
+    store_id = db.Column(db.String(8), comment="门店编码（可选，定向派单）")
+    target_type = db.Column(db.String(20), comment="派单目标: area_manager/group_leader/load_balance/manual")
+    target_value = db.Column(db.String(20), comment="目标值（group_leader/load_balance 时=组编码）")
+    fallback_type = db.Column(db.String(20), comment="一级兜底目标")
+    fallback_value = db.Column(db.String(20), comment="一级兜底值")
+    ultimate_fallback_type = db.Column(db.String(20), comment="最终兜底目标")
+    ultimate_fallback_value = db.Column(db.String(20), comment="最终兜底值")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    auto_dispatch = db.Column(db.String(1), default="1", comment="自动派单开关: 1=启用/0=禁用")
+    notify_channel = db.Column(db.String(10), default="internal", comment="自动派工通知渠道: internal/email/sms/dingtalk/wecom/feishu/ntfy")
+    creator = db.Column(db.String(6), comment="创建人")
+    create_time = db.Column(db.DateTime, comment="创建时间")
+    updator = db.Column(db.String(6), comment="更新人")
+    update_time = db.Column(db.DateTime, comment="更新时间")

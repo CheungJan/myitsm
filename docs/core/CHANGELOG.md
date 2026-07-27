@@ -4,6 +4,72 @@
 
 ---
 
+## [v0.12.0] — 2026-06-12 — FQC Phase 2-3: BOM冗余量 + 退料 + 更换记录 + 工单取消
+
+### 新增
+- **BOM 冗余量**：`tmm41_bom.redundancy_ratio`，补料量 = 非合格数 × (1 + ratio)
+- **QC 审核约束**：未审核的补料 OV=8 时禁止审核 QC
+- **过程记录表**：`tms05_replace_record`，记录工单物料更换（旧→新 EID）
+- **更换 API**：`POST /mes/work-orders/<id>/replace`
+- **自动退料**：FQC 审核通过时检查 OV=8 剩余库存 → 自动生成 IV=3 退料 + TMS04
+- **工单取消清理**：取消时检查下游 → 作废草稿 OV=8 + 已审核 OV=8 生成 IV=3 对冲 + QC草稿作废
+- **消耗类型字典**：OV 新增 11=定额领料 12=不良补料，IV 新增 12=退料入库
+- **结果页补料标签**：`has_pending_replenish`，"补料中"标签
+
+### 变更
+- `qc_service.audit()`：新增补料 OV=8 审核检查 + FQC 完成时自动退料
+- `qc_service.replenish()`：应用 BOM 冗余量 + 用户可覆盖数量
+- `mes_service.transition()`：取消时自动清理关联单据 + 已审核检查
+- `mes_service._create_production_outbound_draft()`：去重查询加 `useflg='1'`
+- `warehouse_service.OV=8审计`：兼容 RELEASED 状态推进到 IN_PROGRESS
+- `WorkOrderList.vue`：抽屉新增"更换"按钮 + 对话框
+- `MaterialConsumeList.vue`：改用 OV/IV 字典取消耗类型标签
+
+---
+
+## [v0.11.0] — 2026-06-12 — FQC 补料 API + 录入页优化
+
+### 新增
+- **补料申请 API**：`POST /api/v1/qc/batches/<batch_id>/replenish`，为不良品行生成 OV=8 补料出库草稿
+- **补料状态字段**：`tqc11_resultdt` / `tqc11_resulteid` 新增 `replenish_status`、`replenish_ov_billid`
+- **BOM 冗余量**：`tmm41_bom.redundancy_ratio`，补料量 = 非合格数 × (1 + ratio)
+- **QC 审核约束**：存在未审核的补料 OV=8 时，禁止审核 QC
+- **结果页补料状态**：`has_pending_replenish` 字段，显示"补料中"标签
+
+### 变更
+- `QcInput.vue`：`handleReplace()` → `handleReplenish()`
+- `qc_service.audit()`：跳过已补料行 + 补料单审核检查
+- `doBatchSubmit()`：新增 `skipReplenishCheck` 参数
+
+### 文档
+- 新增 `FQC优化与补料方案统一实施计划.md`
+- 更新 `数据库字典_PostgreSQL当前版.md`
+- 更新 `生产质检与物料消耗优化实施文档.md`
+
+---
+
+## [v0.10.0] — 2026-05-27 — 采购结算/退货模块
+
+### 新增
+- **采购结算单（TPC14 + TPC14_DT）**：完整 CRUD + 审核 + 作废，支持 COD/PIA/DEP/MON/INS 五种付款方式
+- **采购退货单（TPC16/TPC17）增强**：完整 CRUD + 审核 + 作废，退货数量校验（≤ 入库量-已退量）
+- **14 条新 API 路由**：结算/退货各 6 条 + 可结算/可退货查询 2 条
+- **前端页面**：结算单列表/新建/编辑/审核，退货单列表/新建/编辑/审核
+- **TPC20 需求-订单关联表** + **v_requisition_execution 视图**实时计算执行状态
+
+### 变更
+- `tpc14_pcbill`：custcd→suppliercd 重命名，新增 pay_type/invoice/audit 字段，删除 refbillid/pcamt
+- `tpc16_rpcbill`：custcd→suppliercd 重命名，新增 return_reason
+- `tpc17_rpcbilldt`：新增 return_price/return_amt/line_reason
+- 结算/退货单号由随机 ID 改为 IdMaster 取号（SB/RT 前缀）
+- `tpc13_registerdt` 新增 UNIQUE(rgstbillid, lineno) 约束
+
+### 修复
+- 采购需求执行状态视图：ordered_qty < audit_qty 时正确归为"执行中"
+- 历史测试路由更新 + SQLite 视图兼容
+
+---
+
 ## [v0.9.0] — 2026-05-13 — P0 资产台账重构 + 数据质量治理
 
 ### 新增

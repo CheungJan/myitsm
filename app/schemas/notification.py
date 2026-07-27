@@ -13,6 +13,9 @@ class NotificationTemplateCreate(BaseModel):
     channel: str = Field(..., max_length=10, description="渠道: sms/email/internal")
     subject: str | None = Field(None, max_length=200, description="标题模板")
     body: str | None = Field(None, description="正文模板")
+    ref_type: str | None = Field(None, max_length=20, description="业务类型: dispatch/maintenance/renovate/open/change/recycle")
+    is_default: str | None = Field(None, max_length=1, description="是否默认: 1/0")
+    sort_no: int | None = Field(None, description="排序号")
 
 
 class NotificationTemplateUpdate(BaseModel):
@@ -22,6 +25,10 @@ class NotificationTemplateUpdate(BaseModel):
     channel: str | None = Field(None, max_length=10, description="渠道")
     subject: str | None = Field(None, max_length=200, description="标题模板")
     body: str | None = Field(None, description="正文模板")
+    ref_type: str | None = Field(None, max_length=20, description="业务类型")
+    is_default: str | None = Field(None, max_length=1, description="是否默认: 1/0")
+    sort_no: int | None = Field(None, description="排序号")
+    useflg: str | None = Field(None, max_length=1, description="有效标志: 1/0")
 
 
 class NotificationCreate(BaseModel):

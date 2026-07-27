@@ -1,0 +1,107 @@
+<h2>供应商主数据 CRUD — 字段分级</h2>
+<p class="subtitle">21 个字段按使用频率分三级，列表只显示核心字段，表单展示全部</p>
+
+<div class="section">
+  <h3>字段分级建议</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <tr style="background:#f5f5f5;">
+      <th style="padding:8px;text-align:left;">级别</th>
+      <th style="padding:8px;text-align:left;">字段</th>
+      <th style="padding:8px;text-align:left;">显示位置</th>
+      <th style="padding:8px;text-align:left;">理由</th>
+    </tr>
+    <tr style="background:#e8f5e9;">
+      <td style="padding:6px;"><strong>L1 核心</strong></td>
+      <td style="padding:6px;">supp_cd, supp_nm, custanm(简称), custbrcd(简码), class_cd, contactor, phoneno, useflg</td>
+      <td style="padding:6px;">列表 + 表单</td>
+      <td style="padding:6px;">日常采购选供应商、打电话、看分类</td>
+    </tr>
+    <tr style="background:#fff9c4;">
+      <td style="padding:6px;"><strong>L2 扩展</strong></td>
+      <td style="padding:6px;">address, zipcd, faxno, taxno, banknm, bankaccno, pcrep</td>
+      <td style="padding:6px;">仅表单</td>
+      <td style="padding:6px;">下单、开票、付款时才需要</td>
+    </tr>
+    <tr style="background:#f5f5f5;">
+      <td style="padding:6px;"><strong>L3 系统</strong></td>
+      <td style="padding:6px;">scale(等级), suppinfo, agreements, custcd, custnm, opercd, gendate, upddate</td>
+      <td style="padding:6px;">表单底部 / 隐藏</td>
+      <td style="padding:6px;">Oracle 遗留字段，基本不用</td>
+    </tr>
+  </table>
+</div>
+
+<div class="section">
+  <h3>列表页布局建议</h3>
+  <div class="mockup">
+    <div class="mockup-header">SupplierList.vue 改造后</div>
+    <div class="mockup-body">
+<pre style="font-size:12px;line-height:1.8;background:#fafafa;padding:12px;border-radius:6px;">
+┌──────────────────────────────────────────────────────────────┐
+│  供应商管理                              [🔍搜索] [+新增供应商] │
+├──────────────────────────────────────────────────────────────┤
+│  分类树      │ 列表                                        │
+│  ├─ 全部     │ 编码   │ 名称  │ 简称 │ 分类  │ 联系人│电话  │
+│  ├─ 原材料   │ SUP001 │ 甲科技│ 甲   │ 原材料│ 张三  │xxx   │
+│  ├─ 配件     │ SUP002 │ 乙商贸│ 乙   │ 配件  │ 李四  │xxx   │
+│  └─ 服务     │ ...                                        │
+│              │                           共 156 条  [分页]  │
+└──────────────────────────────────────────────────────────────┘
+</pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>表单布局建议（Dialog，不是独立页面）</h3>
+  <div class="mockup">
+    <div class="mockup-header">新增/编辑供应商 Dialog</div>
+    <div class="mockup-body">
+<pre style="font-size:12px;line-height:1.8;background:#fafafa;padding:12px;border-radius:6px;">
+┌─────────────────────────────────────────────┐
+│  新增供应商                          [×]    │
+├─────────────────────────────────────────────┤
+│  ── 基本信息 ──                             │
+│  供应商编码：[________] (自动编号)            │
+│  供应商名称：[________________] *            │
+│  供应商简称：[________]                      │
+│  供应商简码：[________]                      │
+│  分类：     [原材料 ▼]                       │
+│  联系人：   [________]  电话：[________]      │
+│  等级：     [A ▼]        状态：[启用 ✓]      │
+│  ── 扩展信息（可折叠）──                     │
+│  地址：[____________________________]       │
+│  邮编：[______]  传真：[________]            │
+│  税号：[__________________]                 │
+│  开户银行：[________________]               │
+│  银行账号：[________________]               │
+│  采购代表：[________]                        │
+│                         [保存] [取消]        │
+└─────────────────────────────────────────────┘
+</pre>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Dialog 弹窗（推荐）</h3>
+      <p>Element Plus Dialog，宽度 650px，扩展信息用 el-collapse 折叠</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>不离开列表页上下文</li><li>实现简单，与现有 ItemList 模式一致</li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>独立路由页面</h3>
+      <p>/suppliers/new、/suppliers/:id/edit，Tab 分步表单</p>
+      <div class="pros-cons">
+        <div class="cons"><h4>缺点</h4><ul><li>需新增路由</li><li>字段不多，Tab 分步意义不大</li><li>与其他模块模式不一致</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

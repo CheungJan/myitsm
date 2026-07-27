@@ -3,17 +3,14 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import Engine, text
+from sqlalchemy import text
 
 from app.migration.config import MigrationConfig
 from app.migration.field_mapper import (
-    TableMapping,
     build_mapping,
-    read_source_rows,
-    write_target_rows,
     get_row_count,
-    truncate_table,
     sync_sequence,
+    truncate_table,
 )
 
 logger = logging.getLogger(__name__)
@@ -170,8 +167,9 @@ def _read_batch_from_conn(
 
     target_cols = mapping.common_columns + list(mapping.rename_map.keys())
     cols_str = ", ".join(select_parts)
-    # ORDER BY 所有列确保跨查询 OFFSET 一致性
-    order_cols = ", ".join(target_cols[:3])  # 前3列足够区分
+    # ORDER BY 全列排序确保跨查询 OFFSET 一致性
+    # 仅用前 3 列在存在并列值时会导致同一行被多个批次重复读取或跳过
+    order_cols = ", ".join(target_cols)
     sql = f"SELECT {cols_str} FROM {mapping.old_table} ORDER BY {order_cols} OFFSET {offset} LIMIT {limit}"
     result = conn.execute(text(sql))
     return [dict(zip(target_cols, row)) for row in result.fetchall()]

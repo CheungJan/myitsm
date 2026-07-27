@@ -1,0 +1,77 @@
+<h2>前端交互架构（修订版）</h2>
+<p class="subtitle">拆单入口：订单创建页 | 并单入口：智能扫描（自动识别）</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">场景A：拆单 — 订单创建表单</div>
+    <div class="mockup-body" style="font-size:13px;line-height:2;">
+      <strong>入口：</strong>PurchaseRegisterList → 【新建订单】<br><br>
+      Step 1：选择需求单 PP000180<br>
+      └─ 显示明细：电源 × 100<br><br>
+      Step 2：分配到供应商<br>
+      ├─ 默认：100个 → [供应商下拉]<br>
+      └─ 点击[拆单] → 新增一行<br>
+      &nbsp;&nbsp;&nbsp;├─ 60个 → SUP001<br>
+      &nbsp;&nbsp;&nbsp;└─ 40个 → SUP002<br><br>
+      Step 3：实时校验 + 后端 validate<br><br>
+      Step 4：POST /orders/batch
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">场景B：并单 — 智能扫描</div>
+    <div class="mockup-body" style="font-size:13px;line-height:2;">
+      <strong>入口：</strong>PurchasePlanList → 【智能合并】<br><br>
+      Step 1：后端自动扫描<br>
+      ├─ <code>auditflg='2'</code>（已审核）<br>
+      ├─ <code>available_qty > 0</code><br>
+      └─ 按 itemcd 分组聚合<br><br>
+      Step 2：弹窗展示分组结果<br>
+      ├─ [✓] 电源：3个需求 / 100个 → 推荐供应商<br>
+      ├─ [✓] 网线：2个需求 / 50个 → 推荐供应商<br>
+      └─ ○ 显示器：仅1个需求（无可合并）<br><br>
+      Step 3：用户确认 → POST /orders/batch
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>智能合并弹窗交互细节</h3>
+  <div class="mockup">
+    <div class="mockup-header">merge-preview 弹窗原型</div>
+    <div class="mockup-body" style="font-size:13px;">
+<pre style="background:#fafafa;padding:12px;border-radius:6px;line-height:1.6;">
+┌──────────────────────────────────────────────┐
+│  智能合并推荐                                 │
+├──────────────────────────────────────────────┤
+│  以下商品可合并采购（同类商品多个需求）：        │
+│                                              │
+│  <span style="color:#2e7d32;">[✓]</span> 电源 MB5000    3个需求单  共100个       │
+│      来源：PP000180(50)+PP000181(30)+PP000183(20) │
+│      推荐供应商：[<span style="color:#1565c0;">供应商甲 ▼</span>]                    │
+│                                              │
+│  <span style="color:#2e7d32;">[✓]</span> 网线 6LR4L1    2个需求单  共50个        │
+│      来源：PP000185(30)+PP000186(20)          │
+│      推荐供应商：[<span style="color:#1565c0;">供应商乙 ▼</span>]                    │
+│                                              │
+│  以下商品无可合并（仅1个需求单）：               │
+│  ○ 显示器 MT7002    1个  PP000187             │
+├──────────────────────────────────────────────┤
+│  将生成 <strong>2</strong> 个采购订单                       │
+│  [确认合并]  [取消]  [全不选]                   │
+└──────────────────────────────────────────────┘
+</pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>API 调整：merge-preview 无需入参</h3>
+  <div style="background:#f5f5f5;padding:12px;border-radius:8px;font-size:13px;">
+    文档方案需要前端传 <code>pcplanids</code> 数组，智能扫描方案改为：<br><br>
+    <strong>POST /requisitions/merge-preview</strong>（无参或空 body）<br>
+    → 后端自动查 <code>auditflg='2' AND available_qty > 0</code> 的所有需求行<br>
+    → 按 itemcd 分组 → 过滤出 count ≥ 2 的"可合并组"和 count = 1 的"无可合并组"<br>
+    → 推荐供应商来源：<code>tip02_supplier_price</code> 表（已有）<br>
+  </div>
+</div>

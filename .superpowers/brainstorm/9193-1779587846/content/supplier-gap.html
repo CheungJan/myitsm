@@ -1,0 +1,68 @@
+<h2>供应商模块：PB 版 vs 当前系统 差距分析</h2>
+<p class="subtitle">模型字段齐全，问题在 API 层和前端没有暴露</p>
+
+<div class="section">
+  <h3>1. 供应商主数据 (tmm19_suppliers) — 21 个字段</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <tr style="background:#f5f5f5;">
+      <th style="padding:6px;text-align:left;">PB 字段</th>
+      <th style="padding:6px;text-align:left;">Python 模型</th>
+      <th style="padding:6px;text-align:left;">当前 API</th>
+      <th style="padding:6px;text-align:left;">前端显示</th>
+    </tr>
+    <tr><td style="padding:4px;">custcd (供应商代码)</td><td style="color:#2e7d32;">supp_cd ✓</td><td style="color:#e65100;">仅 GET</td><td style="color:#e65100;">列表显示 ✓</td></tr>
+    <tr><td style="padding:4px;">custnm (供应商名称)</td><td style="color:#2e7d32;">supp_nm ✓</td><td style="color:#e65100;">仅 GET</td><td style="color:#e65100;">列表显示 ✓</td></tr>
+    <tr><td style="padding:4px;">custanm (简称)</td><td style="color:#2e7d32;">custanm ✓</td><td style="color:#c62828;">未暴露</td><td style="color:#c62828;">未显示</td></tr>
+    <tr><td style="padding:4px;">custbrcd (简码/助记码)</td><td style="color:#2e7d32;">custbrcd ✓</td><td style="color:#c62828;">未暴露</td><td style="color:#c62828;">未显示</td></tr>
+    <tr><td style="padding:4px;">classcd (分类)</td><td style="color:#2e7d32;">class_cd ✓</td><td style="color:#e65100;">仅 GET</td><td style="color:#e65100;">列表显示 ✓</td></tr>
+    <tr><td style="padding:4px;">scale (等级)</td><td style="color:#2e7d32;">scale ✓</td><td style="color:#c62828;">未暴露</td><td style="color:#c62828;">未显示</td></tr>
+    <tr><td style="padding:4px;">address (地址)</td><td style="color:#2e7d32;">address ✓</td><td style="color:#e65100;">仅 GET</td><td style="color:#e65100;">详情显示 ✓</td></tr>
+    <tr style="background:#fff3e0;"><td style="padding:4px;">phoneno / faxno (电话/传真)</td><td style="color:#2e7d32;">✓</td><td style="color:#e65100;">仅 GET</td><td style="color:#e65100;">列表+详情 ✓</td></tr>
+    <tr style="background:#fff3e0;"><td style="padding:4px;">contactor (联系人)</td><td style="color:#2e7d32;">✓</td><td style="color:#e65100;">仅 GET</td><td style="color:#e65100;">列表+详情 ✓</td></tr>
+    <tr style="background:#fff3e0;"><td style="padding:4px;">taxno (税号)</td><td style="color:#2e7d32;">✓</td><td style="color:#c62828;">未暴露</td><td style="color:#c62828;">未显示</td></tr>
+    <tr style="background:#fff3e0;"><td style="padding:4px;">banknm/bankaccno (银行)</td><td style="color:#2e7d32;">✓</td><td style="color:#c62828;">未暴露</td><td style="color:#c62828;">未显示</td></tr>
+    <tr style="background:#fff3e0;"><td style="padding:4px;">pcrep (采购代表)</td><td style="color:#2e7d32;">✓</td><td style="color:#c62828;">未暴露</td><td style="color:#c62828;">未显示</td></tr>
+    <tr><td style="padding:4px;">zipcd (邮编)</td><td style="color:#2e7d32;">✓</td><td style="color:#c62828;">未暴露</td><td style="color:#c62828;">未显示</td></tr>
+    <tr><td style="padding:4px;">suppinfo/agreements</td><td style="color:#2e7d32;">✓</td><td style="color:#c62828;">未暴露</td><td style="color:#c62828;">未显示</td></tr>
+  </table>
+  <div style="margin-top:8px;font-size:12px;color:#909399;">
+    <span style="background:#fff3e0;padding:1px 6px;border-radius:3px;">高亮行</span> = 采购订单创建时需要用到的字段（供应商选择、联系方式、银行信息）
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. 供应商商品关联 (tmm24_custitems)</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+    <div style="background:#e8f5e9;padding:12px;border-radius:8px;">
+      <strong>✅ 已有（从物料侧）</strong><br>
+      ItemList.vue → 编辑物料 → "供应商" tab<br>
+      API: CRUD on /items/<cd>/suppliers<br>
+      字段：dfltflg, delivercycle, servicecycle, guaranteeperiod
+    </div>
+    <div style="background:#ffebee;padding:12px;border-radius:8px;">
+      <strong>❌ 缺失（从供应商侧）</strong><br>
+      SupplierList.vue 详情里有"供应商品"表格<br>
+      但数据为空 — TODO 注释<br>
+      缺少: GET /suppliers/<cd>/items
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>3. 供应商价格 (tip02_supplier_price)</h3>
+  <div style="background:#ffebee;padding:12px;border-radius:8px;font-size:13px;">
+    <strong>❌ 完全缺失</strong><br>
+    模型存在，但无 API、Service、Repository、前端<br>
+    仅在 procurement_repository 里有一条原始 SQL 查询<br>
+    PB 版：供应商管理界面中可以维护供应商对商品的报价
+  </div>
+</div>
+
+<div class="section">
+  <h3>4. 供应商分类 (tmm18_supplierclass)</h3>
+  <div style="background:#fff9c4;padding:12px;border-radius:8px;font-size:13px;">
+    <strong>⚠️ 半成品</strong><br>
+    模型存在，useCustClass composable 在用（下拉选项）<br>
+    但无独立管理页面（PB 版有树形分类导航）
+  </div>
+</div>

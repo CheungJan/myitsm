@@ -17,6 +17,7 @@
                     </el-breadcrumb>
                 </div>
                 <div class="header-right">
+                    <NotificationBell />
                     <span class="user-name">{{ userName }}</span>
                     <el-button text @click="handleLogout">退出</el-button>
                 </div>
@@ -35,6 +36,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import AppMenu from '@/components/AppMenu.vue'
 import AppTabs from '@/components/AppTabs.vue'
+import NotificationBell from '@/components/common/NotificationBell.vue'
 
 const route = useRoute()
 const router = useRouter()

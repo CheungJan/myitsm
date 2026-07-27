@@ -2,8 +2,8 @@
 
 **版本**: v2.1  
 **更新日期**: 2026-05-08  
-**模型总数**: 142个业务模型（BaseModel 为公共基类，不计入）  
-**本次更新**: 2026-05-13 P0 完成，全面核对域模型数与实际代码一致
+**模型总数**: 144个业务模型（BaseModel 为公共基类，不计入）  
+**本次更新**: 2026-05-14 P0 物料增强完成，新增 SupplierPrice 模型
 
 > **v2.0 变更说明**：修正所有表名为实际 `__tablename__` 值，与 Oracle 数据库字典保持一致；
 > 新增"Oracle 遗留表评估"章节，标注重构后不再需要的表。
@@ -111,7 +111,7 @@ TMM47_COMMODE (ComMode) — 通讯方式
 | IdMaster | tmm34_idmaster | id | ID 流水号生成器 |
 | CustPosRl | tmm35_cust_pos_rl | id | 客户-设备关联（资产台账） |
 | Area | tmm46_area | areacd | 区域 |
-| ComMode | tmm47_commode | commodecd | 通讯方式 |
+| ComMode | ~~tmm47_commode~~ → tmm31_syscodes(CM) | — | 通讯方式（已迁移至系统字典） |
 
 ---
 
@@ -133,7 +133,7 @@ TIT13_MAINTENANCE_OPEN (MaintenanceOpen) — 新机开通单
 TIT15_MAINTENANCE_RENOVATE (MaintenanceRenovate) — 旧机翻新单
   └── TIT15_EQUIPMENT_RENOVATE (EquipmentRenovate)
 
-TIT16_DEVICE_CHANGE (DeviceChange) — 设备变更单
+TIT16_DEVICE_CHANGE (DeviceChange) — 磁卡号变更单
   └── TMM22_CUSTOMERS_HISTORY — 磁卡号变更记录
 
 TIT17_MAINTENANCE (Maintenance) — 日常保养单
@@ -234,7 +234,7 @@ TWH01_WAREHOUSE (Warehouse)
 
 ---
 
-### 2.5 采购域（11个模型，procurement.py）
+### 2.5 采购域（12个模型，procurement.py）
 
 | 模型 | 实际表名 | 说明 |
 |------|---------|------|
@@ -243,8 +243,9 @@ TWH01_WAREHOUSE (Warehouse)
 | PurchasePlanStatus | tpc03_pcplanstatus | 计划状态 |
 | PurchaseRegister | tpc12_register | 采购登记 |
 | PurchaseRegisterDt | tpc13_registerdt | 登记明细 |
-| PurchaseBill | tpc14_pcbill | 采购单据 |
-| ReturnPurchaseBill | tpc16_rpcbill | 退货单 |
+| PurchaseBill | tpc14_pcbill | 采购结算单 |
+| PurchaseBillDt | tpc14_pcbilldt | 结算明细 |
+| ReturnPurchaseBill | tpc16_rpcbill | 采购退货单 |
 | ReturnPurchaseBillDt | tpc17_rpcbilldt | 退货明细 |
 | SupplierAppraisal | tpc20_suppappraisal | 供应商评价 |
 | SupplierAppraisalDt | tpc21_suppappraisaldt | 评价明细 |
@@ -271,11 +272,12 @@ TWH01_WAREHOUSE (Warehouse)
 | Attendance | tkq01_attendance | 考勤记录 |
 | AttendanceCount | tkq02_attendancecount | 考勤月度汇总 |
 
-#### 库存预警 + 价格（6个，inventory.py）
+#### 库存预警 + 价格（7个，inventory.py）
 
 | 模型 | 实际表名 | 说明 |
 |------|---------|------|
-| Price | tip01_price | 价格规则 |
+| Price | tip01_price | 价格规则（P0加 effective_date/expire_date/is_current） |
+| SupplierPrice | tip02_supplier_price | 供应商报价表（P0新增） |
 | AdjustPrice | tip03_adjprice | 调价记录 |
 | InventoryLimit | tiv01_invlimit | 库存预警规则 |
 | InventoryLimitHistory | tiv02_invlimit_hi | 库存预警历史 |
@@ -375,7 +377,7 @@ TWH01_WAREHOUSE (Warehouse)
 | 源域 | 目标域 | 关联路径 | 说明 |
 |------|--------|---------|------|
 | ITSM | 主数据 | maintenance.custcd → tmm22_customers.cust_cd | 工单关联客户 |
-| ITSM | 主数据 | device_change → tmm22_customers_history | 设备变更→磁卡号历史 |
+| ITSM | 主数据 | device_change → tmm22_customers_history | 磁卡号变更→磁卡号历史 |
 | ITSM | 主数据 | cust_pos_rl.cust_cd → tmm22_customers.cust_cd | 设备关联客户 |
 | 仓储 | 主数据 | stock_in/out.itemcd → tmm12_items.itemcd | 出入库关联物料 |
 | 仓储 | 主数据 | stock_in/out.suppcd → tmm19_suppliers.suppcd | 出入库关联供应商 |
@@ -454,11 +456,11 @@ TWH01_WAREHOUSE (Warehouse)
 | Oracle 表 | 字段数 | 原用途 | 说明 |
 |-----------|--------|--------|------|
 | TMM48_FIXEDASSET | 9 | 固定资产 | 简单台账，可用 CustPosRl 替代部分功能 |
-| TMM40_LABEL | 6 | 标签管理 | PB 打印标签，B/S 暂无直接需求 |
+| TMM40_LABEL | 6 | 标签管理 | ✅ 已迁移(164,690行)+API+页面，见 `app/models/inventory.py:Label` |
 | TMM45_SUPPAPPRAISAL | 7 | 供应商考核主表 | 已有 TPC20/21，可能重复 |
 | TMM49_G3NO | 8 | 3G 号码管理 | 3G 技术过时，仅历史数据参考 |
 | TMM50_MFLOG | 6 | 制造流转日志 | PB 专属流转标记 |
-| TMM52_POSSTATUS | 9 | POS 状态码表 | 可用 TMM31_SYSCODES 编码表替代 |
+| TMM52_POSSTATUS | 9 | POS 状态码表 | ⚠️ 已迁移但标记废弃，codecd/codecd1 与 TMM31_SYSCODES(ST/ZZ) 完全重合，新功能使用 syscodes |
 | TMM33_MESSAGE | 8 | 系统消息 | 已有 TNTF01/02 通知系统替代 |
 
 ---
@@ -467,7 +469,7 @@ TWH01_WAREHOUSE (Warehouse)
 
 | 类别 | 数量 | 说明 |
 |------|------|------|
-| **当前已实现的业务模型** | **142** | 含 14 张业务必须表 |
+| **当前已实现的业务模型** | **143** | 含 14 张业务必须表 + P0 新增 SupplierPrice |
 | ├ Oracle 等价迁移（已完全匹配） | 76 | 69 张原匹配 + 4 张地理表(已迁) + 3 张库存预警扩展 |
 | ├ Oracle 等价迁移（有字段缺失，已补全） | 28 | 155+10 字段已恢复 |
 | ├ 4.3节业务必须表（已建模） | 14 | TMM41-44/TMM24/TMM36/TMM62 等 |
@@ -476,5 +478,5 @@ TWH01_WAREHOUSE (Warehouse)
 | ├ 已替代/淘汰 | 7 | 被新模块替代或 PB C/S 专属 |
 | └ 可选/低价值 | 8 | 标签/固资/G3/门店状态等 |
 
-> 实际数据库表 143 张 = 142 模型表 + 1 张 Alembic 版本表。  
+> 实际数据库表 144 张 = 143 模型表 + 1 张 Alembic 版本表。  
 > 2.1-2.10 节各域模型数已于 2026-05-13 按实际代码重新核对。

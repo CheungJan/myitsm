@@ -51,10 +51,10 @@
                         <template #default="{ row }">{{ codeMaps.ET?.[row.etyp] || row.etyp }}</template>
                     </el-table-column>
                     <el-table-column prop="sflg" label="状态" width="80">
-                        <template #default="{ row }">{{ codeMaps.ES?.[row.sflg] || row.sflg }}</template>
+                        <template #default="{ row }">{{ stLabel(row.sflg) }}</template>
                     </el-table-column>
                     <el-table-column prop="qcflg" label="质检" width="80">
-                        <template #default="{ row }">{{ codeMaps.QS?.[row.qcflg] || row.qcflg }}</template>
+                        <template #default="{ row }">{{ codeMaps.QC?.[row.qcflg] || row.qcflg }}</template>
                     </el-table-column>
                     <el-table-column label="仓库" width="100">
                         <template #default="{ row }">{{ (row as Record<string,unknown>).wh_nm || row.whcd || '-' }}</template>
@@ -63,8 +63,8 @@
                     <el-table-column label="关联单号" width="120">
                         <template #default="{ row }">{{ (row as Record<string,unknown>).plan_refid || row.refid }}</template>
                     </el-table-column>
-                    <el-table-column label="新旧" width="70">
-                        <template #default="{ row }">{{ codeMaps.NO?.[row.new_old] || row.new_old }}</template>
+                    <el-table-column label="资产类型" width="90">
+                        <template #default="{ row }">{{ codeMaps.AT?.[row.asset_type] || row.asset_type || '-' }}</template>
                     </el-table-column>
                     <el-table-column prop="prddate" label="生产日期" width="110" />
                     <el-table-column label="操作" width="180" fixed="right">
@@ -88,7 +88,7 @@
                     <el-col :span="12"><el-form-item label="状态"><el-select v-model="form.sflg" clearable style="width:100%"><el-option v-for="t in sflgOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="质检"><el-select v-model="form.qcflg" clearable style="width:100%"><el-option v-for="t in qcflgOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="仓库"><el-select v-model="form.whcd" clearable style="width:100%"><el-option v-for="w in whOptions" :key="w.whcd" :label="w.whnm" :value="w.whcd" /></el-select></el-form-item></el-col>
-                    <el-col :span="12"><el-form-item label="新旧"><el-select v-model="form.new_old" clearable style="width:100%"><el-option v-for="t in noOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
+                    <el-col :span="12"><el-form-item label="资产类型"><el-select v-model="form.asset_type" clearable style="width:100%"><el-option v-for="t in atOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="质保范围"><el-select v-model="form.old_degree" clearable style="width:100%"><el-option v-for="t in odOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="是否整机"><el-select v-model="form.isunit" clearable style="width:100%"><el-option v-for="t in iuOptions" :key="t.code_cd" :label="t.code_nm" :value="t.code_cd" /></el-select></el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="关联单号"><el-input v-model="form.refid" /></el-form-item></el-col>
@@ -127,14 +127,14 @@
                 </el-table-column>
                 <el-table-column label="状态" width="120">
                     <template #default="{ row }">
-                        <template v-if="row.type === 'i'">{{ codeMaps.ES?.[row.sflg] || row.sflg }}</template>
-                        <template v-else>{{ codeMaps.ES?.[row.sflg] || row.sflg }}→{{ codeMaps.ES?.[row.n_sflg] || row.n_sflg }}</template>
+                        <template v-if="row.type === 'i'">{{ stLabel(row.sflg) }}</template>
+                        <template v-else>{{ stLabel(row.sflg) }}→{{ stLabel(row.n_sflg) }}</template>
                     </template>
                 </el-table-column>
                 <el-table-column label="质检" width="100">
                     <template #default="{ row }">
-                        <template v-if="row.type === 'i'">{{ codeMaps.QS?.[row.qcflg] || row.qcflg }}</template>
-                        <template v-else>{{ codeMaps.QS?.[row.qcflg] || row.qcflg }}→{{ codeMaps.QS?.[row.n_qcflg] || row.n_qcflg }}</template>
+                        <template v-if="row.type === 'i'">{{ codeMaps.QC?.[row.qcflg] || row.qcflg }}</template>
+                        <template v-else>{{ codeMaps.QC?.[row.qcflg] || row.qcflg }}→{{ codeMaps.QC?.[row.n_qcflg] || row.n_qcflg }}</template>
                     </template>
                 </el-table-column>
                 <el-table-column label="仓库" width="100">
@@ -164,6 +164,7 @@ import { watch } from 'vue'
 import type { ElTree } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useDict } from '@/composables/useDict'
 import { fetchEidList, createEid, updateEid, deleteEid, fetchEidTree, fetchSyscodes, fetchWarehouses, fetchEidTracks } from '@/api/master'
 import type { ItemClassNode, EidRecord, EidPage } from '@/api/master'
 
@@ -182,9 +183,9 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const editing = ref<Record<string,string>|null>(null)
 const saving = ref(false)
-const form = reactive({ itemcd: '', eid: '', etyp: '0', whcd: '', sflg: '8', qcflg: '', new_old: '1', old_degree: '', isunit: '', refid: '', prddate: '', manuf_seq: '', remark: '' })
+const form = reactive({ itemcd: '', eid: '', etyp: '0', whcd: '', sflg: '8', qcflg: '', asset_type: '01', old_degree: '', isunit: '', refid: '', prddate: '', manuf_seq: '', remark: '' })
 const whOptions = ref<{ whcd: string; whnm: string }[]>([])
-const noOptions = ref<{ code_cd: string; code_nm: string }[]>([])
+const atOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const iuOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const odOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const historyVisible = ref(false)
@@ -194,27 +195,28 @@ const etypOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const sflgOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const qcflgOptions = ref<{ code_cd: string; code_nm: string }[]>([])
 const codeMaps = ref<Record<string, Record<string, string>>>({})
+const { dictLabel: stLabel } = useDict('ES')
 
 watch(page, () => loadData())
 watch(perPage, () => { page.value = 1; loadData() })
 watch(treeFilterText, (v) => treeRef.value?.filter(v))
 onMounted(async () => {
     await loadTree()
-    const [et, es, qs, no, iu, od] = await Promise.all([
-        fetchSyscodes('ET'), fetchSyscodes('ES'), fetchSyscodes('QS'),
-        fetchSyscodes('NO'), fetchSyscodes('IU'), fetchSyscodes('OD'),
+    const [et, es, qc, at, iu, od] = await Promise.all([
+        fetchSyscodes('ET'), fetchSyscodes('ES'), fetchSyscodes('QC'),
+        fetchSyscodes('AT'), fetchSyscodes('IU'), fetchSyscodes('OD'),
     ])
     etypOptions.value = et.data || []
     sflgOptions.value = es.data || []
-    qcflgOptions.value = qs.data || []
-    noOptions.value = no.data || []
+    qcflgOptions.value = qc.data || []
+    atOptions.value = at.data || []
     iuOptions.value = iu.data || []
     odOptions.value = od.data || []
     codeMaps.value = {
         ET: Object.fromEntries((et.data||[]).map(t => [t.code_cd, t.code_nm])),
         ES: Object.fromEntries((es.data||[]).map(t => [t.code_cd, t.code_nm])),
-        QS: Object.fromEntries((qs.data||[]).map(t => [t.code_cd, t.code_nm])),
-        NO: Object.fromEntries((no.data||[]).map(t => [t.code_cd, t.code_nm])),
+        QC: Object.fromEntries((qc.data||[]).map(t => [t.code_cd, t.code_nm])),
+        AT: Object.fromEntries((at.data||[]).map(t => [t.code_cd, t.code_nm])),
         IU: Object.fromEntries((iu.data||[]).map(t => [t.code_cd, t.code_nm])),
         OD: Object.fromEntries((od.data||[]).map(t => [t.code_cd, t.code_nm])),
     }
@@ -273,13 +275,13 @@ function openDialog(row?: Record<string,string>) {
         form.itemcd = row.itemcd || ''; form.eid = row.eid || ''
         form.etyp = row.etyp || '0'; form.whcd = row.whcd || ''
         form.sflg = row.sflg || '8'; form.qcflg = row.qcflg || ''
-        form.new_old = row.new_old || '1'; form.old_degree = row.old_degree || ''
+        form.asset_type = row.asset_type || '01'; form.old_degree = row.old_degree || ''
         form.isunit = row.isunit || ''; form.refid = row.refid || ''
         form.prddate = row.prddate || ''; form.manuf_seq = row.manuf_seq || ''
         form.remark = row.remark || ''
     } else {
         editing.value = null
-        Object.assign(form, { itemcd: '', eid: '', etyp: '0', whcd: '', sflg: '8', qcflg: '', new_old: '1', old_degree: '', isunit: '', refid: '', prddate: '', manuf_seq: '', remark: '' })
+        Object.assign(form, { itemcd: '', eid: '', etyp: '0', whcd: '', sflg: '8', qcflg: '', asset_type: '01', old_degree: '', isunit: '', refid: '', prddate: '', manuf_seq: '', remark: '' })
     }
     dialogVisible.value = true
 }

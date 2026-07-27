@@ -1,0 +1,7 @@
+- generic [ref=e5]:
+  - heading "myitsm 设备运营管理平台" [level=2] [ref=e6]
+  - generic [ref=e7]:
+    - textbox "用户名" [active] [ref=e12]
+    - textbox "密码" [ref=e17]
+    - button "登录" [ref=e20] [cursor=pointer]:
+      - generic [ref=e21]: 登录

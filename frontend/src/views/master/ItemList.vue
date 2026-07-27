@@ -55,6 +55,24 @@
                     <el-table-column prop="class_cd" label="分类编码" width="100" />
                     <el-table-column prop="itemanm" label="别名" width="120" />
                     <el-table-column prop="unit" label="单位" width="80" />
+                    <el-table-column label="库存上限" width="85">
+                        <template #default="{ row }">{{ row.upperlimit ?? '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="库存下限" width="85">
+                        <template #default="{ row }">{{ row.lowerlimit ?? '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="最小订购" width="85">
+                        <template #default="{ row }">{{ row.minorder ?? '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="新品周期" width="85">
+                        <template #default="{ row }">{{ row.newperiod ?? '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="旧品周期" width="85">
+                        <template #default="{ row }">{{ row.oldperiod ?? '-' }}</template>
+                    </el-table-column>
+                    <el-table-column label="采购负责人" width="100">
+                        <template #default="{ row }">{{ row.pcrep ?? '-' }}</template>
+                    </el-table-column>
                     <el-table-column label="操作" width="120" fixed="right">
                         <template #default="{ row }">
                             <el-button type="primary" link size="small" @click="openItemDialog(row)">编辑</el-button>
@@ -67,28 +85,67 @@
         </div>
 
         <!-- 物料新增/编辑弹窗 -->
-        <el-dialog :title="itemEditing ? '编辑物料' : '新增物料'" v-model="itemDialogVisible" width="500px">
-            <el-form :model="itemForm" label-width="80px">
-                <el-form-item label="编码" required>
-                    <el-input v-model="itemForm.item_cd" :disabled="!!itemEditing" />
-                </el-form-item>
-                <el-form-item label="名称" required>
-                    <el-input v-model="itemForm.item_nm" />
-                </el-form-item>
-                <el-form-item label="分类">
-                    <el-select v-model="itemForm.class_cd" clearable filterable style="width:100%" placeholder="选择分类">
-                        <el-option v-for="c in classOptions" :key="c.class_cd" :label="`${c.class_cd} - ${c.class_nm}`" :value="c.class_cd" />
-                    </el-select>
-                </el-form-item>
-                <el-form-item label="别名">
-                    <el-input v-model="itemForm.itemanm" />
-                </el-form-item>
-                <el-form-item label="单位">
-                    <el-input v-model="itemForm.unit" />
-                </el-form-item>
-            </el-form>
+        <el-dialog :title="itemEditing ? '编辑物料' : '新增物料'" v-model="itemDialogVisible" width="650px">
+            <el-tabs v-model="itemActiveTab" type="border-card">
+                <el-tab-pane label="基本信息" name="base">
+                    <el-form :model="itemForm" label-width="80px">
+                        <el-form-item label="编码" required><el-input v-model="itemForm.item_cd" :disabled="!!itemEditing" /></el-form-item>
+                        <el-form-item label="名称" required><el-input v-model="itemForm.item_nm" /></el-form-item>
+                        <el-form-item label="分类"><el-select v-model="itemForm.class_cd" clearable filterable style="width:100%"><el-option v-for="c in classOptions" :key="c.class_cd" :label="`${c.class_cd} - ${c.class_nm}`" :value="c.class_cd" /></el-select></el-form-item>
+                        <el-form-item label="别名"><el-input v-model="itemForm.itemanm" /></el-form-item>
+                        <el-form-item label="单位"><el-input v-model="itemForm.unit" /></el-form-item>
+                        <el-form-item label="规格"><el-input v-model="itemForm.spec" /></el-form-item>
+                        <el-form-item label="类型"><el-select v-model="itemForm.typflg" style="width:100%"><el-option label="成品/整机" value="1" /><el-option label="配件" value="0" /></el-select></el-form-item>
+<el-form-item label="耗材"><el-switch v-model="itemForm.consume" active-value="1" inactive-value="0" active-text="是" inactive-text="否" /></el-form-item>
+                    </el-form>
+                </el-tab-pane>
+                <el-tab-pane label="库存周期" name="stock">
+                    <el-form :model="itemForm" label-width="100px">
+                        <el-form-item label="库存上限"><el-input-number v-model="itemForm.upperlimit" :min="0" style="width:100%" /></el-form-item>
+                        <el-form-item label="库存下限"><el-input-number v-model="itemForm.lowerlimit" :min="0" style="width:100%" /></el-form-item>
+                        <el-form-item label="最小订购量"><el-input-number v-model="itemForm.minorder" :min="0" style="width:100%" /></el-form-item>
+                        <el-form-item label="新品周期(天)"><el-input-number v-model="itemForm.newperiod" :min="0" style="width:100%" /></el-form-item>
+                        <el-form-item label="旧品周期(天)"><el-input-number v-model="itemForm.oldperiod" :min="0" style="width:100%" /></el-form-item>
+                        <el-form-item label="采购负责人"><el-input v-model="itemForm.pcrep" /></el-form-item>
+                    </el-form>
+                </el-tab-pane>
+                <el-tab-pane label="供应商" name="supplier" v-if="itemEditing">
+                    <div style="margin-bottom:8px"><el-button type="primary" size="small" @click="openAddSupplier">添加供应商</el-button></div>
+                    <el-table :data="itemSuppliers" size="small" stripe>
+                        <el-table-column prop="custcd" label="供应商编码" width="100" />
+                        <el-table-column prop="supp_nm" label="供应商名称" min-width="140" show-overflow-tooltip />
+                        <el-table-column label="默认" width="70"><template #default="{row}">
+                            <el-switch :model-value="row.dfltflg==='Y'" size="small" @change="(v:boolean) => handleSetDefaultSupplier(row, v)" />
+                        </template></el-table-column>
+                        <el-table-column v-for="config in CYCLE_FIELDS_CONFIG" :key="config.key" :label="config.label" :width="config.key === 'guaranteeperiod' ? 110 : 100"><template #default="{row}">
+                            <el-input-number v-model="row[config.key]" :min="0" size="small" controls-position="right" :style="{ width: config.key === 'guaranteeperiod' ? '90px' : '80px' }" @change="(v:number|undefined) => handleUpdateSupplier(row, config.key, v)" />
+                        </template></el-table-column>
+                        <el-table-column label="操作" width="70"><template #default="{row}"><el-button link type="danger" size="small" @click="handleRemoveSupplier(row)">移除</el-button></template></el-table-column>
+                    </el-table>
+                </el-tab-pane>
+                <el-tab-pane label="商品价格" name="price" v-if="itemEditing">
+                    <div style="margin-bottom:8px"><el-button type="primary" size="small" @click="openAddPrice">添加价格</el-button></div>
+                    <el-table :data="itemPrices" size="small" stripe>
+                        <el-table-column label="业务类型" width="100"><template #default="{row}"><template v-if="row._editing"><el-select v-model="row._busityp" size="small" style="width:80px"><el-option v-for="p in priceTypes" :key="p.code_cd" :label="p.code_nm" :value="p.code_cd" /></el-select></template><template v-else>{{ priceTypes.find(p=>p.code_cd===row.busityp)?.code_nm || row.busityp }}</template></template></el-table-column>
+                        <el-table-column label="单价" width="100"><template #default="{row}"><template v-if="row._editing"><el-input-number v-model="row._itemprice" size="small" :min="0" controls-position="right" style="width:90px" /></template><template v-else>{{ row.itemprice }}</template></template></el-table-column>
+                        <el-table-column label="有效" width="70"><template #default="{row}"><el-switch v-if="row._editing" v-model="row._is_current" size="small" /><el-tag v-else :type="row.is_current?'success':'info'" size="small">{{ row.is_current?'有效':'失效' }}</el-tag></template></el-table-column>
+                        <el-table-column label="生效" width="110"><template #default="{row}"><template v-if="row._editing"><el-date-picker v-model="row._effective_date" type="date" size="small" style="width:100px" /></template><template v-else>{{ row.effective_date || '-' }}</template></template></el-table-column>
+                        <el-table-column label="失效" width="110"><template #default="{row}"><template v-if="row._editing"><el-date-picker v-model="row._expire_date" type="date" size="small" style="width:100px" /></template><template v-else>{{ row.expire_date || '-' }}</template></template></el-table-column>
+                        <el-table-column label="操作" width="120"><template #default="{row}"><template v-if="row._editing"><el-button link type="primary" size="small" @click="handleSavePrice(row)">保存</el-button><el-button link size="small" @click="handleCancelEditPrice(row)">取消</el-button></template><template v-else><el-button link type="primary" size="small" @click="handleEditPrice(row)">编辑</el-button><el-button link type="danger" size="small" @click="handleDeletePrice(row)">删除</el-button></template></template></el-table-column>
+                    </el-table>
+                </el-tab-pane>
+                <el-tab-pane :label="itemEditing?.typflg==='0' ? '所属BOM' : '相关BOM'" name="bom" v-if="itemEditing">
+                    <el-table :data="itemBoms" size="small" stripe>
+                        <el-table-column prop="bomcd" label="BOM编码" width="90" />
+                        <el-table-column prop="bomnm" label="BOM名称" min-width="150" show-overflow-tooltip />
+                        <el-table-column label="类型" width="80"><template #default="{row}">{{ row.details?.some((d:any)=>d.itemtyp==='1')?'全配件':'主机+配件' }}</template></el-table-column>
+                        <el-table-column label="有效" width="60"><template #default="{row}"><el-tag :type="row.useflg==='0'?'danger':'success'" size="small">{{ row.useflg==='0'?'无效':'有效' }}</el-tag></template></el-table-column>
+                    </el-table>
+                </el-tab-pane>
+            </el-tabs>
             <template #footer>
                 <el-button @click="itemDialogVisible = false">取消</el-button>
+                <el-button v-if="!!itemEditing" type="danger" @click="handleDeleteItem(itemEditing)">删除</el-button>
                 <el-button type="primary" @click="handleSaveItem" :loading="itemSaving">保存</el-button>
             </template>
         </el-dialog>
@@ -113,6 +170,17 @@
                 <el-button type="primary" @click="handleSaveClass" :loading="classSaving">保存</el-button>
             </template>
         </el-dialog>
+
+        <!-- 添加供应商弹窗 -->
+        <el-dialog title="选择供应商" v-model="supplierDialogVisible" width="480px">
+            <el-select v-model="selectedSuppCd" filterable placeholder="搜索供应商" style="width:100%">
+                <el-option v-for="s in allSuppliers" :key="s.supp_cd" :label="`${s.supp_cd} ${s.supp_nm}`" :value="s.supp_cd" />
+            </el-select>
+            <template #footer>
+                <el-button @click="supplierDialogVisible = false">取消</el-button>
+                <el-button type="primary" :disabled="!selectedSuppCd" @click="handleAddSupplier">添加</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -121,6 +189,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { watch } from 'vue'
 import type { ElTree } from 'element-plus'
 import AppPagination from '@/components/common/AppPagination.vue'
+import { CYCLE_FIELDS_CONFIG } from '@/constants/custitemFields'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
     fetchItems, createItem, updateItem, deleteItem,
@@ -145,16 +214,20 @@ const perPage = ref(20)
 const total = ref(0)
 
 // ---- 物料弹窗 ----
-const itemDialogVisible = ref(false)
+const itemDialogVisible = ref(false); const itemActiveTab = ref('base')
+const itemSuppliers = ref<Record<string,unknown>[]>([]); const itemBoms = ref<unknown[]>([]); const itemPrices = ref<Record<string,unknown>[]>([])
+const priceTypes = ref<{code_cd:string;code_nm:string}[]>([])
+const supplierDialogVisible = ref(false); const selectedSuppCd = ref('')
+const allSuppliers = ref<{supp_cd:string;supp_nm:string}[]>([])
 const itemEditing = ref<ItemRecord | null>(null)
 const itemSaving = ref(false)
-const itemForm = reactive({ item_cd: '', item_nm: '', class_cd: '', itemanm: '', unit: '' })
+const itemForm = reactive<Record<string, unknown>>({ item_cd: '', item_nm: '', class_cd: '', itemanm: '', unit: '', spec: '', typflg: '0', consume: '0', upperlimit: undefined, lowerlimit: undefined, minorder: undefined, newperiod: undefined, oldperiod: undefined, pcrep: '' })
 
 // ---- 分类弹窗 ----
 const classDialogVisible = ref(false)
 const classEditing = ref<ItemClassNode | null>(null)
 const classSaving = ref(false)
-const classForm = reactive({ class_cd: '', class_nm: '', parent_cd: '' })
+const classForm = reactive({ class_cd: '', class_nm: '', parent_cd: '', useflg: '1' })
 
 watch(page, () => loadItems())
 watch(perPage, () => { page.value = 1; loadItems() })
@@ -163,6 +236,7 @@ watch(treeFilterText, (v) => treeRef.value?.filter(v))
 onMounted(async () => {
     await Promise.all([loadTree(), loadClassOptions()])
     loadItems()
+    import('@/api/master').then(m => m.fetchSyscodes('PT').then(r => priceTypes.value = (r.data || []).sort((a,b) => a.code_cd.localeCompare(b.code_cd))))
 })
 
 // ---- 分类树 ----
@@ -200,6 +274,11 @@ function collapseAll() {
 }
 
 function onTreeClick(node: ItemClassNode) {
+    // 点击具体物料 → 直接打开编辑弹窗
+    if (node.type === 'item') {
+        openItemDialog({ item_cd: node.class_cd, item_nm: node.class_nm } as ItemRecord)
+        return
+    }
     selectedClassCd.value = node.class_cd
     searchText.value = ''
     page.value = 1
@@ -266,7 +345,7 @@ async function handleDeleteClass(data: ItemClassNode) {
 async function loadItems() {
     loading.value = true
     try {
-        const params: { page: string; per_page: string; class_cd?: string; recursive?: string; search?: string } = {
+        const params: { page: string; per_page: string; class_cd?: string; recursive?: boolean; search?: string } = {
             page: String(page.value),
             per_page: String(perPage.value),
         }
@@ -275,7 +354,7 @@ async function loadItems() {
             params.search = searchText.value
         } else if (selectedClassCd.value) {
             params.class_cd = selectedClassCd.value
-            params.recursive = '1'
+            params.recursive = true
         }
         const res = await fetchItems(params)
         const data = res.data as ItemsPage
@@ -293,21 +372,154 @@ function onSearch() {
 
 // ---- 物料 CRUD ----
 
-function openItemDialog(row?: ItemRecord) {
+async function openAddPrice() {
+    if (!itemEditing.value) return
+    // 创建本地编辑行，暂不提交
+    const newRow: Record<string,unknown> = { busityp: '', itemprice: 0, unitcd: '', is_current: true, effective_date: null, expire_date: null, _editing: true, _busityp: '', _itemprice: 0, _is_current: true, _effective_date: null, _expire_date: null, _orig_busityp: '' }
+    itemPrices.value.push(newRow)
+}
+async function handleDeletePrice(row: Record<string,unknown>) {
+    if (!itemEditing.value) return
+    try {
+        const { deleteItemPrice, fetchItemPrices } = await import('@/api/master')
+        await deleteItemPrice(itemEditing.value.item_cd, row.busityp as string)
+        const r = await fetchItemPrices(itemEditing.value.item_cd)
+        itemPrices.value = r.data || []
+    } catch { ElMessage.error('删除失败') }
+}
+function handleEditPrice(row: Record<string,unknown>) {
+    row._editing = true; row._busityp = row.busityp; row._itemprice = row.itemprice
+    row._is_current = row.is_current; row._effective_date = row.effective_date; row._expire_date = row.expire_date
+}
+async function handleSavePrice(row: Record<string,unknown>) {
+    if (!itemEditing.value || !row._busityp) { ElMessage.warning('请选择业务类型'); return }
+    try {
+        const { updateItemPrice, addItemPrice, fetchItemPrices } = await import('@/api/master')
+        const oldBusityp = row._orig_busityp as string
+        if (!oldBusityp) {
+            // 新建：调用 add
+            await addItemPrice(itemEditing.value!.item_cd, { busityp: row._busityp, itemprice: row._itemprice, unitcd: '', is_current: row._is_current, effective_date: row._effective_date, expire_date: row._expire_date })
+        } else {
+            // 编辑：调用 update（后端处理 busityp 变更）
+            await updateItemPrice(itemEditing.value.item_cd, oldBusityp, { busityp: row._busityp, itemprice: row._itemprice, is_current: row._is_current, effective_date: row._effective_date, expire_date: row._expire_date })
+        }
+        row._editing = false; row.busityp = row._busityp; row.itemprice = row._itemprice
+        row.is_current = row._is_current; row.effective_date = row._effective_date; row.expire_date = row._expire_date
+        row._orig_busityp = row._busityp
+        const r = await fetchItemPrices(itemEditing.value!.item_cd)
+        itemPrices.value = (r.data || []).map((p: Record<string,unknown>) => ({ ...p, _orig_busityp: p.busityp }))
+    } catch (e: unknown) {
+        const msg = (e as any)?.response?.data?.message || ''
+        if (msg.includes('duplicate') || msg.includes('already exists')) {
+            ElMessage.error('该价格类型已存在，请重新选择')
+        } else {
+            ElMessage.error('保存失败')
+        }
+    }
+}
+function handleCancelEditPrice(row: Record<string,unknown>) {
+    if (!row._orig_busityp) {
+        // 新建未保存的行 → 直接删除
+        itemPrices.value = itemPrices.value.filter(p => p !== row)
+    } else {
+        row._editing = false
+    }
+}
+async function openAddSupplier() {
+    supplierDialogVisible.value = true; selectedSuppCd.value = ''
+    if (!allSuppliers.value.length) {
+        try { const { fetchSuppliersSimple } = await import('@/api/master'); const r = await fetchSuppliersSimple(); allSuppliers.value = r.data || [] } catch { /**/ }
+    }
+}
+async function handleAddSupplier() {
+    if (!selectedSuppCd.value || !itemEditing.value) return
+    try {
+        const { addItemSupplier } = await import('@/api/master')
+        await addItemSupplier(itemEditing.value.item_cd, { custcd: selectedSuppCd.value, dfltflg: itemSuppliers.value.length === 0 ? 'Y' : 'N' })
+        supplierDialogVisible.value = false
+        const { fetchItemSuppliers } = await import('@/api/master')
+        const r = await fetchItemSuppliers(itemEditing.value.item_cd)
+        itemSuppliers.value = r.data || []
+    } catch { ElMessage.error('添加失败') }
+}
+async function handleUpdateSupplier(row: Record<string,unknown>, field: string, val: unknown) {
+    if (!itemEditing.value) return
+    try { const { updateItemSupplier } = await import('@/api/master'); await updateItemSupplier(itemEditing.value.item_cd, row.custcd as string, { [field]: val }) } catch { ElMessage.error('更新失败') }
+}
+async function handleSetDefaultSupplier(row: Record<string,unknown>, val: boolean) {
+    if (!itemEditing.value || !val) return
+    try { const { updateItemSupplier } = await import('@/api/master'); await updateItemSupplier(itemEditing.value.item_cd, row.custcd as string, { dfltflg: 'Y' }) } catch { ElMessage.error('设置失败') }
+    // 刷新列表
+    const { fetchItemSuppliers } = await import('@/api/master'); const r = await fetchItemSuppliers(itemEditing.value.item_cd); itemSuppliers.value = r.data || []
+}
+async function handleRemoveSupplier(row: Record<string,unknown>) {
+    if (!itemEditing.value) return
+    try { await ElMessageBox.confirm(`确定移除供应商 ${row.supp_nm}？`, '确认', { type: 'warning' }) } catch { return }
+    try {
+        const { deleteItemSupplier } = await import('@/api/master')
+        await deleteItemSupplier(itemEditing.value.item_cd, row.custcd as string)
+        const { fetchItemSuppliers } = await import('@/api/master')
+        const r = await fetchItemSuppliers(itemEditing.value.item_cd)
+        itemSuppliers.value = r.data || []
+    } catch { ElMessage.error('移除失败') }
+}
+
+async function openItemDialog(row?: ItemRecord) {
     if (row) {
+        // 从树节点点击时只有 item_cd/item_nm，需补全字段
+        let rowData: ItemRecord = row
+        if (!rowData.class_cd) {
+            try {
+                const params: Record<string,unknown> = { per_page: 1, search: rowData.item_cd }
+                const r = await fetchItems(params as any)
+                const full = (r.data as ItemsPage).items?.find((i: ItemRecord) => i.item_cd === rowData.item_cd)
+                if (full) rowData = full
+            } catch { /* fallback to partial */ }
+        }
+        row = rowData
         itemEditing.value = row
         itemForm.item_cd = row.item_cd || ''
         itemForm.item_nm = row.item_nm || ''
         itemForm.class_cd = row.class_cd || ''
         itemForm.itemanm = row.itemanm || ''
         itemForm.unit = row.unit || ''
+        itemForm.upperlimit = (row as Record<string,unknown>).upperlimit
+        itemForm.lowerlimit = (row as Record<string,unknown>).lowerlimit
+        itemForm.minorder = (row as Record<string,unknown>).minorder
+        itemForm.newperiod = (row as Record<string,unknown>).newperiod
+        itemForm.oldperiod = (row as Record<string,unknown>).oldperiod
+        itemForm.spec = (row as Record<string,unknown>).spec || ''
+        itemForm.typflg = (row as Record<string,unknown>).typflg || '0'
+        itemForm.consume = (row as Record<string,unknown>).consume || '0'
+        itemForm.pcrep = (row as Record<string,unknown>).pcrep || ''
+        itemActiveTab.value = 'base'
+        const currentRow = row!
+        import('@/api/master').then(m => {
+            m.fetchItemSuppliers(currentRow.item_cd).then(r => itemSuppliers.value = r.data || []).catch(() => itemSuppliers.value = [])
+            if (currentRow.typflg === '0') {
+                m.fetchRelatedBoms(currentRow.item_cd).then(r => itemBoms.value = r.data || []).catch(() => itemBoms.value = [])
+            } else {
+                m.fetchBom(currentRow.item_cd.toUpperCase()).then(r => itemBoms.value = (r.data && r.data.bomcd) ? [r.data] : []).catch(() => itemBoms.value = [])
+            }
+            m.fetchItemPrices(row!.item_cd).then(r => { itemPrices.value = (r.data || []).map(p => ({ ...p, _orig_busityp: p.busityp })) }).catch(() => itemPrices.value = [])
+        })
     } else {
         itemEditing.value = null
+        itemActiveTab.value = 'base'
+        itemSuppliers.value = []
+        itemBoms.value = []
         // 新增时自动继承左侧选中分类
         itemForm.item_cd = selectedClassCd.value || ''
         itemForm.item_nm = ''
         itemForm.class_cd = selectedClassCd.value || ''
         itemForm.itemanm = ''
+        itemForm.unit = ''
+        itemForm.upperlimit = undefined
+        itemForm.lowerlimit = undefined
+        itemForm.minorder = undefined
+        itemForm.newperiod = undefined
+        itemForm.oldperiod = undefined
+        itemForm.pcrep = ''
         itemForm.unit = ''
     }
     itemDialogVisible.value = true
@@ -338,11 +550,10 @@ async function handleDeleteItem(row: ItemRecord) {
         await ElMessageBox.confirm(`确定删除物料 ${row.item_cd}？`, '确认删除')
         await deleteItem(row.item_cd)
         ElMessage.success('已删除')
+        itemDialogVisible.value = false; itemEditing.value = null
         loadItems()
     } catch (e: unknown) {
-        if (e !== 'cancel') {
-            ElMessage.error('删除失败')
-        }
+        if (e !== 'cancel') ElMessage.error('删除失败')
     }
 }
 </script>
