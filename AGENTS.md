@@ -96,6 +96,27 @@
 - 请求与响应必须有 schema 校验（Pydantic 或 Marshmallow）。
 - 错误响应统一包含 `request_id`。
 
+## 前端菜单更新约定（新增页面/菜单必做，缺一不可）
+
+新增一个前端页面并显示在侧边栏菜单中，必须完成以下 **4 步**：
+
+| # | 文件/操作 | 内容 | 说明 |
+|---|----------|------|------|
+| 1 | `frontend/src/config/menu.ts` | 在对应 parent 下加 `{ menu_cd, menu_nm, path }` | 前端菜单树的唯一硬编码来源 |
+| 2 | `frontend/src/router/index.ts` | 加路由 `{ path, name, component }` | 路径需与 menu.ts 的 path 一致 |
+| **3** | `tmc01_menus` 表 | `INSERT` menu_cd/menu_nm/parent_cd | 后台菜单定义 |
+| **4** | `tmc02_menusdt` 表 | `INSERT` menu_cd/func_cd='view'/**useflg='1'** | ⚠️ **useflg 必须为 '1'**，NULL 会导致管理员的全部权限查询（`useflg=='1'` 过滤）被排除 |
+
+**验证**：退出重新登录 → 菜单出现。
+
+**开发时如果菜单不显示，按顺序排查**：
+1. `SELECT useflg FROM tmc02_menusdt WHERE menu_cd='xxx'` — 检查是否为 '1'
+2. `SELECT * FROM tmc01_menus WHERE menu_cd='xxx'` — 检查是否存在
+3. `frontend/src/config/menu.ts` — 检查是否已添加
+4. 退出重新登录（清除权限缓存）
+
+> 本约定源自 CLAUDE.md，统一归入 AGENTS.md 作为项目权威规则。CLAUDE.md 保留 MCP/Skills 等环境配置。
+
 ## 命名、编码与文档约定
 - 代码、注释、文档、评审意见统一中文。
 - 编码 UTF-8，换行 LF，文件末尾保留单一换行。
