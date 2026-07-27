@@ -1,12 +1,14 @@
-"""P0-1 测试：离店 d2d_result='5' 触发 L1-L11 联动。
+"""P0-1 测试：离店不改状态不联动，完成维修才是唯一触发器。
 
-验证离店登记时 d2d_result='5'（已解决=关单）：
-  - L4：新配件 whcd 清空（已安装）
-  - L5：旧配件 in_wh='2' 报废 sflg='2'
-  - L2：新配件 warranty_expire 回填
-  - L1：写 EidTrack type='A'
+修正方案：
+  离店(d2d_result='5'/'4'/'6'/'7'): 只写 TIT23，不改主表状态，不触发 L1-L11
+  完成维修 transition(5): current_status→5 + 读 TIT23 派生 is_success + 触发 L1-L11
 
-对比：d2d_result='4'（未解决）不触发联动。
+验证：
+  - 离店后主表 current_status 不变（仍为 2）
+  - 离店后新配件 whcd 不变（L4 不触发）
+  - 离店后无 EidTrack type='A'（L1 不触发）
+  - 完成维修 transition(5) 后触发 L1-L11
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from app.extensions import db
 from app.models.itsm import (
     AccessoriesUpdate,
     MaintenanceDaily,
+    MaintenanceD2D,
 )
 from app.models.master import (
     Customer,
@@ -123,23 +126,49 @@ def _seed_arrive(maintenance_id: str) -> None:
     )
 
 
-class TestLeaveStoreLinkageP01:
-    """P0-1：离店 d2d_result='5' 触发 L1-L11 联动。"""
+class TestLeaveStoreNoLinkageP01:
+    """P0-1 修正：离店不改状态不联动。"""
 
-    def test_leave_store_result_5_triggers_l4(self, app: Flask) -> None:
-        """离店 d2d_result='5' → 新配件 whcd 清空（L4）。"""
+    def test_leave_store_result_5_no_status_change(self, app: Flask) -> None:
+        """离店 d2d_result='5' → 主表 current_status 不变（仍为 2）。"""
         with app.app_context():
             _seed_customer()
             _seed_item("IT0001")
             new_eid = _seed_eid("EIDNEW0001")
-            new_eid.whcd = "W1"  # 工程师仓持有
+            new_eid.whcd = "W1"
             new_eid.sflg = "1"
             daily = _seed_daily()
             _seed_accessories(daily.maintenance_id, new_eid="EIDNEW0001")
             db.session.commit()
             _seed_arrive(daily.maintenance_id)
 
-            # 离店 d2d_result='5'
+            D2DService.leave_store(
+                daily.maintenance_id,
+                {
+                    "d2d_result": "5",
+                    "d2d_phenomenon": "设备无法开机",
+                    "d2d_handling": "更换配件",
+                    "d2d_reason": "配件损坏",
+                },
+                "T00001",
+            )
+
+            db.session.refresh(daily)
+            assert daily.current_status == "2", "P0-1: 离店不改 current_status，仍为 2"
+
+    def test_leave_store_result_5_no_l4(self, app: Flask) -> None:
+        """离店 d2d_result='5' → 新配件 whcd 不变（L4 不触发）。"""
+        with app.app_context():
+            _seed_customer()
+            _seed_item("IT0001")
+            new_eid = _seed_eid("EIDNEW0001")
+            new_eid.whcd = "W1"
+            new_eid.sflg = "1"
+            daily = _seed_daily()
+            _seed_accessories(daily.maintenance_id, new_eid="EIDNEW0001")
+            db.session.commit()
+            _seed_arrive(daily.maintenance_id)
+
             D2DService.leave_store(
                 daily.maintenance_id,
                 {
@@ -152,12 +181,11 @@ class TestLeaveStoreLinkageP01:
             )
 
             db.session.refresh(new_eid)
-            assert new_eid.whcd is None, "P0-1: 离店 d2d_result='5' 应触发 L4 清空 whcd"
-            assert new_eid.sflg == "1", "P0-1: sflg 保持 '1'"
-            assert new_eid.refid == daily.maintenance_id, "P0-1: refid 应为工单号"
+            assert new_eid.whcd == "W1", "P0-1: 离店不触发 L4，whcd 不变"
+            assert new_eid.sflg == "1", "P0-1: 离店 sflg 不变"
 
-    def test_leave_store_result_5_triggers_l1(self, app: Flask) -> None:
-        """离店 d2d_result='5' → 写 EidTrack type='A'（L1）。"""
+    def test_leave_store_result_5_no_l1(self, app: Flask) -> None:
+        """离店 d2d_result='5' → 无 EidTrack type='A'（L1 不触发）。"""
         with app.app_context():
             _seed_customer()
             _seed_item("IT0001")
@@ -187,19 +215,14 @@ class TestLeaveStoreLinkageP01:
                 )
                 .all()
             )
-            assert len(tracks) >= 1, "P0-1: 离店 d2d_result='5' 应写 EidTrack type='A'"
+            assert len(tracks) == 0, "P0-1: 离店不触发 L1，无 EidTrack type='A'"
 
-    def test_leave_store_result_5_triggers_l5_scrap(self, app: Flask) -> None:
-        """离店 d2d_result='5' + in_wh='2' → 旧配件 sflg='2'（L5 报废）。"""
+    def test_leave_store_writes_d2d_record(self, app: Flask) -> None:
+        """离店 d2d_result='5' → 写 TIT23 离店记录。"""
         with app.app_context():
             _seed_customer()
             _seed_item("IT0001")
-            old_eid = _seed_eid("EIDOLD0001")
-            old_eid.whcd = "W1"
-            old_eid.sflg = "1"
             daily = _seed_daily()
-            acc = _seed_accessories(daily.maintenance_id, old_eid="EIDOLD0001")
-            acc.in_wh = "2"  # 报废
             db.session.commit()
             _seed_arrive(daily.maintenance_id)
 
@@ -214,11 +237,23 @@ class TestLeaveStoreLinkageP01:
                 "T00001",
             )
 
-            db.session.refresh(old_eid)
-            assert old_eid.sflg == "2", "P0-1: 离店 d2d_result='5' 应触发 L5 报废"
+            d2d_records = (
+                db.session.query(MaintenanceD2D)
+                .filter(
+                    MaintenanceD2D.maintenance_id == daily.maintenance_id,
+                    MaintenanceD2D.d2d_type == "2",
+                )
+                .all()
+            )
+            assert len(d2d_records) >= 1, "P0-1: 离店应写 TIT23 离店记录"
+            assert d2d_records[0].d2d_result == "5"
 
-    def test_leave_store_result_4_no_linkage(self, app: Flask) -> None:
-        """离店 d2d_result='4'（未解决）→ 不触发 L4（中间态）。"""
+
+class TestCompleteMaintenanceLinkageP01:
+    """P0-1 修正：完成维修 transition(5) 才触发 L1-L11。"""
+
+    def test_transition_5_triggers_l4(self, app: Flask) -> None:
+        """完成维修 transition(5) → 触发 L4（新配件 whcd 清空）。"""
         with app.app_context():
             _seed_customer()
             _seed_item("IT0001")
@@ -228,19 +263,63 @@ class TestLeaveStoreLinkageP01:
             daily = _seed_daily()
             _seed_accessories(daily.maintenance_id, new_eid="EIDNEW0001")
             db.session.commit()
+
+            # 完成维修（不经过离店，直接 transition 2→5）
+            MaintenanceDailyService().transition(daily.maintenance_id, "5", "T00001")
+
+            db.session.refresh(new_eid)
+            assert new_eid.whcd is None, "P0-1: 完成维修应触发 L4 清空 whcd"
+            assert new_eid.sflg == "1"
+            assert new_eid.refid == daily.maintenance_id
+
+    def test_transition_5_triggers_l1(self, app: Flask) -> None:
+        """完成维修 transition(5) → 触发 L1（写 EidTrack type='A'）。"""
+        with app.app_context():
+            _seed_customer()
+            _seed_item("IT0001")
+            _seed_eid("EIDOLD0001")
+            _seed_eid("EIDNEW0001")
+            daily = _seed_daily()
+            _seed_accessories(daily.maintenance_id)
+            db.session.commit()
+
+            MaintenanceDailyService().transition(daily.maintenance_id, "5", "T00001")
+
+            tracks = (
+                db.session.query(EidTrack)
+                .filter(
+                    EidTrack.eid == "EIDOLD0001",
+                    EidTrack.type == "A",
+                )
+                .all()
+            )
+            assert len(tracks) >= 1, "P0-1: 完成维修应触发 L1 写 EidTrack"
+
+    def test_transition_5_derives_is_success_from_d2d(self, app: Flask) -> None:
+        """完成维修 transition(5) → 读 TIT23 派生 is_success。"""
+        with app.app_context():
+            _seed_customer()
+            _seed_item("IT0001")
+            daily = _seed_daily()
+            db.session.commit()
             _seed_arrive(daily.maintenance_id)
 
+            # 离店 d2d_result='5'
             D2DService.leave_store(
                 daily.maintenance_id,
                 {
-                    "d2d_result": "4",  # 未解决
+                    "d2d_result": "5",
                     "d2d_phenomenon": "设备无法开机",
-                    "d2d_handling": "尝试维修未果",
+                    "d2d_handling": "更换配件",
+                    "d2d_reason": "配件损坏",
                 },
                 "T00001",
             )
 
-            db.session.refresh(new_eid)
-            # d2d_result='4' 是中间态，不触发 L4
-            assert new_eid.whcd == "W1", "P0-1: d2d_result='4' 不应触发 L4"
-            assert new_eid.sflg == "1", "P0-1: d2d_result='4' sflg 不变"
+            # 完成维修
+            MaintenanceDailyService().transition(daily.maintenance_id, "5", "T00001")
+
+            db.session.refresh(daily)
+            # is_success 应按 d2d_result='5' 派生
+            assert daily.is_success is not None, "P0-1: 完成维修应派生 is_success"
+            assert daily.current_status == "5"

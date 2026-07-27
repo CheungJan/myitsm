@@ -439,7 +439,14 @@ class TestD2DFourModesE2E:
         headers = _auth_header(app)
         mid = self._create_md(client, headers)
         self._four_modes(client, headers, mid)
-        # 离店后主表 current_status 应为 d2d_result='5'，faultcode 应含 gzdm
+        # 完成维修 transition(5) 才改状态+触发联动
+        rt = client.post(
+            f"/api/v1/itsm/maintenance-daily/{mid}/transition",
+            json={"to_status": "5"},
+            headers=headers,
+        )
+        assert rt.status_code == 200, rt.get_json()
+        # 离店写 faultcode，完成维修后主表 current_status=5
         resp = client.get(f"/api/v1/itsm/maintenance-daily/{mid}", headers=headers)
         assert resp.status_code == 200
         data = resp.get_json()["data"]
@@ -450,6 +457,12 @@ class TestD2DFourModesE2E:
         headers = _auth_header(app)
         mid = self._create_mo(client, headers)
         self._four_modes(client, headers, mid)
+        rt = client.post(
+            f"/api/v1/itsm/maintenance-open/{mid}/transition",
+            json={"to_status": "5"},
+            headers=headers,
+        )
+        assert rt.status_code == 200, rt.get_json()
         resp = client.get(f"/api/v1/itsm/maintenance-open/{mid}", headers=headers)
         assert resp.status_code == 200
         assert resp.get_json()["data"]["current_status"] == "5"
@@ -458,6 +471,12 @@ class TestD2DFourModesE2E:
         headers = _auth_header(app)
         mid = self._create_mr(client, headers)
         self._four_modes(client, headers, mid)
+        rt = client.post(
+            f"/api/v1/itsm/maintenance-renovate/{mid}/transition",
+            json={"to_status": "5"},
+            headers=headers,
+        )
+        assert rt.status_code == 200, rt.get_json()
         resp = client.get(f"/api/v1/itsm/maintenance-renovate/{mid}", headers=headers)
         assert resp.status_code == 200
         assert resp.get_json()["data"]["current_status"] == "5"
@@ -466,6 +485,12 @@ class TestD2DFourModesE2E:
         headers = _auth_header(app)
         mid = self._create_bg(client, headers)
         self._four_modes(client, headers, mid)
+        rt = client.post(
+            f"/api/v1/itsm/device-change/{mid}/transition",
+            json={"to_status": "5"},
+            headers=headers,
+        )
+        assert rt.status_code == 200, rt.get_json()
         resp = client.get(f"/api/v1/itsm/device-change/{mid}", headers=headers)
         assert resp.status_code == 200
         assert resp.get_json()["data"]["current_status"] == "5"
@@ -474,6 +499,12 @@ class TestD2DFourModesE2E:
         headers = _auth_header(app)
         mid = self._create_by(app)
         self._four_modes(client, headers, mid)
+        rt = client.post(
+            f"/api/v1/itsm/maintenance/{mid}/transition",
+            json={"to_status": "5"},
+            headers=headers,
+        )
+        assert rt.status_code == 200, rt.get_json()
         resp = client.get(f"/api/v1/itsm/maintenance/{mid}", headers=headers)
         assert resp.status_code == 200
         assert resp.get_json()["data"]["current_status"] == "5"

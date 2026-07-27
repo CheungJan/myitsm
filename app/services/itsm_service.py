@@ -582,6 +582,9 @@ class MaintenanceDailyService(_BaseMaintenanceService):
         if result.get("success"):
             # 关单完成（to_status=5）：自动创建服务返还入库草稿（IV=3）
             if to_status == CLOSE_STATUS:
+                # P0-1: 完成维修时读 TIT23 最新 d2d_result 派生 is_success
+                # 离店不改状态，完成维修才是唯一触发器
+                self._derive_is_success_from_latest_d2d(record)
                 self._create_service_return_inbound(record, operator)
                 # 1a 阶段关单联动 L1/L2/L3/L11
                 self._write_eid_track_on_daily_close(record, operator)
@@ -593,6 +596,32 @@ class MaintenanceDailyService(_BaseMaintenanceService):
                 self._scrap_old_part_on_close(record, operator)
             db.session.commit()
         return result
+
+    @staticmethod
+    def _derive_is_success_from_latest_d2d(record: Any) -> None:
+        """完成维修时从 TIT23 最新离店记录派生 is_success。
+
+        离店不改主表状态，完成维修 transition(5) 时：
+        - 读 TIT23 最新 d2d_type='2'（离店）记录的 d2d_result/closure_reason
+        - 按 StateMachine.resolve_is_success 派生 is_success
+        """
+        from app.models.itsm import MaintenanceD2D
+
+        latest_d2d = (
+            db.session.query(MaintenanceD2D)
+            .filter(
+                MaintenanceD2D.maintenance_id == record.maintenance_id,
+                MaintenanceD2D.d2d_type == "2",  # 离店
+                MaintenanceD2D.useflg == "1",
+            )
+            .order_by(MaintenanceD2D.leave_time.desc())
+            .first()
+        )
+        if latest_d2d is None:
+            return
+        d2d_result = latest_d2d.d2d_result
+        closure_reason = getattr(latest_d2d, "closure_reason", None)
+        record.is_success = StateMachine.resolve_is_success(d2d_result, closure_reason)
 
     @staticmethod
     def _create_service_return_inbound(record: Any, operator: str) -> None:
@@ -2567,32 +2596,21 @@ class D2DService:
     ) -> None:
         """离店时联动主表（current_status + is_success + leave_time + firstor/first_time + faultcode）。
 
-        PB 语义（w_r_itsm_d2d.srw oe_preupdate）：
-        - current_status = d2d_result
-        - is_success 按 d2d_result/closure_reason 映射派生
+        PB 语义修正（P0-1）：
+        - 离店不改 current_status，不触发 L1-L11 联动
         - leave_time 若空则填充（第一次离店时间）
         - firstor/first_time 若空则用本次 d2d 工程师/到店时间填充
         - faultcode 追加 gzdm
+        - current_status/is_success 由完成维修 transition(5) 时按 TIT23 最新 d2d_result 派生
         """
         main_record, main_fault_type = D2DService._find_main_record(maintenance_id)
         if main_record is None:
             return
 
-        is_success = StateMachine.resolve_is_success(d2d_result, closure_reason)
-        main_record.current_status = d2d_result
-        main_record.is_success = is_success
-
-        # P0-1: d2d_result='5'（已解决=关单）时触发 L1-L11 联动
-        # 离店即关单，联动方法在 commit 前执行，与 transition(5) 行为一致
-        if d2d_result == "5" and isinstance(main_record, MaintenanceDaily):
-            MaintenanceDailyService._create_service_return_inbound(main_record, operator)
-            MaintenanceDailyService._write_eid_track_on_daily_close(main_record, operator)
-            MaintenanceDailyService._update_eid_warranty_on_daily_close(main_record, operator)
-            MaintenanceDailyService._update_pos_r_eid_on_daily_close(main_record, operator)
-            MaintenanceDailyService._write_pos_detail_on_daily_close(main_record, operator)
-            # 1b 阶段 L4/L5
-            MaintenanceDailyService._clear_new_part_whcd_on_close(main_record, operator)
-            MaintenanceDailyService._scrap_old_part_on_close(main_record, operator)
+        # P0-1 修正：离店不改 current_status，不触发 L1-L11 联动
+        # 离店只写 TIT23 + 填充主表 leave_time/firstor/first_time/faultcode
+        # 完成维修 transition(5) 才是唯一触发器：改状态 + 读 TIT23 + 触发联动
+        # is_success 也不在离店派生（由 transition 时按 d2d_result 派生）
 
         # leave_time：第一次离店时间（若空才填）
         if leave_time and not getattr(main_record, "leave_time", None):
