@@ -12,6 +12,8 @@ def test_valid_transition() -> None:
     assert StateMachine.can_transition(MaintenanceState.ASSIGNED, MaintenanceState.UNRESOLVED)
     assert StateMachine.can_transition(MaintenanceState.RESOLVED, MaintenanceState.CLOSED)
     assert StateMachine.can_transition(MaintenanceState.UNRESOLVED, MaintenanceState.ASSIGNED)
+    # P1-3: RESOLVED → ASSIGNED（重新打开）
+    assert StateMachine.can_transition(MaintenanceState.RESOLVED, MaintenanceState.ASSIGNED)
 
 
 def test_cancel_from_any_non_terminal() -> None:

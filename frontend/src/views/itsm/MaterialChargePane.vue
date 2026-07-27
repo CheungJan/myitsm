@@ -448,7 +448,7 @@ const props = defineProps<{
   engineerId?: string
 }>()
 
-const isClosed = computed(() => ['3', '9'].includes(props.currentStatus || ''))
+const isClosed = computed(() => ['3', '5', '9'].includes(props.currentStatus || ''))
 
 // C_TYPE 字典：1维修/2购买/3纯服务费/4整机更换/5耗材线材
 const { dictOptions: cTypeOptions, dictLabel: cTypeDictLabel } = useDict('C_TYPE')

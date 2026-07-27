@@ -435,9 +435,9 @@
             v-if="detail.current_status==='5'"
             size="small"
             type="warning"
-            @click="doTransition(detail,'3')"
+            @click="doTransition(detail,'2')"
           >
-            关单
+            重新打开
           </el-button>
           <el-button
             v-if="['1','2','4','5'].includes(detail.current_status as string)"

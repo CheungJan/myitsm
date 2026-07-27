@@ -105,6 +105,7 @@ class StateMachine:
             MaintenanceState.CANCELLED,
         ],
         MaintenanceState.RESOLVED: [
+            MaintenanceState.ASSIGNED,
             MaintenanceState.CLOSED,
             MaintenanceState.CANCELLED,
         ],
