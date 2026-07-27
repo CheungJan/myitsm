@@ -71,7 +71,7 @@ class StateMachine:
         UNRESOLVED(4) → ASSIGNED(2) / TRANSFERRED(6) / WAITING_PARTS(7) / CLOSED(3) / CANCELLED(9)
         TRANSFERRED(6) → CLOSED(3) / RESOLVED(5) / CANCELLED(9)
         WAITING_PARTS(7) → RESOLVED(5) / UNRESOLVED(4) / CLOSED(3) / CANCELLED(9)
-        RESOLVED(5) → CLOSED(3) / CANCELLED(9)
+        RESOLVED(5) → ASSIGNED(2) / CLOSED(3) / CANCELLED(9)
     """
 
     TRANSITIONS: dict[MaintenanceState, list[MaintenanceState]] = {
