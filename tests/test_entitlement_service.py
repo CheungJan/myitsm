@@ -44,6 +44,39 @@ def _make_rl(business_mode: str | None = None, cust_cd: str = "CUST001") -> Simp
     return SimpleNamespace(business_mode=business_mode, cust_cd=cust_cd)
 
 
+class TestResolveEntitlementLevel0:
+    """0级：人为损坏判定（最高优先）。"""
+
+    def test_damage_type_2_charge(self, app: Flask) -> None:
+        """damage_type='2' 人为损坏 → 一律收费。"""
+        eid = _make_eid(asset_owner=OW_COMMERCIAL)
+        rl = _make_rl(business_mode="02")
+        result = resolve_entitlement(eid, rl, damage_type='2')
+        assert result.free is False
+        assert result.reason == "人为损坏"
+
+    def test_damage_type_2_overrides_rental(self, app: Flask) -> None:
+        """人为损坏覆盖租赁免费规则。"""
+        eid = _make_eid(asset_owner=OW_COMMERCIAL)
+        rl = _make_rl(business_mode="02")
+        result = resolve_entitlement(eid, rl, damage_type='2')
+        assert result.free is False  # 人为>租赁
+
+    def test_damage_type_1_normal_flow(self, app: Flask) -> None:
+        """damage_type='1' 非人为 → 走正常流程。"""
+        eid = _make_eid(asset_owner=OW_COMMERCIAL)
+        rl = _make_rl(business_mode="02")
+        result = resolve_entitlement(eid, rl, damage_type='1')
+        assert result.free is True  # 非人为租赁免费
+
+    def test_damage_type_none_normal_flow(self, app: Flask) -> None:
+        """damage_type=None → 走正常流程。"""
+        eid = _make_eid(asset_owner=OW_COMMERCIAL)
+        rl = _make_rl(business_mode="02")
+        result = resolve_entitlement(eid, rl)
+        assert result.free is True
+
+
 class TestResolveEntitlementLevel1:
     """1级：特殊客户协议（1a 写死返回 None）。"""
 
@@ -69,7 +102,15 @@ class TestResolveEntitlementLevel2:
 
 
 class TestResolveEntitlementLevel3:
-    """3级：租赁/借用/免费投放/合作运营免费。"""
+    """3级：代维按合同 + 租赁/借用/免费投放/合作运营免费。"""
+
+    def test_level3_contract_maintenance_charge(self, app: Flask) -> None:
+        """代维 business_mode='04' → 按合同，1a 阶段无合同默认收费。"""
+        eid = _make_eid(asset_owner=OW_COMMERCIAL)
+        rl = _make_rl(business_mode="04")
+        result = resolve_entitlement(eid, rl)
+        assert result.free is False
+        assert "代维" in result.reason
 
     def test_level3_rental_free(self, app: Flask) -> None:
         """租赁 business_mode='02' → 免费。"""
@@ -191,36 +232,33 @@ class TestResolveEntitlementLevel6:
 class TestResolveServiceResponsibility:
     """SR 默认推导测试。"""
 
-    def test_in_warranty_returns_manufacturer(self, app: Flask) -> None:
-        """保内设备 → '02' 厂商。"""
-        eid = _make_eid(
-            asset_owner=OW_CUSTOMER,
-            warranty_expire=datetime.now() + timedelta(days=30),
-        )
-        assert resolve_service_responsibility(eid) == SR_MANUFACTURER
-
     def test_haisheng_returns_contract(self, app: Flask) -> None:
         """海晟设备 → '03' 代维。"""
         eid = _make_eid(asset_owner=OW_HAISHENG)
         assert resolve_service_responsibility(eid) == SR_CONTRACTOR
 
-    def test_normal_returns_internal(self, app: Flask) -> None:
-        """其他 → '01' 内部。"""
+    def test_commercial_returns_internal(self, app: Flask) -> None:
+        """商用电子 → '01' 内部。"""
+        eid = _make_eid(asset_owner=OW_COMMERCIAL)
+        assert resolve_service_responsibility(eid) == SR_INTERNAL
+
+    def test_customer_returns_internal(self, app: Flask) -> None:
+        """门店资产 → '01' 内部。"""
         eid = _make_eid(asset_owner=OW_CUSTOMER)
+        assert resolve_service_responsibility(eid) == SR_INTERNAL
+
+    def test_in_warranty_still_internal(self, app: Flask) -> None:
+        """保内设备仍是内部维护（商用电子我们自己修，不是厂商修）。"""
+        eid = _make_eid(
+            asset_owner=OW_COMMERCIAL,
+            warranty_expire=datetime.now() + timedelta(days=30),
+        )
         assert resolve_service_responsibility(eid) == SR_INTERNAL
 
     def test_no_warranty_expire_returns_internal(self, app: Flask) -> None:
         """无 warranty_expire → '01' 内部。"""
         eid = _make_eid(asset_owner=OW_COMMERCIAL, warranty_expire=None)
         assert resolve_service_responsibility(eid) == SR_INTERNAL
-
-    def test_haisheng_in_warranty_still_manufacturer(self, app: Flask) -> None:
-        """海晟保内 → 仍走厂商（保内优先于海晟）。"""
-        eid = _make_eid(
-            asset_owner=OW_HAISHENG,
-            warranty_expire=datetime.now() + timedelta(days=30),
-        )
-        assert resolve_service_responsibility(eid) == SR_MANUFACTURER
 
 
 class TestResolveOldPartDisposal:

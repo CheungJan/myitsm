@@ -75,27 +75,34 @@ def get_service_contract(eid: str) -> Optional[dict]:
     return None
 
 
-def resolve_entitlement(eid: Eid, cust_pos_rl: Optional[CustPosRl]) -> Entitlement:
-    """判定设备当前服务权益（6 级优先级，对齐行业 EAM/FSM）。
+def resolve_entitlement(
+    eid: Eid,
+    cust_pos_rl: Optional[CustPosRl],
+    damage_type: Optional[str] = None,
+) -> Entitlement:
+    """判定设备当前服务权益（6级优先级 + 人为损坏判定）。
 
     优先级：
-      1. 特殊客户协议 — 最高优先，覆盖所有规则
-      2. 维保合同 — 客户购买的维保服务
-      3. 租赁/借用/免费投放/合作运营 — 公司承担
+      0. 人为损坏 — 最高优先，直接收费
+      1. 特殊客户协议
+      2. 维保合同
+      3. 租赁/借用/免费投放/合作运营（非人为）→ 公司承担
+      3a. 代维 → 按合同
       4. 厂家保修 — warranty_expire 判定
       5. Owner 默认规则 — asset_owner 兜底
       6. 异常兜底 — 默认收费
 
-    调用示例（关单联动中）：
-        eid = db.session.get(Eid, accessories_update.new_accessories_id)
-        cust_pos_rl = db.session.query(CustPosRl).filter_by(eid=eid.eid).first()
-        entitlement = resolve_entitlement(eid, cust_pos_rl)
+    damage_type: '1'=非人为 / '2'=人为损坏 / None=未判定
     """
     business_mode = cust_pos_rl.business_mode if cust_pos_rl else None
     asset_owner = eid.asset_owner if eid else None
     now = datetime.now()
 
-    # 1. 特殊客户协议（最高优先）
+    # 0. 人为损坏 → 一律收费（最高优先）
+    if damage_type == '2':
+        return Entitlement(free=False, reason="人为损坏")
+
+    # 1. 特殊客户协议
     if cust_pos_rl:
         special = get_special_agreement(cust_pos_rl.cust_cd)
         if special:
@@ -113,23 +120,27 @@ def resolve_entitlement(eid: Eid, cust_pos_rl: Optional[CustPosRl]) -> Entitleme
                 reason=f"维保合同: {contract.get('name', '')}",
             )
 
-    # 3. 租赁/借用/免费投放/合作运营 → 公司承担
+    # 3. 代维 → 按合同
+    if business_mode == '04':
+        return Entitlement(free=False, reason="代维，按合同（无合同默认收费）")
+
+    # 4. 租赁/借用/免费投放/合作运营 → 非人为则公司承担
     if business_mode in ('02', '03', '07', '08'):
         return Entitlement(free=True, reason=f"{BM_S_DICT.get(business_mode, '未知')}，公司承担")
 
-    # 4. 厂家保修（销售/寄售/试用模式按保修期判定）
+    # 5. 厂家保修（销售/寄售/试用模式按保修期判定）
     if business_mode in ('01', '05', '06'):
         if eid and eid.warranty_expire and now <= eid.warranty_expire:
             return Entitlement(free=True, reason="保内")
         return Entitlement(free=False, reason="过保")
 
-    # 5. Owner 默认规则（存量数据无 business_mode 时兜底）
+    # 6. Owner 默认规则（存量数据无 business_mode 时兜底）
     if asset_owner == OW_COMMERCIAL:  # 商用电子
         return Entitlement(free=True, reason="商用电子（默认免费）")
     if asset_owner == OW_HAISHENG:  # 海晟
         return Entitlement(free=False, reason="海晟（按合同，无合同默认收费）")
 
-    # 6. 异常兜底
+    # 7. 异常兜底
     return Entitlement(free=False, reason="门店资产（默认收费）")
 
 
@@ -137,23 +148,18 @@ def resolve_service_responsibility(eid: Optional[Eid]) -> str:
     """派工默认服务责任方（SR 字典）。
 
     推导规则：
-      - 厂商保修期内（warranty_expire > now）→ '02' 厂商
-      - 海晟设备（asset_owner='04'）→ '03' 代维
-      - 其他 → '01' 内部（默认）
+      - 商用电子/通方信息/门店资产 → '01' 内部（我们自己的工程师团队维护）
+      - 海晟设备（asset_owner='04'）→ '03' 代维（第三方设备，按代维合同）
+      - '02' 厂商仅用于非我方设备且存在原厂保修的场景，需手动选择
 
     前端集成：派工 Tab 表单打开时调用此函数自动设默认值，操作人员可手动覆盖。
     """
-    now = datetime.now()
-
-    # 厂商保修期内 → 厂商处理
-    if eid and eid.warranty_expire and now <= eid.warranty_expire:
-        return SR_MANUFACTURER
 
     # 海晟设备 → 代维
     if eid and eid.asset_owner == OW_HAISHENG:
         return SR_CONTRACTOR
 
-    # 其他 → 内部
+    # 其他 → 内部（商用电子/通方信息/门店资产均我们自己的团队维护）
     return SR_INTERNAL
 
 

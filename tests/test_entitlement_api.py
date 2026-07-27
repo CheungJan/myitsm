@@ -187,7 +187,7 @@ class TestEntitlementResolveAPI:
         assert resp.status_code == 404
 
     def test_recommended_sr_in_warranty(self, app: Flask, client: FlaskClient) -> None:
-        """保内设备 → recommended_sr='02' 厂商。"""
+        """保内门店资产 → recommended_sr='01' 内部（我们自己修，不是厂商）。"""
         with app.app_context():
             _seed_customer()
             _seed_eid(
@@ -202,7 +202,7 @@ class TestEntitlementResolveAPI:
             headers=_auth_header(app),
         )
         data = resp.get_json()["data"]
-        assert data["recommended_sr"] == "02"
+        assert data["recommended_sr"] == "01"
 
 
 class TestEntitlementPriceAPI:

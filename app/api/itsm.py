@@ -1555,7 +1555,7 @@ def resolve_dispatch_rule():  # type: ignore[no-untyped-def]
 @itsm_bp.get("/entitlement/resolve")
 @login_required
 def resolve_entitlement_api():  # type: ignore[no-untyped-def]
-    """按 eid + cust_cd 解析服务权益+推荐c_type+推荐SR（供前端工单创建引导）。
+    """按 eid + cust_cd + damage_type 解析服务权益+推荐c_type+推荐SR（供前端工单创建引导）。
 
     返回：
       {
@@ -1568,6 +1568,7 @@ def resolve_entitlement_api():  # type: ignore[no-untyped-def]
     """
     eid_val = request.args.get("eid", "")
     cust_cd = request.args.get("cust_cd", "")
+    damage_type = request.args.get("damage_type") or None  # '2'=人为损坏
     if not eid_val:
         return error_response(message="缺少 eid", code=400)
 
@@ -1590,7 +1591,7 @@ def resolve_entitlement_api():  # type: ignore[no-untyped-def]
             .first()
         )
 
-    entitlement = resolve_entitlement(eid_rec, cust_pos_rl)
+    entitlement = resolve_entitlement(eid_rec, cust_pos_rl, damage_type=damage_type)
     recommended_sr = resolve_service_responsibility(eid_rec)
 
     # c_type 推荐规则（对齐文档 §3.5.4）
