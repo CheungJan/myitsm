@@ -2582,6 +2582,18 @@ class D2DService:
         main_record.current_status = d2d_result
         main_record.is_success = is_success
 
+        # P0-1: d2d_result='5'（已解决=关单）时触发 L1-L11 联动
+        # 离店即关单，联动方法在 commit 前执行，与 transition(5) 行为一致
+        if d2d_result == "5" and isinstance(main_record, MaintenanceDaily):
+            MaintenanceDailyService._create_service_return_inbound(main_record, operator)
+            MaintenanceDailyService._write_eid_track_on_daily_close(main_record, operator)
+            MaintenanceDailyService._update_eid_warranty_on_daily_close(main_record, operator)
+            MaintenanceDailyService._update_pos_r_eid_on_daily_close(main_record, operator)
+            MaintenanceDailyService._write_pos_detail_on_daily_close(main_record, operator)
+            # 1b 阶段 L4/L5
+            MaintenanceDailyService._clear_new_part_whcd_on_close(main_record, operator)
+            MaintenanceDailyService._scrap_old_part_on_close(main_record, operator)
+
         # leave_time：第一次离店时间（若空才填）
         if leave_time and not getattr(main_record, "leave_time", None):
             main_record.leave_time = leave_time
