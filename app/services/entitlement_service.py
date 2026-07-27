@@ -1,9 +1,9 @@
-"""服务权益判定服务（1a 阶段，6 级优先级 + SR 默认推导）。
+"""服务权益判定服务（1a 阶段，7 级优先级 + 人为损坏 + SR 默认推导）。
 
 对齐行业 EAM/FSM 六层模型：
   L3 Business Model → cust_pos_rl.business_mode（BM_S 字典）
   L4 Service Responsibility → dispatch.service_responsibility（SR 字典）
-  L5 Entitlement → resolve_entitlement() 6 级优先级判定
+  L5 Entitlement → resolve_entitlement() 7 级优先级判定（0人为+1协议+2合同+3代维+4租赁+5保修+6Owner+7兜底）
   L6 Billing Rule → c_type 推荐 + TIP01_PRICE 价格带出
 
 1a 阶段：优先级 1-2（特殊协议/维保合同）写死返回 None，后续建表接入。
@@ -80,17 +80,17 @@ def resolve_entitlement(
     cust_pos_rl: Optional[CustPosRl],
     damage_type: Optional[str] = None,
 ) -> Entitlement:
-    """判定设备当前服务权益（6级优先级 + 人为损坏判定）。
+    """判定设备当前服务权益（7级优先级 + 人为损坏判定）。
 
     优先级：
       0. 人为损坏 — 最高优先，直接收费
       1. 特殊客户协议
       2. 维保合同
-      3. 租赁/借用/免费投放/合作运营（非人为）→ 公司承担
-      3a. 代维 → 按合同
-      4. 厂家保修 — warranty_expire 判定
-      5. Owner 默认规则 — asset_owner 兜底
-      6. 异常兜底 — 默认收费
+      3. 代维 — 按合同（无合同默认收费）
+      4. 租赁/借用/免费投放/合作运营（非人为）→ 公司承担
+      5. 厂家保修 — warranty_expire 判定（销售/寄售/试用）
+      6. Owner 默认规则 — asset_owner 兜底
+      7. 异常兜底 — 默认收费
 
     damage_type: '1'=非人为 / '2'=人为损坏 / None=未判定
     """
