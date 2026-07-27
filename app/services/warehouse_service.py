@@ -1332,7 +1332,7 @@ class StockOutService:
 
                     eid_updates: dict[str, Any] = {}
                     if record.invtyp == "2" and getattr(record, "targetwhcd", None):
-                        # 服务领用：EID 移到工程师仓，标记持有
+                        # 服务领用：EID 移到工程师仓，sflg=1（持有中，ES字典；关单 L4 后变为已安装 whcd=NULL）
                         eid_updates["whcd"] = record.targetwhcd
                         eid_updates["sflg"] = "1"
                     elif record.invtyp == "4":

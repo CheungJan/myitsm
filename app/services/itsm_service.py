@@ -1193,14 +1193,22 @@ class MaintenanceOpenService(_BaseMaintenanceService):
         plan.update_time = datetime.now(UTC)
         plan.updator = operator
 
-        # 1a C7：PF→OW 映射（预计划设备来源 → 资产所属）
-        # 3 新设：00商用仓库→01商用电子 / 03IT公司→02通方信息 / 04海晟公司→04海晟
-        # 2 继承：01门店移机 / 02烟草直调 → asset_owner 不变
+        # 1a C7：PF×BM_S→OW 映射（设备来源 + 业务模式 → 资产所属）
+        # 00商用仓库 + 销售 → 门店资产 OW 03（所有权转客户）
+        # 00商用仓库 + 租赁/借用/投放/合作 → 商用电子 OW 01（我们持有）
+        # 03IT公司 → 通方信息 OW 02
+        # 04海晟 → 海晟 OW 04
+        pf_ow_map = {
+            "00": {"01": "03", None: "01"},  # 商用仓库: 销售→门店 / 其他→商用电子
+            "03": {None: "02"},               # IT公司→通方信息
+            "04": {None: "04"},               # 海晟→海晟
+        }
         pos_from = plan.pos_from
         eid_val = plan.posid
-        if eid_val and pos_from in ("00", "03", "04"):
-            pf_ow_map = {"00": "01", "03": "02", "04": "04"}
-            new_owner = pf_ow_map[pos_from]
+        if eid_val and pos_from in pf_ow_map:
+            business_mode = plan.business_mode
+            bm_map = pf_ow_map[pos_from]
+            new_owner = bm_map.get(business_mode) or bm_map.get(None) or "01"
             eid_rec = (
                 db.session.query(EidModel).filter(EidModel.eid == eid_val).first()
             )
@@ -1482,6 +1490,26 @@ class MaintenanceRenovateService(_BaseMaintenanceService):
         plan.plan_status = PLAN_STATUS_COMPLETED
         plan.update_time = datetime.now(UTC)
         plan.updator = operator
+
+        # 1a C7：PF×BM_S→OW 映射（旧机翻新，对齐 MO 逻辑）
+        from app.models.master import Eid as EidModel
+
+        pf_ow_map = {
+            "00": {"01": "03", None: "01"},
+            "03": {None: "02"},
+            "04": {None: "04"},
+        }
+        pos_from = plan.pos_from
+        eid_val = plan.posid
+        if eid_val and pos_from in pf_ow_map:
+            business_mode = plan.business_mode
+            bm_map = pf_ow_map[pos_from]
+            new_owner = bm_map.get(business_mode) or bm_map.get(None) or "01"
+            eid_rec = (
+                db.session.query(EidModel).filter(EidModel.eid == eid_val).first()
+            )
+            if eid_rec and eid_rec.asset_owner != new_owner:
+                eid_rec.asset_owner = new_owner
 
 
 class DeviceChangeService(_BaseMaintenanceService):
