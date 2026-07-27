@@ -33,6 +33,18 @@ export function shouldCharge(storeId: string) {
     return request.get<never, { data: { should_charge: boolean; chargeable_assets: { eid: string; reason: string }[]; count: number } }>('/itsm/should-charge', { params: { store_id: storeId } })
 }
 
+// ---- 1a C8：服务权益+推荐c_type+推荐SR（工单创建引导） ----
+export interface EntitlementResult {
+    entitlement: { free: boolean; reason: string }
+    recommended_c_type: '1' | '2' | '3' | '4' | '5'
+    recommended_sr: '01' | '02' | '03'
+    asset_owner: string
+    warranty_expire: string | null
+}
+export function resolveEntitlement(eid: string, custCd?: string) {
+    return request.get<never, { data: EntitlementResult }>('/itsm/entitlement/resolve', { params: { eid, cust_cd: custCd } })
+}
+
 // ---- 历史同业务单据查询（客户信息 Tab 使用） ----
 export function fetchHistoryByStore(type: string, storeId: string) {
     const params: Record<string, string> = {}

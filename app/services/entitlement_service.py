@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from app.extensions import db
 from app.models.master import CustPosRl, Eid
 
 
@@ -191,3 +192,52 @@ def resolve_old_part_disposal(eid: Optional[Eid], entitlement: Entitlement) -> s
 
     # 默认报废
     return DISPOSAL_SCRAP
+
+
+# tip01_price.busityp 码值
+BUSITYP_SALE = '10'  # 销售价
+BUSITYP_COST = '20'  # 采购价（成本价）
+BUSITYP_MAINTENANCE = '30'  # 维护品价格
+BUSITYP_DEPOSIT = '40'  # 押金
+
+
+def resolve_price(cust_cd: str, itemcd: str) -> Optional[float]:
+    """价格带出规则（按客户分类取销售价/成本价）。
+
+    tip01_price.busityp:
+      '10' = 销售价
+      '20' = 采购价（成本价）
+      '30' = 维护品价格
+      '40' = 押金
+
+    Customer 无 pricetyp 字段（PB 原系统未迁移），暂按 class_cd 判断。
+    后续可加 pricetyp 字段或演进为规则表。
+
+    调用示例（配件更换时）：
+        price = resolve_price(record.store_id, accessories_update.itemcd)
+        if price is not None:
+            accessories_update.price = price
+            if accessories_update.c_type in ('1', '2', '4'):
+                accessories_update.payje = price
+    """
+    from app.models.master import Customer
+    from app.models.inventory import Price
+
+    customer = db.session.get(Customer, cust_cd)
+    if not customer:
+        return None
+
+    # 按客户分类决定取哪个价格
+    # class_cd='24' 或特定分类 → 成本价（busityp='20'）
+    # 其他 → 销售价（busityp='10'）
+    # TODO: 后续加 pricetyp 字段或规则表，当前简化为销售价
+    busityp = BUSITYP_SALE
+
+    price = (
+        db.session.query(Price)
+        .filter_by(itemcd=itemcd, busityp=busityp, useflg='1')
+        .filter(Price.is_current.is_(True))
+        .first()
+    )
+
+    return float(price.itemprice) if price and price.itemprice is not None else None

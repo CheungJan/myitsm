@@ -434,7 +434,7 @@
 import { ref, computed } from 'vue'
 import ItsmSubTablePane from './ItsmSubTablePane.vue'
 import FaultCodeCascader from './FaultCodeCascader.vue'
-import { fetchAccessories, createAccessories, updateAccessories, fetchNewAccessoriesCandidates, fetchOldAccessoriesCandidates } from '@/api/itsm'
+import { fetchAccessories, createAccessories, updateAccessories, fetchNewAccessoriesCandidates, fetchOldAccessoriesCandidates, resolveEntitlement } from '@/api/itsm'
 import type { SubRecord } from '@/api/itsm'
 import { useDict } from '@/composables/useDict'
 
@@ -521,6 +521,44 @@ async function loadOldCandidates(_query: string) {
     oldLoading.value = false
   }
 }
+
+// 1a C8：c_type 推荐规则（按资产属性+权益自动推荐，用户可覆盖）
+const entitlementLoading = ref(false)
+const entitlementInfo = ref<{ free: boolean; reason: string } | null>(null)
+
+/** 按 device_id + store_id 查询权益+推荐 c_type */
+async function recommendCType(form: Record<string, unknown>) {
+  const eid = (form.device_id as string) || ''
+  if (!eid) {
+    entitlementInfo.value = null
+    return
+  }
+  entitlementLoading.value = true
+  try {
+    const r = await resolveEntitlement(eid, props.storeId)
+    const data = r?.data
+    if (data) {
+      entitlementInfo.value = data.entitlement
+      // 仅当用户未手动选择 c_type 时自动推荐
+      if (!form.c_type) {
+        form.c_type = data.recommended_c_type
+      }
+    }
+  } catch {
+    // 静默失败，不影响表单
+    entitlementInfo.value = null
+  } finally {
+    entitlementLoading.value = false
+  }
+}
+
+/** 表单打开时触发推荐（由 ItsmSubTablePane 的 form 初始化调用） */
+function onFormInit(form: Record<string, unknown>) {
+  if (form.device_id && !form.c_type) {
+    recommendCType(form)
+  }
+}
+defineExpose({ onFormInit, recommendCType })
 </script>
 
 <style scoped>

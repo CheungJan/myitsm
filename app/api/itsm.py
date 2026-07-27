@@ -1550,3 +1550,67 @@ def resolve_dispatch_rule():  # type: ignore[no-untyped-def]
     from app.services.itsm_service import DispatchRuleService
     target = DispatchRuleService.resolve(fault_type or None, store_id)
     return success_response(data=target or {})
+
+
+@itsm_bp.get("/entitlement/resolve")
+@login_required
+def resolve_entitlement_api():  # type: ignore[no-untyped-def]
+    """按 eid + cust_cd 解析服务权益+推荐c_type+推荐SR（供前端工单创建引导）。
+
+    返回：
+      {
+        "entitlement": {"free": bool, "reason": str},
+        "recommended_c_type": "1"|"2"|"3"|"4"|"5",
+        "recommended_sr": "01"|"02"|"03",
+        "asset_owner": str,
+        "warranty_expire": str|null
+      }
+    """
+    eid_val = request.args.get("eid", "")
+    cust_cd = request.args.get("cust_cd", "")
+    if not eid_val:
+        return error_response(message="缺少 eid", code=400)
+
+    from app.extensions import db
+    from app.models.master import CustPosRl, Eid
+    from app.services.entitlement_service import (
+        resolve_entitlement,
+        resolve_service_responsibility,
+    )
+
+    eid_rec = db.session.query(Eid).filter(Eid.eid == eid_val).first()
+    if not eid_rec:
+        return error_response(message="设备不存在", code=404)
+
+    cust_pos_rl = None
+    if cust_cd:
+        cust_pos_rl = (
+            db.session.query(CustPosRl)
+            .filter(CustPosRl.eid == eid_val, CustPosRl.cust_cd == cust_cd)
+            .first()
+        )
+
+    entitlement = resolve_entitlement(eid_rec, cust_pos_rl)
+    recommended_sr = resolve_service_responsibility(eid_rec)
+
+    # c_type 推荐规则（对齐文档 §3.5.4）
+    asset_owner = eid_rec.asset_owner or ""
+    if asset_owner == "01":  # 商用电子
+        recommended_c_type = "1"  # 配件更换，免费
+    elif asset_owner == "03" and entitlement.free:
+        recommended_c_type = "1"  # 门店资产保内，配件更换免费
+    elif asset_owner == "03" and not entitlement.free:
+        recommended_c_type = "2"  # 门店资产过保，购买
+    elif asset_owner == "04":  # 海晟
+        recommended_c_type = "1"  # 按代维合同
+    else:
+        recommended_c_type = "3"  # 纯服务费
+
+    return success_response(data={
+        "entitlement": {"free": entitlement.free, "reason": entitlement.reason},
+        "recommended_c_type": recommended_c_type,
+        "recommended_sr": recommended_sr,
+        "asset_owner": asset_owner,
+        "warranty_expire": eid_rec.warranty_expire.isoformat() if eid_rec.warranty_expire else None,
+    })
+
