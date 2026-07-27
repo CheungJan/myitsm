@@ -327,3 +327,91 @@ class TestCloseLinkageC7:
 
             db.session.refresh(eid_rec)
             assert eid_rec.asset_owner == "03", "PF='01' 应继承原 OW='03'"
+
+
+class TestCloseLinkageL4:
+    """L4：关单清空新配件 whcd（标记已安装）。"""
+
+    def test_close_clears_new_part_whcd(self, app: Flask) -> None:
+        """关单后新配件 whcd=NULL（已安装），sflg 保持 '1'。"""
+        with app.app_context():
+            _seed_customer()
+            _seed_item("IT0001")
+            new_eid = _seed_eid("EIDNEW0001")
+            new_eid.whcd = "W1"  # 服务领用后持有在工程师仓
+            new_eid.sflg = "1"
+            daily = _seed_daily()
+            _seed_accessories(daily.maintenance_id, new_eid="EIDNEW0001")
+            db.session.commit()
+
+            svc = MaintenanceDailyService()
+            _transition_to_5(svc, daily.maintenance_id)
+
+            db.session.refresh(new_eid)
+            assert new_eid.whcd is None, "L4：关单后新配件 whcd 应清空（已安装）"
+            assert new_eid.sflg == "1", "L4：sflg 保持 '1'（已使用）"
+            assert new_eid.refid == daily.maintenance_id, "L4：refid 应为工单号"
+
+    def test_close_no_new_part_skips_l4(self, app: Flask) -> None:
+        """无新配件的工单不触发 L4。"""
+        with app.app_context():
+            _seed_customer()
+            _seed_item("IT0001")
+            old_eid = _seed_eid("EIDOLD0001")
+            old_eid.whcd = "W1"
+            daily = _seed_daily()
+            # c_type='3' 纯服务费，无新配件
+            _seed_accessories(daily.maintenance_id, new_eid="", c_type="3")
+            db.session.commit()
+
+            svc = MaintenanceDailyService()
+            _transition_to_5(svc, daily.maintenance_id)
+
+            db.session.refresh(old_eid)
+            # 旧配件不受 L4 影响
+            assert old_eid.whcd == "W1"
+
+
+class TestCloseLinkageL5:
+    """L5：关单处理旧配件报废（in_wh='2'）。"""
+
+    def test_close_scraps_old_part_in_wh_2(self, app: Flask) -> None:
+        """in_wh='2' 的旧配件关单后 sflg='2'（已报废）。"""
+        with app.app_context():
+            _seed_customer()
+            _seed_item("IT0001")
+            old_eid = _seed_eid("EIDOLD0001")
+            old_eid.whcd = "W1"
+            old_eid.sflg = "1"
+            daily = _seed_daily()
+            acc = _seed_accessories(daily.maintenance_id, old_eid="EIDOLD0001")
+            acc.in_wh = "2"  # 标记不入库=报废
+            db.session.commit()
+
+            svc = MaintenanceDailyService()
+            _transition_to_5(svc, daily.maintenance_id)
+
+            db.session.refresh(old_eid)
+            assert old_eid.sflg == "2", "L5：in_wh='2' 旧配件应 sflg='2'（已报废）"
+            assert old_eid.whcd is None, "L5：报废旧配件 whcd 应清空"
+            assert old_eid.refid == daily.maintenance_id, "L5：refid 应为工单号"
+
+    def test_close_keeps_old_part_in_wh_not_2(self, app: Flask) -> None:
+        """in_wh!='2' 的旧配件不触发 L5 报废（走 L6 入库流程）。"""
+        with app.app_context():
+            _seed_customer()
+            _seed_item("IT0001")
+            old_eid = _seed_eid("EIDOLD0001", asset_owner="03")  # 门店资产
+            old_eid.whcd = "W1"
+            old_eid.sflg = "1"
+            daily = _seed_daily()
+            acc = _seed_accessories(daily.maintenance_id, old_eid="EIDOLD0001")
+            acc.in_wh = None  # 未标记报废，走 L6 入库
+            db.session.commit()
+
+            svc = MaintenanceDailyService()
+            _transition_to_5(svc, daily.maintenance_id)
+
+            db.session.refresh(old_eid)
+            # L5 不处理 in_wh!='2' 的记录，sflg 不变（L6 草稿审核后才改）
+            assert old_eid.sflg == "1", "L5：in_wh!='2' 旧配件不触发报废"

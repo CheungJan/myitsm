@@ -588,6 +588,9 @@ class MaintenanceDailyService(_BaseMaintenanceService):
                 self._update_eid_warranty_on_daily_close(record, operator)
                 self._update_pos_r_eid_on_daily_close(record, operator)
                 self._write_pos_detail_on_daily_close(record, operator)
+                # 1b 阶段关单联动 L4/L5
+                self._clear_new_part_whcd_on_close(record, operator)
+                self._scrap_old_part_on_close(record, operator)
             db.session.commit()
         return result
 
@@ -854,6 +857,95 @@ class MaintenanceDailyService(_BaseMaintenanceService):
                     creator=operator,
                 )
                 db.session.add(new_detail)
+
+    @staticmethod
+    def _clear_new_part_whcd_on_close(record: Any, operator: str) -> None:
+        """L4：日常维护单关单时清空新配件 whcd（标记已安装）。
+
+        对每条配件更新记录（TIT25_ACCESSORIES_UPDATE）的新配件（new_accessories_id），
+        将 tmm43_eid.whcd 置 NULL，sflg 保持 '1'（已使用）。
+
+        ES 字典 '1' 双义靠 whcd 区分：
+          - whcd = 工程师仓 → 持有中（服务领用出库后）
+          - whcd = NULL → 已安装（关单 L4 后）
+
+        对齐 PB USP_TRANS_IN_CONFRIM.sql:914-917 set sflg='1', refid=v_id。
+        """
+        from app.models.itsm import AccessoriesUpdate
+        from app.models.master import Eid as EidModel
+
+        rows = (
+            db.session.query(AccessoriesUpdate)
+            .filter(
+                AccessoriesUpdate.maintenance_id == record.maintenance_id,
+                AccessoriesUpdate.new_accessories_id.isnot(None),
+                AccessoriesUpdate.new_accessories_id != "",
+            )
+            .all()
+        )
+        if not rows:
+            return
+
+        change_date = datetime.now()
+        for r in rows:
+            db.session.query(EidModel).filter(
+                EidModel.eid == r.new_accessories_id
+            ).update(
+                {
+                    "whcd": None,  # 清空仓库，标记已安装
+                    "refid": record.maintenance_id,  # 关联单号
+                    "gendate": change_date,
+                    "opercd": operator,
+                },
+                synchronize_session=False,
+            )
+
+    @staticmethod
+    def _scrap_old_part_on_close(record: Any, operator: str) -> None:
+        """L5：日常维护单关单时处理旧配件报废（in_wh='2' 的记录）。
+
+        对 TIT25_ACCESSORIES_UPDATE 中 in_wh='2'（不入库=报废）的旧配件：
+          - tmm43_eid.sflg = '2'（已报废）
+          - refid = maintenance_id
+          - gendate = now
+          - opercd = operator
+          - whcd = NULL（离库）
+
+        in_wh!='2' 的旧配件走 L6 服务返还入库草稿流程（已实现），L5 不重复。
+
+        对齐 PB USP_TRANS_IN_CONFRIM.sql:922-930 operflg='0' 分支：
+          set sflg='2', refid=v_id, gendate=sysdate, opercd=v_userid where eid=v_oldeid
+        """
+        from app.models.itsm import AccessoriesUpdate
+        from app.models.master import Eid as EidModel
+
+        rows = (
+            db.session.query(AccessoriesUpdate)
+            .filter(
+                AccessoriesUpdate.maintenance_id == record.maintenance_id,
+                AccessoriesUpdate.old_accessories_id.isnot(None),
+                AccessoriesUpdate.old_accessories_id != "",
+                AccessoriesUpdate.in_wh == "2",  # 仅处理报废标记
+            )
+            .all()
+        )
+        if not rows:
+            return
+
+        change_date = datetime.now()
+        for r in rows:
+            db.session.query(EidModel).filter(
+                EidModel.eid == r.old_accessories_id
+            ).update(
+                {
+                    "sflg": "2",  # 已报废
+                    "refid": record.maintenance_id,
+                    "gendate": change_date,
+                    "opercd": operator,
+                    "whcd": None,  # 离库
+                },
+                synchronize_session=False,
+            )
 
 
 class MaintenanceOpenService(_BaseMaintenanceService):
