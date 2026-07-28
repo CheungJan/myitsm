@@ -196,6 +196,9 @@
                 label="关闭"
                 value="3"
               /><el-option
+                label="已完结(解决+关闭)"
+                value="3,5"
+              /><el-option
                 label="未解决"
                 value="4"
               /><el-option
@@ -416,6 +419,14 @@
           style="display:flex;gap:8px"
         >
           <el-button
+            v-if="!['5','9'].includes(detail.current_status as string) && formChanged"
+            size="small"
+            type="default"
+            @click="saveDetail(detail)"
+          >
+            保存
+          </el-button>
+          <el-button
             v-if="detail.current_status==='1'"
             size="small"
             type="primary"
@@ -424,7 +435,7 @@
             分派
           </el-button>
           <el-button
-            v-if="detail.current_status==='2'"
+            v-if="['2','4','6','7'].includes(detail.current_status as string)"
             size="small"
             type="success"
             @click="doTransition(detail,'5')"
@@ -438,6 +449,14 @@
             @click="doTransition(detail,'2')"
           >
             重新打开
+          </el-button>
+          <el-button
+            v-if="detail.current_status==='5'"
+            size="small"
+            type="success"
+            @click="doTransition(detail,'3')"
+          >
+            回访确认关单
           </el-button>
           <el-button
             v-if="['1','2','4','5'].includes(detail.current_status as string)"
@@ -914,7 +933,7 @@ import {useListPage} from '@/composables/useListPage'
 import {useDetailDrawer} from '@/composables/useDetailDrawer'
 import {useUserNames} from '@/composables/useUserNames'
 import {useCustomerCards} from '@/composables/useCustomerCards'
-import {fetchMaintenanceDaily, transitionMaintenanceDaily, fetchRV, createRV, updateRV, fetchDispatch, createDispatch, updateDispatch, fetchDispatchResolve} from '@/api/itsm'
+import {fetchMaintenanceDaily, transitionMaintenanceDaily, updateMaintenanceDaily, fetchRV, createRV, updateRV, fetchDispatch, createDispatch, updateDispatch, fetchDispatchResolve} from '@/api/itsm'
 import type {MntRecord} from '@/api/itsm'
 import {useDict} from '@/composables/useDict'
 import {fetchNotifications} from '@/api/notification'
@@ -929,6 +948,19 @@ import DispatchNotifyEditor from './DispatchNotifyEditor.vue'
 const route=useRoute()
 const{items,loading,page,perPage,total,onSearch}=useListPage<MntRecord>(fetchMaintenanceDaily)
 const{detail,open}=useDetailDrawer<MntRecord>()
+const formChanged = ref(false)
+watch(detail, () => { formChanged.value = false }, { deep: true })
+async function saveDetail(row: MntRecord) {
+  try {
+    await updateMaintenanceDaily(row.maintenance_id as string, {
+      store_id: row.store_id, fault_type: row.fault_type,
+      short_description: row.short_description, detail_description: row.detail_description,
+      fault_desc: row.fault_desc, updator: authStore.userCode,
+    })
+    ElMessage.success('保存成功')
+    formChanged.value = false
+  } catch { ElMessage.error('保存失败') }
+}
 const{userName}=useUserNames();const{custCard}=useCustomerCards()
 const{dictLabel:yzLabel}=useDict('YZ');const{dictLabel:jjLabel}=useDict('JJ');const{dictLabel:gzLabel}=useDict('GZ');const{dictLabel:mtLabel}=useDict('MT');const{dictLabel:yxLabel}=useDict('YX');const{dictLabel:gdLabel}=useDict('GD');const{dictLabel:ftLabel}=useDict('FT')
 const activeTab=ref('customer')
@@ -1171,7 +1203,10 @@ async function doTransition(row:MntRecord,toStatus:string){
     await transitionMaintenanceDaily(row.maintenance_id as string,{to_status:toStatus})
     ElMessage.success('流转成功')
     onSearch({})
-  }catch{ElMessage.error('流转失败')}
+  }catch(e:any){
+    const msg = e?.response?.data?.message || e?.message || '流转失败'
+    ElMessage.error(typeof msg === 'string' ? msg : '流转失败')
+  }
 }
 </script>
 <style scoped>

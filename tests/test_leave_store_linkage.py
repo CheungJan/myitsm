@@ -323,3 +323,85 @@ class TestCompleteMaintenanceLinkageP01:
             # is_success 应按 d2d_result='5' 派生
             assert daily.is_success is not None, "P0-1: 完成维修应派生 is_success"
             assert daily.current_status == "5"
+
+
+class TestRevisitCloseNoLinkage:
+    """方案 B：5→3 回访确认关单不触发联动（联动已在 2→5 完成）。"""
+
+    def test_transition_3_no_l4(self, app: Flask) -> None:
+        """5→3 回访确认关单 → 不触发 L4（whcd 已在 2→5 时清空，保持 None）。"""
+        with app.app_context():
+            _seed_customer()
+            _seed_item("IT0001")
+            new_eid = _seed_eid("EIDNEW0001")
+            new_eid.whcd = "W1"
+            new_eid.sflg = "1"
+            daily = _seed_daily()
+            _seed_accessories(daily.maintenance_id, new_eid="EIDNEW0001")
+            db.session.commit()
+
+            # 完成维修 2→5（触发 L4，whcd 清空）
+            MaintenanceDailyService().transition(daily.maintenance_id, "5", "T00001")
+            db.session.refresh(new_eid)
+            assert new_eid.whcd is None, "前置：完成维修应清空 whcd"
+
+            # 回访确认关单 5→3（不触发联动，whcd 保持 None）
+            MaintenanceDailyService().transition(daily.maintenance_id, "3", "T00001")
+            db.session.refresh(daily)
+            db.session.refresh(new_eid)
+            assert daily.current_status == "3", "5→3 后 current_status=3"
+            assert new_eid.whcd is None, "5→3 不触发 L4，whcd 保持 None"
+
+    def test_transition_3_no_l1(self, app: Flask) -> None:
+        """5→3 回访确认关单 → 不触发 L1（无新增 EidTrack）。"""
+        with app.app_context():
+            _seed_customer()
+            _seed_item("IT0001")
+            _seed_eid("EIDOLD0001")
+            _seed_eid("EIDNEW0001")
+            daily = _seed_daily()
+            _seed_accessories(daily.maintenance_id)
+            db.session.commit()
+
+            # 完成维修 2→5（触发 L1）
+            MaintenanceDailyService().transition(daily.maintenance_id, "5", "T00001")
+            tracks_after_5 = (
+                db.session.query(EidTrack)
+                .filter(EidTrack.eid == "EIDOLD0001", EidTrack.type == "A")
+                .count()
+            )
+            assert tracks_after_5 >= 1, "前置：完成维修应写 EidTrack"
+
+            # 回访确认关单 5→3（不触发 L1，EidTrack 数量不变）
+            MaintenanceDailyService().transition(daily.maintenance_id, "3", "T00001")
+            tracks_after_3 = (
+                db.session.query(EidTrack)
+                .filter(EidTrack.eid == "EIDOLD0001", EidTrack.type == "A")
+                .count()
+            )
+            assert tracks_after_3 == tracks_after_5, "5→3 不触发 L1，EidTrack 数量不变"
+
+    def test_transition_3_changes_status_only(self, app: Flask) -> None:
+        """5→3 回访确认关单 → 只改状态，is_success 不变。"""
+        with app.app_context():
+            _seed_customer()
+            _seed_item("IT0001")
+            daily = _seed_daily()
+            db.session.commit()
+            _seed_arrive(daily.maintenance_id)
+            D2DService.leave_store(
+                daily.maintenance_id,
+                {"d2d_result": "5", "d2d_phenomenon": "故障", "d2d_handling": "维修"},
+                "T00001",
+            )
+
+            # 完成维修 2→5
+            MaintenanceDailyService().transition(daily.maintenance_id, "5", "T00001")
+            db.session.refresh(daily)
+            is_success_after_5 = daily.is_success
+
+            # 回访确认关单 5→3
+            MaintenanceDailyService().transition(daily.maintenance_id, "3", "T00001")
+            db.session.refresh(daily)
+            assert daily.current_status == "3"
+            assert daily.is_success == is_success_after_5, "5→3 不改 is_success"

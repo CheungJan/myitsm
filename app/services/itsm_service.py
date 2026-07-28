@@ -580,7 +580,8 @@ class MaintenanceDailyService(_BaseMaintenanceService):
             pk_field="maintenance_id",
         )
         if result.get("success"):
-            # 关单完成（to_status=5）：自动创建服务返还入库草稿（IV=3）
+            # 完成维修（to_status=5 已解决）：触发 L1-L11 联动（配件/资产落地）
+            # 回访确认关单（to_status=3 已关闭）：只改状态，不触发联动（联动已在 5 时完成）
             if to_status == CLOSE_STATUS:
                 # P0-1: 完成维修时读 TIT23 最新 d2d_result 派生 is_success
                 # 离店不改状态，完成维修才是唯一触发器
@@ -594,6 +595,7 @@ class MaintenanceDailyService(_BaseMaintenanceService):
                 # 1b 阶段关单联动 L4/L5
                 self._clear_new_part_whcd_on_close(record, operator)
                 self._scrap_old_part_on_close(record, operator)
+            # to_status=3（回访确认关单）：只改状态，不触发联动
             db.session.commit()
         return result
 
