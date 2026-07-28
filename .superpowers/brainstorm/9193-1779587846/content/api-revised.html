@@ -1,0 +1,92 @@
+<h2>API 设计（修订版）：统一端点</h2>
+<p class="subtitle">只新增两个端点，覆盖拆单+并单所有场景</p>
+
+<div class="section">
+  <h3>端点清单</h3>
+  <table style="width:100%; border-collapse:collapse; font-size:13px;">
+    <tr style="background:#f5f5f5;">
+      <th style="padding:8px;text-align:left;">方法</th>
+      <th style="padding:8px;text-align:left;">路径</th>
+      <th style="padding:8px;text-align:left;">用途</th>
+      <th style="padding:8px;text-align:left;">优先级</th>
+    </tr>
+    <tr>
+      <td style="padding:8px;">POST</td>
+      <td style="padding:8px;"><code>/orders/batch</code></td>
+      <td style="padding:8px;">批量创建订单（拆单+并单统一入口）</td>
+      <td style="padding:8px;"><span style="background:#ffcdd2;padding:2px 6px;border-radius:3px;">P1</span></td>
+    </tr>
+    <tr>
+      <td style="padding:8px;">POST</td>
+      <td style="padding:8px;"><code>/orders/batch/validate</code></td>
+      <td style="padding:8px;">预校验（quantity balance check）</td>
+      <td style="padding:8px;"><span style="background:#ffcdd2;padding:2px 6px;border-radius:3px;">P1</span></td>
+    </tr>
+    <tr>
+      <td style="padding:8px;">POST</td>
+      <td style="padding:8px;"><code>/requisitions/merge-preview</code></td>
+      <td style="padding:8px;">并单预览（按 itemcd 智能分组+推荐供应商）</td>
+      <td style="padding:8px;"><span style="background:#fff9c4;padding:2px 6px;border-radius:3px;">P2</span></td>
+    </tr>
+  </table>
+</div>
+
+<div class="section">
+  <h3>核心端点：POST /orders/batch</h3>
+  <div class="mockup">
+    <div class="mockup-header">Request — 同一结构同时支持拆单和并单</div>
+    <div class="mockup-body">
+<pre style="font-size:12px;line-height:1.6;background:#263238;color:#aed581;padding:12px;border-radius:6px;">{
+  "orders": [
+    {
+      "suppliercd": "SUP001",
+      "memo": "拆单-供应商A",
+      "details": [
+        {                     <span style="color:#90a4ae;">// 拆单：同一个ref</span>
+          "ref_pcplanid": "PP000180", "ref_pclineno": 1,
+          "itemcd": "MB5000", "rgsqty": 60, "unitprice": 100
+        }
+      ]
+    },
+    {
+      "suppliercd": "SUP002",
+      "memo": "拆单-供应商B",
+      "details": [
+        {                     <span style="color:#90a4ae;">// 还是同一个ref → 自动拆</span>
+          "ref_pcplanid": "PP000180", "ref_pclineno": 1,
+          "itemcd": "MB5000", "rgsqty": 40, "unitprice": 105
+        }
+      ]
+    },
+    {
+      "suppliercd": "SUP003",
+      "memo": "并单-合并三个部门的需求",
+      "details": [
+        {                     <span style="color:#90a4ae;">// 并单：不同ref → 自动并</span>
+          "ref_pcplanid": "PP000181", "ref_pclineno": 1,
+          "itemcd": "MB5000", "rgsqty": 50
+        },
+        {
+          "ref_pcplanid": "PP000182", "ref_pclineno": 1,
+          "itemcd": "MB5000", "rgsqty": 30
+        }
+      ]
+    }
+  ]
+}</pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>后端校验逻辑（单次数据库事务）</h3>
+  <div style="background:#f5f5f5;padding:16px;border-radius:8px;font-size:13px;line-height:2;">
+    <strong>1. 结构校验</strong> → orders 数组非空，每项有 suppliercd + details<br>
+    <strong>2. 聚合校验</strong> → 按 (pcplanid, pclineno) 汇总所有 detail 的 rgsqty<br>
+    <strong>3. 余额校验</strong> → 汇总 qty ≤ get_available_qty()<br>
+    <strong>4. UK 冲突检查</strong> → 查询 TPC20 是否已有相同关联<br>
+    <strong>5. 事务写入</strong> → FOR UPDATE 锁定需求行 → 写 tpc12/tpc13 → 写 TPC20 → COMMIT<br>
+    <br>
+    <span style="color:#e65100;">⚠️ 关键：步骤 4-5 之间用 SELECT ... FOR UPDATE 防止并发超量</span>
+  </div>
+</div>

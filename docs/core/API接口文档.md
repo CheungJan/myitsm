@@ -1,8 +1,8 @@
 # API 接口文档
 
-**版本**: v1.1  
+**版本**: v1.2  
 **基础路径**: `/api/v1`  
-**更新日期**: 2026-05-07
+**更新日期**: 2026-05-27（采购结算/退货14端点+路由重命名）
 
 ---
 
@@ -95,16 +95,83 @@ Authorization: Bearer <token>
 
 路由前缀：`/api/v1`
 
+#### 用户/部门/组/权限
+
 | 方法 | 路径 | 说明 | 查询参数 |
 |------|------|------|---------|
-| GET | `/users` | 用户列表 | `status` |
-| GET | `/users/<user_cd>` | 用户详情 | - |
+| GET | `/users` | 用户列表 | `status`,`user_cd`,`user_nm`,`dept_cd` |
+| GET/POST | `/users` / `/users/<cd>` | 用户CRUD | - |
 | GET | `/departments` | 部门列表 | - |
-| GET | `/groups` | 用户组列表 | - |
-| GET | `/users/<user_cd>/groups` | 用户所属用户组 | - |
+| GET/POST/PUT/DELETE | `/departments` / `/departments/<cd>` | 部门CRUD | - |
+| GET/POST/PUT/DELETE | `/groups` / `/groups/<cd>` | 用户组CRUD | - |
+| GET/POST | `/groups/<cd>/members` | 组成员管理 | - |
+| GET/PUT | `/groups/<cd>/rights` | 组权限管理 | - |
+| GET | `/users/<cd>/permissions` | 用户有效权限 | - |
 | GET | `/menus` | 菜单树 | - |
-| GET | `/sysparms` | 系统参数列表 | - |
-| GET | `/sysparms/<parm_cd>` | 指定系统参数 | - |
+| GET | `/menus/perm-tree` | 权限树(动态) | - |
+
+#### 物料分类 & 物料
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/itemclasses/tree` | 分类树(CTE递归) | - |
+| GET/POST | `/itemclasses` | 分类列表/新增 | - |
+| PUT/DELETE | `/itemclasses/<cd>` | 分类编辑/删除 | - |
+| GET | `/items` | 物料列表(分页) | `page`,`per_page`,`class_cd`,`recursive`,`search` |
+| POST/PUT/DELETE | `/items` / `/items/<cd>` | 物料CRUD | - |
+
+#### 客户分类 & 客户
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/custclasses/tree` | 分类树 | - |
+| GET/POST | `/custclasses` | 分类列表/新增 | - |
+| PUT/DELETE | `/custclasses/<cd>` | 分类编辑/删除 | - |
+| GET | `/customers` | 客户列表(分页) | `page`,`per_page`,`class_cd`,`search` |
+| POST/PUT/DELETE | `/customers` / `/customers/<cd>` | 客户CRUD | - |
+
+#### EID 设备管理
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/eid/tree` | 物料分类树(含EID数量) | - |
+| GET | `/eid` | EID列表(分页) | `page`,`per_page`,`class_cd`,`search` |
+| POST | `/eid` | 新增EID | - |
+| PUT/DELETE | `/eid/<itemcd>/<eid>` | 编辑/删除EID | - |
+| GET | `/eid/<itemcd>/<eid>/tracks` | 变更历史(含自动纠正) | - |
+
+#### 资产台账
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/assets` | 资产台账列表(分页) | `page`,`per_page`,`class_cd`,`search`,`asset_type`,`asset_owner`,`useflg`,`location`,`whcd`,`sflg`,`cust_cd`,`item_class` |
+| GET | `/assets/bom` | BOM配件明细(含门店退回状态) | `eid` |
+| PUT | `/assets/<id>` | 更新资产属性 | - |
+
+> **`plan_refid` 取值逻辑**（EID列表）：优先查 `tit15_maintenance_renovate.new_device_id` → 其次查 C 记录（`change_date >= gendate`）。详见表 `tit15_maintenance_renovate`。  
+> **BOM 配件归属**：通过 `tmm44_pos_r_eid` → 父设备 `CustPosRl` 链路解析客户，按页批量后解析。  
+> **`location` 筛选**：`customer` 含直接分配+BOM配件(父设备有客户)；`warehouse` 仅无客户且非BOM配件。
+
+#### 码表查询
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/syscodes` | 按类型查编码 | `code_typ`(BT/YB/ZF/ES/QS/PS/SS/CS/SRC等) |
+| GET | `/areas` | 区域列表 | - |
+| GET | `/syscodes?code_typ=CM` | 通讯方式列表（已迁移至系统字典） | `code_typ=CM` |
+| GET | `/countries` | 国家列表 | - |
+| GET | `/provinces` | 省份列表 | - |
+| GET | `/cities` | 城市列表 | `prvn_cd` |
+| GET | `/towns` | 区县列表 | `city_cd` |
+| GET | `/warehouses` | 仓库列表 | - |
+
+#### 系统参数
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/sysparms` | 系统参数列表 |
+| GET | `/sysparms/<parm_cd>` | 指定系统参数 |
+| PUT | `/sysparms/<parm_cd>` | 更新系统参数 |
 
 ---
 
@@ -140,7 +207,7 @@ Authorization: Bearer <token>
 | POST | `/maintenance-renovate` | 创建 | Body: `MaintenanceRenovateCreate` |
 | POST | `/maintenance-renovate/<renew_id>/transition` | 状态流转 | Body: `StatusTransition` |
 
-#### 设备变更 (BG)
+#### 磁卡号变更 (BG)
 
 | 方法 | 路径 | 说明 | 查询/请求参数 |
 |------|------|------|-------------|
@@ -149,7 +216,7 @@ Authorization: Bearer <token>
 | POST | `/device-change` | 创建 | Body: `DeviceChangeCreate` |
 | POST | `/device-change/<change_id>/transition` | 状态流转 | Body: `StatusTransition` |
 
-> `change_type` 枚举：CK=改磁卡号, BQ=信息变更, BG=设备变更。CK 类型流转完成后自动保存磁卡号历史到 `TMM22_CUSTOMERS_HISTORY`。
+> `change_type` 枚举：CK=改磁卡号, BQ=信息变更, BG=磁卡号+设备变更。CK 类型流转完成后自动保存磁卡号历史到 `TMM22_CUSTOMERS_HISTORY`。
 
 #### 门店关闭 (GB)
 
@@ -244,37 +311,77 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 |------|------|------|---------|
 | GET | `/stock` | 库存明细列表/指定物品余额 | `whcd`, `itemcd`, `page`, `per_page` |
 
+#### 资产盘点 ✅ 新增（2026-05-08）
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/asset-check` | 盘点单列表 | `page`, `per_page` |
+| GET | `/asset-check/<opbillid>` | 盘点单详情（含明细） | - |
+| POST | `/asset-check` | 创建盘点单（含明细） | Body + `details[]` |
+| PUT | `/asset-check/<opbillid>` | 更新盘点单 | Body |
+| POST | `/asset-check/<opbillid>/audit` | 审核盘点单 | - |
+
+#### POS设备变更 ✅ 新增（2026-05-08）
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/pos-change` | 变更记录列表 | `page`, `per_page` |
+| GET | `/pos-change/<pk>` | 变更记录详情（含明细） | - |
+| POST | `/pos-change` | 创建设备变更（含明细） | Body + `details[]` |
+| PUT | `/pos-change/<pk>` | 更新设备变更 | Body |
+
 ---
 
 ### 2.4 采购管理 `procurement`
 
 路由前缀：`/api/v1/procurement`
 
-#### 采购计划
+#### 采购需求
 
 | 方法 | 路径 | 说明 | 查询参数 |
 |------|------|------|---------|
-| GET | `/plans` | 采购计划列表 | `auditflg`, `pctyp`, `page`, `per_page` |
-| GET | `/plans/<pcplanid>` | 采购计划详情 | - |
-| POST | `/plans` | 创建采购计划（含明细） | Body + `details[]` |
-| POST | `/plans/<pcplanid>/audit` | 审核采购计划 | - |
+| GET | `/requisitions` | 需求列表 | `auditflg`, `pctyp`, `execution_status`, `page`, `per_page`, `exclude_completed`, `hide_unavailable` |
+| GET | `/requisitions/<pcplanid>` | 需求详情（含执行跟踪） | - |
+| POST | `/requisitions` | 创建需求（含明细） | Body + `details[]` |
+| PUT | `/requisitions/<pcplanid>` | 编辑需求 | Body |
+| POST | `/requisitions/<pcplanid>/audit` | 审核需求 | Body: `auditflg`, `checkmemo`, `details[]` |
+| POST | `/requisitions/<pcplanid>/void` | 作废需求 | Body: `reason` |
 
-#### 采购登记
-
-| 方法 | 路径 | 说明 | 查询参数 |
-|------|------|------|---------|
-| GET | `/registers` | 采购登记列表 | `suppliercd`, `auditflg`, `page`, `per_page` |
-| GET | `/registers/<rgstbillid>` | 采购登记详情 | - |
-| POST | `/registers` | 创建采购登记（含明细） | Body + `details[]` |
-| POST | `/registers/<rgstbillid>/audit` | 审核采购登记 | - |
-
-#### 采购单据
+#### 采购订单
 
 | 方法 | 路径 | 说明 | 查询参数 |
 |------|------|------|---------|
-| GET | `/bills` | 采购单据列表 | `whcd`, `page`, `per_page` |
-| GET | `/bills/<pcbillid>` | 采购单据详情 | - |
-| POST | `/bills` | 创建采购单据 | Body: `PurchaseBillCreate` |
+| GET | `/orders` | 订单列表 | `suppliercd`, `auditflg`, `execution_status`, `page`, `per_page` |
+| GET | `/orders/<rgstbillid>` | 订单详情 | - |
+| POST | `/orders` | 创建订单（含明细） | Body + `details[]` |
+| POST | `/orders/batch` | 批量创建订单 | Body: `orders[]` |
+| POST | `/orders/batch/validate` | 批量预校验 | Body: `orders[]` |
+| POST | `/orders/<rgstbillid>/audit` | 审核订单 | - |
+| GET | `/available-items` | 可采购商品查询 | `suppliercd` |
+
+#### 采购结算单
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/settlements` | 结算单列表 | `suppliercd`, `auditflg`, `pay_type`, `page`, `per_page` |
+| GET | `/settlements/<pcbillid>` | 结算单详情（含明细） | - |
+| POST | `/settlements` | 创建结算单（含明细） | Body: `PurchaseBillCreate` |
+| PUT | `/settlements/<pcbillid>` | 编辑结算单 | Body: `PurchaseBillUpdate` |
+| POST | `/settlements/<pcbillid>/audit` | 审核结算单 | Body: `auditflg` |
+| POST | `/settlements/<pcbillid>/void` | 作废结算单 | - |
+| GET | `/orders/<rgstbillid>/settleable-items` | 查询订单可结算行 | - |
+
+#### 采购退货
+
+| 方法 | 路径 | 说明 | 查询参数 |
+|------|------|------|---------|
+| GET | `/returns` | 退货列表 | `suppliercd`, `auditflg`, `page`, `per_page` |
+| GET | `/returns/<pcbillid>` | 退货详情（含明细） | - |
+| POST | `/returns` | 创建退货单（含明细） | Body: `ReturnPurchaseBillCreate` |
+| PUT | `/returns/<pcbillid>` | 编辑退货单 | Body: `ReturnPurchaseBillUpdate` |
+| POST | `/returns/<pcbillid>/audit` | 审核退货单 | Body: `auditflg` |
+| POST | `/returns/<pcbillid>/void` | 作废退货单 | - |
+| GET | `/orders/<rgstbillid>/returnable-items` | 查询订单可退货行 | - |
 
 #### 供应商评价
 
@@ -592,6 +699,9 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | GET | `/work-orders/<wo_id>` | 工单详情（含工序） | - |
 | POST | `/work-orders` | 创建工单 | Body: `WorkOrderCreate` |
 | PUT | `/work-orders/<wo_id>` | 更新工单 | Body: `WorkOrderUpdate` |
+| POST | `/work-orders/<wo_id>/transition` | 状态流转 | Body: `{"target": "RELEASED\|PICKING\|..."}` |
+
+> **注意**：`target="RELEASED"` 时系统自动生成 OV=8 生产领料出库草稿，并直接跳至 `PICKING`。API 返回 `status="PICKING"` 而非 `RELEASED`。
 
 #### 工序定义
 
@@ -661,10 +771,10 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 |------|------|--------|------|
 | health | /api/v1 | 1 | 阶段1 |
 | auth | /api/v1 | 2 | 阶段1 |
-| system | /api/v1 | 8 | 阶段1 |
+| system | /api/v1 | 57 | 阶段1 |
 | itsm | /api/v1/itsm | 36 | 阶段2 |
-| warehouse | /api/v1/warehouse | 13 | 阶段3 |
-| procurement | /api/v1/procurement | 13 | 阶段3 |
+| warehouse | /api/v1/warehouse | 23 | 阶段3+7（资产盘点6+POS变更4） |
+| procurement | /api/v1/procurement | 43 | 阶段3+结算/退货14端点 |
 | sales | /api/v1/sales | 11 | 阶段3 |
 | sla | /api/v1/sla | 8 | 阶段3 |
 | attendance | /api/v1/attendance | 3 | 阶段4 |
@@ -677,9 +787,11 @@ NEW → ASSIGNED → IN_PROGRESS → COMPLETED → CLOSED
 | portal | /api/v1/portal | 9 | 阶段5 |
 | mes | /api/v1/mes | 10 | 阶段5 |
 | iot | /api/v1/iot | 10 | 阶段5 |
+| qc | /api/v1/qc | 2 | P0 补 |
+| bom | /api/v1/bom | 9 | F1 补（BOM CRUD） |
 | transactions | /api/v1/transactions | 4 | 阶段6 |
 | reports | /api/v1/reports | 8 | 阶段6 |
-| **合计** | | **195** | |
+| **合计** | | **216** | |
 
 ---
 

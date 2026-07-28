@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from app.extensions import db
 from app.models.inventory import InventoryLimit
@@ -357,3 +357,172 @@ class BOMReportRepository:
             for r in results
         ]
         return items, total
+
+
+class FaultAnalysisRepository:
+    """D2 故障分析报表查询（基于 v_fault_analysis 视图）。"""
+
+    # 过滤条件映射：参数名 -> (SQL 片段, 绑定参数名)
+    # 日期字段按时间列名区分：v_fault_analysis 用 request_time，TIT25 用 a.create_time
+    _FILTERS_VIEW = {
+        "start_date": "request_time >= :start_date",
+        "end_date": "request_time < :end_date",
+        "bill_type": "bill_type = :bill_type",
+        "fault_type_cd": "device_itemcd LIKE :fault_type_cd || '%'",
+    }
+    _FILTERS_TIT25 = {
+        "start_date": "a.create_time >= :start_date",
+        "end_date": "a.create_time < :end_date",
+        "fault_type_cd": "COALESCE(NULLIF(a.itemcd, ''), e_old.itemcd, e_new.itemcd) LIKE :fault_type_cd || '%'",
+    }
+
+    # 修复时长专用过滤：fault_type_cd 同时匹配整机 device_itemcd 或 TIT25 更换的配件 itemcd
+    _FILTERS_REPAIR = {
+        "start_date": "request_time >= :start_date",
+        "end_date": "request_time < :end_date",
+        "bill_type": "bill_type = :bill_type",
+        "fault_type_cd": (
+            "(device_itemcd LIKE :fault_type_cd || '%' "
+            "OR EXISTS ("
+            "SELECT 1 FROM tit25_accessories_update t25 "
+            "LEFT JOIN tmm43_eid e_old ON e_old.eid = t25.old_accessories_id AND e_old.useflg = '1' "
+            "LEFT JOIN tmm43_eid e_new ON e_new.eid = t25.new_accessories_id AND e_new.useflg = '1' "
+            "WHERE t25.maintenance_id = v_fault_analysis.maintenance_id "
+            "AND COALESCE(NULLIF(t25.itemcd, ''), e_old.itemcd, e_new.itemcd) LIKE :fault_type_cd || '%'))"
+        ),
+    }
+
+    @staticmethod
+    def _build_where(
+        params: dict[str, Any], filters: dict[str, str]
+    ) -> tuple[str, dict[str, Any]]:
+        """根据 params 与过滤映射构造 WHERE 子句与绑定参数。
+
+        :param params: 查询参数 dict
+        :param filters: {参数名: SQL 片段} 映射
+        :return: (where_sql, bind_dict)，where_sql 含前导 ' AND ' 或空串
+        """
+        conditions = [filters[k] for k in filters if params.get(k)]
+        where_sql = (" AND " + " AND ".join(conditions)) if conditions else ""
+        bind = {k: params[k] for k in filters if params.get(k)}
+        return where_sql, bind
+
+    @staticmethod
+    def model_fault_rate(params: dict[str, Any]) -> list[dict[str, Any]]:
+        """型号故障率：按整机物料编码统计故障次数（仅成品 typflg=1）。
+
+        聚合维度：device_itemcd + device_item_nm
+        指标：fault_count（故障次数）、distinct_device（不同设备数）
+        """
+        where, bind = FaultAnalysisRepository._build_where(
+            params, FaultAnalysisRepository._FILTERS_VIEW
+        )
+        sql = text(f"""
+            SELECT v.device_itemcd, v.device_item_nm,
+                   COUNT(*) AS fault_count,
+                   COUNT(DISTINCT v.device_id) AS distinct_device
+            FROM v_fault_analysis v
+            JOIN tmm12_items i ON i.item_cd = v.device_itemcd AND COALESCE(i.typflg, '0') = '1'
+            WHERE v.device_itemcd IS NOT NULL{where}
+            GROUP BY v.device_itemcd, v.device_item_nm
+            ORDER BY fault_count DESC
+        """)
+        rows = db.session.execute(sql, bind).all()
+        return [
+            {
+                "itemcd": r[0],
+                "item_nm": r[1],
+                "fault_count": int(r[2] or 0),
+                "distinct_device": int(r[3] or 0),
+            }
+            for r in rows
+        ]
+
+    @staticmethod
+    def accessory_frequency(params: dict[str, Any]) -> list[dict[str, Any]]:
+        """配件更换频次：按配件 itemcd 统计更换次数（仅配件更换，不含整机更换）。
+
+        数据源：TIT25_ACCESSORIES_UPDATE
+        更换类型判定（兼容 PB 历史 posflg 与新系统 c_type）：
+          - 整机更换：posflg='1' OR c_type='4'
+          - 配件更换：posflg='0' OR (c_type='1' AND posflg<>'1')
+          - 排除：c_type='2'/'3'/'5'（购买/非更换服务/耗材线材）
+        itemcd 取值优先级：
+          1. TIT25.itemcd（优化后新数据，B3 字段）
+          2. old_accessories_id/new_accessories_id JOIN TMM43_EID 反查（历史数据）
+        聚合维度：itemcd + tmm12_items.item_nm
+        """
+        where, bind = FaultAnalysisRepository._build_where(
+            params, FaultAnalysisRepository._FILTERS_TIT25
+        )
+        sql = text(f"""
+            WITH t25 AS (
+                SELECT a.id, a.maintenance_id, a.create_time,
+                       COALESCE(
+                           NULLIF(a.itemcd, ''),
+                           e_old.itemcd,
+                           e_new.itemcd
+                       ) AS itemcd
+                FROM tit25_accessories_update a
+                LEFT JOIN tmm43_eid e_old ON e_old.eid = a.old_accessories_id AND e_old.useflg = '1'
+                LEFT JOIN tmm43_eid e_new ON e_new.eid = a.new_accessories_id AND e_new.useflg = '1'
+                WHERE (
+                    -- 配件更换：posflg='0' 或 (c_type='1' 且非整机更换)
+                    a.posflg = '0'
+                    OR (a.c_type = '1' AND COALESCE(a.posflg, '0') <> '1')
+                )
+                  AND COALESCE(a.c_type, '') NOT IN ('2', '3', '5'){where}
+            )
+            SELECT t.itemcd, i.item_nm,
+                   COUNT(*) AS replace_count,
+                   COUNT(DISTINCT t.maintenance_id) AS distinct_maintenance
+            FROM t25 t
+            LEFT JOIN tmm12_items i ON i.item_cd = t.itemcd
+            WHERE t.itemcd IS NOT NULL AND t.itemcd <> ''
+              AND COALESCE(i.typflg, '0') <> '1'
+            GROUP BY t.itemcd, i.item_nm
+            ORDER BY replace_count DESC
+        """)
+        rows = db.session.execute(sql, bind).all()
+        return [
+            {
+                "itemcd": r[0],
+                "item_nm": r[1],
+                "replace_count": int(r[2] or 0),
+                "distinct_maintenance": int(r[3] or 0),
+            }
+            for r in rows
+        ]
+
+    @staticmethod
+    def repair_duration(params: dict[str, Any]) -> list[dict[str, Any]]:
+        """修复时长分析：按单据类型统计平均/中位/最大修复时长（分钟）。
+
+        聚合维度：bill_type
+        指标：avg_minutes / median_minutes / max_minutes / count
+        """
+        where, bind = FaultAnalysisRepository._build_where(
+            params, FaultAnalysisRepository._FILTERS_REPAIR
+        )
+        sql = text(f"""
+            SELECT bill_type,
+                   AVG(repair_minutes) AS avg_minutes,
+                   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY repair_minutes) AS median_minutes,
+                   MAX(repair_minutes) AS max_minutes,
+                   COUNT(repair_minutes) AS count
+            FROM v_fault_analysis
+            WHERE repair_minutes IS NOT NULL{where}
+            GROUP BY bill_type
+            ORDER BY bill_type
+        """)
+        rows = db.session.execute(sql, bind).all()
+        return [
+            {
+                "bill_type": r[0],
+                "avg_minutes": round(float(r[1] or 0), 2),
+                "median_minutes": round(float(r[2] or 0), 2),
+                "max_minutes": round(float(r[3] or 0), 2),
+                "count": int(r[4] or 0),
+            }
+            for r in rows
+        ]

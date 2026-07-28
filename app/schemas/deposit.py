@@ -46,6 +46,7 @@ class DepositPosModelCreate(BaseModel):
     model_nm: str | None = Field(None, max_length=20, description="型号名称")
     rent_money: Decimal | None = Field(None, description="租金")
     sale_money: Decimal | None = Field(None, description="售价")
+    item_cd: str | None = Field(None, max_length=20, description="关联成品物料编码")
 
 
 class DepositPosModelUpdate(BaseModel):
@@ -54,3 +55,12 @@ class DepositPosModelUpdate(BaseModel):
     model_nm: str | None = Field(None, max_length=20, description="型号名称")
     rent_money: Decimal | None = Field(None, description="租金")
     sale_money: Decimal | None = Field(None, description="售价")
+    item_cd: str | None = Field(None, max_length=20, description="关联成品物料编码")
+
+
+class DepositIOQuery(BaseModel):
+    """押金出入流水查询参数。"""
+
+    custcd: str | None = Field(None, max_length=10, description="客户编码")
+    page: int = Field(1, ge=1)
+    per_page: int = Field(20, ge=1, le=100)

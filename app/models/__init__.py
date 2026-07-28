@@ -34,7 +34,9 @@ from app.models.inventory import (
     InventoryDetailDt,
     InventoryLimit,
     InventoryLimitHistory,
+    Label,
     Price,
+    SupplierPrice,
 )
 from app.models.iot import (
     AlertLog,
@@ -52,7 +54,6 @@ from app.models.itsm import (
     EquipmentRenovate,
     FreeReplace,
     FreeReplaceDt,
-    ItsmSysCode,
     LiabilityReg,
     LiabilityRegDt,
     Maintenance,
@@ -71,6 +72,7 @@ from app.models.itsm import (
     OnChooseDt,
     PayList,
     PosDetail,
+    PosStatus,
     RecycleTask,
     RecycleTaskDtl,
     RepairInfo,
@@ -83,7 +85,6 @@ from app.models.master import (
     AssetAttribList,
     Bom,
     BomDt,
-    ComMode,
     Company,
     CustClass,
     CustItems,
@@ -117,6 +118,7 @@ from app.models.portal import (
 )
 from app.models.procurement import (
     PurchaseBill,
+    PurchaseBillDt,
     PurchaseCheckInDt,
     PurchasePlan,
     PurchasePlanDt,
@@ -130,6 +132,7 @@ from app.models.procurement import (
 )
 from app.models.sales import (
     PlanCust,
+    PlanServe,
     SalesBill,
     SalesExtend,
     SalesExtendDt,
@@ -189,7 +192,6 @@ __all__ = [
     # 主数据
     "Company",
     "Area",
-    "ComMode",
     "CustClass",
     "Customer",
     "CustomerHistory",
@@ -211,7 +213,6 @@ __all__ = [
     "TimepointArea",
     "LiabilityReg",
     "LiabilityRegDt",
-    "ItsmSysCode",
     "ArchiveCode",
     "RepairInfo",
     "UserArea",
@@ -228,7 +229,7 @@ __all__ = [
     # ITSM 旧机翻新
     "MaintenanceRenovate",
     "EquipmentRenovate",
-    # ITSM 设备变更
+    # ITSM 磁卡号变更
     "DeviceChange",
     # ITSM 日常保养
     "Maintenance",
@@ -283,6 +284,7 @@ __all__ = [
     "PurchaseRegister",
     "PurchaseRegisterDt",
     "PurchaseBill",
+    "PurchaseBillDt",
     "ReturnPurchaseBill",
     "ReturnPurchaseBillDt",
     "SupplierAppraisal",
@@ -290,6 +292,7 @@ __all__ = [
     "PurchaseCheckInDt",
     # 销售管理
     "PlanCust",
+    "PlanServe",
     "SalesBill",
     "SalesExtend",
     "SalesExtendDt",
@@ -303,6 +306,7 @@ __all__ = [
     "InventoryLimit",
     "InventoryLimitHistory",
     "Price",
+    "SupplierPrice",
     "AdjustPrice",
     "InventoryDetail",
     "InventoryDetailDt",

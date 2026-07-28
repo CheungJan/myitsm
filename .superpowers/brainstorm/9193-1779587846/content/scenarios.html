@@ -1,0 +1,66 @@
+<h2>采购订单拆分与合并 — 两大业务场景</h2>
+<p class="subtitle">文档覆盖了拆单（P1）和并单（P2）两个功能，我们先确认优先级和范围</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">场景A：拆单 (P1 高优先级)</div>
+    <div class="mockup-body" style="font-size:14px; line-height:1.8;">
+      <strong>需求单 PP000180</strong><br>
+      └── 电源 MB5000 × 100个<br><br>
+      <span style="background:#e8f5e9;padding:2px 8px;border-radius:4px;">拆分为 ↓</span><br><br>
+      ├── <strong>PO001</strong>：60个 → 供应商A<br>
+      │   (单价低，交期长)<br>
+      └── <strong>PO002</strong>：40个 → 供应商B<br>
+          (单价高，现货)<br><br>
+      <hr>
+      <small>同一需求行 → 2个订单<br>
+      TPC20 关联 2 条记录</small>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">场景B：并单 (P2 中优先级)</div>
+    <div class="mockup-body" style="font-size:14px; line-height:1.8;">
+      <strong>多个需求单</strong><br>
+      ├── PP000180：电源 × 50 (部门A)<br>
+      ├── PP000181：电源 × 30 (部门B)<br>
+      └── PP000183：电源 × 20 (部门D)<br><br>
+      <span style="background:#fff3e0;padding:2px 8px;border-radius:4px;">合并为 ↓</span><br><br>
+      └── <strong>PO001</strong>：电源 × 100 → 供应商甲<br><br>
+      <hr>
+      <small>3个需求行 → 1个订单<br>
+      TPC20 关联 3 条记录</small>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>文档已有的东西</h3>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px;">
+    <div style="background:#f5f5f5;padding:12px;border-radius:8px;">
+      <strong>数据模型</strong><br>
+      TPC20 关联表（已存在）<br>
+      UK: (pcplanid, pclineno, rgstbillid, rgstlineno)<br>
+      现有结构已支持，无需变更
+    </div>
+    <div style="background:#f5f5f5;padding:12px;border-radius:8px;">
+      <strong>API 设计</strong><br>
+      POST /orders/batch (拆单)<br>
+      POST /orders/batch/validate (校验)<br>
+      POST /requisitions/merge-preview (并单预览)<br>
+      POST /orders/merge-create (并单执行)
+    </div>
+    <div style="background:#f5f5f5;padding:12px;border-radius:8px;">
+      <strong>前端设计</strong><br>
+      PurchaseRegisterList.vue 拆单 UI<br>
+      PurchasePlanList.vue 并单 UI<br>
+      拆分组件 + 合并预览弹窗
+    </div>
+    <div style="background:#f5f5f5;padding:12px;border-radius:8px;">
+      <strong>实施计划</strong><br>
+      Phase 1：拆单 3天<br>
+      Phase 2：并单 2天<br>
+      Phase 3：联调测试 2天
+    </div>
+  </div>
+</div>

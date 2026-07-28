@@ -13,6 +13,8 @@
 
 from __future__ import annotations
 
+from sqlalchemy import Index, UniqueConstraint, ForeignKeyConstraint
+
 from app.extensions import db
 from app.models.base import BaseModel
 
@@ -28,7 +30,7 @@ class PurchasePlan(BaseModel):
 
     pcplanid = db.Column(db.String(8), primary_key=True, comment="采购计划号")
     slbillid = db.Column(db.String(8), comment="关联销售单号")
-    pctyp = db.Column(db.String(1), comment="采购类型")
+    pctyp = db.Column(db.String(2), comment="采购类型")
     ptimes = db.Column(db.Integer, comment="打印次数")
     opercd = db.Column(db.String(6), comment="操作员")
     memo = db.Column(db.String(255), comment="备注")
@@ -57,13 +59,19 @@ class PurchasePlanDt(BaseModel):
         comment="采购计划号",
     )
     lineno = db.Column(db.Integer, nullable=False, comment="行号")
-    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    itemcd = db.Column(
+        db.String(6),
+        db.ForeignKey("tmm12_items.item_cd", name="fk_pcplandt_item", onupdate="CASCADE"),
+        nullable=False,
+        comment="物料编码",
+    )
     rgstqty = db.Column(db.Integer, default=0, comment="登记数量")
     units = db.Column(db.String(4), comment="单位")
     storeqty = db.Column(db.Integer, default=0, comment="库存数量")
     lowlimit = db.Column(db.Integer, default=0, comment="库存下限")
     upperlimit = db.Column(db.Integer, default=0, comment="库存上限")
     auditqty = db.Column(db.Integer, default=0, comment="审批数量")
+    item_usage = db.Column(db.String(20), default="sale", comment="用途标记: sale=销售备货, maintenance=维护消耗品, internal=内部使用")
 
     plan = db.relationship("PurchasePlan", back_populates="details")
 
@@ -82,7 +90,7 @@ class PurchasePlanStatus(BaseModel):
     gendate = db.Column(db.DateTime, comment="创建日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     upddate = db.Column(db.DateTime, comment="更新日期")
-    refbillid = db.Column(db.String(8), comment="关联单号")
+    refbillid = db.Column(db.String(30), comment="关联单号")
 
 
 # ---------------------------------------------------------------------------
@@ -121,12 +129,17 @@ class PurchaseRegisterDt(BaseModel):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     rgstbillid = db.Column(
         db.String(8),
-        db.ForeignKey("tpc12_register.rgstbillid"),
+        db.ForeignKey("tpc12_register.rgstbillid", name="tpc13_registerdt_rgstbillid_fkey", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
         comment="登记单号",
     )
     lineno = db.Column(db.Integer, nullable=False, comment="行号")
-    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    itemcd = db.Column(
+        db.String(6),
+        db.ForeignKey("tmm12_items.item_cd", name="fk_registerdt_item", onupdate="CASCADE"),
+        nullable=False,
+        comment="物料编码",
+    )
     rgsqty = db.Column(db.Integer, default=0, comment="登记数量")
     memo = db.Column(db.String(255), comment="备注")
     units = db.Column(db.String(4), comment="单位")
@@ -134,6 +147,12 @@ class PurchaseRegisterDt(BaseModel):
     deliverdate = db.Column(db.DateTime, comment="交付日期")
     inqty = db.Column(db.Integer, default=0, comment="已入库数量")
     auditqty = db.Column(db.Integer, default=0, comment="审批数量")
+    ref_pcplanid = db.Column(db.String(20), comment="来源需求单号")
+    ref_pclineno = db.Column(db.Integer, comment="来源需求行号")
+
+    __table_args__ = (
+        UniqueConstraint("rgstbillid", "lineno", name="uq_tpc13_registerdt_bill_line"),
+    )
 
     register = db.relationship("PurchaseRegister", back_populates="details")
 
@@ -144,23 +163,76 @@ class PurchaseRegisterDt(BaseModel):
 
 
 class PurchaseBill(BaseModel):
-    """采购单据（TPC14_PCBILL）。"""
+    """采购结算单（TPC14_PCBILL）。"""
 
     __tablename__ = "tpc14_pcbill"
 
-    pcbillid = db.Column(db.String(8), primary_key=True, comment="采购单号")
+    pcbillid = db.Column(db.String(8), primary_key=True, comment="结算单号")
+    ref_rgstbillid = db.Column(db.String(8), comment="来源采购订单（月结置空）")
+    suppliercd = db.Column(db.String(8), comment="供应商编码")
     pctyp = db.Column(db.String(2), comment="采购类型")
-    custcd = db.Column(db.String(8), comment="客户编码")
-    refbillid = db.Column(db.String(8), comment="关联单号")
-    pcdate = db.Column(db.DateTime, comment="采购日期")
-    pcamt = db.Column(db.Numeric(16, 4), comment="采购金额")
-    whcd = db.Column(db.String(2), comment="入库仓库")
+    pay_type = db.Column(db.String(3), default="COD", comment="付款方式")
+    invoice_no = db.Column(db.String(50), comment="发票号码")
+    invoice_date = db.Column(db.Date, comment="发票日期")
+    pcdate = db.Column(db.DateTime, comment="结算日期")
+    total_settle_amt = db.Column(db.Numeric(16, 4), default=0, comment="结算总额")
+    whcd = db.Column(db.String(50), comment="入库仓库（多选逗号分隔）")
     invoiceflg = db.Column(db.String(1), comment="发票标志")
     ptimes = db.Column(db.Integer, comment="打印次数")
     opercd = db.Column(db.String(6), comment="操作员")
     memo = db.Column(db.String(255), comment="备注")
     gendate = db.Column(db.DateTime, comment="创建日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    auditflg = db.Column(db.String(1), default="0", comment="审核标志")
+    auditman = db.Column(db.String(6), comment="审核人")
+    auditdate = db.Column(db.DateTime, comment="审核日期")
+    settlement_period = db.Column(db.String(7), comment="月结周期(YYYY-MM)")
+    settle_stage = db.Column(db.String(10), default="final", comment="结算阶段(deposit=预付/final=尾款)")
+    installment_no = db.Column(db.Integer, comment="分期序号")
+    total_installments = db.Column(db.Integer, comment="分期总期数")
+    due_date = db.Column(db.Date, comment="付款到期日")
+    pay_type_override = db.Column(db.String(1), default="N", comment="是否强制覆盖付款方式一致性(Y/N)，说明追加至memo，操作人/时间复用opercd/gendate")
+
+    details = db.relationship("PurchaseBillDt", back_populates="bill", lazy="dynamic")
+
+
+class PurchaseBillDt(BaseModel):
+    """采购结算明细（TPC14_PCBILLDT）。"""
+
+    __tablename__ = "tpc14_pcbilldt"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    pcbillid = db.Column(
+        db.String(8),
+        db.ForeignKey("tpc14_pcbill.pcbillid", ondelete="CASCADE"),
+        nullable=False,
+        comment="结算单号",
+    )
+    lineno = db.Column(db.Integer, nullable=False, comment="行号")
+    ref_rgstbillid = db.Column(db.String(8), nullable=False, comment="来源采购订单号")
+    ref_rgstlineno = db.Column(db.Integer, nullable=False, comment="来源订单行号")
+    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    order_qty = db.Column(db.Numeric(12, 2), default=0, comment="订购数量(快照)")
+    received_qty = db.Column(db.Numeric(12, 2), default=0, comment="已入库数量(快照)")
+    already_settled = db.Column(db.Numeric(12, 2), default=0, comment="该行已结算累计(不含本次)")
+    settle_qty = db.Column(db.Numeric(12, 2), nullable=False, comment="本次结算数量")
+    settle_price = db.Column(db.Numeric(16, 4), nullable=False, comment="结算单价")
+    settle_amt = db.Column(db.Numeric(16, 4), nullable=False, comment="结算金额")
+
+    __table_args__ = (
+        UniqueConstraint("pcbillid", "lineno", name="tpc14_pcbilldt_pcbillid_lineno_key"),
+        Index("ix_tpc14_pcbilldt_pcbillid", "pcbillid"),
+        Index("ix_tpc14_pcbilldt_itemcd", "itemcd"),
+        Index("ix_tpc14_pcbilldt_ref_reg", "ref_rgstbillid", "ref_rgstlineno"),
+        ForeignKeyConstraint(
+            ["ref_rgstbillid", "ref_rgstlineno"],
+            ["tpc13_registerdt.rgstbillid", "tpc13_registerdt.lineno"],
+            name="fk_tpc14_pcbilldt_ref_registerdt",
+            ondelete="RESTRICT",
+        ),
+    )
+
+    bill = db.relationship("PurchaseBill", back_populates="details")
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +246,7 @@ class ReturnPurchaseBill(BaseModel):
     __tablename__ = "tpc16_rpcbill"
 
     pcbillid = db.Column(db.String(8), primary_key=True, comment="退货单号")
-    custcd = db.Column(db.String(8), comment="客户编码")
+    suppliercd = db.Column(db.String(8), comment="供应商编码")
     pcdate = db.Column(db.DateTime, comment="退货日期")
     pcamt = db.Column(db.Integer, comment="退货金额")
     whcd = db.Column(db.String(2), comment="仓库编码")
@@ -184,6 +256,11 @@ class ReturnPurchaseBill(BaseModel):
     memo = db.Column(db.String(255), comment="备注")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     gendate = db.Column(db.DateTime, comment="创建日期")
+    ref_rgstbillid = db.Column(db.String(8), comment="来源采购订单号")
+    return_reason = db.Column(db.String(20), comment="退货原因")
+    auditflg = db.Column(db.String(1), default="0", comment="审核标志")
+    auditman = db.Column(db.String(6), comment="审核人")
+    auditdate = db.Column(db.DateTime, comment="审核日期")
 
     details = db.relationship("ReturnPurchaseBillDt", back_populates="bill", lazy="dynamic")
 
@@ -206,8 +283,12 @@ class ReturnPurchaseBillDt(BaseModel):
     eid = db.Column(db.String(13), comment="设备EID")
     seid = db.Column(db.String(30), comment="序列号")
     rpcqty = db.Column(db.Integer, default=0, comment="退货数量")
+    return_price = db.Column(db.Numeric(16, 4), comment="退货单价")
+    return_amt = db.Column(db.Numeric(16, 4), comment="退货金额")
     invoiceqty = db.Column(db.Integer, default=0, comment="发票数量")
     units = db.Column(db.String(4), comment="单位")
+    ref_rgstlineno = db.Column(db.Integer, comment="来源订单行号")
+    line_reason = db.Column(db.String(100), comment="行级退货原因说明")
 
     bill = db.relationship("ReturnPurchaseBill", back_populates="details")
 
@@ -255,6 +336,43 @@ class SupplierAppraisalDt(BaseModel):
     appflg = db.Column(db.String(1), comment="评价标志")
 
     appraisal = db.relationship("SupplierAppraisal", back_populates="details")
+
+
+# ---------------------------------------------------------------------------
+# 采购需求与订单关联（TPC20_REQUISITION_ORDER_LINK）
+# ---------------------------------------------------------------------------
+
+
+class RequisitionOrderLink(BaseModel):
+    """采购需求与采购订单关联表（TPC20_REQUISITION_ORDER_LINK）。"""
+
+    __tablename__ = "tpc20_requisition_order_link"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    pcplanid = db.Column(db.String(20), nullable=False, comment="来源需求单号")
+    pclineno = db.Column(db.Integer, nullable=False, comment="来源需求行号")
+    rgstbillid = db.Column(
+        db.String(20),
+        db.ForeignKey("tpc12_register.rgstbillid", name="fk_tpc20_register", ondelete="CASCADE"),
+        nullable=False,
+        comment="采购订单号",
+    )
+    rgstlineno = db.Column(db.Integer, nullable=False, comment="订单行号")
+    linkqty = db.Column(db.Numeric(12, 2), default=0, comment="关联数量")
+    linkstatus = db.Column(
+        db.String(20), default="ordered",
+        comment="关联状态: ordered/partial_in/completed/cancelled"
+    )
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    opercd = db.Column(db.String(20), comment="操作员")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "pcplanid", "pclineno", "rgstbillid", "rgstlineno",
+            name="uk_link_unique"
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

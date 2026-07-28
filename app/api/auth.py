@@ -16,7 +16,23 @@ from app.schemas.auth import LoginRequest
 from app.services.auth_service import AuthService
 from app.utils.response import error_response, success_response
 
-__all__ = ["auth_bp", "login_required"]
+def auditor_required(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """审核权限装饰器 — 仅管理员和指定审批人可操作。"""
+
+    @wraps(fn)
+    @login_required
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        user_cd = g.get("current_user", "")
+        # 管理员或审批人列表（可通过 sysparam/数据库配置）
+        auditors = {"admin", "auditor", "system"}
+        if user_cd not in auditors:
+            return error_response(message="无审核权限，请联系管理员", code=403)
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+__all__ = ["auth_bp", "login_required", "auditor_required"]
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -63,9 +79,26 @@ def login():  # type: ignore[no-untyped-def]
 
     result = AuthService.login(user_id=req.user_id, password=req.password)
     if result is None:
+        # 区分用户不存在/已禁用和密码错误
+        reason = AuthService.check_user_active(req.user_id)
+        if reason:
+            return error_response(message=reason, code=401)
         return error_response(message="用户名或密码错误", code=401)
+    if isinstance(result, dict) and "error" in result:
+        return error_response(message=result["error"], code=403)
 
     return success_response(data=result, message="登录成功")
+
+
+@auth_bp.post("/logout")
+@login_required
+def logout():  # type: ignore[no-untyped-def]
+    """登出，写入日志以清除多点登录标记。"""
+    user_cd = getattr(g, "current_user", None) or ""
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header[7:].strip() if auth_header.startswith("Bearer ") else ""
+    AuthService.logout(user_cd, token)
+    return success_response(message="已登出")
 
 
 @auth_bp.get("/session")

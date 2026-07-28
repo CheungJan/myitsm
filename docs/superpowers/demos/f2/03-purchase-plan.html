@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>采购计划管理 — myITSM F2 Demo</title>
+<style>
+:root{--primary:#409eff;--success:#67c23a;--warning:#e6a23c;--danger:#f56c6c;--bg:#f5f7fa;--border:#e4e7ed;--sidebar-w:220px;--navbar-h:50px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Helvetica Neue",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:#303133}
+.layout{display:flex;height:100vh}
+.sidebar{width:var(--sidebar-w);background:#304156;color:#bfcbd9;flex-shrink:0;display:flex;flex-direction:column}
+.sidebar .logo{height:var(--navbar-h);display:flex;align-items:center;padding:0 20px;font-size:16px;font-weight:700;color:#fff;border-bottom:1px solid rgba(255,255,255,.08)}
+.sidebar .nav-item{padding:12px 20px;cursor:pointer;font-size:14px;transition:all .2s;display:flex;align-items:center;gap:8px;border-left:3px solid transparent}
+.sidebar .nav-item:hover,.sidebar .nav-item.active{background:rgba(255,255,255,.05);color:#fff}
+.sidebar .nav-item.active{border-left-color:var(--primary)}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.navbar{height:var(--navbar-h);background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;justify-content:space-between;font-size:14px}
+.navbar .breadcrumb{color:#909399}
+.content{flex:1;padding:20px;overflow:auto}
+.page-header{margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.page-header h2{font-size:18px;font-weight:600}
+.search-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:16px;background:#fff;border-radius:4px;border:1px solid var(--border);align-items:center}
+.search-bar .field{display:flex;align-items:center;gap:6px}
+.search-bar .field label{font-size:13px;color:#606266;white-space:nowrap}
+.search-bar input,.search-bar select{height:32px;border:1px solid #dcdfe6;border-radius:4px;padding:0 8px;font-size:13px;color:#606266;background:#fff}
+.search-bar input:focus,.search-bar select:focus{outline:none;border-color:var(--primary)}
+.card{background:#fff;border-radius:4px;border:1px solid var(--border);margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:#fafafa;padding:10px 12px;text-align:left;font-weight:600;color:#909399;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--border)}tbody tr:hover{background:#f5f7fa}
+.btn{display:inline-flex;align-items:center;gap:4px;padding:7px 15px;border-radius:4px;font-size:13px;cursor:pointer;border:none;transition:all .2s;font-weight:500}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:#66b1ff}
+.btn-default{background:#fff;color:#606266;border:1px solid #dcdfe6}
+.btn-text{background:transparent;color:var(--primary);padding:4px 8px}.btn-text.danger{color:var(--danger)}
+.tag{display:inline-flex;padding:2px 8px;border-radius:3px;font-size:12px;font-weight:500}
+.tag-warning{background:#fdf6ec;color:#e6a23c;border:1px solid #faecd8}
+.tag-success{background:#f0f9eb;color:#67c23a;border:1px solid #e1f3d8}
+.tag-primary{background:#ecf5ff;color:#409eff;border:1px solid #d9ecff}
+.tag-danger{background:#fef0f0;color:#f56c6c;border:1px solid #fde2e2}
+.pagination{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:12px 16px;font-size:13px;color:#606266}
+.pagination span{cursor:pointer;padding:4px 10px;border-radius:3px}
+.pagination span.active{background:var(--primary);color:#fff}
+.badge{display:inline-flex;min-width:18px;height:18px;border-radius:9px;background:var(--primary);color:#fff;font-size:11px;align-items:center;justify-content:center;padding:0 5px;margin-left:4px}
+.expand-row{background:#fafafa}.expand-row td{padding:0}
+.detail-table{margin:8px 12px 8px 40px;width:calc(100% - 52px)}.detail-table thead th{background:#f0f2f5;font-size:12px}
+.sub-text{font-size:12px;color:#909399}
+.mono{font-family:"SF Mono",Monaco,monospace;font-size:12px;background:#f5f7fa;padding:1px 5px;border-radius:2px}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">⚙ myITSM</div>
+    <div class="nav-item">🏠 首页</div><div class="nav-item">⚙ 系统管理</div><div class="nav-item">📋 基础数据</div><div class="nav-item">📦 仓储管理</div>
+    <div class="nav-item active">🛒 采购管理</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">采购计划</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">采购登记</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">采购单据</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">采购验收</div>
+    <div class="nav-item" style="padding-left:32px;font-size:13px">供应商评价</div>
+    <div class="nav-item">🔧 ITSM工单</div>
+  </aside>
+  <div class="main">
+    <nav class="navbar"><span class="breadcrumb">采购管理 / 采购计划</span><div class="user"><span>👤 admin</span></div></nav>
+    <div class="content">
+      <div class="page-header"><h2>采购计划</h2><button class="btn btn-primary">＋ 新建采购计划</button></div>
+      <div class="search-bar">
+        <div class="field"><label>计划号</label><input placeholder="输入计划号" style="width:140px"></div>
+        <div class="field"><label>供应商</label><input placeholder="输入供应商" style="width:160px"></div>
+        <div class="field"><label>采购类型</label><select style="width:110px"><option>全部</option><option>新机采购</option><option>配件采购</option></select></div>
+        <div class="field"><label>状态</label><select style="width:100px"><option>全部</option><option>待审批</option><option>已审批</option><option>已下单</option></select></div>
+        <button class="btn btn-primary" style="margin-left:auto">🔍 查询</button>
+      </div>
+
+      <div class="card"><div class="table-wrap">
+        <table>
+          <thead><tr><th style="width:30px"></th><th>计划号</th><th>供应商</th><th>采购类型</th><th>物料数量</th><th>金额</th><th>状态</th><th>计划日期</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr onclick="toggleExpand(this,'r1')"><td><span id="icon-r1">▶</span></td><td><span class="mono">PC2024001</span></td><td>上海霍讯物联网科技有限公司</td><td>配件采购</td><td>5 <span class="badge">5</span></td><td style="font-weight:600">¥23,500</td><td><span class="tag tag-success">已下单</span></td><td>2024-01-10</td><td><button class="btn btn-text" onclick="event.stopPropagation()">编辑</button></td></tr>
+            <tr class="expand-row" id="r1" style="display:none"><td colspan="9">
+              <table class="detail-table"><thead><tr><th>物料编码</th><th>物料名称</th><th>规格</th><th>数量</th><th>单价</th><th>金额</th></tr></thead>
+              <tbody>
+                <tr><td>BS4001</td><td>HR11一维码USB扫描枪</td><td>标准</td><td>100</td><td>¥85</td><td>¥8,500</td></tr>
+                <tr><td>CB3400</td><td>335钱箱</td><td>标准</td><td>50</td><td>¥120</td><td>¥6,000</td></tr>
+                <tr><td>HDAN16</td><td>500GB 2.5寸SATA硬盘</td><td>500GB</td><td>60</td><td>¥150</td><td>¥9,000</td></tr>
+              </tbody></table>
+            </td></tr>
+
+            <tr onclick="toggleExpand(this,'r2')"><td><span id="icon-r2">▶</span></td><td><span class="mono">PC2024002</span></td><td>深圳市华科智能有限公司</td><td>新机采购</td><td>3 <span class="badge">3</span></td><td style="font-weight:600">¥156,000</td><td><span class="tag tag-warning">待审批</span></td><td>2024-01-08</td><td><button class="btn btn-text" onclick="event.stopPropagation()">编辑</button><button class="btn btn-text danger" onclick="event.stopPropagation()">删除</button></td></tr>
+            <tr class="expand-row" id="r2" style="display:none"><td colspan="9">
+              <table class="detail-table"><thead><tr><th>物料编码</th><th>物料名称</th><th>规格</th><th>数量</th><th>单价</th><th>金额</th></tr></thead>
+              <tbody>
+                <tr><td>4Q4L01</td><td>TFP4000 4LR4 整机</td><td>DJR64ACNNS3NN</td><td>10</td><td>¥14,800</td><td>¥148,000</td></tr>
+                <tr><td>4Q2014</td><td>TFP2000 整机</td><td>标准</td><td>2</td><td>¥4,000</td><td>¥8,000</td></tr>
+              </tbody></table>
+            </td></tr>
+
+            <tr onclick="toggleExpand(this,'r3')"><td><span id="icon-r3">▶</span></td><td><span class="mono">PC2024003</span></td><td>广州视源电子科技股份有限公司</td><td>配件采购</td><td>8 <span class="badge">8</span></td><td style="font-weight:600">¥45,200</td><td><span class="tag tag-primary">已审批</span></td><td>2024-01-05</td><td><button class="btn btn-text" onclick="event.stopPropagation()">编辑</button></td></tr>
+            <tr class="expand-row" id="r3" style="display:none"><td colspan="9">
+              <table class="detail-table"><thead><tr><th>物料编码</th><th>物料名称</th><th>规格</th><th>数量</th><th>单价</th><th>金额</th></tr></thead>
+              <tbody>
+                <tr><td>CD4A02</td><td>安卓通用型LED8-2中文客显</td><td>LED8-2</td><td>40</td><td>¥380</td><td>¥15,200</td></tr>
+                <tr><td>MB4AL3</td><td>安卓单屏瑞芯微六核主板</td><td>RK3399</td><td>20</td><td>¥600</td><td>¥12,000</td></tr>
+                <tr><td>PW4A01</td><td>400W ATX电源</td><td>标准</td><td>30</td><td>¥200</td><td>¥6,000</td></tr>
+              </tbody></table>
+            </td></tr>
+          </tbody>
+        </table>
+        <div class="pagination"><span>共 42 条</span><span>‹</span><span class="active">1</span><span>2</span><span>3</span><span>›</span></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+<script>function toggleExpand(row,id){var el=document.getElementById(id);var icon=document.getElementById('icon-'+id);if(el.style.display==='none'){el.style.display='table-row';icon.textContent='▼'}else{el.style.display='none';icon.textContent='▶'}}</script>
+</body>
+</html>

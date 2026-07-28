@@ -1,227 +1,356 @@
 """
-客户主数据服务。
+客户生命周期管理服务。
 
-作者：Cascade
-创建时间：2026-04-08
-变更时间：2026-04-08
-
-注意事项：
-    - 客户生命周期管理（优化1：预计划客户生命周期）
-    - 对应 base_cust.pbl 的客户管理功能
+优化方案1（P0）：预计划创建/作废时管理客户状态（TEMP→ACTIVE→INVALID），
+解决 PB 原系统中"幽灵客户"问题。
 """
 
 from __future__ import annotations
 
-import logging
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
-from app.repositories.customer_repository import CustomerRepository
-
-logger = logging.getLogger(__name__)
-
-__all__ = ["CustomerService", "CustomerStatus"]
+from app.extensions import db
+from app.models.master import Customer
 
 
-class CustomerStatus(Enum):
-    """
-    客户生命周期状态。
-
-    状态流转：
-        TEMP → PENDING → ACTIVE
-        TEMP → INVALID（预计划取消）
-        PENDING → INVALID
-    """
+class CustomerStatus(str, Enum):
+    """客户生命周期状态。"""
 
     TEMP = "TEMP"  # 临时（预计划新建）
     PENDING = "PENDING"  # 待确认（预计划提交）
-    ACTIVE = "ACTIVE"  # 正式客户
+    ACTIVE = "ACTIVE"  # 正式客户（预计划完成）
     INVALID = "INVALID"  # 已作废（预计划取消）
-    BLACKLIST = "BLACKLIST"  # 黑名单
 
 
-class CustomerSourceType(Enum):
+class CustomerSourceType(str, Enum):
     """客户来源类型。"""
 
-    PREPLAN = "PREPLAN"  # 预计划
-    MANUAL = "MANUAL"  # 手工录入
+    PREPLAN = "PREPLAN"  # 预计划创建
+    MANUAL = "MANUAL"  # 手工创建
     IMPORT = "IMPORT"  # 批量导入
-    API = "API"  # 接口同步
+    API = "API"  # API 对接
 
 
 class CustomerService:
-    """
-    客户主数据业务服务。
+    """客户生命周期管理服务（静态方法，对齐项目风格）。"""
 
-    功能概述：
-        - 客户生命周期管理（结合优化1）
-        - 预计划关联客户处理
-        - 客户信息维护
-    """
+    # ------------------------------------------------------------------
+    # 查询
+    # ------------------------------------------------------------------
 
-    def __init__(self, customer_repository: CustomerRepository | None = None) -> None:
+    @staticmethod
+    def check_card_exists(custcard: str) -> Customer | None:
+        """检查磁卡号是否已被占用（返回已有客户或 None）。"""
+        if not custcard:
+            return None
+        return (
+            db.session.query(Customer)
+            .filter(
+                Customer.cust_card == custcard,
+                Customer.useflg != "0",
+            )
+            .first()
+        )
+
+    @staticmethod
+    def get_by_custcd(custcd: str) -> Customer | None:
+        """按客户编码查询。"""
+        return db.session.get(Customer, custcd)
+
+    # ------------------------------------------------------------------
+    # 生命周期流转
+    # ------------------------------------------------------------------
+
+    # PB 磁卡号录入规则常量（对齐 d_plan_cust_edit.srd / w_plan_cust_befor.srw）
+    CUSTCARD_MAX_LENGTH = 20  # PB DataWindow char(20) + Oracle VARCHAR2(20)
+    CUSTCD_LENGTH = 8  # PB CHAR(8) 固定 8 位
+
+    @staticmethod
+    def validate_custcard(custcard: str, exclude_custcd: str | None = None) -> str | None:
+        """校验磁卡号录入规则，对齐 PB w_plan_cust_befor.srw of_insert_cust。
+
+        校验规则：
+        1. 长度 ≤ 20 字符（PB DataWindow char(20)）
+        2. 磁卡号在 tmm22_customers 中唯一（useflg='1'），对齐 PB 重复检查
+        3. 大小写不限（PB edit.case=any）
+
+        Args:
+            custcard: 待校验磁卡号
+            exclude_custcd: 排除的客户编码（更新场景排除自身）
+
+        Returns:
+            None 表示校验通过，否则返回错误信息字符串
         """
-        初始化服务。
+        if not custcard or not custcard.strip():
+            return "磁卡号不能为空"
+        if len(custcard) > CustomerService.CUSTCARD_MAX_LENGTH:
+            return f"磁卡号长度不能超过 {CustomerService.CUSTCARD_MAX_LENGTH} 字符"
+        # 磁卡号重复检查（对齐 PB: SELECT count(1) WHERE CUSTCARD=:ls AND USEFLG='1'）
+        from sqlalchemy import func
 
-        参数：
-            customer_repository: 客户仓储实例，默认自动创建
+        query = db.session.query(func.count(Customer.cust_cd)).filter(
+            Customer.cust_card == custcard,
+            Customer.useflg == "1",
+        )
+        if exclude_custcd:
+            query = query.filter(Customer.cust_cd != exclude_custcd)
+        if query.scalar() > 0:
+            return f"磁卡号 {custcard} 已存在，请重新输入"
+        return None
+
+    @staticmethod
+    def validate_custnm_unique(custnm: str, exclude_custcd: str | None = None) -> str | None:
+        """校验客户名称唯一性，对齐 PB w_plan_cust_befor.srw of_insert_cust。
+
+        PB 逻辑：SELECT count(*), max(custcd) WHERE custnm=:ls → 同名客户不允许新建。
+
+        Args:
+            custnm: 待校验客户名称
+            exclude_custcd: 排除的客户编码（更新场景排除自身）
+
+        Returns:
+            None 表示校验通过，否则返回错误信息字符串（含已有 custcd）
         """
-        self._repo = customer_repository or CustomerRepository()
+        if not custnm or not custnm.strip():
+            return "客户名称不能为空"
+        from sqlalchemy import func
 
-    def list_customers(
-        self,
-        status: str | None = None,
-        use_flg: str | None = None,
-    ) -> list[dict[str, Any]]:
+        query = db.session.query(
+            func.count(Customer.cust_cd), func.max(Customer.cust_cd)
+        ).filter(Customer.cust_nm == custnm)
+        if exclude_custcd:
+            query = query.filter(Customer.cust_cd != exclude_custcd)
+        count, existing_cd = query.one()
+        if count > 0 and existing_cd:
+            return f"已有此客户，请使用编码 {existing_cd}"
+        return None
+
+    @staticmethod
+    def generate_custcd() -> str:
+        """生成下一个客户编码（custcd）。
+
+        对齐 PB w_plan_cust_befor_new.srw 逻辑：
+            SELECT max(custcd) INTO :ls_Custcd FROM tmm22_customers;
+            ls_fill = 8 - len(string(integer(ls_Custcd)+1))
+            ls_Custcd = fill('0', ls_fill) + string(integer(ls_Custcd)+1)
+
+        规则：取 tmm22_customers.cust_cd 最大值 +1，左侧补零到 8 位。
+        例如 '00008397' → '00008398'。
         """
-        获取客户列表。
+        from sqlalchemy import func
 
-        参数：
-            status: 生命周期状态过滤
-            use_flg: 有效标志过滤
+        max_custcd = (
+            db.session.query(func.max(Customer.cust_cd)).scalar() or "0"
+        )
+        try:
+            next_val = int(max_custcd) + 1
+        except (ValueError, TypeError):
+            next_val = 1
+        return str(next_val).zfill(8)
 
-        返回值：
-            list[dict[str, Any]]: 客户列表
-        """
-        return self._repo.list_customers(status=status, use_flg=use_flg)
-
-    def get_customer_detail(self, cust_cd: str) -> dict[str, Any] | None:
-        """
-        获取客户详情。
-
-        参数：
-            cust_cd: 客户代码
-
-        返回值：
-            dict[str, Any] | None: 客户详情或空
-        """
-        return self._repo.get_by_code(cust_cd)
-
-    def check_card_exists(self, cust_card: str) -> dict[str, Any] | None:
-        """
-        检查磁卡号是否已存在。
-
-        参数：
-            cust_card: 磁卡号
-
-        返回值：
-            dict[str, Any] | None: 已存在的客户信息或空
-        """
-        return self._repo.get_by_card(cust_card)
-
-    def create_temp_from_preplan(
-        self,
+    @staticmethod
+    def create_temp_customer(
+        data: dict[str, Any],
         preplan_id: str,
-        cust_info: dict[str, Any],
-        oper_cd: str,
-    ) -> dict[str, Any] | None:
+        creator: str,
+        plantyp: str = "",
+    ) -> Customer:
+        """从预计划创建/更新客户。
+
+        新客户（客户表无记录）→ TEMP。
+        已有正式客户（ACTIVE）→ 仅更新信息，保持 ACTIVE。
+        已有临时/待确认客户 → 保持原状态。
+
+        custcd 为空时按 PB 规则自动生成（MAX(custcd)+1，左侧补零到 8 位），
+        对齐 PB w_plan_cust_befor_new.srw 全新开通场景。
+
+        PB 校验（仅 plantyp=00 全新开通，对齐 of_insert_cust）：
+        - 磁卡号重复检查 + 长度限制（≤20 字符）
+        - 客户名称重复检查
+
+        注：plantyp=10 磁卡号变更的新磁卡号（new_custcard）校验在
+        sales_service.create 中执行，因为 new_custcard 是预计划字段
+        而非客户表字段。
         """
-        从预计划创建临时客户（优化1核心功能）。
+        custcd = data.get("custcd") or ""
+        custcard = (data.get("custcard") or "").strip()
+        custnm = (data.get("custnm") or "").strip()
+        # custcd 为空时自动生成（全新开通手动输入磁卡号但未填 custcd 的场景）
+        if not custcd:
+            custcd = CustomerService.generate_custcd()
+            data = {**data, "custcd": custcd}
+        existing = db.session.get(Customer, custcd) if custcd else None
+        is_new = existing is None
+        customer = existing or Customer(cust_cd=custcd)
 
-        流程：
-            1. 生成新客户代码（8位数字）
-            2. 创建客户记录，状态为 TEMP
-            3. 记录来源为 PREPLAN，关联预计划号
+        # PB 校验仅对 plantyp=00 全新开通新客户执行（对齐 of_insert_cust:
+        # if ls_plantyp <> '00' then return 1）
+        if is_new and plantyp == "00":
+            err = CustomerService.validate_custcard(custcard)
+            if err:
+                raise ValueError(err)
+            err = CustomerService.validate_custnm_unique(custnm)
+            if err:
+                raise ValueError(err)
 
-        参数：
-            preplan_id: 预计划单号
-            cust_info: 客户信息
-            oper_cd: 操作员代码
+        # 基本信息
+        customer.cust_nm = custnm or customer.cust_nm or ""
+        customer.cust_card = custcard or customer.cust_card
+        customer.busi_typ = data.get("busityp") or customer.busi_typ
+        customer.address = data.get("address") or customer.address
+        customer.contactor = data.get("contactor") or customer.contactor
+        customer.phone_no = data.get("phoneno") or customer.phone_no
+        customer.yun_type = data.get("yun_type") or customer.yun_type
+        # PB同步字段：从plan_cust同步到tmm22_customers
+        customer.class_cd = data.get("classcd") or customer.class_cd
+        customer.ppt_code = data.get("pptcode") or customer.ppt_code
+        customer.comm_mode = data.get("commmode") or customer.comm_mode
+        customer.is_contract = data.get("is_contract") or customer.is_contract
+        customer.jl_contactor = data.get("jl_contactor") or customer.jl_contactor
+        customer.jl_phoneno = data.get("jl_phoneno") or customer.jl_phoneno
+        customer.custrnm = data.get("custrnm") or customer.custrnm
+        # 地理/负责区域/环线信息（从预计划同步到客户表）
+        customer.geo_prvn_cd = data.get("geo_prvn_cd") or customer.geo_prvn_cd
+        customer.geo_city_cd = data.get("geo_city_cd") or customer.geo_city_cd
+        customer.geo_area_cd = data.get("geo_area_cd") or customer.geo_area_cd
+        customer.geo_street_cd = data.get("geo_street_cd") or customer.geo_street_cd
+        customer.area_cd = data.get("area_cd") or customer.area_cd
+        customer.location = data.get("location") or customer.location
 
-        返回值：
-            dict[str, Any] | None: 新建客户信息或空
-        """
-        # 检查磁卡号是否已存在
-        existing = self.check_card_exists(cust_info.get("cust_card", ""))
-        if existing:
-            logger.warning("磁卡号 %s 已存在，客户代码 %s", 
-                         cust_info.get("cust_card"), existing.get("cust_cd"))
-            return None
+        # 生命周期字段：新客户=TEMP，已有正式客户=保持ACTIVE
+        if is_new:
+            customer.customer_status = CustomerStatus.TEMP.value
+            customer.source_type = CustomerSourceType.PREPLAN.value
+            customer.preplan_id = preplan_id
+            customer.useflg = "1"
+        elif customer.customer_status in (
+            None, "", CustomerStatus.TEMP.value, CustomerStatus.PENDING.value
+        ):
+            customer.customer_status = CustomerStatus.TEMP.value
+            customer.source_type = CustomerSourceType.PREPLAN.value
+            customer.preplan_id = preplan_id
+        # else: ACTIVE or INVALID → keep as is (existing formal customer)
 
-        cust_cd = self._repo.create_temp_from_plan(preplan_id, cust_info, oper_cd)
-        if cust_cd is None:
-            return None
+        if is_new:
+            db.session.add(customer)
+        return customer
 
-        return self.get_customer_detail(cust_cd)
-
-    def promote_to_active(self, cust_cd: str, oper_cd: str) -> bool:
-        """
-        临时客户转正（预计划执行完成时调用）。
-
-        参数：
-            cust_cd: 客户代码
-            oper_cd: 操作员代码
-
-        返回值：
-            bool: 是否成功
-        """
-        return self._transition_status(
-            cust_cd,
-            CustomerStatus.TEMP.value,
-            CustomerStatus.ACTIVE.value,
-            oper_cd,
-        )
-
-    def mark_invalid(self, cust_cd: str, oper_cd: str) -> bool:
-        """
-        标记客户为无效（预计划取消时调用）。
-
-        参数：
-            cust_cd: 客户代码
-            oper_cd: 操作员代码
-
-        返回值：
-            bool: 是否成功
-        """
-        # 获取当前客户状态
-        customer = self.get_customer_detail(cust_cd)
+    @staticmethod
+    def promote_to_pending(custcd: str) -> Customer | None:
+        """预计划提交时：TEMP → PENDING。"""
+        customer = db.session.get(Customer, custcd)
         if customer is None:
-            return False
+            return None
+        if customer.customer_status in (
+            CustomerStatus.TEMP.value,
+            CustomerStatus.PENDING.value,
+        ):
+            customer.customer_status = CustomerStatus.PENDING.value
+        return customer
 
-        current_status = customer.get("customer_status", "ACTIVE")
-        return self._transition_status(
-            cust_cd,
-            current_status,
-            CustomerStatus.INVALID.value,
-            oper_cd,
-        )
+    @staticmethod
+    def promote_to_active(custcd: str, operator: str) -> Customer | None:
+        """预计划完成时：PENDING/TEMP → ACTIVE，记录转正时间。"""
+        customer = db.session.get(Customer, custcd)
+        if customer is None:
+            return None
+        if customer.customer_status in (
+            CustomerStatus.TEMP.value,
+            CustomerStatus.PENDING.value,
+        ):
+            customer.customer_status = CustomerStatus.ACTIVE.value
+            customer.verified_at = datetime.now(UTC)
+        return customer
 
-    def update_customer_info(
-        self,
-        cust_cd: str,
-        cust_info: dict[str, Any],
-        oper_cd: str,
-    ) -> bool:
+    @staticmethod
+    def invalidate_customer(custcd: str, operator: str | None = None) -> Customer | None:
+        """预计划作废时：TEMP/PENDING → INVALID，标记失效（保留记录以复用custcd）。"""
+        customer = db.session.get(Customer, custcd)
+        if customer is None:
+            return None
+        if customer.customer_status in (
+            CustomerStatus.TEMP.value,
+            CustomerStatus.PENDING.value,
+        ):
+            customer.customer_status = CustomerStatus.INVALID.value
+            customer.useflg = "0"
+        return customer
+
+    # ------------------------------------------------------------------
+    # 辅助
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def update_customer_card(custcd: str, new_card: str) -> Customer | None:
+        """同步更新客户磁卡号。"""
+        customer = db.session.get(Customer, custcd)
+        if customer is None:
+            return None
+        customer.cust_card = new_card
+        return customer
+
+    @staticmethod
+    def update_customer_fields(cust_cd: str, data: dict[str, Any]) -> None:
+        """批量更新客户字段（用于预计划同步）。"""
+        customer = db.session.get(Customer, cust_cd)
+        if customer:
+            for field, value in data.items():
+                if hasattr(customer, field) and value is not None:
+                    setattr(customer, field, value)
+
+    # ------------------------------------------------------------------
+    # 门店经营状态 / 数据有效性（对齐 PB usp_plan_confrim）
+    # ------------------------------------------------------------------
+
+    # 门店关闭名称前缀（与 s_status 对应，用于幂等判断）
+    _CLOSE_PREFIX: dict[str, str] = {
+        "3": "(永久关闭)",
+        "2": "(临时关闭)",
+    }
+
+    @staticmethod
+    def set_store_close_status(
+        custcd: str, close_type: str | None, operator: str | None = None
+    ) -> Customer | None:
+        """门店关闭时设置经营状态（对齐 usp_plan_confrim 门店关闭分支）。
+
+        close_type='YJ'（永久）→ s_status='3' + 名称前缀 '(永久关闭)'；
+        其他（临时）→ s_status='2' + 名称前缀 '(临时关闭)'。
+        名称前缀幂等：已加过则不重复添加。
         """
-        更新客户信息。
+        customer = db.session.get(Customer, custcd)
+        if customer is None:
+            return None
 
-        参数：
-            cust_cd: 客户代码
-            cust_info: 客户信息（cust_nm, address, phone_no, contactor）
-            oper_cd: 操作员代码
+        new_status = "3" if (close_type or "").strip().upper() == "YJ" else "2"
+        prefix = CustomerService._CLOSE_PREFIX[new_status]
 
-        返回值：
-            bool: 是否成功
+        customer.s_status = new_status
+        cust_nm = customer.cust_nm or ""
+        # 幂等：避免重复叠加关闭前缀（永久/临时前缀均不重复添加）
+        already_prefixed = cust_nm.startswith("(永久关闭)") or cust_nm.startswith("(临时关闭)")
+        if not already_prefixed:
+            customer.cust_nm = f"{prefix}{cust_nm}"
+        return customer
+
+    @staticmethod
+    def invalidate_store_customer(
+        custcd: str, operator: str | None = None
+    ) -> Customer | None:
+        """客户无效化：移机/取机后空门店逻辑删除（对齐 usp_plan_confrim cust_useflg='1' 分支）。
+
+        置 useflg='0'、pos_n=0、posstatus='03'、posstatus1='31'。
+        仅对当前有效（useflg='1'）的客户生效，避免重复处理。
         """
-        return self._repo.update_customer(cust_cd, cust_info, oper_cd)
-
-    def _transition_status(
-        self,
-        cust_cd: str,
-        old_status: str,
-        new_status: str,
-        oper_cd: str,
-    ) -> bool:
-        """
-        内部方法：执行状态流转。
-
-        参数：
-            cust_cd: 客户代码
-            old_status: 原状态
-            new_status: 新状态
-            oper_cd: 操作员代码
-
-        返回值：
-            bool: 是否成功
-        """
-        return self._repo.transition_status(cust_cd, old_status, new_status, oper_cd)
+        customer = db.session.get(Customer, custcd)
+        if customer is None:
+            return None
+        if (customer.useflg or "") == "0":
+            return customer
+        customer.useflg = "0"
+        customer.pos_n = 0
+        customer.posstatus = "03"
+        customer.posstatus1 = "31"
+        return customer

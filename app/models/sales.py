@@ -25,14 +25,14 @@ class PlanCust(BaseModel):
     __tablename__ = "plan_cust"
 
     planno = db.Column(db.String(10), primary_key=True, comment="计划编号")
-    plantyp = db.Column(db.String(2), comment="计划类型")
-    custnew = db.Column(db.String(2), comment="新旧客户标志")
+    plantyp = db.Column(db.String(2), comment="计划类型（00新机开通/10磁卡号变更/20旧机翻新/30取机回收/40门店关闭）")
+    custnew = db.Column(db.String(2), comment="新旧客户标志（Y=新客户/N=已有客户）")
     custcard = db.Column(db.String(20), comment="客户磁卡号")
     custcd = db.Column(db.String(8), comment="客户编码")
     custnm = db.Column(db.String(80), comment="客户名称")
     classcd = db.Column(db.String(6), comment="分类编码")
     busityp = db.Column(db.String(2), comment="业务类型")
-    pptcode = db.Column(db.String(10), comment="属性代码")
+    pptcode = db.Column(db.String(10), comment="品牌编码")
     is_contract = db.Column(db.String(2), comment="是否合同")
     address = db.Column(db.String(80), comment="地址")
     contactor = db.Column(db.String(10), comment="联系人")
@@ -40,42 +40,73 @@ class PlanCust(BaseModel):
     custrnm = db.Column(db.String(80), comment="客户真实名称")
     jl_contactor = db.Column(db.String(10), comment="经理联系人")
     jl_phoneno = db.Column(db.String(60), comment="经理电话")
-    pos_from = db.Column(db.String(6), comment="POS来源")
-    pos_item = db.Column(db.String(6), comment="POS物料")
-    posid = db.Column(db.String(13), comment="POS设备ID")
-    new_custcard = db.Column(db.String(20), comment="新磁卡号")
-    new_custcd = db.Column(db.String(8), comment="新客户编码")
-    new_phoneno = db.Column(db.String(60), comment="新电话")
-    new_address = db.Column(db.String(80), comment="新地址")
-    new_custnm = db.Column(db.String(80), comment="新客户名称")
-    new_positem = db.Column(db.String(6), comment="新POS物料")
-    new_posid = db.Column(db.String(13), comment="新POS设备ID")
-    solve_type = db.Column(db.String(2), comment="处理方式")
+    pos_from = db.Column(db.String(6), comment="设备来源（PF字典：00商用仓库/01门店移机/02烟草直调/03IT公司/04海晟公司）")
+    pos_item = db.Column(db.String(6), comment="机型编码（00新开店=目标机型；20/30/40=旧设备机型，随旧设备ID自动带出）")
+    posid = db.Column(db.String(13), comment="设备EID（00新开店=目标设备EID；20/30/40=旧设备EID，关联计划门店名下有效成品资产）")
+    new_custcard = db.Column(db.String(20), comment="源磁卡号（移机/变更场景的源门店磁卡号）")
+    new_custcd = db.Column(db.String(8), comment="目标客户编码（移机场景目标门店编码）")
+    new_phoneno = db.Column(db.String(60), comment="源电话（移机场景源门店电话）")
+    new_address = db.Column(db.String(80), comment="源地址（移机场景源门店地址）")
+    new_custnm = db.Column(db.String(80), comment="源门店名称（移机场景源门店名称）")
+    new_positem = db.Column(db.String(6), comment="源机型（移机场景源设备机型）")
+    new_posid = db.Column(db.String(13), comment="源设备ID（移机场景源设备EID）")
+    solve_type = db.Column(db.String(2), comment="旧机处理方式（PB字典：20翻新/30取回/40关门场景使用）")
     back_status = db.Column(db.String(2), comment="回退状态")
-    cust_useflg = db.Column(db.String(2), comment="客户有效标志")
-    plan_status = db.Column(db.String(2), comment="计划状态")
-    servetyp = db.Column(db.String(2), comment="服务类型")
-    pl_serve_task = db.Column(db.String(200), comment="服务任务")
+    cust_useflg = db.Column(db.String(2), comment="客户无效化（00(01/02)移机/20(01-04)翻新/30取回/40关门时勾选，使源门店或计划门店useflg=0）")
+    plan_status = db.Column(db.String(2), comment="计划状态（TS字典：00计划中/01计划完成/02分派中/03实施完成/04实施中/08计划退回/09计划作废）")
+    servetyp = db.Column(db.String(2), comment="服务类型（0客户确认/1预计划呼出/2实施任务）")
+    pl_serve_task = db.Column(db.String(200), comment="服务任务描述")
     imple_status = db.Column(db.String(2), comment="实施状态")
+    imple_billid = db.Column(db.String(20), comment="下游单据ID（实施确认时写入）")
     commmode = db.Column(db.String(4), comment="通讯方式")
     serve_status = db.Column(db.String(2), comment="服务状态")
-    plan_require = db.Column(db.String(200), comment="计划需求")
-    imple_date = db.Column(db.DateTime, comment="实施日期")
-    send_date = db.Column(db.DateTime, comment="发送日期")
-    train_date = db.Column(db.DateTime, comment="培训日期")
-    imple_mark = db.Column(db.String(200), comment="实施备注")
+    plan_require = db.Column(db.String(200), comment="计划要求/需求描述")
+    imple_date = db.Column(db.DateTime, comment="实施日期（安排上门安装日期）")
+    send_date = db.Column(db.DateTime, comment="配送日期（设备配送到店日期）")
+    train_date = db.Column(db.DateTime, comment="培训日期（客户培训日期）")
+    imple_mark = db.Column(db.String(200), comment="实施备注（配送/安装要求等）")
     imple_result = db.Column(db.String(10), comment="实施结果")
     fail_reason = db.Column(db.String(200), comment="失败原因")
-    is_outflag = db.Column(db.String(2), comment="出库标志")
-    status = db.Column(db.String(2), comment="状态")
+    is_outflag = db.Column(db.String(4), comment="出库标志三态（N/A=非商用仓库不适用/0=待出库/1=OV=1出库单已审核）")
+    status = db.Column(db.String(2), comment="PB旧状态字段（已废弃，使用plan_status）")
     gendate = db.Column(db.DateTime, comment="创建日期")
     opercd = db.Column(db.String(6), comment="操作员")
-    propo_item = db.Column(db.String(20), comment="推荐物料")
-    serve_ercd = db.Column(db.String(6), comment="服务工程师")
+    propo_item = db.Column(db.String(20), comment="推荐物料（建议机型编码）")
+    serve_ercd = db.Column(db.String(6), comment="分配呼出人/服务工程师（对齐 PB d_serve_list）")
     deposit = db.Column(db.Numeric(12, 2), comment="押金金额")
-    is_rent = db.Column(db.String(1), comment="是否租赁")
+    is_rent = db.Column(db.String(1), comment="是否租赁（Y租赁/N购买）")
+    business_mode = db.Column(db.String(2), comment="业务模式（BM_S字典：01销售/02租赁/03借用/04代维/05寄售/06试用/07免费投放/08合作运营）")
     yun_type = db.Column(db.String(2), comment="运营类型")
     upload_type = db.Column(db.String(2), comment="上传类型")
+
+
+# ---------------------------------------------------------------------------
+# 呼出单 / 服务计划
+# ---------------------------------------------------------------------------
+
+
+class PlanServe(BaseModel):
+    """预计划呼出单 / 服务计划（PLAN_SERVE）。
+
+    话务台针对预计划呼出客户、确认安装意向并收集反馈意见的记录单，
+    是实施确认的前置依赖。对应 PB sale.pbl 中 ``INSERT INTO PLAN_SERVE`` 逻辑。
+    """
+
+    __tablename__ = "plan_serve"
+
+    dtlid = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="明细ID")
+    planno = db.Column(db.String(10), nullable=True, comment="关联预计划单号（兼容历史NULL数据）")
+    plantyp = db.Column(db.String(2), comment="计划类型")
+    servetyp = db.Column(db.String(2), comment="服务类型（0客户确认/1预计划呼出/2实施任务）")
+    serve_task = db.Column(db.String(200), comment="服务任务")
+    serve_back = db.Column(db.String(200), comment="客户反馈/呼出结果")
+    serve_mark = db.Column(db.String(200), comment="服务备注")
+    commmode = db.Column(db.String(4), comment="通讯方式")
+    status = db.Column(db.String(2), default="00", comment="状态（00待呼出/01已呼出/09作废）")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    genercd = db.Column(db.String(6), comment="创建操作员")
+    opdate = db.Column(db.DateTime, comment="最后操作日期")
+    opercd = db.Column(db.String(6), comment="最后操作员")
 
 
 # ---------------------------------------------------------------------------

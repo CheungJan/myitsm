@@ -1,0 +1,62 @@
+<h2>并发控制方案</h2>
+<p class="subtitle">防止两个用户同时下单导致同一需求行的订购量超过可用余额</p>
+
+<div class="section">
+  <h3>问题场景</h3>
+  <div style="background:#ffebee;padding:16px;border-radius:8px;font-size:13px;line-height:2;">
+    需求行 PP000180-行1：电源 × 100，已有订购50，<strong>可用余额 = 50</strong><br><br>
+    用户A：准备下单 40个 → 读取 available_qty=50 ✓<br>
+    用户B：准备下单 30个 → 读取 available_qty=50 ✓<br>
+    <span style="color:#c62828;">两个都通过校验 → 总共下单70个 → 超出可用余额20个 ❌</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>方案：SELECT ... FOR UPDATE 行级锁</h3>
+  <div style="background:#e8f5e9;padding:16px;border-radius:8px;font-size:13px;line-height:1.8;">
+
+<strong>核心思路：</strong>不锁需求行本身（需求行在 TPC02 表中是只读的），而是<strong>在写入 TPC20 关联表之前，对已存在的关联记录加锁</strong>，确保同一需求行的并发写入串行化。
+
+<pre style="background:#263238;color:#aed581;padding:12px;border-radius:6px;font-size:12px;line-height:1.6;">
+<span style="color:#90a4ae;"># 在 batch_create 事务中</span>
+<span style="color:#82b1ff;">SELECT</span> COALESCE(SUM(linkqty), 0)
+<span style="color:#82b1ff;">FROM</span> tpc20_requisition_order_link
+<span style="color:#82b1ff;">WHERE</span> pcplanid = :pid <span style="color:#82b1ff;">AND</span> pclineno = :lno
+<span style="color:#82b1ff;">FOR UPDATE</span>;   <span style="color:#90a4ae;">← 行级锁，阻塞其他并发事务</span>
+
+<span style="color:#90a4ae;"># 然后检查</span>
+<span style="color:#ff5370;">if</span> already_linked + new_qty > auditqty:
+    <span style="color:#ff5370;">raise</span> ValueError(<span style="color:#c3e88d;">"超出可用余额"</span>)
+
+<span style="color:#90a4ae;"># 通过后写入 TPC20 + 订单</span>
+<span style="color:#82b1ff;">INSERT INTO</span> tpc20_requisition_order_link ...
+<span style="color:#82b1ff;">COMMIT</span>;  <span style="color:#90a4ae;">← 释放锁</span>
+</pre>
+
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>FOR UPDATE（推荐）</h3>
+      <p>利用 PostgreSQL 行级锁，事务内串行化同一需求行的写入</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>数据库原生保证，无竞态</li><li>锁粒度小（仅锁需求行）</li><li>实现简单，无需额外组件</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>并发高时可能有等待</li><li>需注意事务超时设置</li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>乐观锁（版本号）</h3>
+      <p>TPC02 需求行加 version 字段，更新时检查版本</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>无锁等待</li><li>适合读多写少</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>需改 TPC02 表结构</li><li>失败需重试逻辑</li><li>改动范围大</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

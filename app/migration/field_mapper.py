@@ -6,7 +6,6 @@ from typing import Any
 
 from sqlalchemy import Engine, text
 
-
 # 目标库专属列（源库不存在，有 server default 或无数据来源）
 SKIP_TARGET_COLUMNS = {
     "created_at", "updated_at", "status", "password",
@@ -181,7 +180,9 @@ def read_source_rows(
 
     target_cols = mapping.common_columns + list(mapping.rename_map.keys())
     cols_str = ", ".join(select_parts)
-    order_cols = ", ".join(target_cols[:3])
+    # ORDER BY 全列排序，确保跨查询 OFFSET 一致性
+    # 仅用前几列在存在并列值时会导致同一行被多个批次重复读取或跳过
+    order_cols = ", ".join(target_cols)
     sql = f"SELECT {cols_str} FROM {mapping.old_table} ORDER BY {order_cols} OFFSET {offset} LIMIT {limit}"
     with engine.connect() as conn:
         result = conn.execute(text(sql))
