@@ -1,10 +1,10 @@
 """SLA 超时自动关单服务。
 
-扫描 status=5（已解决）且 close_time 超过 sla_close_days 天未回访的日常维护单，
+扫描 status=5（已解决）且 close_time 超过 SLA 配置天数未回访的日常维护单，
 自动 transition(3) 关单（只改状态，不触发联动）。
 
-配置项（sysparm）：
-  sla_close_days: 回访超时天数（默认 3 天）
+配置项（tmm31_syscodes code_typ='SLA', code_cd='close_days'）：
+  默认 3 天，可在系统字典管理页面修改。
 
 行业对齐 ServiceNow/Jira SM 的 SLA 自动关单机制。
 """
@@ -17,13 +17,13 @@ from typing import Any
 
 from app.extensions import db
 from app.models.itsm import MaintenanceDaily
-from app.repositories.system_repository import SystemRepository
 from app.services.itsm_service import MaintenanceDailyService
 
 logger = logging.getLogger(__name__)
 
-# sysparm 配置编码
-SLA_CLOSE_DAYS_PARM = "sla_close_days"
+# SLA 字典配置码
+SLA_CODE_TYP = "SLA"
+SLA_CLOSE_DAYS_CD = "close_days"
 # 默认超时天数
 DEFAULT_SLA_CLOSE_DAYS = 3
 # 自动关单操作人
@@ -35,15 +35,21 @@ class SlaAutoCloseService:
 
     @staticmethod
     def _get_sla_close_days() -> int:
-        """从 sysparm 读取回访超时天数，默认 3 天。"""
-        parm = SystemRepository.get_sysparm_by_cd(SLA_CLOSE_DAYS_PARM)
-        if parm is None or not parm.parm_val:
+        """从 tmm31_syscodes 读取回访超时天数，默认 3 天。"""
+        from app.models.master import SysCode
+
+        code = (
+            db.session.query(SysCode)
+            .filter_by(code_typ=SLA_CODE_TYP, code_cd=SLA_CLOSE_DAYS_CD, useflg="1")
+            .first()
+        )
+        if code is None or not code.memo:
             return DEFAULT_SLA_CLOSE_DAYS
         try:
-            return int(parm.parm_val)
+            return int(code.memo)
         except (ValueError, TypeError):
-            logger.warning("sysparm %s 值无效: %s，使用默认 %d 天",
-                           SLA_CLOSE_DAYS_PARM, parm.parm_val, DEFAULT_SLA_CLOSE_DAYS)
+            logger.warning("SLA close_days 值无效: %s，使用默认 %d 天",
+                           code.memo, DEFAULT_SLA_CLOSE_DAYS)
             return DEFAULT_SLA_CLOSE_DAYS
 
     @staticmethod

@@ -33,9 +33,9 @@ def init_scheduler(app: Any) -> None:
 
     _scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
 
-    # SLA 超时自动关单：每小时扫描一次
-    # 扫描 status=5 且 close_time 超过 sla_close_days 天的单据，自动 transition(3)
-    interval_minutes = int(app.config.get("SLA_AUTO_CLOSE_INTERVAL_MINUTES", 60))
+    # SLA 超时自动关单：从 tmm31_syscodes 读取扫描间隔，默认 60 分钟
+    with app.app_context():
+        interval_minutes = _get_sla_scan_interval()
     _scheduler.add_job(
         func=_run_sla_auto_close,
         trigger=IntervalTrigger(minutes=interval_minutes),
@@ -54,6 +54,24 @@ def shutdown_scheduler() -> None:
     if _scheduler is not None:
         _scheduler.shutdown(wait=False)
         _scheduler = None
+
+
+def _get_sla_scan_interval() -> int:
+    """从 tmm31_syscodes 读取 SLA 扫描间隔（分钟），默认 60。"""
+    from app.extensions import db
+    from app.models.master import SysCode
+
+    code = (
+        db.session.query(SysCode)
+        .filter_by(code_typ="SLA", code_cd="scan_interval", useflg="1")
+        .first()
+    )
+    if code and code.memo:
+        try:
+            return int(code.memo)
+        except (ValueError, TypeError):
+            pass
+    return 60
 
 
 def _run_sla_auto_close() -> None:

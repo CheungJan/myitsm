@@ -142,13 +142,23 @@ def get_daily(maintenance_id: str):  # type: ignore[no-untyped-def]
 @itsm_bp.post("/maintenance-daily")
 @login_required
 def create_daily():  # type: ignore[no-untyped-def]
-    """创建日常维护单。"""
+    """创建日常维护单，自动按 priority(优先级) 绑定 SLA。"""
     body = MaintenanceDailyCreate(**request.get_json(force=True))
     user_cd: str = request.headers.get("X-User-Cd", "system")
     data = MaintenanceDailyService.create(
         body.model_dump(exclude_none=True),
         creator=user_cd,
     )
+    # 自动绑定 SLA（按 priority 字段匹配）
+    priority = body.model_dump().get("priority")
+    if priority:
+        from app.services.sla_service import SlaTicketService
+        SlaTicketService.attach_sla(
+            maintenance_id=data["maintenance_id"],
+            maintenance_type="MD",
+            priority=str(priority),
+            creator=user_cd,
+        )
     return success_response(data=data, code=201)
 
 
