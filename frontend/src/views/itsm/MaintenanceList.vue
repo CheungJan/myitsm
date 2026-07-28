@@ -216,6 +216,13 @@
           </el-button>
           <el-button
             size="small"
+            type="success"
+            @click="createVisible = true"
+          >
+            ＋ 新建
+          </el-button>
+          <el-button
+            size="small"
             @click="doReset"
           >
             重置
@@ -917,6 +924,72 @@
         @sent="onNotifySent"
       />
     </el-dialog>
+
+    <!-- 新建维护单：先查客户，再建工单（对齐 PB w_itsm_custinfo） -->
+    <el-dialog v-model="createVisible" title="新建日常维护单" width="550px" @close="onCloseCreate">
+      <el-form size="small" label-width="90px" @submit.prevent @keyup.enter="searchCustomer">
+        <el-form-item label="查询客户">
+          <el-input v-model="custSearchKw" placeholder="输入磁卡号/店名/地址" clearable />
+        </el-form-item>
+      </el-form>
+      <el-table v-if="custResults.length" :data="custResults" size="small" max-height="200" highlight-current-row @row-click="pickCustomer">
+        <el-table-column prop="cust_card" label="磁卡号" width="100" />
+        <el-table-column prop="cust_nm" label="店名" min-width="120" />
+        <el-table-column prop="address" label="地址" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="area_nm" label="区域" width="80" />
+      </el-table>
+      <el-divider v-if="createForm.store_id" />
+      <el-form v-if="createForm.store_id" ref="createFormRef" :model="createForm" :rules="createRules" label-width="100px" size="small">
+        <el-form-item label="门店" prop="store_id">
+          <el-input :model-value="`${createForm.store_id} - ${custNm}`" disabled />
+        </el-form-item>
+        <el-form-item label="故障类型" prop="fault_type">
+          <el-select v-model="createForm.fault_type" style="width:100%">
+            <el-option v-for="f in faultTypes" :key="f.code_cd" :label="`${f.code_cd} - ${f.code_nm}`" :value="f.code_cd" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="报修描述" prop="detail_description">
+          <el-input v-model="createForm.detail_description" type="textarea" :rows="2" placeholder="门店反馈的报修基础问题信息" />
+        </el-form-item>
+        <el-form-item label="报修简述" prop="short_description">
+          <el-select v-model="createForm.short_description" style="width:100%" filterable allow-create default-first-option placeholder="话务台预判故障分类">
+            <el-option v-for="m in mtOptions" :key="m.code_cd" :label="m.code_nm" :value="m.code_nm" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="设备整机">
+          <el-input v-model="createForm.device_id" placeholder="客户报修的设备EID，用于核实" />
+        </el-form-item>
+        <el-form-item label="请求人">
+          <el-input v-model="createForm.req_name" placeholder="可选，门店报修可不填" />
+        </el-form-item>
+        <el-form-item label="临时电话">
+          <el-input v-model="createForm.temp_contract" placeholder="临时联系电话（非系统门店电话）" />
+        </el-form-item>
+        <el-row :gutter="12">
+          <el-col :span="8">
+            <el-form-item label="严重程度" label-width="70px">
+              <el-select v-model="createForm.servrity" style="width:100%" clearable><el-option label="一般" value="1" /></el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="紧急程度" label-width="70px">
+              <el-select v-model="createForm.emergency_level" style="width:100%" clearable><el-option label="一般" value="1" /></el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="优先级" label-width="60px">
+              <el-select v-model="createForm.priority" style="width:100%">
+                <el-option label="高" value="1" /><el-option label="中" value="2" /><el-option label="低" value="3" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button size="small" @click="onCloseCreate">取消</el-button>
+        <el-button v-if="createForm.store_id" size="small" type="primary" @click="submitCreate">保存并生成工单号</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 <script setup lang="ts">
@@ -933,7 +1006,7 @@ import {useListPage} from '@/composables/useListPage'
 import {useDetailDrawer} from '@/composables/useDetailDrawer'
 import {useUserNames} from '@/composables/useUserNames'
 import {useCustomerCards} from '@/composables/useCustomerCards'
-import {fetchMaintenanceDaily, transitionMaintenanceDaily, updateMaintenanceDaily, fetchRV, createRV, updateRV, fetchDispatch, createDispatch, updateDispatch, fetchDispatchResolve} from '@/api/itsm'
+import {fetchMaintenanceDaily, transitionMaintenanceDaily, updateMaintenanceDaily, createMaintenanceDaily, fetchRV, createRV, updateRV, fetchDispatch, createDispatch, updateDispatch, fetchDispatchResolve} from '@/api/itsm'
 import type {MntRecord} from '@/api/itsm'
 import {useDict} from '@/composables/useDict'
 import {fetchNotifications} from '@/api/notification'
@@ -949,6 +1022,50 @@ const route=useRoute()
 const{items,loading,page,perPage,total,onSearch}=useListPage<MntRecord>(fetchMaintenanceDaily)
 const{detail,open}=useDetailDrawer<MntRecord>()
 const formChanged = ref(false)
+const createVisible = ref(false)
+const createFormRef = ref()
+const createForm = reactive<Record<string,unknown>>({ store_id:'', fault_type:'01', short_description:'', detail_description:'', priority:'2', servrity:'', emergency_level:'', device_id:'', temp_contract:'' })
+const createRules = {
+  store_id: [{ required: true, message:'请先查询并选择客户', trigger:'change' }],
+  fault_type: [{ required: true, message:'请选择故障类型', trigger:'change' }],
+  short_description: [{ required: true, message:'请输入报修简述', trigger:'blur' }],
+}
+const custSearchKw = ref('')
+const custResults = ref<Record<string,unknown>[]>([])
+const custNm = ref('')
+import { fetchCustomers } from '@/api/master'
+async function searchCustomer() {
+  const kw = custSearchKw.value.trim()
+  if (!kw) return
+  try {
+    const r = await fetchCustomers({ search: kw, per_page: '10', useflg: '1' })
+    custResults.value = (r?.data?.items || []).filter((c: any) => c.useflg !== '0')
+    if (!custResults.value.length) ElMessage.warning('未找到有效客户')
+  } catch { custResults.value = [] }
+}
+function pickCustomer(row: any) {
+  if (row.useflg === '0') { ElMessage.warning('该客户已失效，无法开单'); return }
+  createForm.store_id = row.cust_cd
+  custNm.value = row.cust_nm || row.cust_cd
+  custResults.value = []
+  custSearchKw.value = ''
+}
+function onCloseCreate() {
+  createVisible.value = false
+  // 重置表单
+  Object.assign(createForm, { store_id:'', fault_type:'01', short_description:'', detail_description:'', priority:'2', servrity:'', emergency_level:'', device_id:'', temp_contract:'' })
+  custNm.value = ''; custResults.value = []; custSearchKw.value = ''
+}
+async function submitCreate(){
+  if(!createFormRef.value) return
+  try{ await createFormRef.value.validate() }catch{ return }
+  try{
+    await createMaintenanceDaily({...createForm})
+    ElMessage.success('创建成功')
+    onCloseCreate()
+    onSearch({})
+  }catch(e:any){ ElMessage.error(e?.response?.data?.message || '创建失败') }
+}
 watch(detail, () => { formChanged.value = false }, { deep: true })
 async function saveDetail(row: MntRecord) {
   try {

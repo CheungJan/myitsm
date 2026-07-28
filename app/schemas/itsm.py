@@ -23,19 +23,22 @@ class MaintenanceDailyCreate(BaseModel):
     detail_description: str | None = Field(None, max_length=200, description="详细描述")
     device_id: str | None = Field(None, max_length=13, description="设备编号")
     source_type: str | None = Field(None, max_length=10, description="来源类型")
+    temp_contract: str | None = Field(None, max_length=60, description="临时联系电话")
 
 
 class MaintenanceDailyUpdate(BaseModel):
     """更新日常维护单。"""
 
-    fault_type: str | None = Field(None, max_length=8)
-    servrity: str | None = Field(None, max_length=1)
-    emergency_level: str | None = Field(None, max_length=1)
-    priority: str | None = Field(None, max_length=1)
-    short_description: str | None = Field(None, max_length=80)
-    detail_description: str | None = Field(None, max_length=200)
-    device_id: str | None = Field(None, max_length=13)
-    memo: str | None = Field(None, max_length=200)
+    store_id: str | None = Field(None, max_length=8, description="门店ID")
+    fault_type: str | None = Field(None, max_length=8, description="故障类型")
+    servrity: str | None = Field(None, max_length=1, description="严重程度")
+    emergency_level: str | None = Field(None, max_length=1, description="紧急程度")
+    priority: str | None = Field(None, max_length=1, description="优先级")
+    short_description: str | None = Field(None, max_length=80, description="故障简述")
+    detail_description: str | None = Field(None, max_length=200, description="详细描述")
+    device_id: str | None = Field(None, max_length=13, description="设备编号")
+    temp_contract: str | None = Field(None, max_length=60, description="临时联系电话")
+    memo: str | None = Field(None, max_length=200, description="关单分类")
 
 
 class StatusTransition(BaseModel):
