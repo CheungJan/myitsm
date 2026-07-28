@@ -146,3 +146,26 @@ def compliance_stats():  # type: ignore[no-untyped-def]
     sla_id = request.args.get("sla_id")
     data = SlaTicketService.get_compliance_stats(sla_id=sla_id)
     return success_response(data=data)
+
+
+# ---- SLA 超时自动关单 ----
+
+
+@sla_bp.get("/auto-close/preview")
+@login_required
+def auto_close_preview():  # type: ignore[no-untyped-def]
+    """预览超时未回访单据（不执行关单）。"""
+    from app.services.sla_auto_close_service import SlaAutoCloseService
+
+    data = SlaAutoCloseService.preview_overdue()
+    return success_response(data=data)
+
+
+@sla_bp.post("/auto-close/run")
+@login_required
+def auto_close_run():  # type: ignore[no-untyped-def]
+    """手动触发 SLA 超时自动关单扫描。"""
+    from app.services.sla_auto_close_service import SlaAutoCloseService
+
+    data = SlaAutoCloseService.scan_and_close()
+    return success_response(data=data)

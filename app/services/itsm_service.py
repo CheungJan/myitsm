@@ -586,6 +586,8 @@ class MaintenanceDailyService(_BaseMaintenanceService):
                 # P0-1: 完成维修时读 TIT23 最新 d2d_result 派生 is_success
                 # 离店不改状态，完成维修才是唯一触发器
                 self._derive_is_success_from_latest_d2d(record)
+                # 写 close_time（完成维修时间，SLA 超时自动关单起算点）
+                record.close_time = datetime.now(UTC)
                 self._create_service_return_inbound(record, operator)
                 # 1a 阶段关单联动 L1/L2/L3/L11
                 self._write_eid_track_on_daily_close(record, operator)
