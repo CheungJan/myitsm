@@ -6,6 +6,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import desc
+
 from app.extensions import db
 from app.models.inventory import AdjustPrice, InventoryLimit, InventoryLimitHistory, Price
 
@@ -112,6 +114,13 @@ class AdjustPriceRepository:
     @staticmethod
     def get_by_key(pabillid: str, lineno: int) -> AdjustPrice | None:
         return db.session.get(AdjustPrice, (pabillid, lineno))
+
+    @staticmethod
+    def list_all(page: int = 1, per_page: int = 20) -> tuple[list[AdjustPrice], int]:
+        query = db.session.query(AdjustPrice).filter(AdjustPrice.useflg == "1").order_by(desc(AdjustPrice.gendate))
+        total: int = query.count()
+        items: list[AdjustPrice] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
 
     @staticmethod
     def list_by_bill(pabillid: str) -> list[AdjustPrice]:

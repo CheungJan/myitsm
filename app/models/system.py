@@ -30,6 +30,11 @@ class User(BaseModel):
     passwd = db.Column(db.String(128), comment="原始密码（数据迁移用）")
     credamt = db.Column(db.Numeric(12, 2), comment="信用额度")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    default_whcd = db.Column(
+        db.String(2),
+        db.ForeignKey("twh01_warehouse.whcd", name="fk_user_default_warehouse"),
+        comment="默认仓库（FK→twh01_warehouse.whcd，工程师虚拟仓场景使用）",
+    )
 
     groups = db.relationship("UserGroup", back_populates="user", lazy="dynamic")
 
@@ -61,6 +66,7 @@ class Group(BaseModel):
     status = db.Column(db.String(1), default="1", comment="状态")
     # --- Oracle 原表恢复字段 ---
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    leader_cd = db.Column(db.String(6), comment="组长用户编码（tmc13_users.user_cd）")
 
     members = db.relationship("UserGroup", back_populates="group", lazy="dynamic")
     rights = db.relationship("GroupRight", back_populates="group", lazy="dynamic")
@@ -177,6 +183,10 @@ class SysParm(BaseModel):
     allowmultilogon = db.Column(db.String(1), comment="允许多点登录")
     shopbilltype = db.Column(db.String(1), comment="店铺单据类型")
     centralwarehouse = db.Column(db.String(4), comment="中心仓库编码")
+    # ITSM 新增全局参数
+    jwt_expiration_seconds = db.Column(db.Integer, default=28800, comment="JWT超时(秒)")
+    log_retention_days = db.Column(db.Integer, default=30, comment="日志保留天数")
+    max_upload_size_mb = db.Column(db.Integer, default=10, comment="上传大小限制(MB)")
 
 
 class AccLog(BaseModel):

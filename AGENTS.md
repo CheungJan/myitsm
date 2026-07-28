@@ -7,16 +7,20 @@
 ## 目录结构识别约定（重构关键）
 - `app/` 为重构后的 Python 后端代码目录（Flask 应用工厂模式）。
 - `PBsrc/` 为 PB 原始源码目录，包含 25 个 `.pbl` 模块及参考数据文件。
+- `PBsrc/pb_oracle_*/` 为 PB 原 Oracle 数据库（CCGL_TEST）导出的数据库对象源码目录，按对象类型分目录存放（PROCEDURE/FUNCTION/PACKAGE/TRIGGER/TYPE/VIEW/SEQUENCE/INDEX），详见 `docs/core/PB_Oracle_数据库对象导出清单.md`。
 - `docs/core/` 为核心文档目录，`docs/archive/` 为归档文档目录（旧重构资料）。
 - `_backup/` 为备份目录（存放旧重构代码 `app_old/`）。
 - PB→Python 重构时，必须按 `PBsrc/` 下 `.pbl` 模块边界建立映射与迁移清单，禁止跨模块混迁。
 - 若出现目录命名歧义，先在 `docs` 内补充映射说明，再开展代码迁移。
 
 ## 关键参考产物约定
+- **文档权威版本**: `docs/core/` 为唯一权威来源。`docs/myitsm/`、`CJdocs/` 为工作副本。
+- **功能完成后必须**: 同步更新 `docs/core/` 中的对应文档，不能只在工作副本修改。
 - 核心文档统一入口：`docs/core/CORE_DOCS_INDEX.md`（先看索引，再按索引打开原文档）。
 - 涉及数据库表结构、字段语义、字段说明、口径对齐时，优先参考 `docs/core/数据库字典_精简后_最终版.md`。
 - 涉及代码重构优化方案、业务模型改进时，优先参考 `docs/core/PB_TO_PYTHON_OPTIMIZATION_REQUIREMENTS.md`。
 - 涉及功能范围确认、缺失功能规划、扩展需求时，优先参考 `docs/core/系统功能对比分析与扩展规划.md`。
+- 涉及 PB 存储过程/函数/视图/触发器/序列/索引等数据库对象逻辑还原时，优先参考 `PBsrc/pb_oracle_*/` 下导出源码与 `docs/core/PB_Oracle_数据库对象导出清单.md`。
 - 若实现逻辑与参考产物存在冲突，先记录差异并在 `docs` 补充说明后再实施变更。
 
 ## 重构开工前必读清单（每次任务开始前执行）
@@ -25,7 +29,7 @@
    `docs/core/ITSM重构项目需求设计文档.md`（确认 PB 源码分析结论、P0-P4 优化方案与重构路线图）。
 3. `docs/core/PB_TO_PYTHON_OPTIMIZATION_REQUIREMENTS.md`（**确认优化需求**：业务流程改进、数据模型优化方案，如客户生命周期、资产属性等）。
 4. `docs/core/系统功能对比分析与扩展规划.md`（**确认功能范围**：已有功能映射、缺失功能优先级分类、Tier-1/2/3 扩展规划，避免遗漏已确认需求）。
-5. `docs/core/数据库字典_精简后_最终版.md`（确认表结构、字段语义与口径）。
+5. `docs/core/数据库字典_PostgreSQL当前版.md`（确认表结构、字段语义与口径）。
 6. `docs/core/PB_TO_PYTHON_MODULE_MAPPING.csv`（确认模块边界与责任归属）。
 7. `docs/core/PB_TO_PYTHON_SQL_MAPPING.csv`（确认关键 SQL 映射与一致性校验口径）。
 8. `docs/core/PB_TO_PYTHON_DOD_CHECKLIST.md` 与 `docs/core/PB_TO_PYTHON_RELEASE_ROLLBACK_CHECKLIST.md`（确认交付验收与回滚要求）。
@@ -34,8 +38,8 @@
 未完成以上核对前，不得开始模块代码迁移与提交。
 
 ## 项目阶段与目标
-- 当前阶段：全部后端开发已完成（阶段1-5），进入数据库迁移与前端开发阶段。
-- 核心目标：完成 Oracle→PostgreSQL 数据迁移、前端页面开发、系统联调上线。
+- 当前阶段：全部后端开发已完成（阶段1-6），进入数据迁移与前端开发阶段。
+- 核心目标：完成 ortopbitsmdb→myitsm 数据迁移、前端页面开发（Vue 3）、系统联调上线。
 
 ### 阶段路线图与已确认需求
 
@@ -48,21 +52,18 @@
 | ═══ | ═══ | **═══ PB→Python 等价重构完成线 ═══** | |
 | 阶段5 | **已完成** | **[Tier-2]** 结算(G4,4表) + 财务(G5,5表) + 门户(G9,3表) + **[Tier-3]** MES(G7,4表) + IoT(G8,4表) | PR#6 |
 | 字段恢复+业务必须表 | **已完成** | 155缺失字段恢复 + 10优化字段落地 + **14张业务必须表建模** | PR#6 |
-| ═══ | ═══ | **═══ 全部后端开发完成线（138模型/128测试） ═══** | |
+| ═══ | ═══ | **═══ 全部后端开发完成线（138模型/128测试/195端点） ═══** | |
+| 阶段6 | **已完成** | 事务查询(全模块单据+错账更正+进销存) + 报表(库存/EID/销售/BOM) | — |
 
-> **后端开发全部完成**。后续重点：数据库迁移(Oracle→PostgreSQL) + 前端页面开发 + IoT中间件建设。
+> **后端开发全部完成（100% 覆盖 PB 业务逻辑）**。后续重点：ortopbitsmdb→myitsm 数据迁移 + 前端页面开发（Vue 3）+ IoT 中间件建设。
 > 完整功能范围与优先级分类见 `docs/core/系统功能对比分析与扩展规划.md`。
 > 项目整体实施计划见 `docs/core/项目整体实施计划.md`。
 
 ## 重构总原则（必须遵守）
 1. 等价迁移优先（实现阶段）：在完成源码分析与优化点识别后，先保证行为一致，再实施优化。
 2. 小步快跑：按模块拆分，单次变更可回滚、可验证。
-3. 不做无关扩展：未明确要求时，不新增业务功能。Tier-1 扩展功能（SLA/合同/发票/通知）属于已确认需求，不受此条限制。
+3. 不做无关扩展：未明确要求时，不新增业务功能。
 4. 变更可追踪：所有改动必须有对应映射与验收依据。
-5. 源码先行：重构代码前，必须先阅读对应 PB 源码（`.pbl` 下相关 `sru/srw/srf` 等对象）并完成流程分析。
-6. 流程分析至少包含：关键事件入口、核心 SQL、状态流转、主子表关系、异常分支。
-7. 问题先识别：若 PB 源码存在流程缺陷或可维护性问题，必须先形成“问题与优化点清单”，再执行 Python 重构。
-8. 未完成“源码分析 + 优化点确认”前，不得直接进入实现提交阶段。
 
 ## 技术与架构约定
 - 后端框架：Flask（应用工厂模式）。
@@ -95,6 +96,27 @@
 - 请求与响应必须有 schema 校验（Pydantic 或 Marshmallow）。
 - 错误响应统一包含 `request_id`。
 
+## 前端菜单更新约定（新增页面/菜单必做，缺一不可）
+
+新增一个前端页面并显示在侧边栏菜单中，必须完成以下 **4 步**：
+
+| # | 文件/操作 | 内容 | 说明 |
+|---|----------|------|------|
+| 1 | `frontend/src/config/menu.ts` | 在对应 parent 下加 `{ menu_cd, menu_nm, path }` | 前端菜单树的唯一硬编码来源 |
+| 2 | `frontend/src/router/index.ts` | 加路由 `{ path, name, component }` | 路径需与 menu.ts 的 path 一致 |
+| **3** | `tmc01_menus` 表 | `INSERT` menu_cd/menu_nm/parent_cd | 后台菜单定义 |
+| **4** | `tmc02_menusdt` 表 | `INSERT` menu_cd/func_cd='view'/**useflg='1'** | ⚠️ **useflg 必须为 '1'**，NULL 会导致管理员的全部权限查询（`useflg=='1'` 过滤）被排除 |
+
+**验证**：退出重新登录 → 菜单出现。
+
+**开发时如果菜单不显示，按顺序排查**：
+1. `SELECT useflg FROM tmc02_menusdt WHERE menu_cd='xxx'` — 检查是否为 '1'
+2. `SELECT * FROM tmc01_menus WHERE menu_cd='xxx'` — 检查是否存在
+3. `frontend/src/config/menu.ts` — 检查是否已添加
+4. 退出重新登录（清除权限缓存）
+
+> 本约定源自 CLAUDE.md，统一归入 AGENTS.md 作为项目权威规则。CLAUDE.md 保留 MCP/Skills 等环境配置。
+
 ## 命名、编码与文档约定
 - 代码、注释、文档、评审意见统一中文。
 - 编码 UTF-8，换行 LF，文件末尾保留单一换行。
@@ -121,13 +143,6 @@
 - 敏感字段必须脱敏输出。
 - 密钥、令牌、连接串不得入库。
 
-## 迁移执行顺序（推荐）
-1. 建立 PB→Python 模块映射清单。
-2. 建立 PB SQL→Repository 方法映射清单。
-3. 按业务域逐模块迁移（先核心链路）。
-4. 每模块完成后执行一致性校验与回归测试。
-5. 阶段性灰度发布与回滚演练。
-
 ## 交付件最小集合
 - `PB_TO_PYTHON_MODULE_MAPPING.csv`
 - `PB_TO_PYTHON_SQL_MAPPING.csv`
@@ -144,6 +159,7 @@
 - 修改代码/配置/文档前必须先读取文件确认内容，避免覆盖他人修改。
 - 使用 Git 进行版本管理，提交前确保质量门禁通过。
 - 按需使用项目提供的 pre-commit 钩子（black/isort/ruff）进行本地检查。
+- 查询 PB 原 Oracle 数据库（CCGL_TEST）使用 `sqlplus ccgl/ccgl@CCGL_TEST`，常用查询模板与注意事项见 `docs/core/PB_Oracle_数据库对象导出清单.md` §2.1。静态导出源码优先查 `PBsrc/pb_oracle_*/`，动态查询（跨对象搜索/最新状态/动态统计）才连 sqlplus。
 
 ## ITSM业务表结构约定（主子表+公用类型表）
 
@@ -198,3 +214,19 @@
 3. **公用附表复用**：`TIT23_MAINTENANCE_D2D`（上门服务）、`TIT24_MAINTENANCE_RV`（回访）作为公共服务已实现。
 4. **状态机统一**：所有主表共享 `MaintenanceState` 状态机，CURRENT_STATUS 字段语义一致。
 5. **关联查询**：主子表通过 `MAINTENANCE_ID` / `RENOVATE_ID` / `NEW_OPENING_ID` 关联。
+
+Respond terse like smart caveman. All technical substance stay. Only fluff die.
+
+Rules:
+- Drop: articles (a/an/the), filler (just/really/basically), pleasantries, hedging
+- Fragments OK. Short synonyms. Technical terms exact. Code unchanged.
+- Pattern: [thing] [action] [reason]. [next step].
+- Not: "Sure! I'd be happy to help you with that."
+- Yes: "Bug in auth middleware. Fix:"
+
+Switch level: /caveman lite|full|ultra|wenyan
+Stop: "stop caveman" or "normal mode"
+
+Auto-Clarity: drop caveman for security warnings, irreversible actions, user confused. Resume after.
+
+Boundaries: code/commits/PRs written normal.

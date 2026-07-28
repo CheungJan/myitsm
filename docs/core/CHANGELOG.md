@@ -4,6 +4,181 @@
 
 ---
 
+## [v0.12.0] — 2026-06-12 — FQC Phase 2-3: BOM冗余量 + 退料 + 更换记录 + 工单取消
+
+### 新增
+- **BOM 冗余量**：`tmm41_bom.redundancy_ratio`，补料量 = 非合格数 × (1 + ratio)
+- **QC 审核约束**：未审核的补料 OV=8 时禁止审核 QC
+- **过程记录表**：`tms05_replace_record`，记录工单物料更换（旧→新 EID）
+- **更换 API**：`POST /mes/work-orders/<id>/replace`
+- **自动退料**：FQC 审核通过时检查 OV=8 剩余库存 → 自动生成 IV=3 退料 + TMS04
+- **工单取消清理**：取消时检查下游 → 作废草稿 OV=8 + 已审核 OV=8 生成 IV=3 对冲 + QC草稿作废
+- **消耗类型字典**：OV 新增 11=定额领料 12=不良补料，IV 新增 12=退料入库
+- **结果页补料标签**：`has_pending_replenish`，"补料中"标签
+
+### 变更
+- `qc_service.audit()`：新增补料 OV=8 审核检查 + FQC 完成时自动退料
+- `qc_service.replenish()`：应用 BOM 冗余量 + 用户可覆盖数量
+- `mes_service.transition()`：取消时自动清理关联单据 + 已审核检查
+- `mes_service._create_production_outbound_draft()`：去重查询加 `useflg='1'`
+- `warehouse_service.OV=8审计`：兼容 RELEASED 状态推进到 IN_PROGRESS
+- `WorkOrderList.vue`：抽屉新增"更换"按钮 + 对话框
+- `MaterialConsumeList.vue`：改用 OV/IV 字典取消耗类型标签
+
+---
+
+## [v0.11.0] — 2026-06-12 — FQC 补料 API + 录入页优化
+
+### 新增
+- **补料申请 API**：`POST /api/v1/qc/batches/<batch_id>/replenish`，为不良品行生成 OV=8 补料出库草稿
+- **补料状态字段**：`tqc11_resultdt` / `tqc11_resulteid` 新增 `replenish_status`、`replenish_ov_billid`
+- **BOM 冗余量**：`tmm41_bom.redundancy_ratio`，补料量 = 非合格数 × (1 + ratio)
+- **QC 审核约束**：存在未审核的补料 OV=8 时，禁止审核 QC
+- **结果页补料状态**：`has_pending_replenish` 字段，显示"补料中"标签
+
+### 变更
+- `QcInput.vue`：`handleReplace()` → `handleReplenish()`
+- `qc_service.audit()`：跳过已补料行 + 补料单审核检查
+- `doBatchSubmit()`：新增 `skipReplenishCheck` 参数
+
+### 文档
+- 新增 `FQC优化与补料方案统一实施计划.md`
+- 更新 `数据库字典_PostgreSQL当前版.md`
+- 更新 `生产质检与物料消耗优化实施文档.md`
+
+---
+
+## [v0.10.0] — 2026-05-27 — 采购结算/退货模块
+
+### 新增
+- **采购结算单（TPC14 + TPC14_DT）**：完整 CRUD + 审核 + 作废，支持 COD/PIA/DEP/MON/INS 五种付款方式
+- **采购退货单（TPC16/TPC17）增强**：完整 CRUD + 审核 + 作废，退货数量校验（≤ 入库量-已退量）
+- **14 条新 API 路由**：结算/退货各 6 条 + 可结算/可退货查询 2 条
+- **前端页面**：结算单列表/新建/编辑/审核，退货单列表/新建/编辑/审核
+- **TPC20 需求-订单关联表** + **v_requisition_execution 视图**实时计算执行状态
+
+### 变更
+- `tpc14_pcbill`：custcd→suppliercd 重命名，新增 pay_type/invoice/audit 字段，删除 refbillid/pcamt
+- `tpc16_rpcbill`：custcd→suppliercd 重命名，新增 return_reason
+- `tpc17_rpcbilldt`：新增 return_price/return_amt/line_reason
+- 结算/退货单号由随机 ID 改为 IdMaster 取号（SB/RT 前缀）
+- `tpc13_registerdt` 新增 UNIQUE(rgstbillid, lineno) 约束
+
+### 修复
+- 采购需求执行状态视图：ordered_qty < audit_qty 时正确归为"执行中"
+- 历史测试路由更新 + SQLite 视图兼容
+
+---
+
+## [v0.9.0] — 2026-05-13 — P0 资产台账重构 + 数据质量治理
+
+### 新增
+- **物料分类树三级结构**：tmm11_itemclass + tmm12_items 叶子节点，大类→中类→物料编码
+- **BOM 配件归属解析**：tmm44_pos_r_eid → 父设备 CustPosRl 链路，按页批量后解析（非全表 JOIN）
+- **所属整机列**：资产列表+详情显示 host_eid，区分 BOM 配件与独立设备
+- **C 记录自动纠正**：历史详情实时校验 change_date≥gendate，自动修正日期(posupddate)和单号(翻新单)
+- **plan_refid 三级取值**：翻新单(tit15_maintenance_renovate) → C记录(时间校验) → 空
+- **性能索引**：idx_pos_r_eid_eid / idx_pos_r_eid_useflg / idx_cust_pos_rl_eid_useflg
+
+### 变更
+- **资产查询重构**：Eid 主表，BOM 归属子查询(LEFT JOIN)，位置筛选含 BOM 配件
+- **item_class 多选**：前端 el-tree-select 多选+父子级联，后端逗号分隔递归查询
+- **BOM 门店退回**：`/assets/bom` 新增 store_returned，配件状态联动整机门店分配
+- **树选择修复**：node-key="class_cd" 解决"点一个全选"Bug
+
+### 数据修复
+- **1,230 台孤儿报废**：sflg='1' 无客户无 BOM → sflg='2' + 1,189 条报废轨迹
+- **1,650 台退回同步**：门店已退回但 sflg 未联动 → sflg='0' + 1,402 条退回轨迹
+- **C 记录脏数据纠正**：2,700 条 change_date<gendate 自动过滤+纠正
+- **EID 空格清理**：tmm43_eid(1)+tmm43_eid_track(2)+tmm44_pos_r_eid(80)
+
+### 文档
+- 更新 API接口文档.md（新增 /assets、/assets/bom 端点）
+- 更新 数据库ER关系文档.md（Eid 17→22 字段，EidTrack 31→43 字段，新增 TMM44_POS_R_EID）
+- 更新 数据库字典_精简后_最终版.md（补充 P0 字段）
+- 新增 scripts/scrap_orphan_devices.py
+
+---
+
+## [v0.8.1] — 2026-05-11 — 系统参数清理
+
+- 标记 5 个零售遗留字段为废弃（costtype/centralwarehouse/poinvaliddays/soinvaliddays/shopbilltype）
+- 新增 3 个 ITSM 全局参数（jwt_expiration_seconds/log_retention_days/max_upload_size_mb）
+- ParamsList.vue 改为 3 分组表单（认证安全/系统运维/路径配置），6 字段
+- allowmultilogon 接入登录流程，登出 API + token 活跃管理
+- SysCode 模型加 memo 字段，tit03→tmm31 字典合并完成
+
+---
+
+## [v0.8.0] — 2026-05-10 — F1 前端地基完成 + 字典表合并 + 数据修复
+
+### 新增
+- **行政区域表迁移**：新增 tmm02_country(192)/tmm03_province(34)/tmm04_city(436)/tmm05_town(2778)
+- **客户行政区域回填**：11,022条 country_cd=191/prvn_cd=09，按分类名+地址匹配 city_cd
+- **预计划关联**：6927条 source_type=PREPLAN，preplan_id 通过磁卡号关联 plan_cust
+- **物料分类树**：ItemList.vue CTE递归树+表格联动，CRUD+搜索互斥
+- **客户管理重写**：52字段全展示，9分组折叠编辑，6码表下拉，详情/编辑对等
+- **EID设备管理**：复用物料分类树(含EID角标)，7码表下拉，变更历史(type=i/u/d)
+- **前端类型安全**：master.ts 严格interface，分组码表映射(codeMaps)
+
+### 变更
+- **tit03_syscodes→tmm31_syscodes**：75条ITSM字典迁入，ItsmSysCode模型移除
+- **新增31条业务码表**：CS/SRC/ES/ET/NO/IU/OD/SS/PS/QS
+- **itemclass parent_cd修复**：从ortopbitsmdb同步186条
+- **SysCode模型加memo字段**
+
+### 数据修复
+- 客户状态/来源初始化(11020条ACTIVE+MANUAL)
+- 物料分类parent_cd回填(186条)
+- 行政区域回填(按分类名+地址匹配)
+- 预计划来源识别(PREPLAN 6927条)
+
+### 文档
+- 新增 客户主数据字段规范.md
+- 更新 前端vue3-setup.md(实施记录)、迁移计划(Phase7补充)、CORE_DOCS_INDEX
+
+---
+
+## [v0.7.0] — 2026-05-08 — 数据迁移完成 + 模块补全
+
+**PR**: [#7](https://github.com/CheungJan/myitsm/pull/7) / [#8](https://github.com/CheungJan/myitsm/pull/8)
+
+### 新增
+- **数据迁移工具**：双PG连接器 + 动态字段映射 + 5批执行引擎 + CLI入口（`app/migration/`）
+- **逐表校验测试**：14 个参数化行数对比测试
+- **资产盘点模块**：AssetCheckAccept Repository + Service + API（6端点）
+- **POS设备变更模块**：PosChange Repository + Service + API（4端点）
+
+### 数据迁移结果
+- 86 表完全匹配，总体完整率 **99.6%**（3,339,020/3,353,080 行）
+- 7 大问题全部修复（OFFSET不一致、CHAR空格、NOT NULL默认值、id FK断裂等）
+
+### 文档
+- 新增 数据迁移执行方案 v2、数据迁移问题解决报告、Oracle核查导出指南
+- 更新 项目整体实施计划 v1.3、API接口文档 v1.2、系统功能分析 v1.3、文档体系审查报告、数据库ER关系文档 v2.1
+
+---
+
+## [v0.6.0] — 2026-05-07 — 阶段6 事务查询与报表模块
+
+### 新增
+- **全模块单据统一查询**：跨 9 种单据类型 UNION ALL 联合查询，支持按类型/门店/状态/日期/关键字筛选
+- **错账更正（红蓝单冲销）**：原单标记冲销（redflg）+ 审计日志记录
+- **进销存汇总**：按物料+仓库聚合期初/入库/出库/期末
+- **库存报表**（3端点）：库存快照 + 库存预警清单 + 库存变动流水
+- **EID 追踪报表**（2端点）：EID 全生命周期追踪 + 单个 EID 变更追溯明细
+- **销售报表**（2端点）：销售状态汇总统计 + 未结单据清单
+- **BOM 结构树报表**
+
+### 文件
+- `app/api/transactions.py` — 事务查询蓝图（4端点）
+- `app/api/reports.py` — 报表蓝图（8端点）
+- `app/services/transaction_service.py` / `report_service.py`
+- `app/repositories/transaction_repository.py` / `report_repository.py`
+- `app/schemas/transaction.py` / `report.py`
+
+---
+
 ## [v0.5.0] — 2026-04-27 — 阶段5 Tier-2/3 完整实现
 
 **PR**: [#6](https://github.com/CheungJan/myitsm/pull/6)

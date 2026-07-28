@@ -1,0 +1,176 @@
+PROCEDURE SP_KQ_STATISTIC(I_MON    IN VARCHAR2,
+                                            I_NUM    IN VARCHAR2,
+                                            O_RETURN OUT VARCHAR2)
+
+ AS
+  V_DATE  DATE;
+  V_COUNT NUMBER;
+  V_OPERTEMP   VARCHAR2(10);
+  V_REP   TKQ02_ATTENDANCECOUNT%ROWTYPE;
+BEGIN
+
+  BEGIN
+    V_DATE := LAST_DAY(TO_DATE(I_MON, 'YYYYMM'));
+  EXCEPTION
+    WHEN OTHERS THEN
+      RAISE_APPLICATION_ERROR(-20010, '月份有误！'||V_DATE);
+      ROLLBACK;
+      O_RETURN := '月份有误！';
+      RETURN;
+  END;
+
+  --按员工处理考勤记录
+  FOR ATT IN (SELECT AMONTH,ADATE,OPERID ,OPERNM,
+             (CASE WHEN PUNCHNUM = 1 THEN '卡'
+                  WHEN PUNCHNUM >= 2 AND LATECOUNT IS NULL AND LEAVECOUNT IS NULL THEN '/'
+                  WHEN PUNCHNUM >= 2 AND LATECOUNT > 0 AND LEAVECOUNT IS NULL THEN 'Φ'|| LATECOUNT
+                  WHEN PUNCHNUM >= 2 AND LATECOUNT IS NULL AND LEAVECOUNT > 0 THEN 'Χ'|| LEAVECOUNT
+                  WHEN PUNCHNUM >= 2 AND LATECOUNT > 0 AND LEAVECOUNT > 0 THEN 'Φ'|| LATECOUNT ||'Χ'|| LEAVECOUNT
+                  ELSE NULL END) KQ
+              FROM TKQ01_ATTENDANCE
+                       WHERE AMONTH  = I_MON
+                         AND IMP_NUM  = TO_NUMBER(I_NUM)
+                         AND USEFLG = '1'
+                       ORDER BY OPERID ,ADATE ) LOOP
+
+    IF V_OPERTEMP IS NULL OR V_OPERTEMP <> ATT.OPERID THEN
+      IF V_REP.AMONTH IS NOT NULL THEN
+        UPDATE TKQ02_ATTENDANCECOUNT T SET
+          D1  = V_REP.D1 , D2  = V_REP.D2 , D3  = V_REP.D3 , D4  = V_REP.D4 ,
+          D5  = V_REP.D5 , D6  = V_REP.D6 , D7  = V_REP.D7 , D8  = V_REP.D8 ,
+          D9  = V_REP.D9 , D10 = V_REP.D10, D11 = V_REP.D11, D12 = V_REP.D12,
+          D13 = V_REP.D13, D14 = V_REP.D14, D15 = V_REP.D15, D16 = V_REP.D16,
+          D17 = V_REP.D17, D18 = V_REP.D18, D19 = V_REP.D19, D20 = V_REP.D20,
+          D21 = V_REP.D21, D22 = V_REP.D22, D23 = V_REP.D23, D24 = V_REP.D24,
+          D25 = V_REP.D25, D26 = V_REP.D26, D27 = V_REP.D27, D28 = V_REP.D28,
+          D29 = V_REP.D29, D30 = V_REP.D30, D31 = V_REP.D31, IMP_NUM =TO_NUMBER(I_NUM),
+          UPDATE_TIME =SYSDATE
+        WHERE T.AMONTH = V_REP.AMONTH
+         AND T.OPERID = V_REP.OPERID;
+      END IF;
+      V_OPERTEMP  := ATT.OPERID ;
+      V_REP       := NULL;
+
+      --查询当前员工报表信息是否存在
+      SELECT COUNT(*) INTO V_COUNT FROM TKQ02_ATTENDANCECOUNT T WHERE T.AMONTH = ATT.AMONTH AND T.OPERID = ATT.OPERID;
+
+      IF V_COUNT > 0 THEN
+        --有 :取出数据
+        SELECT T.* INTO V_REP FROM TKQ02_ATTENDANCECOUNT T
+         WHERE T.AMONTH = ATT.AMONTH AND T.OPERID = ATT.OPERID;
+      ELSE
+        --没有 :新增数据记录
+        V_REP.AMONTH := ATT.AMONTH; --考勤月份
+        V_REP.OPERID := ATT.OPERID; --员工ID
+        V_REP.OPERNM := ATT.OPERNM; --员工姓名
+
+        V_REP.MEMO        := NULL; --备注
+        V_REP.IMP_NUM     := TO_NUMBER(I_NUM); --导入次数
+        V_REP.USEFLG      := '1'; --有效标记
+        V_REP.IMP_DATE    := SYSDATE; --生成日期
+        V_REP.UPDATE_TIME := NULL; --更新时间
+        V_REP.UPDATOR     := NULL; --更新人
+
+        BEGIN
+          INSERT INTO TKQ02_ATTENDANCECOUNT VALUES V_REP;
+        EXCEPTION
+          WHEN OTHERS THEN
+            RAISE_APPLICATION_ERROR(-20010,
+                                    '插入考勤报表失败！' || ATT.OPERID);
+            ROLLBACK;
+            O_RETURN := '插入考勤报表失败！' || ATT.OPERID;
+            RETURN;
+        END;
+      END IF;
+    END IF;
+
+    IF TO_CHAR(ATT.ADATE,'DD') = '01' THEN
+      V_REP.D1  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '02' THEN
+      V_REP.D2  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '03' THEN
+      V_REP.D3  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '04' THEN
+      V_REP.D4  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '05' THEN
+      V_REP.D5  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '06' THEN
+      V_REP.D6  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '07' THEN
+      V_REP.D7  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '08' THEN
+      V_REP.D8  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '09' THEN
+      V_REP.D9  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '10' THEN
+      V_REP.D10  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '11' THEN
+      V_REP.D11  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '12' THEN
+      V_REP.D12  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '13' THEN
+      V_REP.D13  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '14' THEN
+      V_REP.D14  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '15' THEN
+      V_REP.D15  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '16' THEN
+      V_REP.D16  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '17' THEN
+      V_REP.D17  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '18' THEN
+      V_REP.D18  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '19' THEN
+      V_REP.D19  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '20' THEN
+      V_REP.D20  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '21' THEN
+      V_REP.D21  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '22' THEN
+      V_REP.D22  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '23' THEN
+      V_REP.D23  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '24' THEN
+      V_REP.D24  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '25' THEN
+      V_REP.D25  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '26' THEN
+      V_REP.D26  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '27' THEN
+      V_REP.D27  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '28' THEN
+      V_REP.D28  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '29' THEN
+      V_REP.D29  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '30' THEN
+      V_REP.D30  := ATT.KQ;
+    ELSIF TO_CHAR(ATT.ADATE,'DD') = '31' THEN
+      V_REP.D31  := ATT.KQ;
+    END IF;
+
+
+  END LOOP;
+  IF V_REP.OPERID IS NOT NULL THEN
+    UPDATE TKQ02_ATTENDANCECOUNT T SET
+      D1  = V_REP.D1 , D2  = V_REP.D2 , D3  = V_REP.D3 , D4  = V_REP.D4 ,
+      D5  = V_REP.D5 , D6  = V_REP.D6 , D7  = V_REP.D7 , D8  = V_REP.D8 ,
+      D9  = V_REP.D9 , D10 = V_REP.D10, D11 = V_REP.D11, D12 = V_REP.D12,
+      D13 = V_REP.D13, D14 = V_REP.D14, D15 = V_REP.D15, D16 = V_REP.D16,
+      D17 = V_REP.D17, D18 = V_REP.D18, D19 = V_REP.D19, D20 = V_REP.D20,
+      D21 = V_REP.D21, D22 = V_REP.D22, D23 = V_REP.D23, D24 = V_REP.D24,
+      D25 = V_REP.D25, D26 = V_REP.D26, D27 = V_REP.D27, D28 = V_REP.D28,
+      D29 = V_REP.D29, D30 = V_REP.D30, D31 = V_REP.D31, IMP_NUM =TO_NUMBER(I_NUM),
+      UPDATE_TIME =SYSDATE
+    WHERE T.AMONTH = V_REP.AMONTH
+     AND T.OPERID = V_REP.OPERID;
+   END IF;
+
+  -------------------------
+  O_RETURN := 'OK';
+  -------------------
+
+EXCEPTION
+  WHEN OTHERS THEN
+    O_RETURN := SQLCODE || SQLERRM;
+
+END;

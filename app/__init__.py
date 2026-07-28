@@ -12,6 +12,7 @@ import uuid
 from typing import Any
 
 from flask import Flask, g, jsonify
+from sqlalchemy.exc import DataError, IntegrityError
 
 from app.config import config_map
 from app.extensions import cors, db, migrate
@@ -40,8 +41,38 @@ def create_app(config_name: str | None = None) -> Flask:
 def _init_extensions(app: Flask) -> None:
     """初始化扩展。"""
     db.init_app(app)
-    migrate.init_app(app, db)
+    migrate.init_app(app, db, compare_type=True, include_comments=False)
     cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
+
+    # 注册 Eid 模型事件监听（自动写 tmm43_eid_track i/u/d，对齐 PB 触发器）
+    from app.extensions.eid_listeners import register_eid_listeners
+
+    register_eid_listeners()
+
+    # 注册审计字段自动维护（update_time / updator 兜底赋值）
+    from app.extensions.audit_listeners import register_audit_listeners
+
+    register_audit_listeners()
+
+    # 注册 POS 状态同步事件监听器（审核意见 13，d2d 离店/关单/新建 → 同步 TMM22.posstatus）
+    from app.services.pos_sync_listener import _on_d2d_leave_sync_pos  # noqa: F401
+    from app.services.pos_sync_listener import _on_maintenance_close_sync_pos  # noqa: F401
+    from app.services.pos_sync_listener import _on_maintenance_create_sync_pos  # noqa: F401
+
+    # 注册 seed CLI
+    from app.seed import init_app as seed_init
+
+    seed_init(app)
+
+    # 初始化定时任务调度器（非 testing 环境）
+    # SLA 超时自动关单等定时任务在此注册
+    if app.config.get("TESTING"):
+        # testing 环境不启动调度器，避免测试时后台任务干扰
+        pass
+    else:
+        from app.extensions.scheduler import init_scheduler
+
+        init_scheduler(app)
 
 
 def _register_blueprints(app: Flask) -> None:
@@ -49,6 +80,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.api.attendance import attendance_bp
     from app.api.auth import auth_bp
     from app.api.billing import billing_bp
+    from app.api.bom import bom_bp
     from app.api.contract import contract_bp
     from app.api.deposit import deposit_bp
     from app.api.finance import finance_bp
@@ -60,9 +92,12 @@ def _register_blueprints(app: Flask) -> None:
     from app.api.notification import notification_bp
     from app.api.portal import portal_bp
     from app.api.procurement import procurement_bp
+    from app.api.qc import qc_bp
+    from app.api.reports import report_bp
     from app.api.sales import sales_bp
     from app.api.sla import sla_bp
     from app.api.system import system_bp
+    from app.api.transactions import transaction_bp
     from app.api.warehouse import warehouse_bp
 
     app.register_blueprint(health_bp, url_prefix="/api/v1")
@@ -74,6 +109,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(sales_bp, url_prefix="/api/v1/sales")
     app.register_blueprint(sla_bp, url_prefix="/api/v1/sla")
     app.register_blueprint(attendance_bp, url_prefix="/api/v1/attendance")
+    app.register_blueprint(bom_bp, url_prefix="/api/v1/bom")
     app.register_blueprint(inventory_bp, url_prefix="/api/v1/inventory")
     app.register_blueprint(deposit_bp, url_prefix="/api/v1/deposit")
     app.register_blueprint(contract_bp, url_prefix="/api/v1/contract")
@@ -85,6 +121,11 @@ def _register_blueprints(app: Flask) -> None:
     # Tier-3 扩展
     app.register_blueprint(mes_bp, url_prefix="/api/v1/mes")
     app.register_blueprint(iot_bp, url_prefix="/api/v1/iot")
+    # 质检
+    app.register_blueprint(qc_bp, url_prefix="/api/v1/qc")
+    # 事务查询与报表
+    app.register_blueprint(transaction_bp, url_prefix="/api/v1/transactions")
+    app.register_blueprint(report_bp, url_prefix="/api/v1/reports")
 
 
 def _make_error_body(code: int, message: str) -> dict[str, Any]:
@@ -116,10 +157,59 @@ def _register_error_handlers(app: Flask) -> None:
     def not_found(exc: Exception) -> tuple[Any, int]:
         return jsonify(_make_error_body(404, "资源不存在")), 404
 
+    @app.errorhandler(IntegrityError)
+    def handle_integrity_error(exc: IntegrityError) -> tuple[Any, int]:
+        """数据库约束错误（主键冲突、唯一约束、外键约束）。"""
+        request_id = getattr(g, "request_id", "")
+        logger.exception("数据库约束冲突，request_id=%s", request_id)
+        msg = str(exc.orig) if exc.orig else "数据库约束冲突"
+        return jsonify(_make_error_body(409, msg)), 409
+
+    @app.errorhandler(DataError)
+    def handle_data_error(exc: DataError) -> tuple[Any, int]:
+        """数据库数据类型错误。"""
+        request_id = getattr(g, "request_id", "")
+        logger.exception("数据库数据类型错误，request_id=%s", request_id)
+        msg = str(exc.orig) if exc.orig else "数据格式错误"
+        return jsonify(_make_error_body(400, msg)), 400
+
     @app.errorhandler(Exception)
-    def handle_exception(exc: Exception) -> tuple[Any, int]:
+    def handle_validation_error(exc: Exception) -> tuple[Any, int]:
+        """Pydantic 校验错误，返回中文消息。"""
+        from pydantic import ValidationError
+        import re
+        if isinstance(exc, ValidationError):
+            _msg_map = {
+                "Field required": "必填",
+                "Input should be a valid date": "日期格式无效",
+                "Input should be a valid datetime": "日期时间格式无效",
+                "value is not a valid integer": "不是有效整数",
+                "value is not a valid float": "不是有效数字",
+            }
+            msgs = []
+            for e in exc.errors():
+                loc = " → ".join(str(l) for l in e["loc"])
+                msg = e["msg"]
+                # 翻译常见消息
+                for eng, chn in _msg_map.items():
+                    if eng in msg:
+                        msg = msg.replace(eng, chn)
+                        break
+                # 翻译 "String should have at most N characters"
+                m = re.search(r"String should have at most (\d+) characters?", msg)
+                if m:
+                    msg = f"最多{m.group(1)}个字符"
+                # 翻译 "String should have at least N characters"
+                m = re.search(r"String should have at least (\d+) characters?", msg)
+                if m:
+                    msg = f"至少{m.group(1)}个字符"
+                msgs.append(f"{loc}: {msg}")
+            return jsonify(_make_error_body(400, "；".join(msgs))), 400
+        # 非 ValidationError 走通用处理
         request_id = getattr(g, "request_id", "")
         logger.exception("请求处理异常，request_id=%s", request_id)
+        if app.debug:
+            return jsonify(_make_error_body(500, str(exc))), 500
         return jsonify(_make_error_body(500, "服务器内部错误")), 500
 
 

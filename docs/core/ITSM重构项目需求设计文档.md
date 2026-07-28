@@ -1,10 +1,10 @@
 # ITSM 重构项目需求设计文档
 
-**文档版本**: v1.1  
+**文档版本**: v1.2  
 **创建时间**: 2026-04-27  
-**更新时间**: 2026-04-27（新增双库合并方案）  
+**更新时间**: 2026-05-08（后端100%完成+数据迁移完成）  
 **目标**: 将 PowerBuilder ITSM 系统重构为 Python + Flask + PostgreSQL 技术栈  
-**状态**: 待确认
+**状态**: ✅ 后端已完成（138模型/205端点/145测试），数据迁移完成(99.6%)，进入前端阶段
 
 ---
 
@@ -78,9 +78,9 @@
 | 类型码 | 含义 | 关联单据表 | 当前实现 |
 |--------|------|-----------|---------|
 | 00 | 新机开通 | TIT13_MAINTENANCE_OPEN | 正常 |
-| 10 | 设备变更 | TIT16_DEVICE_CHANGE | 正常 |
+| 10 | 磁卡号变更 | TIT16_DEVICE_CHANGE | 正常 |
 | 20 | 旧机翻新 | TIT15_MAINTENANCE_RENOVATE | 正常 |
-| **30** | **取机** | **TIT10_MAINTENANCEDAY** | **⚠️ 问题：借用日常维护单** |
+| **30** | **取机回收** | **TIT20_RECYCLE_TASK** | **✅ 已独立（重构优化4.2）** |
 | 40 | 关门 | —（已注释） | **⚠️ 功能未实现** |
 
 **当前流程**：
@@ -105,7 +105,7 @@
 | MO | 新机开通单 | TIT13_MAINTENANCE_OPEN | NEW_OPENING_ID | u_itsm_open（42,483字符） |
 | MR | 旧机翻新单 | TIT15_MAINTENANCE_RENOVATE | RENEW_ID | u_itsm_renovate（43,045字符） |
 | BY | 保养维护单 | TIT17_MAINTENANCE | DAILY_MAINTENANCE_ID | u_itsm_maintenance_daily |
-| BG | 设备变更单 | TIT16_DEVICE_CHANGE | DEVICE_CHANGE_ID | u_itsm_device_change |
+| BG | 磁卡号变更单 | TIT16_DEVICE_CHANGE | DEVICE_CHANGE_ID | u_itsm_device_change |
 | GB | 门店关闭 | TIT18_STORE_CLOSE | — | u_itsm_store_close |
 
 **统一状态流转**（CURRENT_STATUS 字段）：
@@ -271,7 +271,7 @@
 #### 问题4：磁卡号变更直接删除历史记录（⚠️ 严重）
 
 - **位置**：`itsm02.pbl/u_itsm_device_change.sru`
-- **现象**：设备变更 CHANGE_TYPE='CK'（改磁卡号）时，直接删除/覆盖旧磁卡号记录，导致历史数据丢失
+- **现象**：磁卡号变更 CHANGE_TYPE='CK'（改磁卡号）时，直接删除/覆盖旧磁卡号记录，导致历史数据丢失
 - **影响**：无法追溯磁卡号变更历史，审计追溯困难，报表数据缺失
 - **优化方案**：
   - 新建 TMM22_CUSTOMERS_HISTORY 表，变更前自动保存旧磁卡号信息
@@ -411,7 +411,7 @@
 | TIT14_EQUIPMENT_OPEN | 开通设备明细 | 3 |
 | TIT15_MAINTENANCE_RENOVATE | 旧机翻新单主表 | 3 |
 | TIT15_EQUIPMENT_RENOVATE | 翻新设备映射 | 1 |
-| TIT16_DEVICE_CHANGE | 设备变更单主表 | 4 |
+| TIT16_DEVICE_CHANGE | 磁卡号变更单主表 | 4 |
 | TIT17_MAINTENANCE | 保养维护单主表 | 1 |
 | TIT17_CUST_POS_DAILY | 保养设备明细 | 1 |
 | TIT17_MAINTENANCE_PLAN | 保养计划 | 1 |
@@ -614,7 +614,7 @@ class StockMovementService:
 | 新机开通单 CRUD | u_itsm_open | app/api/maintenance_open.py |
 | 旧机翻新单 CRUD | u_itsm_renovate | app/api/maintenance_renovate.py |
 | 保养维护单 CRUD | u_itsm_maintenance_daily | app/api/maintenance_daily.py |
-| 设备变更单 + 磁卡号历史 | u_itsm_device_change | app/api/device_change.py |
+| 磁卡号变更单 + 磁卡号历史 | u_itsm_device_change | app/api/device_change.py |
 | 取机/回收任务（优化1） | 新建 | app/api/recycle_task.py |
 | 公用附表服务（D2D/回访） | itsm.pbl 公用 | app/services/d2d_service.py 等 |
 

@@ -34,12 +34,14 @@ class WorkOrder(BaseModel):
     actual_start = db.Column(db.Date, comment="实际开始日期")
     actual_end = db.Column(db.Date, comment="实际完成日期")
     status = db.Column(
-        db.String(10),
+        db.String(20),
         default="DRAFT",
-        comment="状态（DRAFT/RELEASED/IN_PROGRESS/COMPLETED/CANCELLED）",
+        comment="状态（DRAFT/RELEASED/PICKING/IN_PROGRESS/QC_PENDING/COMPLETED/CANCELLED）",
     )
+    wo_type = db.Column(db.String(10), default="PRODUCTION", comment="工单类型: PRODUCTION=生产 RENOVATION=翻新")
     priority = db.Column(db.String(10), default="NORMAL", comment="优先级")
-    warehouse_cd = db.Column(db.String(20), comment="目标仓库")
+    warehouse_cd = db.Column(db.String(20), comment="成品入库仓库")
+    pick_whcd = db.Column(db.String(20), comment="领料出库仓库")
     remark = db.Column(db.String(200), comment="备注")
     opercd = db.Column(db.String(6), comment="操作人")
     upddate = db.Column(db.DateTime, comment="更新日期")
@@ -94,7 +96,7 @@ class WorkProcess(BaseModel):
     actual_qty = db.Column(db.Integer, default=0, comment="完成数量")
     defect_qty = db.Column(db.Integer, default=0, comment="不良品数量")
     status = db.Column(
-        db.String(10),
+        db.String(20),
         default="PENDING",
         comment="状态（PENDING/IN_PROGRESS/COMPLETED/SKIPPED）",
     )
@@ -111,6 +113,17 @@ class WorkProcess(BaseModel):
 # ---------------------------------------------------------------------------
 # 物料消耗
 # ---------------------------------------------------------------------------
+
+
+class ConsumeType:
+    """物料消耗类型常量（与 tmm31_syscodes CT 字典同步）。"""
+
+    PLAN = "1"       # 定额领料
+    REPLENISH = "2"  # 不良补料
+    SCRAP = "3"      # 报废出库
+    REPAIR = "4"     # 返修出库
+    RETURN = "5"     # 退料入库
+    RETURN_OUT = "6"  # 退货出库
 
 
 class MaterialConsume(BaseModel):
@@ -130,3 +143,38 @@ class MaterialConsume(BaseModel):
     remark = db.Column(db.String(200), comment="备注")
     opercd = db.Column(db.String(6), comment="操作人")
     upddate = db.Column(db.DateTime, comment="更新日期")
+
+    # 扩展字段：消耗类型与来源关联
+    consume_type = db.Column(
+        db.String(2),
+        default="1",
+        comment="消耗类型：1定额 2补料 3报废 4返修 5退换"
+    )
+    ref_bill_type = db.Column(db.String(2), comment="来源单据类型：OV出库/IV入库")
+    ref_bill_id = db.Column(db.String(20), comment="来源单据号")
+    ref_qc_id = db.Column(db.String(12), comment="关联质检单号")
+
+    # 成本字段（允许为空，后续填入）
+    unit_cost = db.Column(db.Numeric(12, 4), comment="单价（采购价/标准成本）")
+    total_cost = db.Column(db.Numeric(14, 2), comment="总成本（actual_qty * unit_cost）")
+
+
+class ReplaceRecord(BaseModel):
+    """物料更换记录（TMS05_REPLACE_RECORD）。"""
+
+    __tablename__ = "tms05_replace_record"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="主键")
+    wo_id = db.Column(db.String(20), nullable=False, comment="工单号")
+    old_eid = db.Column(db.String(20), comment="旧物料序列号（批次物料可为空）")
+    new_eid = db.Column(db.String(20), comment="新物料序列号（批次物料可为空，FQC合格后生成）")
+    itemcd = db.Column(db.String(12), nullable=True, comment="物料编码")
+    old_batch_no = db.Column(db.String(20), comment="旧批次号（批次物料使用）")
+    new_batch_no = db.Column(db.String(20), comment="新批次号（批次物料使用）")
+    replace_date = db.Column(db.TIMESTAMP, comment="更换时间")
+    opercd = db.Column(db.String(10), comment="操作人")
+    memo = db.Column(db.String(200), comment="备注")
+
+    __table_args__ = (
+        db.Index("idx_tms05_wo", "wo_id"),
+    )

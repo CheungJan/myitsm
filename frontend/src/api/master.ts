@@ -1,0 +1,555 @@
+import request from './request'
+
+// ---- 类型定义 ----
+
+export interface ItemClassNode {
+    class_cd: string
+    class_nm: string
+    childflg: string
+    children: ItemClassNode[]
+    type?: string
+    parent_cd?: string
+    opercd?: string
+    gendate?: string
+    created_at?: string
+}
+
+export interface ItemRecord {
+    item_cd: string
+    item_nm: string
+    class_cd: string
+    itemanm: string
+    unit: string
+    spec: string
+    useflg: string
+    upperlimit?: number
+    lowerlimit?: number
+    minorder?: number
+    newperiod?: number
+    oldperiod?: number
+    itembrcd?: string
+    itemsize?: string
+    pcrep?: string
+    purchasetyp?: string
+    keeper?: string
+    backup?: string
+    typflg?: string
+    consume?: string
+    [key: string]: unknown
+}
+
+export interface ItemsPage {
+    items: ItemRecord[]
+    total: number
+}
+
+export interface ItemQuery {
+    page?: number | string
+    per_page?: number | string
+    class_cd?: string
+    recursive?: boolean
+    search?: string
+}
+
+// ---- BOM 类型 ----
+
+export interface BomRecord {
+    bomcd: string
+    bomnm: string
+    useflg: string
+    gendate: string
+    redundancy_ratio?: number
+    details?: BomDetailRecord[]
+}
+
+export interface BomDetailRecord {
+    bomcd: string
+    itemcd: string
+    bomqty: number
+    itemtyp: string
+    item_nm?: string
+}
+
+export interface BomListPage {
+    items: BomRecord[]
+    total: number
+}
+
+// ---- 物料分类 ----
+
+export function fetchItemClassTree() {
+    return request.get<never, { data: ItemClassNode[] }>('/itemclasses/tree')
+}
+
+export function fetchSuppliers() {
+    return request.get<never, { data: { supp_cd: string; supp_nm: string }[] }>('/suppliers')
+}
+
+export function fetchSuppliersSimple() {
+    return request.get<never, { data: { supp_cd: string; supp_nm: string }[] }>('/suppliers/simple')
+}
+
+export function fetchSuppliersByRequisition(pcplanid: string) {
+    return request.get<never, { data: { supp_cd: string; supp_nm: string }[] }>('/suppliers/by-requisition', { params: { pcplanid } })
+}
+
+export function fetchBomClassTree(typflg?: string) {
+    return request.get<never, { data: ItemClassNode[] }>('/itemclasses/bom-tree', { params: typflg ? { typflg } : {} })
+}
+
+export function fetchItemPrices(itemCd: string) {
+    return request.get<never, { data: Record<string, unknown>[] }>(`/items/${itemCd}/prices`)
+}
+
+export function addItemPrice(itemCd: string, data: Record<string, unknown>) {
+    return request.post<never, { data: Record<string, unknown> }>(`/items/${itemCd}/prices`, data)
+}
+
+export function updateItemPrice(itemCd: string, busityp: string, data: Record<string, unknown>) {
+    return request.put<never, { data: Record<string, unknown> }>(`/items/${itemCd}/prices/${busityp}`, data)
+}
+
+export function deleteItemPrice(itemCd: string, busityp: string) {
+    return request.delete<never, unknown>(`/items/${itemCd}/prices/${busityp}`)
+}
+
+export function fetchRelatedBoms(itemCd: string) {
+    return request.get<never, { data: Record<string, unknown>[] }>(`/items/${itemCd}/related-boms`)
+}
+
+export function fetchItemSuppliers(itemCd: string) {
+    return request.get<never, { data: { custcd: string; supp_nm: string; dfltflg: string; delivercycle: number; servicecycle: number; guaranteeperiod: number }[] }>(`/items/${itemCd}/suppliers`)
+}
+
+export function addItemSupplier(itemCd: string, data: Record<string, unknown>) {
+    return request.post<never, { data: Record<string, unknown> }>(`/items/${itemCd}/suppliers`, data)
+}
+
+export function updateItemSupplier(itemCd: string, custCd: string, data: Record<string, unknown>) {
+    return request.put<never, { data: Record<string, unknown> }>(`/items/${itemCd}/suppliers/${custCd}`, data)
+}
+
+export function deleteItemSupplier(itemCd: string, custCd: string) {
+    return request.delete<never, unknown>(`/items/${itemCd}/suppliers/${custCd}`)
+}
+
+export function fetchItemClasses() {
+    return request.get<never, { data: { class_cd: string; class_nm: string; parent_cd: string }[] }>('/itemclasses')
+}
+
+export function createItemClass(data: Record<string, string>) {
+    return request.post<never, { data: ItemClassNode }>('/itemclasses', data)
+}
+
+export function updateItemClass(classCd: string, data: Record<string, string>) {
+    return request.put<never, { data: ItemClassNode }>(`/itemclasses/${classCd}`, data)
+}
+
+export function deleteItemClass(classCd: string) {
+    return request.delete<never, unknown>(`/itemclasses/${classCd}`)
+}
+
+// ---- 物料 CRUD ----
+
+export function fetchItems(params?: ItemQuery) {
+    return request.get<never, { data: ItemsPage }>('/items', { params })
+}
+
+export function createItem(data: Partial<ItemRecord>) {
+    return request.post<never, { data: ItemRecord }>('/items', data)
+}
+
+export function updateItem(itemCd: string, data: Partial<ItemRecord>) {
+    return request.put<never, { data: ItemRecord }>(`/items/${itemCd}`, data)
+}
+
+export function deleteItem(itemCd: string) {
+    return request.delete<never, unknown>(`/items/${itemCd}`)
+}
+
+// ---- 客户分类 ----
+
+export interface CustClassNode {
+    class_cd: string
+    class_nm: string
+    childflg: string
+    parent_cd: string
+    useflg: string
+    children: CustClassNode[]
+}
+
+export interface CustRecord {
+    cust_cd: string
+    cust_nm: string
+    cust_card: string
+    class_cd: string
+    phone_no: string
+    contactor: string
+    address: string
+    useflg: string
+    cust_anm: string
+    custrnm: string
+    store_cd: string
+    cust_brcd: string
+    area_cd: string
+    parentcd: string
+    zipcd: string
+    faxno: string
+    taxno: string
+    banknm: string
+    bankaccno: string
+    yj_money: string
+    pos_n: string
+    posstatus: string
+    posstatus1: string
+    ad_video: string
+    opersystem: string
+    data_base: string
+    soft_edition: string
+    systemcode: string
+    card3g: string
+    adr3g: string
+    busi_typ: string
+    ppt_code: string
+    levels: string
+    ordertype: string
+    is_contract: string
+    zf_type: string
+    comm_mode: string
+    customer_status: string
+    opendate: string
+    replacedate: string
+    source_type: string
+    preplan_id: string
+    jl_contactor: string
+    jl_phoneno: string
+    area: string
+    location: string
+    s_status: string
+    backup: string
+    [key: string]: unknown
+}
+
+export interface CustPage {
+    items: CustRecord[]
+    total: number
+}
+
+export interface CustQuery {
+    page?: number | string
+    per_page?: number | string
+    class_cd?: string
+    search?: string
+    customer_status?: string
+}
+
+export function fetchCustClassTree() {
+    return request.get<never, { data: CustClassNode[] }>('/custclasses/tree')
+}
+
+export function fetchCustClasses() {
+    return request.get<never, { data: { class_cd: string; class_nm: string; parent_cd: string }[] }>('/custclasses')
+}
+
+export function createCustClass(data: Record<string, string>) {
+    return request.post<never, { data: CustClassNode }>('/custclasses', data)
+}
+
+export function updateCustClass(classCd: string, data: Record<string, string>) {
+    return request.put<never, { data: CustClassNode }>(`/custclasses/${classCd}`, data)
+}
+
+export function deleteCustClass(classCd: string) {
+    return request.delete<never, unknown>(`/custclasses/${classCd}`)
+}
+
+// ---- 码表 ----
+
+export function fetchSyscodes(codeTyp: string) {
+    return request.get<never, { data: { code_cd: string; code_nm: string }[] }>('/syscodes', { params: { code_typ: codeTyp } })
+}
+
+export function fetchAreas() {
+    return request.get<never, { data: { area_cd: string; area_nm: string; area_id: number; name: string; usercd?: string; usercd_nm?: string }[] }>('/areas')
+}
+
+// ---- 区域管理 CRUD ----
+export interface AreaRecord { area_cd: string; area_nm: string; parent_cd?: string; usercd?: string; usercd_nm?: string; useflg?: string }
+export function createArea(data: Record<string, unknown>) {
+    return request.post<never, { data: AreaRecord }>('/areas', data)
+}
+export function updateArea(area_cd: string, data: Record<string, unknown>) {
+    return request.put<never, { data: AreaRecord }>(`/areas/${area_cd}`, data)
+}
+export function deleteArea(area_cd: string) {
+    return request.delete<never, { data: null }>(`/areas/${area_cd}`)
+}
+
+// ---- 区域用户关联 ----
+export interface AreaUserRecord { user_cd: string; user_nm: string; dept_cd?: string; choose: number }
+export function fetchAreaUsers(area_cd: string) {
+    return request.get<never, { data: AreaUserRecord[] }>(`/areas/${area_cd}/users`)
+}
+export function setAreaUsers(area_cd: string, user_cds: string[]) {
+    return request.put<never, { data: null }>(`/areas/${area_cd}/users`, { area_cd, user_cds })
+}
+
+// ---- 有限公司下拉（tmm22.class_cd 关联客户分类 class_nm） ----
+export function fetchYXCompanies() {
+    return request.get<never, { data: { class_cd: string; class_nm: string }[] }>('/yx-companies')
+}
+
+export function fetchCountries() {
+    return request.get<never, { data: { country_cd: string; country_nm: string }[] }>('/countries')
+}
+
+export function fetchProvinces() {
+    return request.get<never, { data: { prvn_cd: string; prvn_nm: string }[] }>('/provinces')
+}
+
+export function fetchCities(prvnCd?: string) {
+    return request.get<never, { data: { city_cd: string; city_nm: string }[] }>('/cities', { params: prvnCd ? { prvn_cd: prvnCd } : {} })
+}
+
+export function fetchTowns(cityCd?: string) {
+    return request.get<never, { data: { town_cd: string; town_nm: string }[] }>('/towns', { params: cityCd ? { city_cd: cityCd } : {} })
+}
+
+// ---- 国标地理四级联动（geo_*）----
+export function fetchGeoProvinces() {
+    return request.get<never, { data: { code: string; name: string }[] }>('/geo/provinces')
+}
+export function fetchGeoCities(provinceCode?: string) {
+    return request.get<never, { data: { code: string; name: string; province_code: string }[] }>(
+        '/geo/cities', { params: provinceCode ? { province_code: provinceCode } : {} }
+    )
+}
+export function fetchGeoAreas(cityCode?: string, provinceCode?: string) {
+    const params: Record<string, string> = {}
+    if (cityCode) params.city_code = cityCode
+    else if (provinceCode) params.province_code = provinceCode
+    return request.get<never, { data: { code: string; name: string; city_code: string; province_code: string }[] }>(
+        '/geo/areas', { params }
+    )
+}
+export function fetchGeoStreets(areaCode?: string) {
+    return request.get<never, { data: { code: string; name: string; area_code: string }[] }>(
+        '/geo/streets', { params: areaCode ? { area_code: areaCode } : {} }
+    )
+}
+
+// ---- 客户 ----
+
+export function fetchCustomers(params?: CustQuery) {
+    return request.get<never, { data: CustPage }>('/customers', { params })
+}
+export function createCustomer(data: Partial<CustRecord>) {
+    return request.post<never, { data: CustRecord }>('/customers', data)
+}
+export function updateCustomer(custCd: string, data: Partial<CustRecord>) {
+    return request.put<never, { data: CustRecord }>(`/customers/${custCd}`, data)
+}
+export function deleteCustomer(custCd: string) {
+    return request.delete<never, unknown>(`/customers/${custCd}`)
+}
+export function fetchCustomerDetail(custCd: string) {
+    return request.get<never, { data: CustRecord }>(`/customers/${custCd}`)
+}
+export function fetchCustomerAssets(custCd: string, params?: { page?: number | string; per_page?: number | string }) {
+    return request.get<never, { data: { items: Record<string, unknown>[]; total: number } }>(`/customers/${custCd}/assets`, { params })
+}
+
+// ---- 仓库 ----
+
+export function fetchWarehouses(useflg?: string) {
+    const params: Record<string, string> = {}
+    if (useflg !== undefined && useflg !== '') {
+        params.useflg = useflg
+    }
+    return request.get<never, { data: { whcd: string; whnm: string }[] }>('/warehouses', { params })
+}
+
+// ---- EID ----
+
+export interface EidRecord {
+    eid: string
+    itemcd: string
+    item_nm: string
+    etyp: string
+    whcd: string
+    sflg: string
+    asset_type: string
+    qcflg: string
+    gendate: string
+    prddate: string
+    [key: string]: unknown
+}
+
+export interface EidPage {
+    items: EidRecord[]
+    total: number
+}
+
+export interface EidQuery {
+    page?: number | string
+    per_page?: number | string
+    class_cd?: string
+    search?: string
+}
+
+export function fetchEidTree() {
+    return request.get<never, { data: ItemClassNode[] }>('/eid/tree')
+}
+
+export function fetchEidList(params?: EidQuery) {
+    return request.get<never, { data: EidPage }>('/eid', { params })
+}
+export function createEid(data: Record<string, unknown>) {
+    return request.post('/eid', data)
+}
+export function updateEid(itemcd: string, eidVal: string, data: Record<string, unknown>) {
+    return request.put(`/eid/${itemcd}/${eidVal}`, data)
+}
+export function deleteEid(itemcd: string, eidVal: string) {
+    return request.delete(`/eid/${itemcd}/${eidVal}`)
+}
+
+export function fetchEidTracks(itemcd: string, eid: string) {
+    return request.get<never, { data: Record<string,unknown>[] }>(`/eid/${itemcd}/${eid}/tracks`)
+}
+
+// ---- BOM API ----
+
+export function fetchBoms(params?: { page?: number | string; per_page?: number | string; search?: string }) {
+    return request.get<never, { data: BomListPage }>('/bom', { params })
+}
+
+export function fetchBom(bomcd: string) {
+    return request.get<never, { data: BomRecord }>(`/bom/${bomcd}`)
+}
+
+export function createBom(data: { bomcd: string; bomnm: string; redundancy_ratio?: number }) {
+    return request.post<never, { data: BomRecord }>('/bom', data)
+}
+
+export function updateBom(bomcd: string, data: { bomnm?: string; useflg?: string; redundancy_ratio?: number }) {
+    return request.put<never, { data: BomRecord }>(`/bom/${bomcd}`, data)
+}
+
+export function deleteBom(bomcd: string) {
+    return request.delete<never, unknown>(`/bom/${bomcd}`)
+}
+
+export function addBomDetail(bomcd: string, data: { itemcd: string; bomqty: number; itemtyp: string }) {
+    return request.post<never, { data: BomDetailRecord }>(`/bom/${bomcd}/details`, data)
+}
+
+export function updateBomDetail(bomcd: string, itemcd: string, data: { bomqty?: number; itemtyp?: string }) {
+    return request.put<never, { data: BomDetailRecord }>(`/bom/${bomcd}/details/${itemcd}`, data)
+}
+
+export function deleteBomDetail(bomcd: string, itemcd: string) {
+    return request.delete<never, unknown>(`/bom/${bomcd}/details/${itemcd}`)
+}
+
+// ---- 资产 ----
+
+export function fetchAssets(params?: Record<string, string>) {
+    return request.get('/assets', { params })
+}
+
+// ---- 供应商 CRUD ----
+
+export function fetchSuppliersPaginated(params: { keyword?: string; class_cd?: string; page?: number; per_page?: number }) {
+    return request.get('/suppliers', { params })
+}
+
+export function fetchSupplierDetail(suppCd: string) {
+    return request.get(`/suppliers/${suppCd}`)
+}
+
+export function createSupplier(data: Record<string, unknown>) {
+    return request.post('/suppliers', data)
+}
+
+export function updateSupplier(suppCd: string, data: Record<string, unknown>) {
+    return request.put(`/suppliers/${suppCd}`, data)
+}
+
+export function deleteSupplier(suppCd: string) {
+    return request.delete(`/suppliers/${suppCd}`)
+}
+
+// ---- 供应商分类 ----
+
+export function fetchSupplierClasses() {
+    return request.get('/supplierclasses')
+}
+
+export function fetchSupplierClassTree() {
+    return request.get('/supplierclasses/tree')
+}
+
+export function createSupplierClass(data: Record<string, unknown>) {
+    return request.post('/supplierclasses', data)
+}
+
+export function updateSupplierClass(classCd: string, data: Record<string, unknown>) {
+    return request.put(`/supplierclasses/${classCd}`, data)
+}
+
+export function deleteSupplierClass(classCd: string) {
+    return request.delete(`/supplierclasses/${classCd}`)
+}
+
+// ---- 供应商商品关联 ----
+
+export function fetchSupplierItems(suppCd: string) {
+    return request.get(`/suppliers/${suppCd}/items`)
+}
+
+export function addSupplierItem(suppCd: string, data: Record<string, unknown>) {
+    return request.post(`/suppliers/${suppCd}/items`, data)
+}
+
+export function updateSupplierItem(suppCd: string, itemCd: string, data: Record<string, unknown>) {
+    return request.put(`/suppliers/${suppCd}/items/${itemCd}`, data)
+}
+
+export function deleteSupplierItem(suppCd: string, itemCd: string) {
+    return request.delete(`/suppliers/${suppCd}/items/${itemCd}`)
+}
+
+// ---- 供应商价格 ----
+
+export function fetchSupplierPrices(suppCd: string, params?: { item_cd?: string; current_only?: boolean }) {
+    return request.get(`/suppliers/${suppCd}/prices`, { params })
+}
+
+export function createSupplierPrice(suppCd: string, data: Record<string, unknown>) {
+    return request.post(`/suppliers/${suppCd}/prices`, data)
+}
+
+export function updateSupplierPrice(suppCd: string, priceId: number, data: Record<string, unknown>) {
+    return request.put(`/suppliers/${suppCd}/prices/${priceId}`, data)
+}
+
+export function deleteSupplierPrice(suppCd: string, priceId: number) {
+    return request.delete(`/suppliers/${suppCd}/prices/${priceId}`)
+}
+
+// ---- 批量订单（拆单/并单） ----
+
+export const batchCreateOrders = (data: { orders: Array<{ suppliercd: string; memo?: string; details: Array<{ itemcd: string; rgsqty: number; units?: string; ref_pcplanid: string; ref_pclineno: number; unitprice?: number }> }> }) =>
+    request.post('/procurement/orders/batch', data)
+
+// 价格解析
+export const fetchPriceResolve = (itemcd: string, supp_cd: string, qty: number = 1) =>
+    request.get('/prices/resolve', { params: { itemcd, supp_cd, qty } })
+
+// 智能合并
+export const getMergePreview = () =>
+    request.post('/procurement/requisitions/merge-preview')
+
+export const validateBatchOrders = (data: { orders: Array<Record<string, unknown>> }) =>
+    request.post('/procurement/orders/batch/validate', data)

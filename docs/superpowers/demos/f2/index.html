@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>myITSM F2 UI Demos</title>
+<style>
+:root{--primary:#409eff;--bg:#f5f7fa}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Helvetica Neue",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);display:flex;align-items:center;justify-content:center;min-height:100vh}
+.container{text-align:center;max-width:600px}
+h1{font-size:24px;margin-bottom:8px;color:#303133}
+.sub{color:#909399;margin-bottom:32px;font-size:14px}
+.cards{display:flex;flex-direction:column;gap:12px}
+.card{background:#fff;border-radius:8px;border:1px solid #e4e7ed;padding:20px;display:flex;align-items:center;gap:16px;text-decoration:none;transition:all .2s;text-align:left}
+.card:hover{box-shadow:0 4px 12px rgba(0,0,0,.08);transform:translateY(-1px)}
+.card .icon{font-size:28px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:8px}
+.card .info{flex:1}.card .info h3{font-size:15px;color:#303133;margin-bottom:4px}
+.card .info p{font-size:12px;color:#909399}
+.card .arrow{color:#c0c4cc;font-size:18px}
+.icon-plan{background:#ecf5ff}.icon-stock{background:#f0f9eb}.icon-purchase{background:#fdf6ec}.icon-itsm{background:#fef0f0}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>myITSM F2 业务主链 UI 演示</h1>
+  <p class="sub">4 个核心页面 — Element Plus 风格，左侧 220px 侧边栏 + 顶部 50px 导航栏</p>
+  <div class="cards">
+    <a href="01-plan-list.html" class="card">
+      <div class="icon icon-plan">📋</div>
+      <div class="info"><h3>预计划管理</h3><p>搜索栏 + 表格 + 分页 + 状态标签</p></div>
+      <div class="arrow">→</div>
+    </a>
+    <a href="02-stock-in-list.html" class="card">
+      <div class="icon icon-stock">📦</div>
+      <div class="info"><h3>入库单管理</h3><p>搜索栏 + 表格 + 详情 Drawer 含明细表格 + 状态流转</p></div>
+      <div class="arrow">→</div>
+    </a>
+    <a href="03-purchase-plan.html" class="card">
+      <div class="icon icon-purchase">🛒</div>
+      <div class="info"><h3>采购计划管理</h3><p>搜索栏 + 主子表可展开行 + 物料明细</p></div>
+      <div class="arrow">→</div>
+    </a>
+    <a href="04-itsm-maintenance.html" class="card">
+      <div class="icon icon-itsm">🔧</div>
+      <div class="info"><h3>ITSM 维修工单</h3><p>统计卡片 + 状态流转可视化 + 详情弹窗</p></div>
+      <div class="arrow">→</div>
+    </a>
+  </div>
+</div>
+</body>
+</html>

@@ -4,13 +4,58 @@
 对应数据库表：TMM01_COMPANY, TMM11_ITEMCLASS, TMM12_ITEMS,
 TMM18_SUPPLIERCLASS, TMM19_SUPPLIERS, TMM21_CUSTCLASS,
 TMM22_CUSTOMERS, TMM31_SYSCODES, TMM34_IDMASTER,
-TMM35_CUST_POS_RL, TMM46_AREA, TMM47_COMMODE
+TMM35_CUST_POS_RL, TMM46_AREA
 """
 
 from __future__ import annotations
 
 from app.extensions import db
 from app.models.base import BaseModel
+
+
+class Country(BaseModel):
+    """国家表（TMM02_COUNTRY）。"""
+
+    __tablename__ = "tmm02_country"
+
+    country_cd = db.Column(db.String(3), primary_key=True, comment="国家代码")
+    country_nm = db.Column(db.String(50), nullable=False, comment="国家名称")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+
+class Province(BaseModel):
+    """省份表（TMM03_PROVINCE）。"""
+
+    __tablename__ = "tmm03_province"
+
+    prvn_cd = db.Column(db.String(2), primary_key=True, comment="省份代码")
+    prvn_nm = db.Column(db.String(50), nullable=False, comment="省份名称")
+    country_cd = db.Column(
+        db.String(3), db.ForeignKey("tmm02_country.country_cd"), comment="国家代码"
+    )
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+
+class City(BaseModel):
+    """城市表（TMM04_CITY）。"""
+
+    __tablename__ = "tmm04_city"
+
+    city_cd = db.Column(db.String(4), primary_key=True, comment="城市代码")
+    city_nm = db.Column(db.String(50), nullable=False, comment="城市名称")
+    prvn_cd = db.Column(db.String(2), db.ForeignKey("tmm03_province.prvn_cd"), comment="省份代码")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
+
+
+class Town(BaseModel):
+    """区县表（TMM05_TOWN）。"""
+
+    __tablename__ = "tmm05_town"
+
+    town_cd = db.Column(db.String(4), primary_key=True, comment="区县代码")
+    town_nm = db.Column(db.String(50), nullable=False, comment="区县名称")
+    city_cd = db.Column(db.String(4), db.ForeignKey("tmm04_city.city_cd"), comment="城市代码")
+    useflg = db.Column(db.String(1), default="1", comment="有效标志")
 
 
 class Company(BaseModel):
@@ -41,28 +86,14 @@ class Area(BaseModel):
 
     __tablename__ = "tmm46_area"
 
-    area_cd = db.Column(db.String(20), primary_key=True, comment="区域编码")
+    area_cd = db.Column(db.String(20), primary_key=True, comment="区域编码（原Oracle TMM46_AREA.ID，迁移后字符串化为主键）")
     area_nm = db.Column(db.String(50), nullable=False, comment="区域名称")
-    parent_cd = db.Column(db.String(20), comment="上级区域")
+    parent_cd = db.Column(db.String(20), comment="上级区域【扩展字段，Oracle原表无此字段，当前全为空，待后续启用】")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
-    # --- Oracle 原表恢复字段 ---
-    area_id = db.Column(db.Integer, comment="区域ID")
-    name = db.Column(db.String(50), comment="区域全称")
+    # --- Oracle 原表迁移备份字段（待删除）---
+    area_id = db.Column(db.Integer, comment="【废弃】Oracle原表ID的整数备份，已回填为area_cd::int，业务代码不再使用")
+    name = db.Column(db.String(50), comment="【废弃】Oracle原表NAME的备份，已迁移至area_nm，业务代码不再使用")
     usercd = db.Column(db.String(6), comment="负责人编码")
-
-
-class ComMode(BaseModel):
-    """通讯方式表（TMM47_COMMODE）。"""
-
-    __tablename__ = "tmm47_commode"
-
-    cmm_cd = db.Column(db.String(20), primary_key=True, comment="通讯方式编码")
-    cmm_nm = db.Column(db.String(50), nullable=False, comment="通讯方式名称")
-    cmm_type = db.Column(db.String(10), comment="类型")
-    useflg = db.Column(db.String(1), default="1", comment="有效标志")
-    # --- Oracle 原表恢复字段 ---
-    parent = db.Column(db.String(20), comment="上级编码")
-    childflg = db.Column(db.String(1), comment="子节点标志")
 
 
 class CustClass(BaseModel):
@@ -108,7 +139,17 @@ class Customer(BaseModel):
     ppt_code = db.Column(db.String(20), comment="品牌编码")
     zf_type = db.Column(db.String(10), comment="支付方式")
     comm_mode = db.Column(db.String(20), comment="通讯方式")
-    store_cd = db.Column(db.String(30), comment="门店编码")
+    store_cd = db.Column(db.String(30), comment="【废弃】门店编码，Oracle原表无此字段，数据全为空，与cust_cd功能重复，待删除")
+    # 行政区域（老系统 tmm02-05 自定义短码，待废弃）
+    country_cd = db.Column(db.String(3), comment="【废弃】国家代码（老系统自定义短码，如191=中国），由geo_prvn_cd等替代，待删除")
+    prvn_cd = db.Column(db.String(2), comment="【废弃】省份代码（老系统自定义短码，如09=上海），由geo_prvn_cd替代，待删除")
+    city_cd = db.Column(db.String(4), comment="【废弃】城市/区代码（老系统自定义短码，如0121=浦东新区），由geo_city_cd/geo_area_cd替代，待删除")
+    town_cd = db.Column(db.String(4), comment="【废弃】区县代码（老系统自定义短码，迁移后全为空），由geo_area_cd替代，待删除")
+    # 行政区域（国标 geo_* 四级，关联 geo_province/city/area/street 表）
+    geo_prvn_cd = db.Column(db.String(6), comment="国标省级代码（关联geo_province.code，如31=上海市）")
+    geo_city_cd = db.Column(db.String(6), comment="国标地级市代码（关联geo_city.code，如3101=上海市辖区）")
+    geo_area_cd = db.Column(db.String(6), comment="国标区县代码（关联geo_area.code，如310101=黄浦区）")
+    geo_street_cd = db.Column(db.String(12), comment="国标街道代码（关联geo_street.code，如310101002=南京东路街道）")
     # --- Oracle 原表恢复字段（31个） ---
     cust_anm = db.Column(db.String(40), comment="客户别名")
     cust_brcd = db.Column(db.String(20), comment="客户条码")
@@ -120,7 +161,7 @@ class Customer(BaseModel):
     parentcd = db.Column(db.String(8), comment="上级客户编码")
     backup = db.Column(db.String(200), comment="备注")
     location = db.Column(db.String(1), comment="位置标志")
-    area = db.Column(db.Integer, comment="区域编号")
+    area = db.Column(db.Integer, comment="【废弃】Oracle原表AREA整数（关联TMM46_AREA.ID），迁移后由area_cd（VARCHAR）替代，数据已回填至area_cd，不再写入")
     pos_n = db.Column(db.Integer, comment="POS数量")
     opersystem = db.Column(db.String(128), comment="POS操作系统")
     data_base = db.Column(db.String(128), comment="POS数据库版本")
@@ -141,6 +182,7 @@ class Customer(BaseModel):
     posstatus1 = db.Column(db.String(2), comment="POS状态1")
     is_contract = db.Column(db.String(2), comment="合同标志")
     yj_money = db.Column(db.Numeric(12, 2), comment="押金金额")
+    yun_type = db.Column(db.String(2), comment="所属云类别（与plan_cust.yun_type一致）")
     # --- 优化方案1 未落地字段（4个） ---
     source_type = db.Column(db.String(20), comment="来源类型（PREPLAN/MANUAL/IMPORT/API）")
     verified_at = db.Column(db.DateTime, comment="转正时间")
@@ -190,18 +232,7 @@ class CustPosRl(BaseModel):
     item_cd = db.Column(db.String(20), comment="物料编码")
     eid = db.Column(db.String(50), comment="设备序列号")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
-    # 优化字段：资产属性扩展
-    asset_type = db.Column(
-        db.String(10),
-        default="NEW",
-        comment="资产类型（NEW=新机/USED=旧机/REFURB=翻新机/SCRAP=报废）",
-    )
-    recyclable = db.Column(db.Boolean, default=False, comment="可回收标志")
-    recycle_status = db.Column(
-        db.String(10),
-        comment="回收状态（PENDING/RECYCLED/SCRAPPED）",
-    )
-    install_date = db.Column(db.DateTime, comment="安装日期")
+    # 资产属性已迁至 tmm43_eid 表（2026-05-11）
     # --- Oracle 原表恢复字段（11个） ---
     sysinfo = db.Column(db.String(30), comment="系统信息")
     softinfo = db.Column(db.String(30), comment="软件信息")
@@ -218,6 +249,9 @@ class CustPosRl(BaseModel):
     created_from = db.Column(db.String(20), comment="来源追溯")
     source_id = db.Column(db.String(20), comment="来源单号")
     warranty_expire = db.Column(db.DateTime, comment="保修到期日")
+    business_mode = db.Column(db.String(2), comment="业务模式（BM_S字典：01销售/02租赁/03借用/04代维/05寄售/06试用/07免费投放/08合作运营）")
+
+    __table_args__ = (db.Index("idx_cust_pos_rl_eid_useflg", "eid", "useflg"),)
 
     customer = db.relationship("Customer", back_populates="positions")
 
@@ -234,6 +268,9 @@ class ItemClass(BaseModel):
     classtyp = db.Column(db.String(1), comment="分类类型")
     childflg = db.Column(db.String(1), comment="子节点标志")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
 
 
 class Item(BaseModel):
@@ -264,7 +301,7 @@ class Item(BaseModel):
     oldperiod = db.Column(db.Integer, comment="旧品周期(天)")
     backup = db.Column(db.String(200), comment="备注")
     typflg = db.Column(db.String(1), comment="物料类型标志")
-    purchasetyp = db.Column(db.String(1), comment="采购类型")
+    purchasetyp = db.Column(db.String(2), comment="采购类型")
     consume = db.Column(db.String(1), comment="消耗标志")
 
 
@@ -324,6 +361,7 @@ class SysCode(BaseModel):
     sort_no = db.Column(db.Integer, default=0, comment="排序号")
     # --- Oracle 原表恢复字段 ---
     sysflg = db.Column(db.String(1), comment="系统标志")
+    memo = db.Column(db.String(60), comment="说明")
 
     __table_args__ = (db.UniqueConstraint("code_typ", "code_cd", name="uq_syscode"),)
 
@@ -363,17 +401,29 @@ class Eid(BaseModel):
     gendate = db.Column(db.DateTime, comment="创建日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
     etyp = db.Column(db.String(1), comment="设备类型")
-    sflg = db.Column(db.String(1), comment="状态标志")
+    sflg = db.Column(db.String(1), comment="设备状态（ES字典：0新品已检/1已使用/2已报废/3待检/4已退回/5返修中/6检验中/7生产中/8在库/9出库/S销售出库；'1'按whcd区分：whcd=工程师仓=持有/whcd=NULL=已安装）")
     refid = db.Column(db.String(8), comment="关联单号")
+    ref_eid = db.Column(db.String(13), comment="溯源旧EID（翻新时记录来源）")
     qcflg = db.Column(db.String(2), comment="质检标志")
     whcd = db.Column(db.String(2), comment="仓库编码")
     prddate = db.Column(db.DateTime, comment="生产日期")
     itemtyp = db.Column(db.String(2), comment="物料类型")
-    new_old = db.Column(db.String(1), comment="新旧标志")
+    new_old = db.Column(db.String(1), comment="【已废弃】新旧标志，请使用 asset_type")
     remark = db.Column(db.String(200), comment="备注")
     manuf_seq = db.Column(db.String(100), comment="制造序列号")
     old_degree = db.Column(db.Numeric, comment="旧化程度")
     isunit = db.Column(db.String(1), comment="是否整机")
+    # 资产属性（从 CustPosRl 迁入，2026-05-11）
+    asset_type = db.Column(
+        db.String(10), comment="资产类型（AT码表：01新机/02旧机/03翻新机/04报废）"
+    )
+    recyclable = db.Column(db.Boolean, default=False, comment="可回收标志")
+    recycle_status = db.Column(db.String(10), comment="回收状态（RS码表）")
+    asset_owner = db.Column(db.String(20), default="01", comment="资产所属方（OW码表：01商用电子/02通方信息/03门店资产/04海晟）")
+    install_date = db.Column(db.DateTime, comment="安装日期")
+    warranty_expire = db.Column(db.DateTime, comment="保修到期日（install_date + 按 old_degree 取 newperiod/oldperiod，关单 L2 写入）")
+    # 方案 A 预占：预计划选 posid 时锁定 EID，其他计划不可选
+    reserve_planno = db.Column(db.String(20), comment="预占预计划号（方案A专属）")
 
 
 class EidTrack(BaseModel):
@@ -390,20 +440,20 @@ class EidTrack(BaseModel):
     gendate = db.Column(db.DateTime, comment="创建日期")
     useflg = db.Column(db.String(1), comment="有效标志")
     etyp = db.Column(db.String(1), comment="设备类型")
-    sflg = db.Column(db.String(1), comment="状态标志")
-    refid = db.Column(db.String(8), comment="关联单号")
+    sflg = db.Column(db.String(1), comment="设备状态（ES字典，同 tmm43_eid.sflg）")
+    refid = db.Column(db.String(20), comment="关联单号")
     qcflg = db.Column(db.String(2), comment="质检标志")
     whcd = db.Column(db.String(2), comment="仓库编码")
     prddate = db.Column(db.DateTime, comment="生产日期")
     itemtyp = db.Column(db.String(2), comment="物料类型")
-    new_old = db.Column(db.String(1), comment="新旧标志")
-    n_sflg = db.Column(db.String(1), comment="新状态标志")
-    n_refid = db.Column(db.String(8), comment="新关联单号")
+    new_old = db.Column(db.String(1), comment="【已废弃】新旧标志，请使用 asset_type")
+    n_sflg = db.Column(db.String(1), comment="新设备状态（ES字典，同 tmm43_eid.sflg）")
+    n_refid = db.Column(db.String(20), comment="新关联单号")
     n_qcflg = db.Column(db.String(2), comment="新质检标志")
     n_whcd = db.Column(db.String(2), comment="新仓库编码")
     n_prddate = db.Column(db.DateTime, comment="新生产日期")
     n_itemtyp = db.Column(db.String(2), comment="新物料类型")
-    n_new_old = db.Column(db.String(1), comment="新新旧标志")
+    n_new_old = db.Column(db.String(1), comment="【已废弃】新旧标志（新值），请使用 n_asset_type")
     n_itemcd = db.Column(db.String(6), comment="新物料编码")
     n_etyp = db.Column(db.String(1), comment="新设备类型")
     remark = db.Column(db.String(200), comment="备注")
@@ -412,6 +462,24 @@ class EidTrack(BaseModel):
     n_manf_seq = db.Column(db.String(100), comment="新制造序列号")
     old_degree = db.Column(db.Numeric, comment="旧化程度")
     n_old_degree = db.Column(db.Numeric, comment="新旧化程度")
+    # 资产追踪扩展（2026-05-12）
+    install_date = db.Column(db.DateTime, comment="安装日期")
+    n_install_date = db.Column(db.DateTime, comment="新安装日期")
+    cust_cd = db.Column(db.String(20), comment="变更前客户")
+    n_cust_cd = db.Column(db.String(20), comment="变更后客户")
+    asset_type = db.Column(db.String(10), comment="资产类型")
+    n_asset_type = db.Column(db.String(10), comment="新资产类型")
+    recyclable = db.Column(db.String(1), comment="可回收标志")
+    n_recyclable = db.Column(db.String(1), comment="新可回收标志")
+    recycle_status = db.Column(db.String(10), comment="回收状态")
+    n_recycle_status = db.Column(db.String(10), comment="新回收状态")
+    asset_owner = db.Column(db.String(20), comment="资产所属方")
+    n_asset_owner = db.Column(db.String(20), comment="新资产所属方")
+
+    __table_args__ = (
+        db.Index("idx_eid_track_eid_itemcd", "eid", "itemcd"),
+        db.Index("idx_eid_track_type_eid", "type", "eid"),
+    )
 
 
 class Bom(BaseModel):
@@ -419,12 +487,13 @@ class Bom(BaseModel):
 
     __tablename__ = "tmm41_bom"
 
-    bomcd = db.Column(db.String(6), primary_key=True, comment="BOM编码")
+    bomcd = db.Column(db.String(20), primary_key=True, comment="BOM编码")
     bomnm = db.Column(db.String(50), comment="BOM名称")
     opercd = db.Column(db.String(6), comment="操作员")
     gendate = db.Column(db.DateTime, comment="创建日期")
     upddate = db.Column(db.DateTime, comment="更新日期")
     useflg = db.Column(db.String(1), default="1", comment="有效标志")
+    redundancy_ratio = db.Column(db.Numeric(5, 4), default=0, comment="补料冗余比例")
 
     details = db.relationship("BomDt", back_populates="bom", lazy="dynamic")
 
@@ -436,7 +505,7 @@ class BomDt(BaseModel):
     __table_args__ = (db.PrimaryKeyConstraint("bomcd", "itemcd"),)
 
     bomcd = db.Column(
-        db.String(6),
+        db.String(20),
         db.ForeignKey("tmm41_bom.bomcd"),
         nullable=False,
         comment="BOM编码",
@@ -457,7 +526,12 @@ class CustItems(BaseModel):
     __tablename__ = "tmm24_custitems"
     __table_args__ = (db.PrimaryKeyConstraint("itemcd", "custcd"),)
 
-    itemcd = db.Column(db.String(6), nullable=False, comment="物料编码")
+    itemcd = db.Column(
+        db.String(6),
+        db.ForeignKey("tmm12_items.item_cd", name="fk_custitems_item", onupdate="CASCADE"),
+        nullable=False,
+        comment="物料编码",
+    )
     custcd = db.Column(db.String(8), nullable=False, comment="客户编码")
     dfltflg = db.Column(db.String(1), comment="默认标志")
     opercd = db.Column(db.String(6), comment="操作员")
@@ -508,3 +582,116 @@ class AssetAttribList(BaseModel):
     c_address = db.Column(db.String(200), comment="地址")
     remark = db.Column(db.String(200), comment="备注")
     asset_type = db.Column(db.String(10), comment="资产类型")
+
+
+class PosREid(BaseModel):
+    """POS与EID关联表（TMM44_POS_R_EID）。"""
+
+    __tablename__ = "tmm44_pos_r_eid"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    posid = db.Column(db.String(50), comment="整机POS编码")
+    eid = db.Column(db.String(50), comment="配件EID")
+    itemcd = db.Column(db.String(10), comment="物料编码")
+    opercd = db.Column(db.String(6), comment="操作员")
+    gendate = db.Column(db.DateTime, comment="创建日期")
+    upddate = db.Column(db.DateTime, comment="更新日期")
+    useflg = db.Column(db.String(1), default="1")
+
+    __table_args__ = (
+        db.Index("idx_pos_r_eid_eid", "eid"),
+        db.Index("idx_pos_r_eid_useflg", "useflg", "eid"),
+    )
+
+
+# ─────────────────────────────────────────────
+# 国标行政区划表（来源：province-city-china / data.sqlite）
+# 与老系统 tmm02-05 表并存，新业务使用此组表
+# 编码体系：民政部国标行政区划码
+# ─────────────────────────────────────────────
+
+
+class GeoProvince(BaseModel):
+    """国标省级行政区（geo_province）。
+    
+    数据来源：province-city-china（民政部国标行政区划码）。
+    与老表 tmm03_province 并存，老表保持不变。
+    编码示例：11=北京市, 31=上海市, 44=广东省。
+    """
+
+    __tablename__ = "geo_province"
+
+    code = db.Column(db.String(6), primary_key=True, comment="国标省级代码（2位，如11=北京）")
+    name = db.Column(db.String(50), nullable=False, comment="省级名称")
+
+    cities = db.relationship("GeoCity", back_populates="province", lazy="dynamic")
+
+
+class GeoCity(BaseModel):
+    """国标地级市行政区（geo_city）。
+    
+    数据来源：province-city-china。
+    老表 tmm04_city 实为区县级，与本表层级不同。
+    编码示例：1101=北京市辖区, 3101=上海市辖区, 4401=广州市。
+    """
+
+    __tablename__ = "geo_city"
+
+    code = db.Column(db.String(6), primary_key=True, comment="国标地级市代码（4位，如3101=上海市辖区）")
+    name = db.Column(db.String(50), nullable=False, comment="地级市名称")
+    province_code = db.Column(
+        db.String(6), db.ForeignKey("geo_province.code"), comment="所属省级代码"
+    )
+
+    province = db.relationship("GeoProvince", back_populates="cities")
+    areas = db.relationship("GeoArea", back_populates="city", lazy="dynamic")
+
+
+class GeoArea(BaseModel):
+    """国标区县行政区（geo_area）。
+    
+    数据来源：province-city-china。
+    编码示例：110101=东城区, 310101=黄浦区。
+    """
+
+    __tablename__ = "geo_area"
+
+    code = db.Column(db.String(6), primary_key=True, comment="国标区县代码（6位，如310101=黄浦区）")
+    name = db.Column(db.String(50), nullable=False, comment="区县名称")
+    city_code = db.Column(
+        db.String(6), db.ForeignKey("geo_city.code"), comment="所属地级市代码"
+    )
+    province_code = db.Column(db.String(6), comment="所属省级代码（冗余，便于查询）")
+
+    city = db.relationship("GeoCity", back_populates="areas")
+    streets = db.relationship("GeoStreet", back_populates="area", lazy="dynamic")
+
+    __table_args__ = (
+        db.Index("idx_geo_area_city_code", "city_code"),
+        db.Index("idx_geo_area_province_code", "province_code"),
+    )
+
+
+class GeoStreet(BaseModel):
+    """国标街道/乡镇行政区（geo_street）。
+    
+    数据来源：province-city-china（41352条）。
+    编码示例：110101001=东华门街道（9位），末3位001-099=街道，100-199=镇，200-399=乡。
+    """
+
+    __tablename__ = "geo_street"
+
+    code = db.Column(db.String(12), primary_key=True, comment="国标街道代码（9位，如110101001=东华门街道）")
+    name = db.Column(db.String(100), nullable=False, comment="街道/乡镇名称")
+    area_code = db.Column(
+        db.String(6), db.ForeignKey("geo_area.code"), comment="所属区县代码"
+    )
+    province_code = db.Column(db.String(6), comment="所属省级代码（冗余，便于查询）")
+    city_code = db.Column(db.String(6), comment="所属地级市代码（冗余，便于查询）")
+
+    area = db.relationship("GeoArea", back_populates="streets")
+
+    __table_args__ = (
+        db.Index("idx_geo_street_area_code", "area_code"),
+        db.Index("idx_geo_street_city_code", "city_code"),
+    )

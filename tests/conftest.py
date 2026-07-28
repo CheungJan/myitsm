@@ -23,11 +23,20 @@ def app() -> Generator[Flask, None, None]:
 
 
 @pytest.fixture(autouse=True)
-def _rollback(app: Flask) -> Generator[None, None, None]:
-    """每个测试结束后回滚，保证隔离。"""
+def _clean_db(app: Flask) -> Generator[None, None, None]:
+    """每个测试开始前清空所有表数据，保证隔离。
+
+    简单可靠：测试内可自由 commit，下一测试开始时全表清空。
+    """
     with app.app_context():
+        # 测试前清空所有表
+        _db.session.remove()
+        for table in reversed(_db.metadata.sorted_tables):
+            _db.session.execute(table.delete())
+        _db.session.commit()
         yield
-        _db.session.rollback()
+        # 测试后也清理，避免污染 session 级状态
+        _db.session.remove()
 
 
 @pytest.fixture()

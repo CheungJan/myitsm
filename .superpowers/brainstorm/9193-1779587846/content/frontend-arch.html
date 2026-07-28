@@ -1,0 +1,72 @@
+<h2>前端交互架构</h2>
+<p class="subtitle">拆单和并单的入口不同，但最终都调用同一个 API</p>
+
+<div class="section">
+  <h3>拆单流程：从订单创建页进入</h3>
+  <div style="background:#e8f5e9;padding:16px;border-radius:8px;font-size:13px;line-height:2.2;">
+    <strong>入口：</strong>PurchaseRegisterList.vue → 【新建订单】按钮<br>
+    <strong>页面：</strong>订单创建表单（已有），新增"选择需求"功能<br><br>
+
+    ┌─ <strong>Step 1：选择需求单</strong> ─────────────────<br>
+    │  下拉选择 PP000180，显示明细：电源 × 100<br>
+    │<br>
+    ├─ <strong>Step 2：分配到供应商</strong> ──────────────<br>
+    │  默认：100个 → 供应商下拉选择<br>
+    │  点击[拆单]：新增一行 → 60个→SUP001 / 40个→SUP002<br>
+    │  前端实时校验：分配总量 ≤ 可用数量<br>
+    │<br>
+    ├─ <strong>Step 3：调 validate API</strong> ─────────────<br>
+    │  后端二次校验，返回 available_qty vs requested_qty<br>
+    │<br>
+    └─ <strong>Step 4：调 POST /orders/batch</strong> ─────<br>
+      一次性提交所有分组，后端事务写入<br><br>
+    <span style="color:#1565c0;">→ 组件位置：新建/复用订单创建弹窗，不放在列表页</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>并单流程：从需求列表页进入</h3>
+  <div style="background:#fff3e0;padding:16px;border-radius:8px;font-size:13px;line-height:2.2;">
+    <strong>入口：</strong>PurchasePlanList.vue → 勾选 + 【合并生成订单】按钮<br><br>
+
+    ┌─ <strong>Step 1：勾选需求单</strong> ─────────────────<br>
+    │  [✓] PP000180  [✓] PP000181  [✓] PP000183<br>
+    │<br>
+    ├─ <strong>Step 2：调 merge-preview API</strong> ──────<br>
+    │  后端按 itemcd 分组 → 推荐供应商 + 汇总数量<br>
+    │<br>
+    ├─ <strong>Step 3：用户确认/调整</strong> ──────────────<br>
+    │  预览弹窗：电源×100→SUP001 / 网线×20→SUP003<br>
+    │  可修改供应商、调整数量<br>
+    │<br>
+    └─ <strong>Step 4：调 POST /orders/batch</strong> ─────<br>
+      前端将 preview groups 转换为 orders 数组，统一提交<br><br>
+    <span style="color:#1565c0;">→ merge-preview 只管查询+建议，不写数据</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>前端文件变更计划</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <tr style="background:#f5f5f5;">
+      <th style="padding:8px;text-align:left;">文件</th>
+      <th style="padding:8px;text-align:left;">变更类型</th>
+      <th style="padding:8px;text-align:left;">内容</th>
+    </tr>
+    <tr>
+      <td style="padding:8px;"><code>src/api/master.ts</code></td>
+      <td style="padding:8px;">新增</td>
+      <td style="padding:8px;">batchCreateOrders + validateBatchOrders + getMergePreview</td>
+    </tr>
+    <tr>
+      <td style="padding:8px;"><code>PurchaseRegisterList.vue</code></td>
+      <td style="padding:8px;">修改</td>
+      <td style="padding:8px;">订单创建表单新增"拆分行"能力</td>
+    </tr>
+    <tr>
+      <td style="padding:8px;"><code>PurchasePlanList.vue</code></td>
+      <td style="padding:8px;">修改</td>
+      <td style="padding:8px;">新增勾选 + 合并预览弹窗</td>
+    </tr>
+  </table>
+</div>

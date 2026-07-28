@@ -11,6 +11,7 @@ from sqlalchemy import desc
 from app.extensions import db
 from app.models.sales import (
     PlanCust,
+    PlanServe,
     SalesBill,
     SalesExtend,
     SalesExtendDt,
@@ -23,8 +24,24 @@ def _gen_id(prefix: str = "") -> str:
 
 
 def _gen_plan_id() -> str:
-    """生成10位计划编号。"""
-    return uuid.uuid4().hex[:10].upper()
+    """生成预计划编号：PL + 6位数字自增（对齐 PB plan_cust.planno 规则）。
+
+    格式：PL000001 ~ PL999999，从 plan_cust 表中 PL 开头最大编号 +1。
+    非 PL 开头的历史记录（如 UUID）不参与计数，避免冲突。
+    """
+    # 查询当前 PL 开头的最大编号
+    max_planno = (
+        db.session.query(PlanCust.planno)
+        .filter(PlanCust.planno.like("PL%"))
+        .order_by(desc(PlanCust.planno))
+        .first()
+    )
+    if max_planno and max_planno[0]:
+        # 提取数字部分 +1
+        seq = int(max_planno[0][2:]) + 1
+    else:
+        seq = 1
+    return f"PL{seq:06d}"
 
 
 class PlanCustRepository:
@@ -38,17 +55,46 @@ class PlanCustRepository:
     def list_by_filters(
         plantyp: str | None = None,
         plan_status: str | None = None,
+        exclude_plan_status: str | None = None,
         custcd: str | None = None,
+        planno: str | None = None,
+        custnm: str | None = None,
+        custcard: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        serve_status: str | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> tuple[list[PlanCust], int]:
+        from datetime import datetime as _dt
+
         query = db.session.query(PlanCust)
+        if planno:
+            query = query.filter(PlanCust.planno.ilike(f"%{planno}%"))
         if plantyp:
             query = query.filter(PlanCust.plantyp == plantyp)
         if plan_status:
             query = query.filter(PlanCust.plan_status == plan_status)
+        if exclude_plan_status:
+            query = query.filter(PlanCust.plan_status != exclude_plan_status)
         if custcd:
             query = query.filter(PlanCust.custcd == custcd)
+        if custnm:
+            query = query.filter(PlanCust.custnm.ilike(f"%{custnm}%"))
+        if custcard:
+            query = query.filter(PlanCust.custcard.ilike(f"%{custcard}%"))
+        if date_from:
+            try:
+                query = query.filter(PlanCust.gendate >= _dt.strptime(date_from, "%Y-%m-%d"))
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                query = query.filter(PlanCust.gendate < _dt.strptime(date_to, "%Y-%m-%d").replace(hour=23, minute=59, second=59))
+            except ValueError:
+                pass
+        if serve_status:
+            query = query.filter(PlanCust.serve_status == serve_status)
         query = query.order_by(desc(PlanCust.gendate))
         total: int = query.count()
         items: list[PlanCust] = query.offset((page - 1) * per_page).limit(per_page).all()
@@ -70,7 +116,103 @@ class PlanCustRepository:
     @staticmethod
     def update(record: PlanCust, data: dict[str, Any]) -> PlanCust:
         for key, value in data.items():
+            if hasattr(record, key):
+                setattr(record, key, value)
+        return record
+
+    @staticmethod
+    def update_status(record: PlanCust, new_status: str) -> PlanCust:
+        """更新计划状态。"""
+        record.plan_status = new_status
+        return record
+
+    @staticmethod
+    def find_by_custcard(custcard: str) -> PlanCust | None:
+        """按磁卡号查找预计划（用于重复检查）。"""
+        if not custcard:
+            return None
+        return (
+            db.session.query(PlanCust)
+            .filter(
+                PlanCust.custcard == custcard,
+            )
+            .first()
+        )
+
+
+class PlanServeRepository:
+    """呼出单数据访问（PLAN_SERVE）。"""
+
+    @staticmethod
+    def get_by_id(dtlid: int) -> PlanServe | None:
+        return db.session.get(PlanServe, dtlid)
+
+    @staticmethod
+    def list_by_filters(
+        planno: str | None = None,
+        status: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list[PlanServe], int]:
+        query = db.session.query(PlanServe)
+        if planno:
+            query = query.filter(PlanServe.planno == planno)
+        if status:
+            query = query.filter(PlanServe.status == status)
+        query = query.order_by(desc(PlanServe.gendate))
+        total: int = query.count()
+        items: list[PlanServe] = query.offset((page - 1) * per_page).limit(per_page).all()
+        return items, total
+
+    @staticmethod
+    def list_by_plan(planno: str) -> list[PlanServe]:
+        """获取指定预计划的所有呼出记录。"""
+        return (
+            db.session.query(PlanServe)
+            .filter(PlanServe.planno == planno)
+            .order_by(desc(PlanServe.gendate))
+            .all()
+        )
+
+    @staticmethod
+    def count_by_plan(planno: str, status: str | None = None) -> int:
+        """统计指定预计划的呼出单数量。
+
+        - status=None：全部
+        - status='00'：待呼出
+        - status='01'：已呼出
+        - status='09'：已作废
+        """
+        query = db.session.query(PlanServe).filter(PlanServe.planno == planno)
+        if status:
+            query = query.filter(PlanServe.status == status)
+        return query.count()
+
+    @staticmethod
+    def create(data: dict[str, Any], creator: str) -> PlanServe:
+        now = datetime.now(UTC)
+        record = PlanServe(
+            genercd=creator,
+            gendate=now,
+            opercd=creator,
+            opdate=now,
+            status="00",
+            **data,
+        )
+        db.session.add(record)
+        return record
+
+    @staticmethod
+    def update(record: PlanServe, data: dict[str, Any]) -> PlanServe:
+        for key, value in data.items():
             setattr(record, key, value)
+        record.opercd = data.get("opercd", record.opercd)
+        record.opdate = datetime.now(UTC)
+        return record
+
+    @staticmethod
+    def update_status(record: PlanServe, new_status: str) -> PlanServe:
+        record.status = new_status
         return record
 
 
