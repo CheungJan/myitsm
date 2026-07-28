@@ -64,6 +64,16 @@ def _init_extensions(app: Flask) -> None:
 
     seed_init(app)
 
+    # 初始化定时任务调度器（非 testing 环境）
+    # SLA 超时自动关单等定时任务在此注册
+    if app.config.get("TESTING"):
+        # testing 环境不启动调度器，避免测试时后台任务干扰
+        pass
+    else:
+        from app.extensions.scheduler import init_scheduler
+
+        init_scheduler(app)
+
 
 def _register_blueprints(app: Flask) -> None:
     """注册蓝图。"""
