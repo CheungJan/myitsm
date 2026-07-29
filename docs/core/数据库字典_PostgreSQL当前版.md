@@ -1,6 +1,6 @@
 # 完整数据库字典（myitsm）
 
-> 生成时间：2026-05-13 | 更新：2026-07-22 | 数据库：myitsm | PostgreSQL | v1.7 +D2/D3视图优化(工单级聚合+回溯faultcode+优化列)
+> 生成时间：2026-05-13 | 更新：2026-07-29 | 数据库：myitsm | PostgreSQL | v1.8 +1a字段(warranty_expire/business_mode/service_responsibility) +asset_type替代new_old
 > 🟢=自动生成（information_schema）| 🟡=手动维护 | 🔗=引用ER文档
 > 配套：`数据库ER关系文档.md`（ER关联）| `数据库变更追踪_迁移后.md`（变更历史）
 
@@ -673,20 +673,21 @@
 | 10 | whcd | VARCHAR(2) |  | 仓库编码 |
 | 11 | prddate | TIMESTAMP |  | 生产日期 |
 | 12 | itemtyp | VARCHAR(2) |  | 物料类型 |
-| 13 | new_old | VARCHAR(1) |  | 新旧标志 |
+| 13 | new_old | VARCHAR(1) |  | 【已废弃】新旧标志，已由 asset_type 替代（AT码表：01新机/02旧机/03翻新机/04报废） |
 | 14 | remark | VARCHAR(200) |  | 备注 |
 | 15 | manuf_seq | VARCHAR(100) |  | 制造序列号 |
-| 16 | old_degree | numeric |  | 旧化程度 |
+| 16 | old_degree | numeric |  | 质保范围（OD字典：12=新品质保/3=旧品质保），L2关单时按 TIT25.IS_NEW 写入，用于计算 warranty_expire |
 | 17 | isunit | VARCHAR(1) |  | 是否整机 |
 | 18 | created_at | TIMESTAMP | NOT NULL |  |
 | 19 | updated_at | TIMESTAMP | NOT NULL |  |
-| 20 | asset_type | VARCHAR(10) |  | 资产类型（AT码表：01新机/02旧机/03翻新机/04报废） |
+| 20 | asset_type | VARCHAR(10) |  | 资产类型（AT码表：01新机/02旧机/03翻新机/04报废）。新采购入库→01，返修入库→02，翻新EID→03。替代 new_old |
 | 21 | recyclable | BOOLEAN |  | 可回收标志 |
 | 22 | recycle_status | VARCHAR(10) |  | 回收状态（RS码表） |
 | 23 | asset_owner | VARCHAR(20) |  | 资产所属方（OW码表：01商用电子/02通方信息/03门店资产/04海晟） |
-| 24 | install_date | TIMESTAMP |  | 安装日期 |
+| 24 | install_date | TIMESTAMP |  | 安装日期（2026-07-29 修正：用 tmm35_cust_pos_rl.posupddate 回填，无POS记录则用 gendate） |
 | 25 | ref_eid | VARCHAR(13) |  | 来源EID（翻新溯源链，OV=10翻新出库→IV=6翻新入库后写入，可递归追溯） |
 | 26 | reserve_planno | VARCHAR(20) |  | 预占预计划号（方案A：创建预计划选posid时锁定；出库审核/作废后释放为NULL） |
+| 27 | warranty_expire | TIMESTAMP |  | 保修到期日（install_date + old_degree×物品newperiod/oldperiod，关单L2写入；2026-07-29修正：同步 install_date 重算） |
 
 #### 21. tmm43_eid_track
 

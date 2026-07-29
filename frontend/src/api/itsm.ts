@@ -27,6 +27,7 @@ export function transitionMaintenanceT17(daily_maintenance_id:string, data:Recor
 export function fetchMaintenanceT17(p?:Record<string,string>){return request.get<never,{data:MntPage}>('/itsm/maintenance',{params:p})}
 export function updateMaintenanceDaily(maintenance_id:string, data:Record<string,unknown>){return request.put<never,{data:MntRecord}>(`/itsm/maintenance-daily/${maintenance_id}`,data)}
 export function createMaintenanceDaily(data:Record<string,unknown>){return request.post<never,{data:MntRecord}>('/itsm/maintenance-daily',data)}
+export function fetchStoreDevices(cust_cd:string){return request.get<never,{data:{eid:string,itemcd:string,item_nm:string,install_date:string|null}[]}>(`/itsm/store-devices/${cust_cd}`)}
 export function transitionMaintenanceDaily(maintenance_id:string, data:Record<string,unknown>){return request.post<never,{data:Record<string,unknown>}>(`/itsm/maintenance-daily/${maintenance_id}/transition`,data)}
 
 // ---- 收费自动判断 ----

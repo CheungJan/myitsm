@@ -21,6 +21,10 @@ from app.models.deposit import (
     DepositList,
     DepositPosModel,
 )
+from app.models.entitlement import (
+    ServiceContract,
+    SpecialAgreement,
+)
 from app.models.finance import (
     Account,
     Depreciation,
@@ -347,4 +351,7 @@ __all__ = [
     "DeviceData",
     "AlertRule",
     "AlertLog",
+    # Entitlement 权益判定（P2）
+    "SpecialAgreement",
+    "ServiceContract",
 ]

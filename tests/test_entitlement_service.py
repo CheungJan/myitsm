@@ -78,27 +78,170 @@ class TestResolveEntitlementLevel0:
 
 
 class TestResolveEntitlementLevel1:
-    """1级：特殊客户协议（1a 写死返回 None）。"""
+    """1级：特殊客户协议（P2 接入 SpecialAgreement 表）。"""
 
-    def test_level1_stub_returns_none(self, app: Flask) -> None:
-        """1a 阶段 get_special_agreement 写死返回 None，不触发免费。"""
-        eid = _make_eid(asset_owner=OW_CUSTOMER)
-        rl = _make_rl(business_mode="01")
-        result = resolve_entitlement(eid, rl)
-        # 1级 None → 走 4级 销售模式判定
-        assert result.reason in ("保内", "过保")
+    def test_level1_free_agreement(self, app: Flask) -> None:
+        """有效特殊协议 is_free='1' → 免费。"""
+        from datetime import date, timedelta
+
+        from app.extensions import db
+        from app.models.entitlement import SpecialAgreement
+
+        with app.app_context():
+            db.session.query(SpecialAgreement).delete()
+            db.session.add(SpecialAgreement(
+                agreement_id="AG001",
+                cust_cd="CUST001",
+                agreement_nm="VIP免费协议",
+                is_free="1",
+                effective_date=date.today() - timedelta(days=10),
+                expire_date=date.today() + timedelta(days=10),
+                useflg="1",
+            ))
+            db.session.commit()
+
+            eid = _make_eid(asset_owner=OW_CUSTOMER)
+            rl = _make_rl(business_mode="01", cust_cd="CUST001")
+            result = resolve_entitlement(eid, rl)
+            assert result.free is True
+            assert "特殊协议" in result.reason
+
+    def test_level1_expired_agreement_skipped(self, app: Flask) -> None:
+        """过期协议不生效，走后续优先级。"""
+        from datetime import date, timedelta
+
+        from app.extensions import db
+        from app.models.entitlement import SpecialAgreement
+
+        with app.app_context():
+            db.session.query(SpecialAgreement).delete()
+            db.session.add(SpecialAgreement(
+                agreement_id="AG002",
+                cust_cd="CUST001",
+                agreement_nm="过期协议",
+                is_free="1",
+                effective_date=date.today() - timedelta(days=20),
+                expire_date=date.today() - timedelta(days=5),
+                useflg="1",
+            ))
+            db.session.commit()
+
+            eid = _make_eid(asset_owner=OW_CUSTOMER)
+            rl = _make_rl(business_mode="01", cust_cd="CUST001")
+            result = resolve_entitlement(eid, rl)
+            assert "特殊协议" not in result.reason
+
+    def test_level1_charge_agreement(self, app: Flask) -> None:
+        """is_free='0' 协议 → 收费。"""
+        from datetime import date, timedelta
+
+        from app.extensions import db
+        from app.models.entitlement import SpecialAgreement
+
+        with app.app_context():
+            db.session.query(SpecialAgreement).delete()
+            db.session.add(SpecialAgreement(
+                agreement_id="AG003",
+                cust_cd="CUST001",
+                agreement_nm="收费协议",
+                is_free="0",
+                effective_date=date.today() - timedelta(days=10),
+                expire_date=date.today() + timedelta(days=10),
+                useflg="1",
+            ))
+            db.session.commit()
+
+            eid = _make_eid(asset_owner=OW_CUSTOMER)
+            rl = _make_rl(business_mode="01", cust_cd="CUST001")
+            result = resolve_entitlement(eid, rl)
+            assert result.free is False
+            assert "特殊协议" in result.reason
 
 
 class TestResolveEntitlementLevel2:
-    """2级：维保合同（1a 写死返回 None）。"""
+    """2级：维保合同（P2 接入 ServiceContract 表）。"""
 
-    def test_level2_stub_returns_none(self, app: Flask) -> None:
-        """1a 阶段 get_service_contract 写死返回 None。"""
-        eid = _make_eid(asset_owner=OW_CUSTOMER)
-        rl = _make_rl(business_mode="01")
-        result = resolve_entitlement(eid, rl)
-        # 2级 None → 走 4级
-        assert result.reason in ("保内", "过保")
+    def test_level2_free_contract_by_eid(self, app: Flask) -> None:
+        """按 eid 匹配维保合同 is_free='1' → 免费。"""
+        from datetime import date, timedelta
+
+        from app.extensions import db
+        from app.models.entitlement import ServiceContract
+
+        with app.app_context():
+            db.session.query(ServiceContract).delete()
+            db.session.add(ServiceContract(
+                contract_id="CT001",
+                contract_no="HT2026001",
+                cust_cd="CUST001",
+                eid="EIDTEST001",
+                contract_nm="设备维保合同",
+                is_free="1",
+                effective_date=date.today() - timedelta(days=10),
+                expire_date=date.today() + timedelta(days=10),
+                useflg="1",
+            ))
+            db.session.commit()
+
+            eid = _make_eid(asset_owner=OW_CUSTOMER, eid="EIDTEST001")
+            rl = _make_rl(business_mode="01", cust_cd="CUST001")
+            result = resolve_entitlement(eid, rl)
+            assert result.free is True
+            assert "维保合同" in result.reason
+
+    def test_level2_contract_fallback_to_cust_cd(self, app: Flask) -> None:
+        """eid 无匹配时按 cust_cd 兜底。"""
+        from datetime import date, timedelta
+
+        from app.extensions import db
+        from app.models.entitlement import ServiceContract
+
+        with app.app_context():
+            db.session.query(ServiceContract).delete()
+            db.session.add(ServiceContract(
+                contract_id="CT002",
+                contract_no="HT2026002",
+                cust_cd="CUST002",
+                eid=None,
+                contract_nm="客户维保合同",
+                is_free="1",
+                effective_date=date.today() - timedelta(days=10),
+                expire_date=date.today() + timedelta(days=10),
+                useflg="1",
+            ))
+            db.session.commit()
+
+            eid = _make_eid(asset_owner=OW_CUSTOMER, eid="EIDNOCONTRACT")
+            rl = _make_rl(business_mode="01", cust_cd="CUST002")
+            result = resolve_entitlement(eid, rl)
+            assert result.free is True
+            assert "维保合同" in result.reason
+
+    def test_level2_expired_contract_skipped(self, app: Flask) -> None:
+        """过期合同不生效。"""
+        from datetime import date, timedelta
+
+        from app.extensions import db
+        from app.models.entitlement import ServiceContract
+
+        with app.app_context():
+            db.session.query(ServiceContract).delete()
+            db.session.add(ServiceContract(
+                contract_id="CT003",
+                cust_cd="CUST001",
+                eid="EIDTEST001",
+                contract_nm="过期合同",
+                is_free="1",
+                effective_date=date.today() - timedelta(days=20),
+                expire_date=date.today() - timedelta(days=5),
+                useflg="1",
+            ))
+            db.session.commit()
+
+            eid = _make_eid(asset_owner=OW_CUSTOMER, eid="EIDTEST001")
+            rl = _make_rl(business_mode="01", cust_cd="CUST001")
+            result = resolve_entitlement(eid, rl)
+            assert "维保合同" not in result.reason
 
 
 class TestResolveEntitlementLevel3:

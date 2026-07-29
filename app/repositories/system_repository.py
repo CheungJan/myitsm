@@ -1084,6 +1084,11 @@ class SystemRepository:
 
     @staticmethod
     def create_eid(data: dict[str, Any]) -> Eid:
+        # 新采购设备默认为新品
+        if "asset_type" not in data:
+            data["asset_type"] = "01"  # 新机
+        if "old_degree" not in data:
+            data["old_degree"] = 12  # 新品质保
         e = Eid(**data)
         db.session.add(e)
         db.session.commit()

@@ -927,9 +927,10 @@
 
     <!-- 新建维护单：先查客户，再建工单（对齐 PB w_itsm_custinfo） -->
     <el-dialog v-model="createVisible" title="新建日常维护单" width="550px" @close="onCloseCreate">
-      <el-form size="small" label-width="90px" @submit.prevent @keyup.enter="searchCustomer">
+      <el-form size="small" label-width="90px" @submit.prevent>
         <el-form-item label="查询客户">
-          <el-input v-model="custSearchKw" placeholder="输入磁卡号/店名/地址" clearable />
+          <el-input v-model="custSearchKw" placeholder="输入磁卡号/店名/地址" clearable @keyup.enter="searchCustomer" style="width:85%" />
+          <el-button :loading="custSearching" type="primary" @click="searchCustomer" style="margin-left:8px">确定</el-button>
         </el-form-item>
       </el-form>
       <el-table v-if="custResults.length" :data="custResults" size="small" max-height="200" highlight-current-row @row-click="pickCustomer">
@@ -957,10 +958,14 @@
           </el-select>
         </el-form-item>
         <el-form-item label="设备整机">
-          <el-input v-model="createForm.device_id" placeholder="客户报修的设备EID，用于核实" />
+          <el-select v-model="createForm.device_id" style="width:100%" filterable clearable placeholder="选择门店现有设备">
+            <el-option v-for="e in storeEids" :key="e.eid" :label="`${e.eid} - ${e.item_nm||'未知'}`" :value="e.eid" />
+          </el-select>
         </el-form-item>
         <el-form-item label="请求人">
-          <el-input v-model="createForm.req_name" placeholder="可选，门店报修可不填" />
+          <el-select v-model="createForm.req_name" style="width:100%" filterable clearable placeholder="可选，（自动筛选本区域工程师）">
+            <el-option v-for="u in areaUsers" :key="u.user_cd" :label="`${u.user_nm} (${u.user_cd})`" :value="u.user_cd" />
+          </el-select>
         </el-form-item>
         <el-form-item label="临时电话">
           <el-input v-model="createForm.temp_contract" placeholder="临时联系电话（非系统门店电话）" />
@@ -968,12 +973,16 @@
         <el-row :gutter="12">
           <el-col :span="8">
             <el-form-item label="严重程度" label-width="70px">
-              <el-select v-model="createForm.servrity" style="width:100%" clearable><el-option label="一般" value="1" /></el-select>
+              <el-select v-model="createForm.servrity" style="width:100%" clearable>
+                <el-option v-for="y in yzOptions" :key="y.code_cd" :label="y.code_nm" :value="y.code_cd" />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="紧急程度" label-width="70px">
-              <el-select v-model="createForm.emergency_level" style="width:100%" clearable><el-option label="一般" value="1" /></el-select>
+              <el-select v-model="createForm.emergency_level" style="width:100%" clearable>
+                <el-option v-for="j in jjOptions" :key="j.code_cd" :label="j.code_nm" :value="j.code_cd" />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -1006,7 +1015,7 @@ import {useListPage} from '@/composables/useListPage'
 import {useDetailDrawer} from '@/composables/useDetailDrawer'
 import {useUserNames} from '@/composables/useUserNames'
 import {useCustomerCards} from '@/composables/useCustomerCards'
-import {fetchMaintenanceDaily, transitionMaintenanceDaily, updateMaintenanceDaily, createMaintenanceDaily, fetchRV, createRV, updateRV, fetchDispatch, createDispatch, updateDispatch, fetchDispatchResolve} from '@/api/itsm'
+import {fetchMaintenanceDaily, transitionMaintenanceDaily, updateMaintenanceDaily, createMaintenanceDaily, fetchStoreDevices, fetchRV, createRV, updateRV, fetchDispatch, createDispatch, updateDispatch, fetchDispatchResolve} from '@/api/itsm'
 import type {MntRecord} from '@/api/itsm'
 import {useDict} from '@/composables/useDict'
 import {fetchNotifications} from '@/api/notification'
@@ -1031,17 +1040,24 @@ const createRules = {
   short_description: [{ required: true, message:'请输入报修简述', trigger:'blur' }],
 }
 const custSearchKw = ref('')
+const custSearching = ref(false)
 const custResults = ref<Record<string,unknown>[]>([])
 const custNm = ref('')
+const storeEids = ref<Record<string,unknown>[]>([])
+const areaUsers = ref<Record<string,unknown>[]>([])
+const yzOptions = ref<Record<string,unknown>[]>([])
+const jjOptions = ref<Record<string,unknown>[]>([])
 import { fetchCustomers } from '@/api/master'
 async function searchCustomer() {
   const kw = custSearchKw.value.trim()
   if (!kw) return
+  custSearching.value = true
   try {
     const r = await fetchCustomers({ search: kw, per_page: '10', useflg: '1' })
     custResults.value = (r?.data?.items || []).filter((c: any) => c.useflg !== '0')
     if (!custResults.value.length) ElMessage.warning('未找到有效客户')
   } catch { custResults.value = [] }
+  finally { custSearching.value = false }
 }
 function pickCustomer(row: any) {
   if (row.useflg === '0') { ElMessage.warning('该客户已失效，无法开单'); return }
@@ -1049,12 +1065,29 @@ function pickCustomer(row: any) {
   custNm.value = row.cust_nm || row.cust_cd
   custResults.value = []
   custSearchKw.value = ''
+  // 加载门店整机设备，默认最新安装
+  fetchStoreDevices(row.cust_cd).then(r => {
+    storeEids.value = r?.data || []
+    if (storeEids.value.length) createForm.device_id = storeEids.value[0].eid
+  }).catch(() => { storeEids.value = [] })
+  // 加载区域工程师
+  const areaCd = row.area_cd || ''
+  if (areaCd) {
+    fetchAreaUsers(areaCd).then(r => {
+      areaUsers.value = (r?.data || []).filter((u: any) => u.choose === 1)
+    }).catch(() => { areaUsers.value = [] })
+  }
 }
+// 加载字典
+onMounted(() => {
+  fetchSyscodes('YZ').then(r => { yzOptions.value = r?.data || [] }).catch(()=>{})
+  fetchSyscodes('JJ').then(r => { jjOptions.value = r?.data || [] }).catch(()=>{})
+})
 function onCloseCreate() {
   createVisible.value = false
   // 重置表单
   Object.assign(createForm, { store_id:'', fault_type:'01', short_description:'', detail_description:'', priority:'2', servrity:'', emergency_level:'', device_id:'', temp_contract:'' })
-  custNm.value = ''; custResults.value = []; custSearchKw.value = ''
+  custNm.value = ''; custResults.value = []; custSearchKw.value = ''; storeEids.value = []; areaUsers.value = []; createForm.device_id = ''
 }
 async function submitCreate(){
   if(!createFormRef.value) return

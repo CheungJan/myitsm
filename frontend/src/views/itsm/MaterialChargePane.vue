@@ -202,6 +202,7 @@
               <el-option label="否" value="0" />
             </el-select>
           </el-form-item>
+          <el-form-item label="是否新品"><el-select v-model="form.is_new" style="width:100%" clearable><el-option label="新品（12个月质保）" value="1"/><el-option label="旧品（3个月质保）" value="0"/></el-select></el-form-item>
         </template>
 
         <!-- c_type=2 购买：新配件+配件类型+价格 -->
@@ -263,6 +264,7 @@
               <el-option label="否" value="0" />
             </el-select>
           </el-form-item>
+          <el-form-item label="是否新品"><el-select v-model="form.is_new" style="width:100%" clearable><el-option label="新品（12个月质保）" value="1"/><el-option label="旧品（3个月质保）" value="0"/></el-select></el-form-item>
         </template>
 
         <!-- c_type=3 纯服务费：收费类型+金额+收款日期 -->
@@ -372,6 +374,7 @@
               <el-option label="否" value="0" />
             </el-select>
           </el-form-item>
+          <el-form-item label="是否新品"><el-select v-model="form.is_new" style="width:100%" clearable><el-option label="新品（12个月质保）" value="1"/><el-option label="旧品（3个月质保）" value="0"/></el-select></el-form-item>
         </template>
 
         <!-- c_type=5 耗材/线材：配件类型（填名称）+金额 -->

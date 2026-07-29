@@ -175,6 +175,7 @@ class AccessoriesUpdateCreate(BaseModel):
     price: float | None = Field(None, description="价格")
     engineer_id: str | None = Field(None, max_length=6, description="工程师ID")
     c_type: str | None = Field(None, max_length=1, description="操作类型（C_TYPE 字典：1维修/2购买/3纯服务费/4整机更换/5耗材线材）")
+    is_new: str | None = Field(None, max_length=1, description="是否新品（1=新品→old_degree=12/0=旧品→old_degree=3，对齐 PB IS_NEW）")
     # B3：配件更换关联故障代码
     itemcd: str | None = Field(None, max_length=13, description="配件物料编码（B3：关联故障代码用）")
     fault_cd: str | None = Field(None, max_length=8, description="故障代码（B3：配件更换时自动关联）")

@@ -685,6 +685,8 @@ class StockInService:
                         "whcd": record.whcd,
                         "sflg": "3",  # 待检
                         "qcflg": "DJ",  # 待检
+                        "asset_type": "02",  # 旧机
+                        "old_degree": 3,  # 旧品质保（返修后保修期缩短）
                     },
                     synchronize_session=False,
                 )

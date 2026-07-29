@@ -1647,3 +1647,25 @@ def resolve_price_api():  # type: ignore[no-untyped-def]
         "busityp": BUSITYP_SALE,
     })
 
+
+@itsm_bp.get("/store-devices/<cust_cd>")
+@login_required
+def list_store_devices(cust_cd: str):  # type: ignore[no-untyped-def]
+    """查询门店有效整机设备（供新建工单下拉选择）。"""
+    from app.extensions import db
+    from app.models.master import CustPosRl, Eid, Item
+
+    rows = (
+        db.session.query(CustPosRl.eid, Eid.itemcd, Item.item_nm, CustPosRl.posupddate)
+        .join(Eid, CustPosRl.eid == Eid.eid)
+        .outerjoin(Item, Eid.itemcd == Item.item_cd)
+        .filter(CustPosRl.cust_cd == cust_cd, CustPosRl.useflg == "1")
+        .order_by(CustPosRl.posupddate.desc().nullslast())
+        .all()
+    )
+    data = [
+        {"eid": r[0], "itemcd": r[1], "item_nm": r[2] or "", "posupddate": str(r[3]) if r[3] else None}
+        for r in rows
+    ]
+    return success_response(data=data)
+

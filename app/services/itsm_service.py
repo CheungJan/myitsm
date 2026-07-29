@@ -789,13 +789,21 @@ class MaintenanceDailyService(_BaseMaintenanceService):
                 continue
             # 新配件安装日期 = 关单日期
             new_eid.install_date = change_date
+            # 对齐 PB USP_ITSM_TRANS_IN：按 IS_NEW 设置旧化程度
+            is_new = r.is_new
+            if is_new == "1":
+                new_eid.asset_type = "01"  # 新机
+                new_eid.old_degree = 12   # 新品，12个月质保
+            elif is_new == "0":
+                new_eid.asset_type = "02"  # 旧机
+                new_eid.old_degree = 3    # 旧品，3个月质保
             # 派生保修到期日
+            od = new_eid.old_degree
             item = db.session.get(Item, new_eid.itemcd)
-            if item:
-                period = item.newperiod if new_eid.old_degree == 12 else item.oldperiod
+            if item and od:
+                period = item.newperiod if od == 12 else item.oldperiod
                 if period:
                     from datetime import timedelta
-
                     new_eid.warranty_expire = change_date + timedelta(days=int(period))
 
     @staticmethod
