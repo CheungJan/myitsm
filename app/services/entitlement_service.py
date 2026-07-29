@@ -51,28 +51,65 @@ OW_HAISHENG = '04'  # 海晟
 
 
 def get_special_agreement(cust_cd: str) -> Optional[dict]:
-    """查询特殊客户协议（1a 阶段返回 None，后续建 special_agreement 表接入）。
+    """查询特殊客户协议（优先级 1）。
 
-    后续实现：
-        return db.session.query(SpecialAgreement).filter_by(
-            cust_cd=cust_cd, useflg='1'
-        ).filter(now() >= effective_date,
-                 or_(expire_date.is_(None), now() <= expire_date)).first()
+    按 cust_cd 匹配，useflg='1' 且在有效期内。
     """
-    # 1a 阶段：写死返回 None
-    return None
+    from datetime import date
+
+    from app.models.entitlement import SpecialAgreement
+
+    today = date.today()
+    agreement = (
+        db.session.query(SpecialAgreement)
+        .filter(
+            SpecialAgreement.cust_cd == cust_cd,
+            SpecialAgreement.useflg == "1",
+            SpecialAgreement.effective_date <= today,
+            db.or_(
+                SpecialAgreement.expire_date.is_(None),
+                SpecialAgreement.expire_date >= today,
+            ),
+        )
+        .order_by(SpecialAgreement.effective_date.desc())
+        .first()
+    )
+    if agreement is None:
+        return None
+    return {
+        "is_free": agreement.is_free == "1",
+        "name": agreement.agreement_nm or "",
+        "agreement_id": agreement.agreement_id,
+    }
 
 
-def get_service_contract(eid: str) -> Optional[dict]:
-    """查询维保合同（1a 阶段返回 None，后续建 service_contract 表接入）。
+def get_service_contract(eid: str, cust_cd: Optional[str] = None) -> Optional[dict]:
+    """查询维保合同（优先级 2）。
 
-    后续实现：
-        return db.session.query(ServiceContract).filter(
-            or_(eid == eid, cust_cd == cust_cd), useflg='1'
-        ).filter(now() >= effective_date, now() <= expire_date).first()
+    按 eid 精确匹配，或 cust_cd 匹配，useflg='1' 且在有效期内。
     """
-    # 1a 阶段：写死返回 None
-    return None
+    from datetime import date
+
+    from app.models.entitlement import ServiceContract
+
+    today = date.today()
+    query = db.session.query(ServiceContract).filter(
+        ServiceContract.useflg == "1",
+        ServiceContract.effective_date <= today,
+        ServiceContract.expire_date >= today,
+    )
+    # 优先按 eid 精确匹配
+    contract = query.filter(ServiceContract.eid == eid).first()
+    # eid 无匹配时按 cust_cd 兜底
+    if contract is None and cust_cd:
+        contract = query.filter(ServiceContract.cust_cd == cust_cd).first()
+    if contract is None:
+        return None
+    return {
+        "is_free": contract.is_free == "1",
+        "name": contract.contract_nm or "",
+        "contract_id": contract.contract_id,
+    }
 
 
 def resolve_entitlement(
@@ -113,10 +150,11 @@ def resolve_entitlement(
 
     # 2. 维保合同
     if eid:
-        contract = get_service_contract(eid.eid)
+        cust_cd = cust_pos_rl.cust_cd if cust_pos_rl else None
+        contract = get_service_contract(eid.eid, cust_cd)
         if contract:
             return Entitlement(
-                free=contract.get('is_free', True),
+                free=contract.get("is_free", True),
                 reason=f"维保合同: {contract.get('name', '')}",
             )
 
