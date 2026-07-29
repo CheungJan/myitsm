@@ -116,6 +116,8 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(entitlement_bp, url_prefix="/api/v1/entitlement")
     app.register_blueprint(contract_bp, url_prefix="/api/v1/contract")
     app.register_blueprint(notification_bp, url_prefix="/api/v1/notification")
+    # P2 Entitlement 完整化
+    app.register_blueprint(entitlement_bp, url_prefix="/api/v1/entitlement")
     # Tier-2 扩展
     app.register_blueprint(billing_bp, url_prefix="/api/v1/billing")
     app.register_blueprint(finance_bp, url_prefix="/api/v1/finance")

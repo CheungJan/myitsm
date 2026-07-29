@@ -351,7 +351,7 @@ __all__ = [
     "DeviceData",
     "AlertRule",
     "AlertLog",
-    # Entitlement 权益判定（P2）
+    # 服务权益判定（P2 Entitlement 完整化）
     "SpecialAgreement",
     "ServiceContract",
 ]
